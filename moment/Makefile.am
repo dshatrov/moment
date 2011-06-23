@@ -83,6 +83,7 @@ libmoment_rtmp_1_0_la_LIBADD += -lws2_32
 endif
 
 bin_PROGRAMS = moment
+moment_DEPENDENCIES = libmoment-1.0.la
 moment_SOURCES =	\
 	moment.cpp
 moment_LDADD = $(top_builddir)/moment/libmoment-1.0.la $(THIS_LIBS)
