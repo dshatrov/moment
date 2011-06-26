@@ -1650,8 +1650,9 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 			    (recv_chunk_stream->in_msg_type_id == RtmpMessageType::AudioMessage ||
 			     recv_chunk_stream->in_msg_type_id == RtmpMessageType::VideoMessage))
 		    {
-			// TODO Constants for chunk stream ids.
-			Uint32 const out_chunk_stream_id = (recv_chunk_stream->in_msg_type_id == RtmpMessageType::AudioMessage ? 4 : 5);
+			Uint32 const out_chunk_stream_id =
+				(recv_chunk_stream->in_msg_type_id == RtmpMessageType::AudioMessage ?
+					 DefaultAudioChunkStreamId : DefaultVideoChunkStreamId);
 			fillPrechunkedPages (&recv_chunk_stream->in_prechunk_ctx,
 					     ConstMemory (data, recv_chunk_stream->in_msg_len - recv_chunk_stream->msg_offset),
 					     &recv_chunk_stream->page_list,
@@ -1695,8 +1696,9 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 			    (recv_chunk_stream->in_msg_type_id == RtmpMessageType::AudioMessage ||
 			     recv_chunk_stream->in_msg_type_id == RtmpMessageType::VideoMessage))
 		    {
-			// TODO Constants for chunk stream ids.
-			Uint32 const out_chunk_stream_id = (recv_chunk_stream->in_msg_type_id == RtmpMessageType::AudioMessage ? 4 : 5);
+			Uint32 const out_chunk_stream_id =
+				(recv_chunk_stream->in_msg_type_id == RtmpMessageType::AudioMessage ?
+					 DefaultAudioChunkStreamId : DefaultVideoChunkStreamId);
 			fillPrechunkedPages (&recv_chunk_stream->in_prechunk_ctx,
 					     ConstMemory (data, in_chunk_size),
 					     &recv_chunk_stream->page_list,
@@ -1909,7 +1911,6 @@ RtmpConnection::RtmpConnection (Object     * const coderef_container,
       page_pool (page_pool),
       sender (NULL),
 
-      // TODO When to enable prechunking?
       prechunking_enabled (true),
 
       is_closed (false),
@@ -1957,7 +1958,6 @@ RtmpConnection::RtmpConnection (Object * const coderef_container)
       page_pool (NULL),
       sender (NULL),
 
-      // TODO When to enable prechunking?
       prechunking_enabled (true),
 
       is_closed (false),

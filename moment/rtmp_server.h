@@ -108,8 +108,8 @@ public:
     void setRtmpConnection (RtmpConnection * const rtmp_conn)
     {
 	this->rtmp_conn = rtmp_conn;
-	audio_chunk_stream = rtmp_conn->getChunkStream (4, true /* create */);
-	video_chunk_stream = rtmp_conn->getChunkStream (5, true /* create */);
+	audio_chunk_stream = rtmp_conn->getChunkStream (RtmpConnection::DefaultAudioChunkStreamId, true /* create */);
+	video_chunk_stream = rtmp_conn->getChunkStream (RtmpConnection::DefaultVideoChunkStreamId, true /* create */);
     }
 
     // TODO Deprecated constructor, delete.
@@ -117,8 +117,8 @@ public:
 	: rtmp_conn (rtmp_conn),
 	  playing (0)
     {
-	audio_chunk_stream = rtmp_conn->getChunkStream (4, true /* create */);
-	video_chunk_stream = rtmp_conn->getChunkStream (5, true /* create */);
+	audio_chunk_stream = rtmp_conn->getChunkStream (RtmpConnection::DefaultAudioChunkStreamId, true /* create */);
+	video_chunk_stream = rtmp_conn->getChunkStream (RtmpConnection::DefaultVideoChunkStreamId, true /* create */);
     }
 
     RtmpServer ()

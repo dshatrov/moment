@@ -38,6 +38,17 @@ class RtmpConnection : public DependentCodeReferenced,
 		       public IntrusiveListElement<RtmpConnection_OutputQueue_name>
 {
 public:
+    enum {
+	DefaultAudioChunkStreamId = 4,
+	DefaultVideoChunkStreamId = 5
+    };
+
+    enum {
+	MinChunkSize = 128,
+	MaxChunkSize = 65536,
+	DefaultChunkSize = 128
+    };
+
     class MessageInfo
     {
     public:
@@ -100,12 +111,6 @@ private:
 	//  4 bytes - extended timestamp.
 	// TODO More descriptive name
 	MaxHeaderLen = 18
-    };
-
-    enum {
-	MinChunkSize = 128,
-	MaxChunkSize = 65536,
-	DefaultChunkSize = 128
     };
 
     class ReceiveState
@@ -218,11 +223,15 @@ private:
 	Type3_HeaderLen =  0
     };
 
+public:
     class PrechunkContext
     {
-    public:
+	friend class RtmpConnection;
+
+    private:
 	Size prechunk_offset;
 
+    public:
 	void reset ()
 	{
 	    prechunk_offset = 0;
@@ -234,7 +243,6 @@ private:
 	}
     };
 
-public:
     class ChunkStream : public BasicReferenced
     {
 	friend class RtmpConnection;
@@ -269,6 +277,7 @@ private:
 
     Sender *sender;
 
+    // Prechunking is always enabled currently.
     bool prechunking_enabled;
 
     Cb<Frontend> frontend;
@@ -340,13 +349,6 @@ private:
 			    ChunkStream       * mt_nonnull chunk_stream,
 			    Byte              * mt_nonnull header_buf);
 
-    void fillPrechunkedPages (PrechunkContext        *prechunk_ctx,
-			      ConstMemory const &mem,
-			      PagePool::PageListHead *page_list,
-			      Uint32                  chunk_stream_id,
-			      Uint32                  msg_timestamp,
-			      bool                    first_chunk);
-
     // TODO rename to resetChunk()
     void resetPacket ();
 
@@ -358,6 +360,13 @@ public:
 
     ChunkStream* getChunkStream (Uint32 chunk_stream_id,
 				 bool create);
+
+    void fillPrechunkedPages (PrechunkContext        *prechunk_ctx,
+			      ConstMemory const      &mem,
+			      PagePool::PageListHead *page_list,
+			      Uint32                  chunk_stream_id,
+			      Uint32                  msg_timestamp,
+			      bool                    first_chunk);
 
   // Send methods.
 
@@ -371,9 +380,10 @@ public:
 	Size msg_len;
 	// Chunk stream header compression.
 	bool cs_hdr_comp;
+	// Greater than zero for prechunked messages.
+	Uint32 prechunk_size;
 
 	// TODO ChunkStream *chunk_stream;
-	//      bool prechunked;
     };
 
     void sendMessage (MessageDesc  const * mt_nonnull mdesc,
