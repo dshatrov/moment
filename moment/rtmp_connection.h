@@ -72,7 +72,7 @@ public:
 				Size                    msg_len,
 				void                   *cb_data);
 
-	void (*closed) (Exception *exc mt_exc_kind ((IoException, InternalException)),
+	void (*closed) (Exception *exc_ mt_exc_kind ((IoException, InternalException)),
 			void *cb_data);
     };
 
@@ -414,6 +414,16 @@ public:
 
     void sendCommandMessage_AMF0 (Uint32 msg_stream_Id,
 				  ConstMemory const &mem);
+
+  // Extra send utility methods.
+
+    void sendConnect ();
+
+    void sendCreateStream ();
+
+    void sendPlay (ConstMemory const &stream_name);
+
+  // ______
 
     void closeAfterFlush ();
 

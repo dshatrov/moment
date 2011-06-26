@@ -349,6 +349,14 @@ RtmpConnection::sendMessagePages (MessageDesc const      * const mt_nonnull mdes
     Sender::MessageEntry_Pages * const msg_pages =
 	    Sender::MessageEntry_Pages::createNew (MaxHeaderLen);
     msg_pages->header_len = fillMessageHeader (mdesc, chunk_stream, msg_pages->getHeaderData());
+#if 0
+    {
+	logLock ();
+	logD_unlocked_ (_func, "header:");
+	hexdump (logs, ConstMemory (msg_pages->getHeaderData(), msg_pages->header_len));
+	logUnlock ();
+    }
+#endif
     msg_pages->page_pool = page_pool;
     msg_pages->msg_offset = msg_offset;
 
@@ -649,6 +657,98 @@ RtmpConnection::sendCommandMessage_AMF0 (Uint32 const msg_stream_id,
     mdesc.cs_hdr_comp = 0;
 
     sendMessage (&mdesc, data_chunk_stream, mem, false /* prechunked */);
+}
+
+void
+RtmpConnection::sendConnect ()
+{
+    AmfAtom atoms [16];
+    AmfEncoder encoder (atoms);
+
+    encoder.addString ("connect");
+    encoder.addNumber (1.0);
+
+    {
+	encoder.beginObject ();
+
+	encoder.addFieldName ("app");
+	encoder.addString ("");
+
+	encoder.addFieldName ("flashVer");
+	encoder.addString ("LNX 10,0,22,87");
+
+	encoder.addFieldName ("tcUrl");
+	encoder.addString ("");
+
+	encoder.addFieldName ("fpad");
+	encoder.addBoolean (false);
+
+	encoder.addFieldName ("audioCodecs");
+	encoder.addNumber ((double) 0x00fff /* SUPPORT_SND_ALL */);
+
+	encoder.addFieldName ("videoCodecs");
+	encoder.addNumber ((double) 0x00ff /* SUPPORT_VID_ALL */);
+
+	encoder.endObject ();
+    }
+
+    Byte msg_buf [512];
+    Size msg_len;
+    if (!encoder.encode (Memory::forObject (msg_buf), AmfEncoding::AMF0, &msg_len)) {
+	logE_ (_func, "encode() failed");
+	unreachable ();
+    }
+
+    sendCommandMessage_AMF0 (CommandMessageStreamId, ConstMemory (msg_buf, msg_len));
+    logD (send, _func, "msg_len: ", msg_len);
+    if (logLevelOn (send, LogLevel::Debug))
+	hexdump (ConstMemory (msg_buf, msg_len));
+}
+
+void
+RtmpConnection::sendCreateStream ()
+{
+    AmfAtom atoms [3];
+    AmfEncoder encoder (atoms);
+
+    encoder.addString ("createStream");
+    // FIXME Use saner transaction ids.
+    encoder.addNumber (2.0);
+
+    encoder.addNullObject ();
+
+    Byte msg_buf [512];
+    Size msg_len;
+    if (!encoder.encode (Memory::forObject (msg_buf), AmfEncoding::AMF0, &msg_len)) {
+	logE_ (_func, "encode() failed");
+	unreachable ();
+    }
+
+    sendCommandMessage_AMF0 (CommandMessageStreamId, ConstMemory (msg_buf, msg_len));
+}
+
+void
+RtmpConnection::sendPlay (ConstMemory const &stream_name)
+{
+    AmfAtom atoms [4];
+    AmfEncoder encoder (atoms);
+
+    encoder.addString ("play");
+    // FIXME Use saner transaction ids.
+    encoder.addNumber (3.0);
+    encoder.addNullObject ();
+    encoder.addString (stream_name);
+
+    // FIXME stream_name shouldn't be too long, otherwise the message will not be sent.
+    Byte msg_buf [4096];
+    Size msg_len;
+    if (!encoder.encode (Memory::forObject (msg_buf), AmfEncoding::AMF0, &msg_len)) {
+	logE_ (_func, "encode() failed");
+	// TODO Uncomment once message length limitation is resolved.
+	// unreachable ();
+    }
+
+    sendCommandMessage_AMF0 (CommandMessageStreamId, ConstMemory (msg_buf, msg_len));
 }
 
 void
@@ -1149,7 +1249,7 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 		    memset (msg_s1 + 5, 0 , 4);
 		    {
 			unsigned n = 0;
-			for (unsigned i = 9; i < 1536; ++i) {
+			for (unsigned i = 9; i < 1537; ++i) {
 			    n = (1536 + i + n) % 317;
 			    msg_s1 [i] = n;
 			}
@@ -1226,6 +1326,7 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 		if (len < 1) {
 		    recv_needed_len = 1;
 		    ret_res = Receiver::ProcessInputResult::Again;
+		    logD (chunk, _func, "len < 1, returning Again");
 		    goto _return;
 		}
 		recv_needed_len = 0;
@@ -1241,11 +1342,13 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 			      // Ids 64-319
 				cs_id = 64;
 				cs_id__fmt = CsIdFormat::OneByte;
+				logD (chunk, _func, "expecting CsIdFormat::OneByte");
 			    } break;
 			    case 1: {
 			      // Ids 64-65536
 				cs_id = 64;
 				cs_id__fmt = CsIdFormat::TwoBytes_First;
+				logD (chunk, _func, "expecting CsIdFormat::TwoBytes_First");
 			    } break;
 			    case 2: {
 			      // Low-level protocol message
@@ -1266,6 +1369,7 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 		    case CsIdFormat::TwoBytes_First: {
 			cs_id += data [0];
 			cs_id__fmt = CsIdFormat::TwoBytes_Second;
+			logD (chunk, _func, "expecting CsIdFormat::TwoBytes_Second");
 		    } break;
 		    case CsIdFormat::TwoBytes_Second: {
 			cs_id += ((Uint16) data [0]) << 8;
@@ -1336,7 +1440,7 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 		recv_chunk_stream->in_msg_len = (data [5] <<  0) |
 						(data [4] <<  8) |
 						(data [3] << 16);
-	    recv_chunk_stream->in_msg_type_id = data [6];
+		recv_chunk_stream->in_msg_type_id = data [6];
 		recv_chunk_stream->in_msg_stream_id = (data [ 7] <<  0) |
 						      (data [ 8] <<  8) |
 						      (data [ 9] << 16) |
@@ -1659,23 +1763,26 @@ RtmpConnection::processError (Exception * const exc_,
 void
 RtmpConnection::startClient ()
 {
+    logD_ (_func_);
+
     conn_state = ReceiveState::ClientWaitS0;
 
     PagePool::PageListHead page_list;
-    page_pool->getPages (&page_list, 1536 /* len */);
-    assert (page_list.first->data_len >= 1536);
+    page_pool->getPages (&page_list, 1537 /* len */);
+    assert (page_list.first->data_len >= 1537);
     Byte * const msg_c1 = page_list.first->getData();
+    msg_c1 [0] = 3;
     {
 	Uint32 const time = getTimeMicroseconds ();
-	msg_c1 [0] = (time >>  0) & 0xff;
-	msg_c1 [1] = (time >>  8) & 0xff;
-	msg_c1 [2] = (time >> 16) & 0xff;
-	msg_c1 [3] = (time >> 24) & 0xff;
+	msg_c1 [1] = (time >>  0) & 0xff;
+	msg_c1 [2] = (time >>  8) & 0xff;
+	msg_c1 [3] = (time >> 16) & 0xff;
+	msg_c1 [4] = (time >> 24) & 0xff;
     }
-    memset (msg_c1 + 4, 0, 4);
+    memset (msg_c1 + 5, 0, 4);
     {
 	unsigned n = 0;
-	for (unsigned i = 8; i < 1536; ++i) {
+	for (unsigned i = 9; i < 1537; ++i) {
 	    n = (1536 + i + n) % 317;
 	    msg_c1 [i] = n;
 	}
