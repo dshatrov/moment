@@ -88,5 +88,11 @@ moment_SOURCES =	\
 	moment.cpp
 moment_LDADD = $(top_builddir)/moment/libmoment-1.0.la $(THIS_LIBS)
 
+bin_PROGRAMS = rtmptool
+rtmptool_DEPENDENCIES = libmoment-1.0.la
+rtmptool_SOURCES =	\
+	rtmptool.cpp
+rtmptool_LDADD = $(top_builddir)/moment/libmoment-1.0.la $(THIS_LIBS)
+
 EXTRA_DIST = $(moment_private_headers) $(moment_extra_dist)
 
