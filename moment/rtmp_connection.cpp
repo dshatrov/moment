@@ -1471,6 +1471,7 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 		if (len < 7) {
 		    recv_needed_len = 7;
 		    ret_res = Receiver::ProcessInputResult::Again;
+		    goto _return;
 		}
 		recv_needed_len = 0;
 
@@ -1724,7 +1725,10 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 
 _return:
     if (len != mem.len()) {
-	assert (len < mem.len());
+	if (len > mem.len()) {
+	    logE_ (_func, "len > mem.len(): ", len, " > ", mem.len());
+	    unreachable ();
+	}
     }
 
     assert (len <= mem.len());
