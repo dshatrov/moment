@@ -32,15 +32,25 @@ RtmptService rtmpt_service (NULL);
 class ClientSession : public Object
 {
 public:
-    // TODO Proper synchronization.
+    mt_mutex (mutex) bool valid;
 
     RtmpServer rtmp_server;
 
     // Synchronized by rtmp_server.
     bool watching;
 
+    // Returns 'false' if ClientSession is invalid already.
+    bool invalidate ()
+    {
+      StateMutexLock l (&mutex);
+        bool const ret_valid = valid;
+	valid = false;
+	return ret_valid;
+    }
+
     ClientSession ()
-	: watching (false)
+	: valid (true),
+	  watching (false)
     {
     }
 };
@@ -148,6 +158,9 @@ void closed (Exception * const exc,
 	logE_ (_func, exc->toString());
 
     ClientSession * const client_session = static_cast <ClientSession*> (_client_session);
+    if (!client_session->invalidate())
+	return;
+
     client_session->unref ();
 }
 
