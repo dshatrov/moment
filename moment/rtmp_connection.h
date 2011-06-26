@@ -264,8 +264,8 @@ public:
     };
 
 private:
-    Timers * const timers;
-    PagePool * const page_pool;
+    Timers *timers;
+    PagePool *page_pool;
 
     Sender *sender;
 
@@ -504,9 +504,15 @@ public:
     Result doCreateStream (MessageInfo * mt_nonnull msg_info,
 			   AmfDecoder  * mt_nonnull amf_decoder);
 
+    // Deprecated constructor.
     RtmpConnection (Object   *coderef_container,
 		    Timers   * mt_nonnull timers,
 		    PagePool * mt_nonnull page_pool);
+
+    void init (Timers   * mt_nonnull timers,
+	       PagePool * mt_nonnull page_pool);
+
+    RtmpConnection (Object *coderef_container);
 
     ~RtmpConnection ();
 };

@@ -1894,6 +1894,7 @@ RtmpConnection::doCreateStream (MessageInfo * mt_nonnull msg_info,
     return Result::Success;
 }
 
+// Deprecated constructor
 RtmpConnection::RtmpConnection (Object     * const coderef_container,
 				Timers     * mt_nonnull const timers,
 				PagePool   * mt_nonnull const page_pool)
@@ -1902,6 +1903,54 @@ RtmpConnection::RtmpConnection (Object     * const coderef_container,
       timers (timers),
 	
       page_pool (page_pool),
+      sender (NULL),
+
+      // TODO When to enable prechunking?
+      prechunking_enabled (true),
+
+      is_closed (false),
+
+      ping_send_timer (NULL),
+      ping_reply_received (false),
+
+      in_chunk_size  (DefaultChunkSize),
+      out_chunk_size (DefaultChunkSize),
+
+      extended_timestamp_is_delta (false),
+
+      processing_input (false),
+      block_input (false),
+
+      remote_wack_size (1 << 20 /* 1 Mb */),
+
+      recv_needed_len (0),
+      total_received (0),
+      last_ack (0),
+
+      conn_state (ReceiveState::Invalid),
+
+      local_wack_size (1 << 20 /* 1 Mb */)
+{
+    resetPacket ();
+
+    control_chunk_stream = getChunkStream (2, true /* create */);
+    data_chunk_stream    = getChunkStream (3, true /* create */);
+}
+
+void
+RtmpConnection::init (Timers     * mt_nonnull const timers,
+		      PagePool   * mt_nonnull const page_pool)
+{
+    this->timers = timers;
+    this->page_pool = page_pool;
+}
+
+RtmpConnection::RtmpConnection (Object * const coderef_container)
+    : DependentCodeReferenced (coderef_container),
+
+      timers (NULL),
+	
+      page_pool (NULL),
       sender (NULL),
 
       // TODO When to enable prechunking?
