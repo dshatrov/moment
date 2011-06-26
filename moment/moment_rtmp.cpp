@@ -34,6 +34,10 @@ class ClientSession : public Object
 public:
     mt_mutex (mutex) bool valid;
 
+    mt_const RtmpConnection *rtmp_conn;
+    // Remember that RtmpConnection must be available when we're calling
+    // RtmpServer's methods. We must take special care to ensure that this
+    // holds. See takeRtmpConnRef().
     RtmpServer rtmp_server;
 
     // Synchronized by rtmp_server.
@@ -48,11 +52,32 @@ public:
 	return ret_valid;
     }
 
+    // Secures a reference to rtmp_conn so that it is safe to call rtmp_server's
+    // methods.
+    void takeRtmpConnRef (Ref<Object> * const mt_nonnull ret_ref)
+    {
+	mutex.lock ();
+
+	if (valid)
+	    *ret_ref = rtmp_conn->getCoderefContainer();
+	else
+	    *ret_ref = NULL;
+
+	mutex.unlock ();
+    }
+
     ClientSession ()
 	: valid (true),
 	  watching (false)
     {
     }
+
+#if 0
+    ~ClientSession ()
+    {
+	logD_ (_func, "0x", fmt_hex, (UintPtr) this);
+    }
+#endif
 };
 
 void streamAudioMessage (VideoStream::MessageInfo * const mt_nonnull msg_info,
@@ -62,14 +87,19 @@ void streamAudioMessage (VideoStream::MessageInfo * const mt_nonnull msg_info,
 {
 //    logD_ (_func_);
 
-    ClientSession * const session = static_cast <ClientSession*> (_session);
+    ClientSession * const client_session = static_cast <ClientSession*> (_session);
+
+    Ref<Object> rtmp_conn_ref;
+    client_session->takeRtmpConnRef (&rtmp_conn_ref);
+    if (!rtmp_conn_ref)
+	return;
 
     RtmpConnection::MessageInfo rtmp_msg_info;
     rtmp_msg_info.msg_stream_id = RtmpConnection::DefaultMessageStreamId;
     rtmp_msg_info.timestamp = (Uint32) msg_info->timestamp;
 
     // TODO Prehunking logics must match MomentVideo arch.
-    session->rtmp_server.sendAudioMessage (&rtmp_msg_info, page_list, msg_len, false /* prechunked */);
+    client_session->rtmp_server.sendAudioMessage (&rtmp_msg_info, page_list, msg_len, false /* prechunked */);
 }
 
 void streamVideoMessage (VideoStream::MessageInfo * const mt_nonnull msg_info,
@@ -79,17 +109,22 @@ void streamVideoMessage (VideoStream::MessageInfo * const mt_nonnull msg_info,
 {
 //    logD_ (_func_);
 
-    ClientSession * const session = static_cast <ClientSession*> (_session);
+    ClientSession * const client_session = static_cast <ClientSession*> (_session);
+
+    Ref<Object> rtmp_conn_ref;
+    client_session->takeRtmpConnRef (&rtmp_conn_ref);
+    if (!rtmp_conn_ref)
+	return;
 
     RtmpConnection::MessageInfo rtmp_msg_info;
     rtmp_msg_info.msg_stream_id = RtmpConnection::DefaultMessageStreamId;
     rtmp_msg_info.timestamp = (Uint32) msg_info->timestamp;
 
     // TODO Prehunking logics must match MomentVideo arch.
-    session->rtmp_server.sendVideoMessage (&rtmp_msg_info, page_list, msg_len, false /* prechunked */);
+    client_session->rtmp_server.sendVideoMessage (&rtmp_msg_info, page_list, msg_len, false /* prechunked */);
 }
 
-void streamClosed (void * const _session)
+void streamClosed (void * const /* _session */)
 {
     logD_ (_func_);
 }
@@ -127,7 +162,7 @@ Result startWatching (ConstMemory const &stream_name,
     }
     client_session->watching = true;
 
-    video_stream->getEventInformer()->subscribe (&video_event_handler, client_session, NULL, client_session);
+    video_stream->getEventInformer()->subscribe (&video_event_handler, client_session, NULL /* ref_data */, client_session);
 
     return Result::Success;
 }
@@ -145,7 +180,9 @@ Result commandMessage (RtmpConnection::MessageInfo * const mt_nonnull msg_info,
 		       void                   * const _client_session)
 {
     logD_ (_func_);
+
     ClientSession * const client_session = static_cast <ClientSession*> (_client_session);
+    // No need to call takeRtmpConnRef(), because this it rtmp_conn's callback.
     return client_session->rtmp_server.commandMessage (msg_info, page_list, msg_len, amf_encoding);
 }
 
@@ -178,6 +215,7 @@ Result clientConnected (RtmpConnection * mt_nonnull const rtmp_conn,
     logD_ (_func_);
 
     Ref<ClientSession> const client_session = grab (new ClientSession);
+    client_session->rtmp_conn = rtmp_conn;
 
     client_session->rtmp_server.setFrontend (Cb<RtmpServer::Frontend> (
 	    &rtmp_server_frontend, client_session, client_session));
