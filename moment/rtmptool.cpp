@@ -22,6 +22,8 @@ private:
 	ConnectionState_Streaming
     };
 
+    mt_const Byte id_char;
+
     RtmpConnection rtmp_conn;
     TcpConnection tcp_conn;
     DeferredConnectionSender conn_sender;
@@ -70,7 +72,8 @@ public:
     void init (Timers   *timers,
 	       PagePool *page_pool);
 
-    RtmpClient (Object *coderef_container);
+    RtmpClient (Object *coderef_container,
+		Byte    id_char);
 };
 
 TcpConnection::Frontend const RtmpClient::tcp_conn_frontend = {
@@ -215,16 +218,18 @@ Result
 RtmpClient::videoMessage (RtmpConnection::MessageInfo * const mt_nonnull /* msg_info */,
 			  PagePool::PageListHead      * const mt_nonnull /* page_list */,
 			  Size                          const /* msg_len */,
-			  void                        * const /* _self */)
+			  void                        * const _self)
 {
-//    logD_ (_func, "ts: ", msg_info->timestamp);
+//    logD_ (_func, "0x", fmt_hex, (UintPtr) _self, ", ts: ", fmt_def, msg_info->timestamp);
 
-    static int debug_counter = 10;
+    RtmpClient * const self = static_cast <RtmpClient*> (_self);
+
+    static int debug_counter = 1031;
     ++debug_counter;
-    if (debug_counter >= 10) {
+    if (debug_counter >= 1031) {
 	debug_counter = 0;
 
-	logs->print (".");
+	logs->print (ConstMemory::forObject (self->id_char));
 	logs->flush ();
     }
 
@@ -261,8 +266,10 @@ RtmpClient::init (Timers   * const timers,
     rtmp_conn.init (timers, page_pool);
 }
 
-RtmpClient::RtmpClient (Object * const coderef_container)
+RtmpClient::RtmpClient (Object * const coderef_container,
+			Byte     const id_char)
     : DependentCodeReferenced (coderef_container),
+      id_char (id_char),
       rtmp_conn     (coderef_container),
       tcp_conn      (coderef_container),
       conn_sender   (coderef_container),
@@ -287,7 +294,7 @@ Result doTest (void)
     MyCpp::myCppInit ();
     libMaryInit ();
 
-    PagePool page_pool (4096 /* page_size */, 128 /* min_pages */);
+    PagePool page_pool (4096 /* page_size */, 4096 /* min_pages */);
 
     ServerApp server_app (NULL /* coderef_container */);
     if (!server_app.init ()) {
@@ -301,9 +308,23 @@ Result doTest (void)
 	return Result::Failure;
     }
 
-    RtmpClient client (NULL /* coderef_container */);
-    client.init (server_app.getTimers(), &page_pool);
-    client.start (server_app.getPollGroup(), addr);
+    {
+	Byte id_char = 'a';
+	for (Uint32 i = 0; i < 250; ++i) {
+	    logD_ (_func, "Starting client, id_char: ", ConstMemory::forObject (id_char));
+
+	    // Note that RtmpClient objects are never freed.
+	    RtmpClient *client = new RtmpClient (NULL /* coderef_container */, id_char);
+
+	    client->init (server_app.getTimers(), &page_pool);
+	    client->start (server_app.getPollGroup(), addr);
+
+	    if (id_char == 'z')
+		id_char = 'a';
+	    else
+		++id_char;
+	}
+    }
 
     logD_ (_func, "Starting...");
     server_app.run ();
