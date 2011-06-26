@@ -44,6 +44,11 @@ RtmpService::destroySession (ClientSession * const session)
 {
     logD (rtmp_service, _func, "session: 0x", fmt_hex, (UintPtr) session);
 
+    if (!session->valid) {
+	return;
+    }
+    session->valid = false;
+
     poll_group->removePollable (session->pollable_key);
 
     // TODO close TCP connection explicitly.
@@ -59,6 +64,7 @@ RtmpService::acceptOneConnection ()
     logD (rtmp_service, _func_);
 
     Ref<ClientSession> session = grab (new ClientSession (timers, page_pool));
+    session->valid = true;
     session->weak_rtmp_service = this;
     session->unsafe_rtmp_service = this;
 

@@ -39,6 +39,8 @@ private:
 			  public IntrusiveListElement<SessionList_name>
     {
     public:
+	bool valid;
+
 	mt_const WeakCodeRef weak_rtmp_service;
 	mt_const RtmpService *unsafe_rtmp_service;
 
