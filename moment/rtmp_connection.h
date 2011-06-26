@@ -46,6 +46,7 @@ public:
     enum {
 	MinChunkSize = 128,
 	MaxChunkSize = 65536,
+	PrechunkSize = 65536,
 	DefaultChunkSize = 128
     };
 
@@ -55,10 +56,12 @@ public:
 	Uint32 msg_stream_id;
 	Uint32 timestamp;
 
+	// TODO Make use of this field.
+	Uint32 prechunk_size;
+
 	// TODO Put all information about a message here,
 	//      including page_list, msg_len and amf_encoding.
 	// TODO Rename to class Message.
-	// TODO bool prechunked;
     };
 
     typedef Result (*CommandMessageCallback) (MessageInfo            * mt_nonnull msg_info,
@@ -252,23 +255,24 @@ public:
 
 	// Incoming message accumulator.
 	PagePool::PageListHead page_list;
-	Size msg_offset;
 
 	PrechunkContext in_prechunk_ctx;
+
+	Size in_msg_offset;
 
 	Uint32 in_msg_timestamp;
 	Uint32 in_msg_timestamp_delta;
 	Uint32 in_msg_len;
 	Uint32 in_msg_type_id;
 	Uint32 in_msg_stream_id;
-	bool in_msg_prv_was_type0;
-	bool in_header_valid;
+	bool   in_msg_prv_was_type0;
+	bool   in_header_valid;
 
 	Uint32 out_msg_timestamp;
 	Uint32 out_msg_len;
 	Uint32 out_msg_type_id;
 	Uint32 out_msg_stream_id;
-	bool out_header_valid;
+	bool   out_header_valid;
     };
 
 private:
@@ -315,6 +319,7 @@ private:
 
     Uint16 cs_id;
     CsIdFormat cs_id__fmt;
+    Size chunk_offset;
 
     ChunkStream *recv_chunk_stream;
 
@@ -361,12 +366,13 @@ public:
     ChunkStream* getChunkStream (Uint32 chunk_stream_id,
 				 bool create);
 
-    void fillPrechunkedPages (PrechunkContext        *prechunk_ctx,
-			      ConstMemory const      &mem,
-			      PagePool::PageListHead *page_list,
-			      Uint32                  chunk_stream_id,
-			      Uint32                  msg_timestamp,
-			      bool                    first_chunk);
+    static void fillPrechunkedPages (PrechunkContext        *prechunk_ctx,
+				     ConstMemory const      &mem,
+				     PagePool               *page_pool,
+				     PagePool::PageListHead *page_list,
+				     Uint32                  chunk_stream_id,
+				     Uint32                  msg_timestamp,
+				     bool                    first_chunk);
 
   // Send methods.
 
@@ -380,22 +386,23 @@ public:
 	Size msg_len;
 	// Chunk stream header compression.
 	bool cs_hdr_comp;
-	// Greater than zero for prechunked messages.
-	Uint32 prechunk_size;
 
 	// TODO ChunkStream *chunk_stream;
     };
 
+    // @prechunk_size - If 0, then message data is not prechunked.
     void sendMessage (MessageDesc  const * mt_nonnull mdesc,
 		      ChunkStream        * mt_nonnull chunk_stream,
 		      ConstMemory  const &mem,
-		      bool                prechunked);
+		      Uint32              prechunk_size);
 
+    // @prechunk_size - If 0, then message data is not prechunked.
     void sendMessagePages (MessageDesc const      * mt_nonnull mdesc,
 			   ChunkStream            * mt_nonnull chunk_stream,
 			   PagePool::PageListHead * mt_nonnull page_list,
 			   Size                    msg_offset,
-			   bool                    prechunked);
+			   Uint32                  prechunk_size,
+			   bool                    take_ownership = false);
 
     void sendRawPages (PagePool::Page *first_page,
 		       Size msg_offset);

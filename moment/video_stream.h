@@ -38,8 +38,12 @@ public:
     public:
 	Uint64 timestamp;
 
+	// Greater than zero for prechunked messages.
+	Uint32 prechunk_size;
+
 	MessageInfo ()
-	    : timestamp (0)
+	    : timestamp (0),
+	      prechunk_size (0)
 	{
 	}
     };

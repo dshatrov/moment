@@ -57,7 +57,7 @@ RtmpConnection::getChunkStream (Uint32 const chunk_stream_id,
 	Ref<ChunkStream> const chunk_stream = grab (new ChunkStream);
 
 	chunk_stream->chunk_stream_id = chunk_stream_id;
-	chunk_stream->msg_offset = 0;
+	chunk_stream->in_msg_offset = 0;
 	chunk_stream->in_header_valid = false;
 	chunk_stream->out_header_valid = false;
 	chunk_stream_tree.add (chunk_stream);
@@ -259,12 +259,15 @@ RtmpConnection::fillMessageHeader (MessageDesc const * const mt_nonnull mdesc,
 void
 RtmpConnection::fillPrechunkedPages (PrechunkContext        * const  prechunk_ctx,
 				     ConstMemory              const &mem,
+				     PagePool               * const  page_pool,
 				     PagePool::PageListHead * const  page_list,
 				     Uint32                   const  chunk_stream_id,
 				     Uint32                   const  msg_timestamp,
 				     bool                     const  first_chunk)
 {
     logD (chunk, _func, mem.len(), " bytes");
+
+    Size const prechunk_size = PrechunkSize;
 
     Size total_filled = 0;
     while (total_filled < mem.len ()) {
@@ -291,9 +294,9 @@ RtmpConnection::fillPrechunkedPages (PrechunkContext        * const  prechunk_ct
 	}
 
 	Size tofill;
-	assert (prechunk_ctx->prechunk_offset < out_chunk_size);
-	if (out_chunk_size - prechunk_ctx->prechunk_offset < mem.len() - total_filled)
-	    tofill = out_chunk_size - prechunk_ctx->prechunk_offset;
+	assert (prechunk_ctx->prechunk_offset < prechunk_size);
+	if (prechunk_size - prechunk_ctx->prechunk_offset < mem.len() - total_filled)
+	    tofill = prechunk_size - prechunk_ctx->prechunk_offset;
 	else
 	    tofill = mem.len() - total_filled;
 
@@ -302,8 +305,8 @@ RtmpConnection::fillPrechunkedPages (PrechunkContext        * const  prechunk_ct
 	total_filled += tofill;
 
 	prechunk_ctx->prechunk_offset += tofill;
-	assert (prechunk_ctx->prechunk_offset <= out_chunk_size);
-	if (prechunk_ctx->prechunk_offset == out_chunk_size)
+	assert (prechunk_ctx->prechunk_offset <= prechunk_size);
+	if (prechunk_ctx->prechunk_offset == prechunk_size)
 	    prechunk_ctx->prechunk_offset = 0;
     }
 }
@@ -312,14 +315,22 @@ void
 RtmpConnection::sendMessage (MessageDesc const * const mt_nonnull mdesc,
 			     ChunkStream       * const mt_nonnull chunk_stream,
 			     ConstMemory const &mem,
-			     bool        const  prechunked)
+			     Uint32             prechunk_size)
 {
     PagePool::PageListHead page_list;
-    if (prechunked) {
+    if (prechunk_size > 0) {
 	page_pool->getFillPages (&page_list, mem);
     } else {
+	prechunk_size = PrechunkSize;
+
 	PrechunkContext prechunk_ctx;
-	fillPrechunkedPages (&prechunk_ctx, mem, &page_list, chunk_stream->chunk_stream_id, mdesc->timestamp, true /* first_chunk */);
+	fillPrechunkedPages (&prechunk_ctx,
+			     mem,
+			     page_pool,
+			     &page_list,
+			     chunk_stream->chunk_stream_id,
+			     mdesc->timestamp,
+			     true /* first_chunk */);
 #if 0
 	logD (chunk, _func, "prechunked 1st page:");
 	if (page_list.first)
@@ -328,7 +339,7 @@ RtmpConnection::sendMessage (MessageDesc const * const mt_nonnull mdesc,
     }
 
     // TODO put_pages or 'bool take_ownership'.
-    sendMessagePages (mdesc, chunk_stream, &page_list, 0 /* msg_offset */, true /* prechunked */);
+    sendMessagePages (mdesc, chunk_stream, &page_list, 0 /* msg_offset */, prechunk_size, true /* take_ownership */);
 }
 
 // TODO first_page is enough, page_list not needed
@@ -337,7 +348,8 @@ RtmpConnection::sendMessagePages (MessageDesc const      * const mt_nonnull mdes
 				  ChunkStream            * const mt_nonnull chunk_stream,
 				  PagePool::PageListHead * const mt_nonnull page_list,
 				  Size                     const msg_offset,
-				  bool                     const prechunked)
+				  Uint32                         prechunk_size,
+				  bool                     const take_ownership)
 {
     if (is_closed) {
 	logD (close, _func, "0x", fmt_hex, (UintPtr) this, " is closed");
@@ -360,7 +372,9 @@ RtmpConnection::sendMessagePages (MessageDesc const      * const mt_nonnull mdes
     msg_pages->page_pool = page_pool;
     msg_pages->msg_offset = msg_offset;
 
-    if (!prechunked) {
+    if (prechunk_size == 0) {
+	prechunk_size = PrechunkSize;
+
 	PrechunkContext prechunk_ctx;
 	PagePool::PageListHead prechunked_pages;
 
@@ -369,6 +383,7 @@ RtmpConnection::sendMessagePages (MessageDesc const      * const mt_nonnull mdes
 	    if (page == page_list->first) {
 		fillPrechunkedPages (&prechunk_ctx,
 				     page->mem().region (msg_offset),
+				     page_pool,
 				     &prechunked_pages,
 				     chunk_stream->chunk_stream_id,
 				     mdesc->timestamp,
@@ -376,6 +391,7 @@ RtmpConnection::sendMessagePages (MessageDesc const      * const mt_nonnull mdes
 	    } else {
 		fillPrechunkedPages (&prechunk_ctx,
 				     page->mem(),
+				     page_pool,
 				     &prechunked_pages,
 				     chunk_stream->chunk_stream_id,
 				     mdesc->timestamp,
@@ -386,8 +402,19 @@ RtmpConnection::sendMessagePages (MessageDesc const      * const mt_nonnull mdes
 	}
 
 	msg_pages->first_page = prechunked_pages.first;
+
+	if (take_ownership)
+	    page_pool->msgUnref (page_list->first);
     } else {
 	msg_pages->first_page = page_list->first;
+
+	if (!take_ownership)
+	    page_pool->msgRef (page_list->first);
+    }
+
+    if (prechunk_size != out_chunk_size) {
+	sendSetChunkSize (prechunk_size);
+	out_chunk_size = prechunk_size;
     }
 
     sender->sendMessage (msg_pages);
@@ -422,6 +449,7 @@ RtmpConnection::resetPacket ()
     conn_state = ReceiveState::BasicHeader;
     cs_id = 0;
     cs_id__fmt = CsIdFormat::Unknown;
+    chunk_offset = 0;
 }
 
 void
@@ -434,7 +462,7 @@ RtmpConnection::resetMessage (ChunkStream * const mt_nonnull chunk_stream)
     }
     chunk_stream->page_list.reset ();
 
-    chunk_stream->msg_offset = 0;
+    chunk_stream->in_msg_offset = 0;
     chunk_stream->in_prechunk_ctx.reset ();
 }
 
@@ -455,7 +483,11 @@ RtmpConnection::sendSetChunkSize (Uint32 const chunk_size)
     mdesc.msg_len = sizeof (msg);
     mdesc.cs_hdr_comp = 0;
 
-    sendMessage (&mdesc, control_chunk_stream, ConstMemory::forObject (msg), false /* prechunked */);
+    // We pass 'out_chunk_size' for @prechunk_size parameter to prevent
+    // sendMessagePages() from calling sendSetChunkSize() recursively.
+    // This is a safe thing to do, since "set chunk size" message always fits
+    // into a single chunk.
+    sendMessage (&mdesc, control_chunk_stream, ConstMemory::forObject (msg), out_chunk_size /* prechunk_size */);
 }
 
 void
@@ -475,7 +507,7 @@ RtmpConnection::sendAck (Uint32 const seq)
     mdesc.msg_len = sizeof (msg);
     mdesc.cs_hdr_comp = 0;
 
-    sendMessage (&mdesc, control_chunk_stream, ConstMemory::forObject (msg), false /* prechunked */);
+    sendMessage (&mdesc, control_chunk_stream, ConstMemory::forObject (msg), 0 /* prechunk_size */);
 }
 
 void
@@ -495,7 +527,7 @@ RtmpConnection::sendWindowAckSize (Uint32 const wack_size)
     mdesc.msg_len = sizeof (msg);
     mdesc.cs_hdr_comp = 0;
 
-    sendMessage (&mdesc, control_chunk_stream, ConstMemory::forObject (msg), false /* prechunked */);
+    sendMessage (&mdesc, control_chunk_stream, ConstMemory::forObject (msg), 0 /* prechunk_size */);
 }
 
 void
@@ -518,7 +550,7 @@ RtmpConnection::sendSetPeerBandwidth (Uint32 const wack_size,
     mdesc.msg_len = sizeof (msg);
     mdesc.cs_hdr_comp = 0;
 
-    sendMessage (&mdesc, control_chunk_stream, ConstMemory::forObject (msg), false /* prechunked */);
+    sendMessage (&mdesc, control_chunk_stream, ConstMemory::forObject (msg), 0 /* prechunk_size */);
 }
 
 void
@@ -541,7 +573,7 @@ RtmpConnection::sendUserControl_StreamBegin (Uint32 const msg_stream_id)
     mdesc.msg_len = sizeof (msg);
     mdesc.cs_hdr_comp = 0;
 
-    sendMessage (&mdesc, control_chunk_stream, ConstMemory::forObject (msg), false /* prechunked */);
+    sendMessage (&mdesc, control_chunk_stream, ConstMemory::forObject (msg), 0 /* prechunk_size */);
 }
 
 void
@@ -570,7 +602,7 @@ RtmpConnection::sendUserControl_SetBufferLength (Uint32 const msg_stream_id,
     mdesc.msg_len = sizeof (msg);
     mdesc.cs_hdr_comp = 0;
 
-    sendMessage (&mdesc, control_chunk_stream, ConstMemory::forObject (msg), false /* prechunked */);
+    sendMessage (&mdesc, control_chunk_stream, ConstMemory::forObject (msg), 0 /* prechunk_size */);
 }
 
 void
@@ -593,7 +625,7 @@ RtmpConnection::sendUserControl_StreamIsRecorded (Uint32 const msg_stream_id)
     mdesc.msg_len = sizeof (msg);
     mdesc.cs_hdr_comp = 0;
 
-    sendMessage (&mdesc, control_chunk_stream, ConstMemory::forObject (msg), false /* prechunked */);
+    sendMessage (&mdesc, control_chunk_stream, ConstMemory::forObject (msg), 0 /* prechunk_size */);
 }
 
 void
@@ -619,7 +651,7 @@ RtmpConnection::sendUserControl_PingRequest ()
     mdesc.msg_len = sizeof (msg);
     mdesc.cs_hdr_comp = 0;
 
-    sendMessage (&mdesc, control_chunk_stream, ConstMemory::forObject (msg), false /* prechunked */);
+    sendMessage (&mdesc, control_chunk_stream, ConstMemory::forObject (msg), 0 /* prechunk_size */);
 }
 
 void
@@ -642,7 +674,7 @@ RtmpConnection::sendUserControl_PingResponse (Uint32 const timestamp)
     mdesc.msg_len = sizeof (msg);
     mdesc.cs_hdr_comp = 0;
 
-    sendMessage (&mdesc, control_chunk_stream, ConstMemory::forObject (msg), false /* prechunked */);
+    sendMessage (&mdesc, control_chunk_stream, ConstMemory::forObject (msg), 0 /* prechunk_size */);
 }
 
 void
@@ -656,7 +688,7 @@ RtmpConnection::sendCommandMessage_AMF0 (Uint32 const msg_stream_id,
     mdesc.msg_len = mem.len();
     mdesc.cs_hdr_comp = 0;
 
-    sendMessage (&mdesc, data_chunk_stream, mem, false /* prechunked */);
+    sendMessage (&mdesc, data_chunk_stream, mem, 0 /* prechunk_size */);
 }
 
 void
@@ -917,7 +949,8 @@ RtmpConnection::processMessage (ChunkStream * const chunk_stream)
 				     ((Uint32) msg_buf [2] <<  8) |
 				     ((Uint32) msg_buf [3] <<  0);
 
-	    Byte const limit_type = msg_buf [4];
+	    // Unused
+	    // Byte const limit_type = msg_buf [4];
 
 	    if (local_wack_size != wack_size)
 		sendWindowAckSize (local_wack_size);
@@ -929,7 +962,7 @@ RtmpConnection::processMessage (ChunkStream * const chunk_stream)
 		MessageInfo msg_info;
 		msg_info.msg_stream_id = chunk_stream->in_msg_stream_id;
 		msg_info.timestamp = chunk_stream->in_msg_timestamp;
-		// TODO prechunked?
+		msg_info.prechunk_size = (prechunking_enabled ? PrechunkSize : 0);
 		Result res = Result::Failure;
 		frontend.call_ret<Result> (&res, frontend->audioMessage, /*(*/ &msg_info, &chunk_stream->page_list, msg_len /*)*/);
 		return res;
@@ -942,7 +975,7 @@ RtmpConnection::processMessage (ChunkStream * const chunk_stream)
 		MessageInfo msg_info;
 		msg_info.msg_stream_id = chunk_stream->in_msg_stream_id;
 		msg_info.timestamp = chunk_stream->in_msg_timestamp;
-		// TODO prechunked?
+		msg_info.prechunk_size = (prechunking_enabled ? PrechunkSize : 0);
 		Result res = Result::Failure;
 		frontend.call_ret<Result> (&res, frontend->videoMessage, /*(*/ &msg_info, &chunk_stream->page_list, msg_len /*)*/);
 		return res;
@@ -1576,11 +1609,11 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 		    if (recv_chunk_stream->in_msg_timestamp >= 0x00ffffff) {
 			has_extended_timestamp = true;
 		    } else {
-			if (recv_chunk_stream->msg_offset == 0)
+			if (recv_chunk_stream->in_msg_offset == 0)
 			    recv_chunk_stream->in_msg_timestamp += recv_chunk_stream->in_msg_timestamp;
 		    }
 		} else {
-		    if (recv_chunk_stream->msg_offset == 0)
+		    if (recv_chunk_stream->in_msg_offset == 0)
 			recv_chunk_stream->in_msg_timestamp += recv_chunk_stream->in_msg_timestamp_delta;
 		}
 
@@ -1603,7 +1636,7 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 		}
 		recv_needed_len = 0;
 
-		if (recv_chunk_stream->msg_offset == 0) {
+		if (recv_chunk_stream->in_msg_offset == 0) {
 		    Uint32 const extended_timestamp = (data [3] <<  0) |
 						      (data [2] <<  8) |
 						      (data [1] << 16) |
@@ -1624,27 +1657,37 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 	    case ReceiveState::ChunkData: {
 		logD (msg, _func, "ChunkData");
 
-		if (!((recv_chunk_stream->msg_offset < recv_chunk_stream->in_msg_len) ||
-		      (recv_chunk_stream->in_msg_len == 0 && recv_chunk_stream->msg_offset == 0)))
+		if (!((recv_chunk_stream->in_msg_offset < recv_chunk_stream->in_msg_len) ||
+		      (recv_chunk_stream->in_msg_len == 0 && recv_chunk_stream->in_msg_offset == 0)))
 		{
-		    logE_ (_func, "bad chunking: msg_offset: ", recv_chunk_stream->msg_offset, ", "
+		    logE_ (_func, "bad chunking: in_msg_offset: ", recv_chunk_stream->in_msg_offset, ", "
 			   "in_msg_len: ", recv_chunk_stream->in_msg_len);
 		    ret_res = Receiver::ProcessInputResult::Error;
 		    goto _return;
 		}
 
-		logD (msg, _func, "in_msg_len: ", recv_chunk_stream->in_msg_len, ", msg_offset: ", recv_chunk_stream->msg_offset);
-		if (recv_chunk_stream->in_msg_len - recv_chunk_stream->msg_offset <= in_chunk_size) {
+		logD (msg, _func, "in_msg_len: ", recv_chunk_stream->in_msg_len, ", in_msg_offset: ", recv_chunk_stream->in_msg_offset);
+		Size const msg_left = recv_chunk_stream->in_msg_len - recv_chunk_stream->in_msg_offset;
+		if (msg_left <= in_chunk_size) {
 		  // Last chunk of a message.
 
 		    logD (msg, _func, "last chunk");
 
-		    if (len < recv_chunk_stream->in_msg_len - recv_chunk_stream->msg_offset) {
+#if 0
+// Deprecated
+		    if (len < recv_chunk_stream->in_msg_len - recv_chunk_stream->in_msg_offset) {
 			// TODO There's no reason to wait: process partial chunks.
 			// TODO recv_needed_len
 			ret_res = Receiver::ProcessInputResult::Again;
 			goto _return;
 		    }
+#endif
+
+		    Size tofill = msg_left;
+		    assert (chunk_offset < tofill);
+		    tofill -= chunk_offset;
+		    if (tofill > len)
+			tofill = len;
 
 		    if (prechunking_enabled &&
 			    (recv_chunk_stream->in_msg_type_id == RtmpMessageType::AudioMessage ||
@@ -1654,22 +1697,30 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 				(recv_chunk_stream->in_msg_type_id == RtmpMessageType::AudioMessage ?
 					 DefaultAudioChunkStreamId : DefaultVideoChunkStreamId);
 			fillPrechunkedPages (&recv_chunk_stream->in_prechunk_ctx,
-					     ConstMemory (data, recv_chunk_stream->in_msg_len - recv_chunk_stream->msg_offset),
+					     ConstMemory (data, tofill),
+					     page_pool,
 					     &recv_chunk_stream->page_list,
 					     out_chunk_stream_id,
 					     recv_chunk_stream->in_msg_timestamp,
-					     recv_chunk_stream->msg_offset == 0 /* first_chunk */);
+					     recv_chunk_stream->in_msg_offset == 0 /* first_chunk */);
 		    } else {
 			page_pool->getFillPages (&recv_chunk_stream->page_list,
-						 ConstMemory (data, recv_chunk_stream->in_msg_len - recv_chunk_stream->msg_offset));
+						 ConstMemory (data, tofill));
+		    }
+
+		    {
+			data += tofill;
+			len -= tofill;
+		    }
+
+		    chunk_offset += tofill;
+		    assert (chunk_offset <= msg_left);
+		    if (chunk_offset < msg_left) {
+			ret_res = Receiver::ProcessInputResult::Again;
+			goto _return;
 		    }
 
 		    Result const res = processMessage (recv_chunk_stream);
-
-		    {
-			data += recv_chunk_stream->in_msg_len - recv_chunk_stream->msg_offset;
-			len -= recv_chunk_stream->in_msg_len - recv_chunk_stream->msg_offset;
-		    }
 
 		    resetMessage (recv_chunk_stream);
 		    resetPacket ();
@@ -1684,6 +1735,8 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 
 		    logD (msg, _func, "intermediate chunk");
 
+#if 0
+// Deprecated
 		    if (len < in_chunk_size) {
 			// TODO There's no reason to wait: process partial chunks.
 			recv_needed_len = in_chunk_size;
@@ -1691,6 +1744,12 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 			goto _return;
 		    }
 		    recv_needed_len = 0;
+#endif
+
+		    assert (chunk_offset < in_chunk_size);
+		    Size tofill = in_chunk_size - chunk_offset;
+		    if (tofill > len)
+			tofill = len;
 
 		    if (prechunking_enabled &&
 			    (recv_chunk_stream->in_msg_type_id == RtmpMessageType::AudioMessage ||
@@ -1700,23 +1759,30 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 				(recv_chunk_stream->in_msg_type_id == RtmpMessageType::AudioMessage ?
 					 DefaultAudioChunkStreamId : DefaultVideoChunkStreamId);
 			fillPrechunkedPages (&recv_chunk_stream->in_prechunk_ctx,
-					     ConstMemory (data, in_chunk_size),
+					     ConstMemory (data, tofill),
+					     page_pool,
 					     &recv_chunk_stream->page_list,
 					     out_chunk_stream_id,
 					     recv_chunk_stream->in_msg_timestamp,
-					     recv_chunk_stream->msg_offset == 0 /* first_chunk */);
+					     recv_chunk_stream->in_msg_offset == 0 /* first_chunk */);
 		    } else {
 			page_pool->getFillPages (&recv_chunk_stream->page_list,
-						 ConstMemory (data, in_chunk_size));
+						 ConstMemory (data, tofill));
 		    }
 
 		    {
-			len -= in_chunk_size;
-			data += in_chunk_size;
+			len -= tofill;
+			data += tofill;
 		    }
 
-		    recv_chunk_stream->msg_offset += in_chunk_size;
+		    chunk_offset += tofill;
+		    assert (chunk_offset <= in_chunk_size);
+		    if (chunk_offset < in_chunk_size) {
+			ret_res = Receiver::ProcessInputResult::Again;
+			goto _return;
+		    }
 
+		    recv_chunk_stream->in_msg_offset += in_chunk_size;
 		    resetPacket ();
 		}
 	    } break;

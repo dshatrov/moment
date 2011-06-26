@@ -192,8 +192,7 @@ RtmpServer::doPublish (RtmpConnection::MessageInfo * const mt_nonnull msg_info,
 void
 RtmpServer::sendVideoMessage (RtmpConnection::MessageInfo * const mt_nonnull msg_info,
 			      PagePool::PageListHead      * const mt_nonnull page_list,
-			      Size                          const msg_len,
-			      bool                          const prechunked)
+			      Size                          const msg_len)
 {
 //    logD (rtmp_server, _func);
 
@@ -205,14 +204,13 @@ RtmpServer::sendVideoMessage (RtmpConnection::MessageInfo * const mt_nonnull msg
     mdesc.msg_len = msg_len;
     mdesc.cs_hdr_comp = true;
 
-    rtmp_conn->sendMessagePages (&mdesc, video_chunk_stream, page_list, 0 /* msg_offset */, prechunked);
+    rtmp_conn->sendMessagePages (&mdesc, video_chunk_stream, page_list, 0 /* msg_offset */, msg_info->prechunk_size);
 }
 
 void
 RtmpServer::sendAudioMessage (RtmpConnection::MessageInfo * const mt_nonnull msg_info,
 			      PagePool::PageListHead      * const mt_nonnull page_list,
-			      Size                          const msg_len,
-			      bool                          const prechunked)
+			      Size                          const msg_len)
 {
 //    logD (rtmp_server, _func);
 
@@ -223,7 +221,7 @@ RtmpServer::sendAudioMessage (RtmpConnection::MessageInfo * const mt_nonnull msg
     mdesc.msg_len = msg_len;
     mdesc.cs_hdr_comp = true;
 
-    rtmp_conn->sendMessagePages (&mdesc, audio_chunk_stream, page_list, 0 /* msg_offset */, prechunked);
+    rtmp_conn->sendMessagePages (&mdesc, audio_chunk_stream, page_list, 0 /* msg_offset */, msg_info->prechunk_size);
 }
 
 Result

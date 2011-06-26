@@ -97,9 +97,9 @@ void streamAudioMessage (VideoStream::MessageInfo * const mt_nonnull msg_info,
     RtmpConnection::MessageInfo rtmp_msg_info;
     rtmp_msg_info.msg_stream_id = RtmpConnection::DefaultMessageStreamId;
     rtmp_msg_info.timestamp = (Uint32) msg_info->timestamp;
+    rtmp_msg_info.prechunk_size = msg_info->prechunk_size;
 
-    // TODO Prehunking logics must match MomentVideo arch.
-    client_session->rtmp_server.sendAudioMessage (&rtmp_msg_info, page_list, msg_len, false /* prechunked */);
+    client_session->rtmp_server.sendAudioMessage (&rtmp_msg_info, page_list, msg_len);
 }
 
 void streamVideoMessage (VideoStream::MessageInfo * const mt_nonnull msg_info,
@@ -119,9 +119,9 @@ void streamVideoMessage (VideoStream::MessageInfo * const mt_nonnull msg_info,
     RtmpConnection::MessageInfo rtmp_msg_info;
     rtmp_msg_info.msg_stream_id = RtmpConnection::DefaultMessageStreamId;
     rtmp_msg_info.timestamp = (Uint32) msg_info->timestamp;
+    rtmp_msg_info.prechunk_size = msg_info->prechunk_size;
 
-    // TODO Prehunking logics must match MomentVideo arch.
-    client_session->rtmp_server.sendVideoMessage (&rtmp_msg_info, page_list, msg_len, false /* prechunked */);
+    client_session->rtmp_server.sendVideoMessage (&rtmp_msg_info, page_list, msg_len);
 }
 
 void streamClosed (void * const /* _session */)

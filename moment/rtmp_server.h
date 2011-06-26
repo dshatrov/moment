@@ -86,13 +86,11 @@ public:
 
     void sendVideoMessage (RtmpConnection::MessageInfo * mt_nonnull msg_info,
 			   PagePool::PageListHead      * mt_nonnull page_list,
-			   Size                         msg_len,
-			   bool                         prechunked = true);
+			   Size                         msg_len);
 
     void sendAudioMessage (RtmpConnection::MessageInfo * mt_nonnull msg_info,
 			   PagePool::PageListHead      * mt_nonnull page_list,
-			   Size                         msg_len,
-			   bool                         prechunked = true);
+			   Size                         msg_len);
 
     Result commandMessage (RtmpConnection::MessageInfo * mt_nonnull msg_info,
 			   PagePool::PageListHead      * mt_nonnull page_list,
