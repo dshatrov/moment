@@ -131,6 +131,8 @@ RtmpConnection::fillMessageHeader (MessageDesc const * const mt_nonnull mdesc,
 	{
 	    Uint32 const timestamp_delta = timestamp - chunk_stream->out_msg_timestamp;
 	    if (timestamp < chunk_stream->out_msg_timestamp) {
+		// This goes against RTMP rules and should never happen
+		// (that's what the timestampGreater() check above is for).
 		logW_ (_func, "Backwards timestamp: "
 		       "new: ", timestamp, ", "
 		       "old: ", chunk_stream->out_msg_timestamp);
@@ -139,7 +141,7 @@ RtmpConnection::fillMessageHeader (MessageDesc const * const mt_nonnull mdesc,
 	    if (chunk_stream->out_msg_type_id == mdesc->msg_type_id &&
 		chunk_stream->out_msg_len == mdesc->msg_len)
 	    {
-		if (chunk_stream->out_msg_timestamp == timestamp &&
+		if (chunk_stream->out_msg_timestamp_delta == timestamp_delta &&
 		    // We don't want to mix type 3 chunks and extended timestamps.
 		    // (There's no well-formulated reason for this.)
 		    chunk_stream->out_msg_timestamp < 0x00ffffff)
@@ -162,6 +164,7 @@ RtmpConnection::fillMessageHeader (MessageDesc const * const mt_nonnull mdesc,
 //			   "type 2 header, timestamp_delta: 0x", fmt_hex, timestamp_delta);
 
 		    chunk_stream->out_msg_timestamp = timestamp;
+		    chunk_stream->out_msg_timestamp_delta = timestamp_delta;
 
 		    if (timestamp_delta >= 0x00ffffff) {
 			header_buf [offs + 0] = 0xff;
@@ -190,6 +193,7 @@ RtmpConnection::fillMessageHeader (MessageDesc const * const mt_nonnull mdesc,
 		got_header = true;
 
 		chunk_stream->out_msg_timestamp = timestamp;
+		chunk_stream->out_msg_timestamp_delta = timestamp_delta;
 		chunk_stream->out_msg_len = mdesc->msg_len;
 		chunk_stream->out_msg_type_id = mdesc->msg_type_id;
 
@@ -228,6 +232,7 @@ RtmpConnection::fillMessageHeader (MessageDesc const * const mt_nonnull mdesc,
 
 	chunk_stream->out_header_valid = true;
 	chunk_stream->out_msg_timestamp = timestamp;
+	chunk_stream->out_msg_timestamp_delta = timestamp; // Somewhat weird RTMP rule.
 	chunk_stream->out_msg_len = mdesc->msg_len;
 	chunk_stream->out_msg_type_id = mdesc->msg_type_id;
 	chunk_stream->out_msg_stream_id = mdesc->msg_stream_id;
@@ -1495,10 +1500,9 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 		if (timestamp == 0x00ffffff)
 		    has_extended_timestamp = false;
 		else
-		    recv_chunk_stream->in_msg_timestamp = timestamp;// /* TEST for extended timestamp */ + 0x00ffdfff;
+		    recv_chunk_stream->in_msg_timestamp = timestamp;
 
-		recv_chunk_stream->in_msg_prv_was_type0 = true;
-		recv_chunk_stream->in_msg_timestamp_delta = 0;
+		recv_chunk_stream->in_msg_timestamp_delta = timestamp;
 		recv_chunk_stream->in_msg_len = (data [5] <<  0) |
 						(data [4] <<  8) |
 						(data [3] << 16);
@@ -1555,7 +1559,6 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 		else
 		    recv_chunk_stream->in_msg_timestamp += timestamp_delta;
 
-		recv_chunk_stream->in_msg_prv_was_type0 = false;
 		recv_chunk_stream->in_msg_timestamp_delta = timestamp_delta;
 		recv_chunk_stream->in_msg_len = (data [5] <<  0) |
 						(data [4] <<  8) |
@@ -1603,7 +1606,6 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 		else
 		    recv_chunk_stream->in_msg_timestamp += timestamp_delta;
 
-		recv_chunk_stream->in_msg_prv_was_type0 = false;
 		recv_chunk_stream->in_msg_timestamp_delta = timestamp_delta;
 
 		{
@@ -1634,23 +1636,20 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 		}
 
 		bool has_extended_timestamp = false;
-		if (recv_chunk_stream->in_msg_prv_was_type0) {
-		    if (recv_chunk_stream->in_msg_timestamp >= 0x00ffffff) {
-			has_extended_timestamp = true;
-		    } else {
-			if (recv_chunk_stream->in_msg_offset == 0)
-			    recv_chunk_stream->in_msg_timestamp += recv_chunk_stream->in_msg_timestamp;
-		    }
-		} else {
-		    if (recv_chunk_stream->in_msg_offset == 0)
-			recv_chunk_stream->in_msg_timestamp += recv_chunk_stream->in_msg_timestamp_delta;
-		}
+		if (recv_chunk_stream->in_msg_timestamp_delta >= 0x00ffffff)
+		    has_extended_timestamp = true;
+
+		if (recv_chunk_stream->in_msg_offset == 0)
+		    recv_chunk_stream->in_msg_timestamp += recv_chunk_stream->in_msg_timestamp_delta;
 
 		logD (msg, _func, "new msg timestamp: 0x", fmt_hex, recv_chunk_stream->in_msg_timestamp);
 
 		if (has_extended_timestamp) {
-		    // XXX false?
+		    // XXX false or true?
+		    // This doesn't matter as long as we simply ignore
+		    // the extended timestamp field and use the old value.
 		    extended_timestamp_is_delta = false;
+		    ignore_extended_timestamp = true;
 		    conn_state = ReceiveState::ExtendedTimestamp;
 		} else
 		    conn_state = ReceiveState::ChunkData;
@@ -1665,7 +1664,9 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 		}
 		recv_needed_len = 0;
 
-		if (recv_chunk_stream->in_msg_offset == 0) {
+		if (recv_chunk_stream->in_msg_offset == 0 &&
+		    !ignore_extended_timestamp)
+		{
 		    Uint32 const extended_timestamp = (data [3] <<  0) |
 						      (data [2] <<  8) |
 						      (data [1] << 16) |
@@ -1675,6 +1676,7 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 		    else
 			recv_chunk_stream->in_msg_timestamp = extended_timestamp;
 		}
+		ignore_extended_timestamp = false;
 
 		{
 		    data += 4;
@@ -2017,6 +2019,7 @@ RtmpConnection::RtmpConnection (Object     * const coderef_container,
       out_chunk_size (DefaultChunkSize),
 
       extended_timestamp_is_delta (false),
+      ignore_extended_timestamp (false),
 
       processing_input (false),
       block_input (false),
@@ -2064,6 +2067,7 @@ RtmpConnection::RtmpConnection (Object * const coderef_container)
       out_chunk_size (DefaultChunkSize),
 
       extended_timestamp_is_delta (false),
+      ignore_extended_timestamp (false),
 
       processing_input (false),
       block_input (false),

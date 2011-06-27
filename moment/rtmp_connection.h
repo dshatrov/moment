@@ -265,10 +265,10 @@ public:
 	Uint32 in_msg_len;
 	Uint32 in_msg_type_id;
 	Uint32 in_msg_stream_id;
-	bool   in_msg_prv_was_type0;
 	bool   in_header_valid;
 
 	Uint32 out_msg_timestamp;
+	Uint32 out_msg_timestamp_delta;
 	Uint32 out_msg_len;
 	Uint32 out_msg_type_id;
 	Uint32 out_msg_stream_id;
@@ -296,6 +296,7 @@ private:
     Size out_chunk_size;
 
     bool extended_timestamp_is_delta;
+    bool ignore_extended_timestamp;
 
     bool processing_input;
     bool block_input;
