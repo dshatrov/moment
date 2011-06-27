@@ -73,6 +73,8 @@ RtmpConnection::fillMessageHeader (MessageDesc const * const mt_nonnull mdesc,
 				   ChunkStream       * const mt_nonnull chunk_stream,
 				   Byte              * const mt_nonnull header_buf)
 {
+    Uint32 const timestamp = mdesc->timestamp + 0x00ffafff;
+
     bool has_extended_timestamp = false;
     Uint32 extended_timestamp = 0;
 
@@ -82,11 +84,28 @@ RtmpConnection::fillMessageHeader (MessageDesc const * const mt_nonnull mdesc,
     offs += 1;
 
     bool got_header = false;
-    bool header_type = 0;
+    Byte header_type = 0;
 
-    logD (time, _func, "timestamp: ", fmt_hex, mdesc->timestamp);
+    logD (time, _func, "timestamp: 0x", fmt_hex, timestamp);
 
-    // XXX cs_hdr_comp - ?
+//    logD_ (_func, "chunk_stream 0x", fmt_hex, (UintPtr) chunk_stream);
+
+#if 0
+    {
+	static int counter = 100;
+	if (counter >= 100) {
+	    logD_ (_func, "chunk_stream 0x", fmt_hex, (UintPtr) chunk_stream,
+		   ", timestamp: 0x", fmt_hex, timestamp);
+	    counter = 0;
+	} else {
+	    ++counter;
+	}
+    }
+#endif
+
+    // TODO cs_hdr_comp is probably unnecessary, because all messages
+    // for which we explicitly set cs_hdr_comp to 0 fit into a single 128-byte
+    // chunk anyway. Is 128 bytes a minimum size for a chunk?
     if (mdesc->cs_hdr_comp &&
 	chunk_stream->out_header_valid)
     {
@@ -95,57 +114,62 @@ RtmpConnection::fillMessageHeader (MessageDesc const * const mt_nonnull mdesc,
 	// TEST
 //	force_type0 = true;
 
-	if (chunk_stream->out_msg_timestamp >= 0x00ffffff)
+	if (chunk_stream->out_msg_timestamp >= 0x00ffffff) {
+	    // Forcing type 0 header to be sure that all type 3 headers of
+	    // this message's chunks should have extended timestamp field.
+	    // This is essential for prechunking.
 	    force_type0 = true;
+	}
 
-	if (!timestampGreater (chunk_stream->out_msg_timestamp, mdesc->timestamp))
+	if (!timestampGreater (chunk_stream->out_msg_timestamp, timestamp)) {
+	    logW_ (_func, "!timestampGreater: ", chunk_stream->out_msg_timestamp, ", ", timestamp);
 	    force_type0 = true;
+	}
 
 	if (!force_type0 &&
 	    chunk_stream->out_msg_stream_id == mdesc->msg_stream_id)
 	{
-	    Uint32 const timestamp_delta = mdesc->timestamp - chunk_stream->out_msg_timestamp;
-
-#if 0
-// Something is wrong with type 2 headers, and probably with type 3 headers.
-
-// It looks like the spec says that Type 2 headers should be used for fixed-size
-// message streams only, and Type 3 headers should not come with the first chunk
-// of a message.
+	    Uint32 const timestamp_delta = timestamp - chunk_stream->out_msg_timestamp;
+	    if (timestamp < chunk_stream->out_msg_timestamp) {
+		logW_ (_func, "Backwards timestamp: "
+		       "new: ", timestamp, ", "
+		       "old: ", chunk_stream->out_msg_timestamp);
+	    }
 
 	    if (chunk_stream->out_msg_type_id == mdesc->msg_type_id &&
 		chunk_stream->out_msg_len == mdesc->msg_len)
 	    {
-
-#if 0
-		if (chunk_stream->out_msg_timestamp == mdesc->timestamp &&
+		if (chunk_stream->out_msg_timestamp == timestamp &&
+		    // We don't want to mix type 3 chunks and extended timestamps.
+		    // (There's no well-formulated reason for this.)
 		    chunk_stream->out_msg_timestamp < 0x00ffffff)
 		{
 		  // Type 3 header
 
 		    got_header = true;
 
+//		    logD_ (_func, "chunk_stream 0x", fmt_hex, (UintPtr) chunk_stream, ": "
+//			   "type 3 header");
+
 		    header_type = 3;
 		    offs += Type3_HeaderLen;
 		} else {
-#endif
 		  // Type 2 header
 
 		    got_header = true;
 
-		    logD_ (_func, "Type 2 header, timestamp_delta: 0x", fmt_hex, timestamp_delta);
+//		    logD_ (_func, "chunk_stream 0x", fmt_hex, (UintPtr) chunk_stream, ": "
+//			   "type 2 header, timestamp_delta: 0x", fmt_hex, timestamp_delta);
 
-		    chunk_stream->out_msg_timestamp = mdesc->timestamp;
+		    chunk_stream->out_msg_timestamp = timestamp;
 
-//		    if (timestamp_delta >= 0x00ffffff) {
-		    if (mdesc->timestamp >= 0x00ffffff) {
+		    if (timestamp_delta >= 0x00ffffff) {
 			header_buf [offs + 0] = 0xff;
 			header_buf [offs + 1] = 0xff;
 			header_buf [offs + 2] = 0xff;
 
 			has_extended_timestamp = true;
-//			extended_timestamp = timestamp_delta;
-			extended_timestamp = mdesc->timestamp;
+			extended_timestamp = timestamp_delta;
 		    } else {
 			header_buf [offs + 0] = (timestamp_delta >> 16) & 0xff;
 			header_buf [offs + 1] = (timestamp_delta >>  8) & 0xff;
@@ -155,30 +179,29 @@ RtmpConnection::fillMessageHeader (MessageDesc const * const mt_nonnull mdesc,
 		    header_type = 2;
 		    offs += Type2_HeaderLen;
 		}
-//	    } else {
-#endif
+	    }
 
 	    if (!got_header) {
 	      // Type 1 header
 
+//		logD_ (_func, "chunk_stream 0x", fmt_hex, (UintPtr) chunk_stream, ": "
+//		       "type 1 header");
+
 		got_header = true;
 
-		chunk_stream->out_msg_timestamp = mdesc->timestamp;
+		chunk_stream->out_msg_timestamp = timestamp;
 		chunk_stream->out_msg_len = mdesc->msg_len;
 		chunk_stream->out_msg_type_id = mdesc->msg_type_id;
 
 		logD (time, _func, "snd timestamp_delta: 0x", fmt_hex, timestamp_delta);
 
-//		if (timestamp_delta >= 0x00ffffff) {
-		if (mdesc->timestamp >= 0x00ffffff) {
+		if (timestamp_delta >= 0x00ffffff) {
 		    header_buf [offs + 0] = 0xff;
 		    header_buf [offs + 1] = 0xff;
 		    header_buf [offs + 2] = 0xff;
 
 		    has_extended_timestamp = true;
-		  // TODO Figure out what should be put here.
-//		    extended_timestamp = timestamp_delta;
-		    extended_timestamp = mdesc->timestamp;
+		    extended_timestamp = timestamp_delta;
 		} else {
 		    header_buf [offs + 0] = (timestamp_delta >> 16) & 0xff;
 		    header_buf [offs + 1] = (timestamp_delta >>  8) & 0xff;
@@ -200,25 +223,28 @@ RtmpConnection::fillMessageHeader (MessageDesc const * const mt_nonnull mdesc,
     if (!got_header) {
       // Type 0 header
 
+//	logD_ (_func, "chunk_stream 0x", fmt_hex, (UintPtr) chunk_stream, ": "
+//	       "type 0 header");
+
 	chunk_stream->out_header_valid = true;
-	chunk_stream->out_msg_timestamp = mdesc->timestamp;
+	chunk_stream->out_msg_timestamp = timestamp;
 	chunk_stream->out_msg_len = mdesc->msg_len;
 	chunk_stream->out_msg_type_id = mdesc->msg_type_id;
 	chunk_stream->out_msg_stream_id = mdesc->msg_stream_id;
 
-	logD (time, _func, "snd timestamp: 0x", fmt_hex, mdesc->timestamp);
+	logD (time, _func, "snd timestamp: 0x", fmt_hex, timestamp);
 
-	if (mdesc->timestamp >= 0x00ffffff) {
+	if (timestamp >= 0x00ffffff) {
 	    header_buf [offs + 0] = 0xff;
 	    header_buf [offs + 1] = 0xff;
 	    header_buf [offs + 2] = 0xff;
 
 	    has_extended_timestamp = true;
-	    extended_timestamp = mdesc->timestamp;
+	    extended_timestamp = timestamp;
 	} else {
-	    header_buf [offs + 0] = (mdesc->timestamp >> 16) & 0xff;
-	    header_buf [offs + 1] = (mdesc->timestamp >>  8) & 0xff;
-	    header_buf [offs + 2] = (mdesc->timestamp >>  0) & 0xff;
+	    header_buf [offs + 0] = (timestamp >> 16) & 0xff;
+	    header_buf [offs + 1] = (timestamp >>  8) & 0xff;
+	    header_buf [offs + 2] = (timestamp >>  0) & 0xff;
 	}
 
 	header_buf [offs + 3] = (mdesc->msg_len >> 16) & 0xff;
@@ -251,6 +277,9 @@ RtmpConnection::fillMessageHeader (MessageDesc const * const mt_nonnull mdesc,
 
     // FIXME Assuming small chunk stream ids (2-63)
     header_buf [0] = (header_type << 6) | (Byte) chunk_stream->chunk_stream_id;
+
+//    logD_ (_func, "header_type: ", header_type, ", offs: ", offs);
+//    hexdump (logs, ConstMemory (header_buf, offs));
 
     assert (offs <= MaxHeaderLen);
     return offs;
@@ -1082,7 +1111,7 @@ RtmpConnection::processUserControlMessage (ChunkStream * const chunk_stream)
 	    sendUserControl_PingResponse (timestamp);
 	} break;
 	case UserControlMessageType::PingResponse: {
-	    logD (msg, _func, "PingResponse");
+	    logD_ (/* msg, */ _func, "PingResponse");
 
 	    ping_reply_received = true;
 	} break;
