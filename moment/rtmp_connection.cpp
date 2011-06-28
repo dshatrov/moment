@@ -68,12 +68,18 @@ RtmpConnection::getChunkStream (Uint32 const chunk_stream_id,
     return chunk_stream_node->value;
 }
 
+static inline Uint32 debugMangleTimestamp (Uint32 const timestamp)
+{
+//    return timestamp;
+    return timestamp + 0x00ffafff; // Extended timesatmps debugging.
+}
+
 Size
 RtmpConnection::fillMessageHeader (MessageDesc const * const mt_nonnull mdesc,
 				   ChunkStream       * const mt_nonnull chunk_stream,
 				   Byte              * const mt_nonnull header_buf)
 {
-    Uint32 const timestamp = mdesc->timestamp + 0x00ffafff;
+    Uint32 const timestamp = debugMangleTimestamp (mdesc->timestamp);
 
     bool has_extended_timestamp = false;
     Uint32 extended_timestamp = 0;
@@ -88,7 +94,8 @@ RtmpConnection::fillMessageHeader (MessageDesc const * const mt_nonnull mdesc,
 
     logD (time, _func, "timestamp: 0x", fmt_hex, timestamp);
 
-//    logD_ (_func, "chunk_stream 0x", fmt_hex, (UintPtr) chunk_stream);
+//    logD_ (_func, "chunk_stream 0x", fmt_hex, (UintPtr) chunk_stream,
+//	     ", msg_len: ", fmt_def, mdesc->msg_len);
 
 #if 0
     {
@@ -296,14 +303,21 @@ RtmpConnection::fillPrechunkedPages (PrechunkContext        * const  prechunk_ct
 				     PagePool               * const  page_pool,
 				     PagePool::PageListHead * const  page_list,
 				     Uint32                   const  chunk_stream_id,
-				     Uint32                   const  msg_timestamp,
+				     Uint32                          msg_timestamp,
 				     bool                     const  first_chunk)
 {
+    msg_timestamp = debugMangleTimestamp (msg_timestamp);
+
     logD (chunk, _func, mem.len(), " bytes");
 
     Size const prechunk_size = PrechunkSize;
 
     Size total_filled = 0;
+
+    // There's no need to reset 'prechunk_ctx->prechunk_offset' to 0, because
+    // it is set to 0 in PrechunkContext() constructor, and we require distinct
+    // contexts for distinct messages.
+
     while (total_filled < mem.len ()) {
 	if (prechunk_ctx->prechunk_offset == 0 &&
 		!(first_chunk && total_filled == 0))
