@@ -15,6 +15,8 @@ else
 #    COMMON_CFLAGS += -DLIBMARY_WRITEV
 endif
 
+COMMON_LDFLAGS =
+
 AM_CFLAGS = -std=c99 $(COMMON_CFLAGS)
 AM_CXXFLAGS = -std=c++0x $(COMMON_CFLAGS)
 
@@ -65,18 +67,23 @@ libmoment_1_0_la_SOURCES =	\
 
 moment_extra_dist =
 
-libmoment_1_0_la_LDFLAGS = -no-undefined -version-info "0:0:0"
+libmoment_1_0_la_LDFLAGS = -no-undefined -version-info "0:0:0" $(COMMON_LDFLAGS)
 libmoment_1_0_la_LIBADD = $(THIS_LIBS)
 if PLATFORM_WIN32
 libmoment_1_0_la_LIBADD += -lws2_32
 endif
 
 momentdir = $(libdir)/moment-1.0
-moment_LTLIBRARIES = libmoment-rtmp-1.0.la
+moment_LTLIBRARIES = libmoment-file-1.0.la libmoment-rtmp-1.0.la
+
+libmoment_file_1_0_la_SOURCES = \
+	mod_file.cpp
+libmoment_file_1_0_la_LDFLAGS = -no-undefined -version-info "0:0:0" $(COMMON_LDFLAGS)
+libmoment_file_1_0_la_LIBADD = $(THIS_LIBS)
+
 libmoment_rtmp_1_0_la_SOURCES =	\
 	moment_rtmp.cpp
-
-libmoment_rtmp_1_0_la_LDFLAGS = -no-undefined -version-info "0:0:0"
+libmoment_rtmp_1_0_la_LDFLAGS = -no-undefined -version-info "0:0:0" $(COMMON_LDFLAGS)
 libmoment_rtmp_1_0_la_LIBADD = $(THIS_LIBS)
 if PLATFORM_WIN32
 libmoment_rtmp_1_0_la_LIBADD += -lws2_32
@@ -88,11 +95,13 @@ moment_DEPENDENCIES = libmoment-1.0.la
 moment_SOURCES =	\
 	moment.cpp
 moment_LDADD = $(top_builddir)/moment/libmoment-1.0.la $(THIS_LIBS)
+moment_LDFLAGS = $(COMMON_LDFLAGS)
 
 rtmptool_DEPENDENCIES = libmoment-1.0.la
 rtmptool_SOURCES =	\
 	rtmptool.cpp
 rtmptool_LDADD = $(top_builddir)/moment/libmoment-1.0.la $(THIS_LIBS)
+rtmptool_LDFLAGS = $(COMMON_LDFLAGS)
 
 EXTRA_DIST = $(moment_private_headers) $(moment_extra_dist)
 
