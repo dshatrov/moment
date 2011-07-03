@@ -165,6 +165,33 @@ int main (int argc, char **argv)
 	    logE_ (_func, "http_service.init() failed: ", exc->toString());
 	    return EXIT_FAILURE;
 	}
+
+	{
+	    ConstMemory const opt_name = "http/http_bind";
+	    ConstMemory const http_bind = config.getString (opt_name);
+	    logD_ (_func, opt_name, ": ", http_bind);
+	    if (!http_bind.isNull ()) {
+		IpAddress addr;
+		if (!setIpAddress (http_bind, &addr)) {
+		    logE_ (_func, "setIpAddress() failed (http)");
+		    return EXIT_FAILURE;
+		}
+
+		if (!http_service.bind (addr)) {
+		    logE_ (_func, "http_service.bind() faled: ", exc->toString());
+		    return EXIT_FAILURE;
+		}
+
+		if (!http_service.start ()) {
+		    logE_ (_func, "http_service.start() failed: ", exc->toString());
+		    return EXIT_FAILURE;
+		}
+	    } else {
+		logI_ (_func, "HTTP service is not bound to any port "
+		       "and won't accept any connections. "
+		       "Set \"", opt_name, "\" option to bind the service.");
+	    }
+	}
     }
 
     logD_ (_func, "CREATING MOMENT SERVER");
