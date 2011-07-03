@@ -43,8 +43,8 @@
 	RTMPT_SERVER__OK_HEADERS \
 	"Content-Type: application/x-fcs\r\n" \
 
-#define RTMPT_SERVER__403_HEADERS \
-	"HTTP/1.1 403 Not found\r\n" \
+#define RTMPT_SERVER__404_HEADERS \
+	"HTTP/1.1 404 Not found\r\n" \
 	RTMPT_SERVER__COMMON_HEADERS \
 	"Content-Type: text/plain\r\n" \
 	"Content-Length: 0\r\n"
@@ -313,11 +313,10 @@ RtmptServer::doSend (RtmptConnection * const rtmpt_conn,
 {
     SessionMap::Entry session_entry = session_map.lookup (session_id);
     if (session_entry.isNull()) {
-	// TODO Common string macro for "403 Not Found" replies.
 	RTMPT_SERVER__HEADERS_DATE
 	rtmpt_conn->conn_sender.send (
 		page_pool,
-		RTMPT_SERVER__403_HEADERS
+		RTMPT_SERVER__404_HEADERS
 		"\r\n");
 	rtmpt_conn->conn_sender.flush ();
 	return;
@@ -340,7 +339,7 @@ RtmptServer::doIdle (RtmptConnection * const rtmpt_conn,
 	RTMPT_SERVER__HEADERS_DATE
 	rtmpt_conn->conn_sender.send (
 		page_pool,
-		RTMPT_SERVER__403_HEADERS
+		RTMPT_SERVER__404_HEADERS
 		"\r\n");
 	rtmpt_conn->conn_sender.flush ();
 	return;
@@ -360,7 +359,7 @@ RtmptServer::doClose (RtmptConnection * const rtmpt_conn,
 	RTMPT_SERVER__HEADERS_DATE
 	rtmpt_conn->conn_sender.send (
 		page_pool,
-		RTMPT_SERVER__403_HEADERS
+		RTMPT_SERVER__404_HEADERS
 		"\r\n");
 	rtmpt_conn->conn_sender.flush ();
 	return;
