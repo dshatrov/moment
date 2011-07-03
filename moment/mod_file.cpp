@@ -20,6 +20,8 @@
 #include <libmary/types.h>
 #include <cstring>
 
+#include <mycpp/list.h>
+
 #include <libmary/module_init.h>
 
 #include <moment/libmoment.h>
@@ -65,16 +67,25 @@ namespace Moment {
 
 namespace {
 
+class PathEntry : public BasicReferenced
+{
+public:
+    Ref<String> path;
+    Ref<String> prefix;
+};
+
+MyCpp::List< Ref<PathEntry> > path_list;
+
 PagePool *page_pool = NULL;
-Ref<String> root_path;
-Ref<String> path_prefix;
 
 Result httpRequest (HttpRequest  * const mt_nonnull req,
 		    Sender       * const mt_nonnull conn_sender,
 		    Memory const &msg_body,
 		    void        ** const mt_nonnull ret_msg_data,
-		    void         * const cb_data)
+		    void         * const _path_entry)
 {
+    PathEntry * const path_entry = static_cast <PathEntry*> (_path_entry);
+
     logD_ (_func, "HTTP request: ", req->getRequestLine());
 
   // TODO On Linux, we could do a better job with sendfile() or splice().
@@ -88,7 +99,7 @@ Result httpRequest (HttpRequest  * const mt_nonnull req,
 	    full_path = full_path.region (1);
 	}
 
-	ConstMemory const prefix = path_prefix->mem();
+	ConstMemory const prefix = path_entry->prefix->mem();
 	if (full_path.len() < prefix.len()
 	    || memcmp (full_path.mem(), prefix.mem(), prefix.len()))
 	{
@@ -155,7 +166,7 @@ Result httpRequest (HttpRequest  * const mt_nonnull req,
 	}
     }
 
-    Ref<String> const filename = makeString (root_path->mem(), "/", file_path);
+    Ref<String> const filename = makeString (path_entry->path->mem(), !path_entry->path->isNull() ? "/" : "", file_path);
     logD_ (_func, "Opening ", filename);
     NativeFile native_file (filename->mem(),
 			    0 /* open_flags */,
@@ -238,6 +249,58 @@ HttpService::HttpHandler http_handler = {
     NULL /* httpMessageBody */
 };
 
+void momentFile_addPath (MConfig::Section * const section,
+			 HttpService      * const http_service)
+{
+    Ref<PathEntry> const path_entry = grab (new PathEntry);
+
+    {
+	MConfig::Option * const opt = section->getOption ("path");
+	MConfig::Value *val;
+	if (opt
+	    && (val = opt->getValue()))
+	{
+	    path_entry->path = grab (new String (val->mem()));
+	} else {
+	    path_entry->path = grab (new String ());
+	}
+    }
+
+    {
+	ConstMemory prefix;
+	{
+	    MConfig::Option * const opt = section->getOption ("prefix");
+	    MConfig::Value *val;
+	    if (opt
+		&& (val = opt->getValue()))
+	    {
+		prefix = val->mem();
+	    }
+	}
+
+	if (prefix.len() > 0
+	    && prefix.mem() [0] == '/')
+	{
+	    prefix = prefix.region (1);
+	}
+
+	path_entry->prefix = grab (new String (prefix));
+    }
+
+    logD_ (_func, "Adding path \"", path_entry->path, "\", prefix \"", path_entry->prefix->mem(), "\"");
+
+    http_service->addHttpHandler (Cb<HttpService::HttpHandler> (&http_handler, path_entry, NULL /* coderef_container */),
+				  path_entry->prefix->mem());
+
+    path_list.append (path_entry);
+}
+
+// Multiple file paths can be specified like this:
+//     mod_file {
+//         { path = "/home/user/files"; prefix = "files"; }
+//         { path = "/home/user/trash"; prefix = "trash"; }
+//     }
+//
 void momentFileInit ()
 {
     MomentServer * const moment = MomentServer::getInstance();
@@ -262,36 +325,21 @@ void momentFileInit ()
 	}
     }
 
-    root_path = grab (new String (
-	    config->getString_default ("mod_file/root_path", LIBMOMENT_PREFIX "/var/moment_www")));
+    do {
+	MConfig::Section * const modfile_section = config->getSection ("mod_file");
+	if (!modfile_section)
+	    break;
 
-    // Note: Don't forget to strip one leading slash, if any, when reading a config option.
-    {
-	ConstMemory prefix_mem = "files";
-	{
-	    MConfig::Option * const opt = config->getOption ("mod_file/path_prefix");
-	    if (opt) {
-		MConfig::Value * const val = opt->getValue ();
-		if (val) {
-		    Ref<String> val_str = val->getAsString ();
-		    if (val_str) {
-			prefix_mem = val_str->mem ();
-		    }
-		}
+	MConfig::Section::iter iter (*modfile_section);
+	while (!modfile_section->iter_done (iter)) {
+	    MConfig::SectionEntry * const sect_entry = modfile_section->iter_next (iter);
+	    if (sect_entry->getType() == MConfig::SectionEntry::Type_Section
+		&& sect_entry->getName().len() == 0)
+	    {
+		momentFile_addPath (static_cast <MConfig::Section*> (sect_entry), http_service);
 	    }
 	}
-
-	if (prefix_mem.len() > 0
-	    && prefix_mem.mem() [0] == '/')
-	{
-	    prefix_mem = prefix_mem.region (1);
-	}
-
-	path_prefix = grab (new String (prefix_mem));
-    }
-
-    http_service->addHttpHandler (Cb<HttpService::HttpHandler> (&http_handler, NULL, NULL),
-				  path_prefix->mem());
+    } while (0);
 }
 
 void momentFileUnload ()
