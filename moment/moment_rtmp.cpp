@@ -235,7 +235,7 @@ RtmpVideoService::Frontend const rtmp_video_service_frontend = {
     clientConnected
 };
 
-void momentRtmptInit ()
+void momentRtmpInit ()
 {
     MomentServer * const moment = MomentServer::getInstance();
     ServerApp * const server_app = moment->getServerApp();
@@ -251,7 +251,7 @@ void momentRtmptInit ()
 
 	if (enable != MConfig::Config::Boolean_True) {
 	    logI_ (_func, "Unrestricted RTMP access module is not enabled. "
-		   "Set \"mod_rtmp/enable\" option to \"y\" to enable.");
+		   "Set \"", opt_name, "\" option to \"y\" to enable.");
 	    return;
 	}
     }
@@ -269,11 +269,12 @@ void momentRtmptInit ()
 	    return;
 	}
 
-	IpAddress addr;
 	{
-	    ConstMemory rtmp_bind = config->getString ("mod_rtmp/rtmp_bind");
-	    logD_ (_func, "rtmp_bind: ", rtmp_bind);
+	    ConstMemory const opt_name = "mod_rtmp/rtmp_bind";
+	    ConstMemory const rtmp_bind = config->getString (opt_name);
+	    logD_ (_func, opt_name, ": ", rtmp_bind);
 	    if (!rtmp_bind.isNull ()) {
+		IpAddress addr;
 		if (!setIpAddress (rtmp_bind, &addr)) {
 		    logE_ (_func, "setIpAddress() failed (rtmp)");
 		    return;
@@ -288,6 +289,10 @@ void momentRtmptInit ()
 		    logE_ (_func, "rtmp_service.start() failed: ", exc->toString());
 		    return;
 		}
+	    } else {
+		logI_ (_func, "RTMP service is not bound to any port "
+		       "and won't accept any connections. "
+		       "Set \"", opt_name, "\" option to bind the service.");
 	    }
 	}
     }
@@ -307,11 +312,12 @@ void momentRtmptInit ()
 
 	IpAddress addr;
 	{
-	    ConstMemory rtmpt_bind = config->getString ("mod_rtmp/rtmpt_bind");
-	    logD_ (_func, "rtmpt_bind: ", rtmpt_bind);
+	    ConstMemory const opt_name = "mod_rtmp/rtmpt_bind";
+	    ConstMemory const rtmpt_bind = config->getString (opt_name);
+	    logD_ (_func, opt_name, ": ", rtmpt_bind);
 	    if (!rtmpt_bind.isNull ()) {
 		if (!setIpAddress (rtmpt_bind, &addr)) {
-		    logE_ (_func, "setIpAddress() failed (rtmp)");
+		    logE_ (_func, "setIpAddress() failed (rtmpt)");
 		    return;
 		}
 
@@ -324,12 +330,16 @@ void momentRtmptInit ()
 		    logE_ (_func, "rtmpt_service.start() failed: ", exc->toString());
 		    return;
 		}
+	    } else {
+		logI_ (_func, "RTMPT service is not bound to any port "
+		       "and won't accept any connections. "
+		       "Set \"", opt_name, "\" option to \"y\" to bind the service.");
 	    }
 	}
     }
 }
 
-void momentRtmptUnload ()
+void momentRtmpUnload ()
 {
 }
 
@@ -344,14 +354,14 @@ void libMary_moduleInit ()
 {
     logD_ ("RTMP MODULE INIT");
 
-    Moment::momentRtmptInit ();
+    Moment::momentRtmpInit ();
 }
 
 void libMary_moduleUnload()
 {
     logD_ ("RTMP MODULE UNLOAD");
 
-    Moment::momentRtmptUnload ();
+    Moment::momentRtmpUnload ();
 }
 
 }
