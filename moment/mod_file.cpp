@@ -48,11 +48,11 @@
 	"Content-Type: text/plain\r\n" \
 	"Content-Length: ", (content_length), "\r\n"
 
-#define MOMENT_FILE__400_HEADERS \
+#define MOMENT_FILE__400_HEADERS(content_length) \
 	"HTTP/1.1 400 Bad Request\r\n" \
 	MOMENT_FILE__COMMON_HEADERS \
 	"Content-Type: text/plain\r\n" \
-	"Content-Length: 0\r\n"
+	"Content-Length: ", (content_length), "\r\n"
 
 #define MOMENT_FILE__500_HEADERS(content_length) \
 	"HTTP/1.1 500 Internal Server Error\r\n" \
@@ -109,7 +109,54 @@ Result httpRequest (HttpRequest  * const mt_nonnull req,
 	file_path = full_path.region (prefix.len());
     }
 
+    while (file_path.len() > 0
+	   && file_path.mem() [0] == '/')
+    {
+	file_path = file_path.region (1);
+    }
+
+    logD_ (_func, "file_path: ", file_path);
+    if (file_path.len() == 0) {
+
+	file_path = "index.html";
+
+#if 0
+	logE_ (_func, "Empty file path\n");
+
+	MOMENT_FILE__HEADERS_DATE;
+	ConstMemory const reply_body = "400 Bad Request";
+	conn_sender->send (
+		page_pool,
+		MOMENT_FILE__400_HEADERS (reply_body.len()),
+		"\r\n",
+		reply_body);
+	conn_sender->flush ();
+
+	return Result::Success;
+#endif
+    }
+
+    ConstMemory mime_type = "text/plain";
+    {
+	void const * const dot_ptr = memrchr (file_path.mem(), '.', file_path.len());
+	if (dot_ptr) {
+	    ConstMemory const ext = file_path.region ((Byte const *) (dot_ptr) + 1 - file_path.mem());
+	    if (equal (ext, "html"))
+		mime_type = "text/html";
+	    else
+	    if (equal (ext, "css"))
+		mime_type = "text/css";
+	    else
+	    if (equal (ext, "js"))
+		mime_type = "application/javascript";
+	    else
+	    if (equal (ext, "swf"))
+		mime_type = "application/x-shockwave-flash";
+	}
+    }
+
     Ref<String> const filename = makeString (root_path->mem(), "/", file_path);
+    logD_ (_func, "Opening ", filename);
     NativeFile native_file (filename->mem(),
 			    0 /* open_flags */,
 			    File::AccessMode::ReadOnly);
@@ -147,7 +194,7 @@ Result httpRequest (HttpRequest  * const mt_nonnull req,
     MOMENT_FILE__HEADERS_DATE;
     conn_sender->send (
 	    page_pool,
-	    MOMENT_FILE__OK_HEADERS ("text/plain", stat.size),
+	    MOMENT_FILE__OK_HEADERS (mime_type, stat.size),
 	    "\r\n");
 
     PagePool::PageListHead page_list;
@@ -219,7 +266,29 @@ void momentFileInit ()
 	    config->getString_default ("mod_file/root_path", LIBMOMENT_PREFIX "/var/moment_www")));
 
     // Note: Don't forget to strip one leading slash, if any, when reading a config option.
-    path_prefix = grab (new String ("file"));
+    {
+	ConstMemory prefix_mem = "files";
+	{
+	    MConfig::Option * const opt = config->getOption ("mod_file/path_prefix");
+	    if (opt) {
+		MConfig::Value * const val = opt->getValue ();
+		if (val) {
+		    Ref<String> val_str = val->getAsString ();
+		    if (val_str) {
+			prefix_mem = val_str->mem ();
+		    }
+		}
+	    }
+	}
+
+	if (prefix_mem.len() > 0
+	    && prefix_mem.mem() [0] == '/')
+	{
+	    prefix_mem = prefix_mem.region (1);
+	}
+
+	path_prefix = grab (new String (prefix_mem));
+    }
 
     http_service->addHttpHandler (Cb<HttpService::HttpHandler> (&http_handler, NULL, NULL),
 				  path_prefix->mem());
