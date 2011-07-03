@@ -33,6 +33,8 @@ MomentServer::loadModules ()
     if (module_path.len() == 0)
 	module_path = LIBMOMENT_PREFIX "/moment-1.0";
 
+    logD_ (_func, "MODULE PATH: ", module_path);
+
     Ref<Vfs> const vfs = Vfs::createDefaultLocalVfs (module_path);
     if (!vfs)
 	return Result::Failure;
@@ -53,7 +55,7 @@ MomentServer::loadModules ()
 
 	ConstMemory const entry_name = stat_path->mem();
 
-	Ref<Vfs::StatData> const stat_data = vfs->stat (dir_entry->mem());
+	Ref<Vfs::FileStat> const stat_data = vfs->stat (dir_entry->mem());
 	if (!stat_data) {
 	    logE_ (_func, "Could not stat ", stat_path);
 	    continue;
@@ -75,7 +77,7 @@ MomentServer::loadModules ()
 		module_name = entry_name.region (0, (Byte const *) dot_ptr - entry_name.mem());
 	}
 
-	if (stat_data->file_type == Vfs::FileType_RegularFile &&
+	if (stat_data->file_type == Vfs::FileType::RegularFile &&
 	    !loaded_names.lookup (module_name))
 	{
 	    loaded_names.add (module_name, EmptyBase());
