@@ -49,6 +49,8 @@ public class MySubscriber extends Sprite
     private var reconnect_interval : uint;
     private var reconnect_timer : uint;
 
+    private var hide_buttons_timer : uint;
+
     private function doResize () : void
     {
         stage_width  = stage.stageWidth;
@@ -310,9 +312,20 @@ public class MySubscriber extends Sprite
 	ExternalInterface.call ("togglePlaylist");
     }
 
+    private function hideButtonsTick () : void
+    {
+	playlist_button.setVisible (false);
+	fullscreen_button.setVisible (false);
+    }
+
     private function onMouseMove (event : MouseEvent) : void
     {
 //        trace ("--- onMouseMove, " + event.localX + ", " + event.localY + " (" + stage_width + ", " + stage_height + "), " + (stage_width - (event.target.x + event.localX)) + ", " + (stage_height - (event.target.y + event.localY)) + " | " + event.target.scaleX + ", " + event.target.scaleY);
+
+	if (hide_buttons_timer) {
+	    clearInterval (hide_buttons_timer);
+	    hide_buttons_timer = 0;
+	}
 
         if (stage_width - (event.target.x + event.localX) > 400 ||
             stage_height - (event.target.y + event.localY) > 300)
@@ -320,6 +333,8 @@ public class MySubscriber extends Sprite
 	    playlist_button.setVisible (false);
 	    fullscreen_button.setVisible (false);
         } else {
+	    hide_buttons_timer = setInterval (hideButtonsTick, 5000);
+
 	    if (stage.displayState != "fullScreen")
 	      playlist_button.setVisible (true);
 
@@ -355,6 +370,8 @@ public class MySubscriber extends Sprite
     {
 	reconnect_interval = 0;
 	reconnect_timer = 0;
+
+	hide_buttons_timer = setInterval (hideButtonsTick, 5000);
 
 	stage.scaleMode = StageScaleMode.NO_SCALE;
 	stage.align = StageAlign.TOP_LEFT;
