@@ -51,6 +51,8 @@ public class MySubscriber extends Sprite
 
     private var hide_buttons_timer : uint;
 
+    private var frame_no : uint;
+
     private function doResize () : void
     {
         stage_width  = stage.stageWidth;
@@ -189,7 +191,14 @@ public class MySubscriber extends Sprite
 
     private function onEnterFrame (event : Event) : void
     {
-	reconnect_interval = 0;
+	trace ("--- onEnterFrame");
+
+	// This doesn't filter all spurious EnterFrame events.
+	if (frame_no == 1)
+	    showBuffering ();
+
+	++frame_no;
+
 	repositionVideo ();
 	showVideo ();
     }
@@ -220,8 +229,6 @@ public class MySubscriber extends Sprite
 		reconnect_timer = 0;
 	    }
 
-	    showBuffering ();
-
 	    var stream : NetStream = new NetStream (conn);
 	    stream.bufferTime = 5;
 	    stream.client = new MyStreamClient();
@@ -237,6 +244,7 @@ public class MySubscriber extends Sprite
 		}
 	    );
 
+	    frame_no = 0;
 	    video.addEventListener (Event.ENTER_FRAME, onEnterFrame);
 
 	    stream.play (stream_name);
@@ -248,7 +256,6 @@ public class MySubscriber extends Sprite
 
 	    if (!reconnect_timer) {
 		if (reconnect_interval == 0) {
-		    reconnect_interval = 2000;
 		    doReconnect ();
 		    return;
 		}
@@ -267,15 +274,21 @@ public class MySubscriber extends Sprite
     {
 	trace ("--- doSetChannel: " + uri);
 
+	video.removeEventListener (Event.ENTER_FRAME, onEnterFrame);
+
 	showConnecting ();
 
-	if (!reconnect)
+	if (!reconnect) {
 	    reconnect_interval = 0;
+	} else {
+	    if (!reconnect_interval)
+		reconnect_interval = 2000;
+	}
 
 	if (reconnect_timer) {
 	    clearInterval (reconnect_timer);
 	}
-	reconnect_timer = setInterval (reconnectTick, 3000);
+	reconnect_timer = setInterval (reconnectTick, reconnect ? reconnect_interval : 3000);
 
 	channel_uri = uri;
 	stream_name = stream_name_;
