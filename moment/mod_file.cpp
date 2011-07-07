@@ -86,7 +86,7 @@ Result httpRequest (HttpRequest  * const mt_nonnull req,
 {
     PathEntry * const path_entry = static_cast <PathEntry*> (_path_entry);
 
-    logD_ (_func, "HTTP request: ", req->getRequestLine());
+//    logD_ (_func, "HTTP request: ", req->getRequestLine());
 
   // TODO On Linux, we could do a better job with sendfile() or splice().
 
@@ -126,7 +126,7 @@ Result httpRequest (HttpRequest  * const mt_nonnull req,
 	file_path = file_path.region (1);
     }
 
-    logD_ (_func, "file_path: ", file_path);
+//    logD_ (_func, "file_path: ", file_path);
     if (file_path.len() == 0) {
 
 	file_path = "index.html";
@@ -163,16 +163,22 @@ Result httpRequest (HttpRequest  * const mt_nonnull req,
 	    else
 	    if (equal (ext, "swf"))
 		mime_type = "application/x-shockwave-flash";
+	    else
+	    if (equal (ext, "png"))
+		mime_type = "image/png";
+	    else
+	    if (equal (ext, "jpg"))
+		mime_type = "image/jpeg";
 	}
     }
 
     Ref<String> const filename = makeString (path_entry->path->mem(), !path_entry->path->isNull() ? "/" : "", file_path);
-    logD_ (_func, "Opening ", filename);
+//    logD_ (_func, "Opening ", filename);
     NativeFile native_file (filename->mem(),
 			    0 /* open_flags */,
 			    File::AccessMode::ReadOnly);
     if (exc) {
-	logE_ (_func, "Could not open \"", filename, "\"");
+	logE_ (_func, "Could not open \"", filename, "\": ", exc->toString());
 
 	MOMENT_FILE__HEADERS_DATE;
 	ConstMemory const reply_body = "404 Not Found";
@@ -240,7 +246,7 @@ Result httpRequest (HttpRequest  * const mt_nonnull req,
 	return Result::Success;
     }
 
-    logD_ (_func, "done");
+//    logD_ (_func, "done");
     return Result::Success;
 }
 
