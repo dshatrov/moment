@@ -123,6 +123,63 @@ AmfDecoder::decodeString (Memory const &mem,
 }
 
 Result
+AmfDecoder::decodeFieldName (Memory const &mem,
+			     Size * const ret_len,
+			     Size * const ret_full_len)
+{
+    if (msg_len - cur_offset < 2) {
+	logE_ (_func, "no field name");
+	return Result::Failure;
+    }
+
+    Byte header_data [2];
+    array->get (cur_offset, Memory::forObject (header_data));
+
+    cur_offset += 2;
+
+    Uint32 const string_len = ((Uint32) header_data [0] << 8) |
+			      ((Uint32) header_data [1] << 0);
+
+    if (msg_len - cur_offset < string_len) {
+	logE_ (_func, "message is too short");
+	return Result::Failure;
+    }
+
+    Size const tocopy = (mem.len() > string_len ? string_len : mem.len());
+    array->get (cur_offset, mem.region (0, tocopy));
+
+    cur_offset += string_len;
+
+    if (ret_len)
+	*ret_len = tocopy;
+
+    if (ret_full_len)
+	*ret_full_len = string_len;
+
+    return Result::Success;
+}
+
+Result
+AmfDecoder::beginObject ()
+{
+    if (msg_len - cur_offset < 1) {
+	logE_ (_func, "no object marker");
+	return Result::Failure;
+    }
+
+    Byte obj_marker;
+    array->get (cur_offset, Memory::forObject (obj_marker));
+    cur_offset += 1;
+
+    if (obj_marker != AmfMarker::Object) {
+	logE_ (_func, "not an object");
+	return Result::Failure;
+    }
+
+    return Result::Success;
+}
+
+Result
 AmfDecoder::skipObject ()
 {
     if (msg_len - cur_offset < 1) {

@@ -48,6 +48,12 @@ public:
 			 Size *ret_len,
 			 Size *ret_full_len);
 
+    Result decodeFieldName (Memory const &mem,
+			    Size *ret_len,
+			    Size *ret_full_len);
+
+    Result beginObject ();
+
     Result skipObject ();
 
     AmfDecoder (AmfEncoding const encoding,
