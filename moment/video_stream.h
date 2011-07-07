@@ -33,16 +33,19 @@ using namespace M;
 class VideoStream : public Object
 {
 public:
+    // Must be copyable.
     struct MessageInfo
     {
     public:
 	Uint64 timestamp;
+	bool is_keyframe;
 
 	// Greater than zero for prechunked messages.
 	Uint32 prechunk_size;
 
 	MessageInfo ()
 	    : timestamp (0),
+	      is_keyframe (true),
 	      prechunk_size (0)
 	{
 	}
@@ -51,11 +54,13 @@ public:
     struct EventHandler
     {
 	void (*audioMessage) (MessageInfo            * mt_nonnull msg_info,
+			      PagePool               * mt_nonnull page_pool,
 			      PagePool::PageListHead * mt_nonnull page_list,
 			      Size                    msg_len,
 			      void                  *cb_data);
 
 	void (*videoMessage) (MessageInfo            * mt_nonnull msg_info,
+			      PagePool               * mt_nonnull page_pool,
 			      PagePool::PageListHead * mt_nonnull page_list,
 			      Size                    msg_len,
 			      void                   *cb_data);
@@ -69,7 +74,18 @@ public:
 	void (*closed) (void *cb_data);
     };
 
+    struct SavedFrame
+    {
+	VideoStream::MessageInfo msg_info;
+	PagePool *page_pool;
+	PagePool::PageListHead page_list;
+	Size msg_len;
+    };
+
 private:
+    mt_mutex (mutex) bool got_saved_keyframe;
+    mt_mutex (mutex) SavedFrame saved_keyframe;
+
     Informer_<EventHandler> event_informer;
 
     static void informAudioMessage (EventHandler *event_handler,
@@ -95,10 +111,12 @@ public:
     }
 
     void fireAudioMessage (MessageInfo            * mt_nonnull msg_info,
+			   PagePool               * mt_nonnull page_pool,
 			   PagePool::PageListHead * mt_nonnull page_list,
 			   Size                    msg_len);
 
     void fireVideoMessage (MessageInfo            * mt_nonnull msg_info,
+			   PagePool               * mt_nonnull page_pool,
 			   PagePool::PageListHead * mt_nonnull page_list,
 			   Size                    msg_len);
 
@@ -108,6 +126,8 @@ public:
 				 AmfDecoder        * mt_nonnull amf_decoder);
 
     void close ();
+
+    bool getSavedKeyframe (SavedFrame * mt_nonnull ret_frame);
 
     VideoStream ();
 

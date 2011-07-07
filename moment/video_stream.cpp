@@ -27,13 +27,16 @@ namespace Moment {
 namespace {
     struct InformAudioMessage_Data {
 	VideoStream::MessageInfo *msg_info;
+	PagePool                 *page_pool;
 	PagePool::PageListHead   *page_list;
 	Size                      msg_len;
 
 	InformAudioMessage_Data (VideoStream::MessageInfo * const msg_info,
+				 PagePool                 * const page_pool,
 				 PagePool::PageListHead   * const page_list,
 				 Size                       const msg_len)
 	    : msg_info (msg_info),
+	      page_pool (page_pool),
 	      page_list (page_list),
 	      msg_len (msg_len)
 	{
@@ -48,6 +51,7 @@ VideoStream::informAudioMessage (EventHandler * const event_handler,
 {
     InformAudioMessage_Data * const inform_data = static_cast <InformAudioMessage_Data*> (_inform_data);
     event_handler->audioMessage (inform_data->msg_info,
+				 inform_data->page_pool,
 				 inform_data->page_list,
 				 inform_data->msg_len,
 				 cb_data);
@@ -56,13 +60,16 @@ VideoStream::informAudioMessage (EventHandler * const event_handler,
 namespace {
     struct InformVideoMessage_Data {
 	VideoStream::MessageInfo *msg_info;
+	PagePool                 *page_pool;
 	PagePool::PageListHead   *page_list;
 	Size                      msg_len;
 
 	InformVideoMessage_Data (VideoStream::MessageInfo * const msg_info,
+				 PagePool                 * const page_pool,
 				 PagePool::PageListHead   * const page_list,
 				 Size                       const msg_len)
 	    : msg_info (msg_info),
+	      page_pool (page_pool),
 	      page_list (page_list),
 	      msg_len (msg_len)
 	{
@@ -77,6 +84,7 @@ VideoStream::informVideoMessage (EventHandler * const event_handler,
 {
     InformVideoMessage_Data * const inform_data = static_cast <InformVideoMessage_Data*> (_inform_data);
     event_handler->videoMessage (inform_data->msg_info,
+				 inform_data->page_pool,
 				 inform_data->page_list,
 				 inform_data->msg_len,
 				 cb_data);
@@ -127,19 +135,38 @@ VideoStream::informClosed (EventHandler * const event_handler,
 
 void
 VideoStream::fireAudioMessage (MessageInfo            * const mt_nonnull msg_info,
+			       PagePool               * const mt_nonnull page_pool,
 			       PagePool::PageListHead * const mt_nonnull page_list,
 			       Size                     const msg_len)
 {
-    InformAudioMessage_Data inform_data (msg_info, page_list, msg_len);
+    InformAudioMessage_Data inform_data (msg_info, page_pool, page_list, msg_len);
     event_informer.informAll (informAudioMessage, &inform_data);
 }
 
 void
 VideoStream::fireVideoMessage (MessageInfo            * const mt_nonnull msg_info,
+			       PagePool               * const mt_nonnull page_pool,
 			       PagePool::PageListHead * const mt_nonnull page_list,
 			       Size                     const msg_len)
 {
-    InformVideoMessage_Data inform_data (msg_info, page_list, msg_len);
+    if (msg_info->is_keyframe) {
+	mutex.lock ();
+
+	if (got_saved_keyframe)
+	    saved_keyframe.page_pool->msgUnref (saved_keyframe.page_list.first);
+
+	got_saved_keyframe = true;
+	saved_keyframe.msg_info = *msg_info;
+	saved_keyframe.page_pool = page_pool;
+	saved_keyframe.page_list = *page_list;
+	saved_keyframe.msg_len = msg_len;
+
+	page_pool->msgRef (page_list->first);
+
+	mutex.unlock ();
+    }
+
+    InformVideoMessage_Data inform_data (msg_info, page_pool, page_list, msg_len);
     event_informer.informAll (informVideoMessage, &inform_data);
 }
 
@@ -159,13 +186,32 @@ VideoStream::close ()
     event_informer.informAll (informClosed, NULL /* inform_data */);
 }
 
+bool
+VideoStream::getSavedKeyframe (SavedFrame * const mt_nonnull ret_frame)
+{
+  StateMutexLock l (&mutex);
+
+    if (!got_saved_keyframe)
+	return false;
+
+    saved_keyframe.page_pool->msgRef (saved_keyframe.page_list.first);
+    *ret_frame = saved_keyframe;
+
+    return true;
+}
+
 VideoStream::VideoStream ()
-    : event_informer (this, &mutex)
+    : got_saved_keyframe (false),
+      event_informer (this, &mutex)
 {
 }
 
 VideoStream::~VideoStream ()
 {
+  StateMutexLock l (&mutex);
+
+    if (got_saved_keyframe)
+	saved_keyframe.page_pool->msgUnref (saved_keyframe.page_list.first);
 }
 
 }

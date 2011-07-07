@@ -29,6 +29,8 @@ namespace {
 RtmpService rtmp_service (NULL);
 RtmptService rtmpt_service (NULL);
 
+Count no_keyframe_limit = 25;
+
 class ClientSession : public Object
 {
 public:
@@ -39,6 +41,10 @@ public:
     // RtmpServer's methods. We must take special care to ensure that this
     // holds. See takeRtmpConnRef().
     RtmpServer rtmp_server;
+
+    // Used from streamVideoMessage() only.
+    Count no_keyframe_counter;
+    bool keyframe_sent;
 
     // Synchronized by rtmp_server.
     bool watching;
@@ -68,6 +74,8 @@ public:
 
     ClientSession ()
 	: valid (true),
+	  no_keyframe_counter (0),
+	  keyframe_sent (false),
 	  watching (false)
     {
     }
@@ -81,6 +89,7 @@ public:
 };
 
 void streamAudioMessage (VideoStream::MessageInfo * const mt_nonnull msg_info,
+			 PagePool                 * const mt_nonnull page_pool,
 			 PagePool::PageListHead   * const mt_nonnull page_list,
 			 Size                       const msg_len,
 			 void                     * const _session)
@@ -103,6 +112,7 @@ void streamAudioMessage (VideoStream::MessageInfo * const mt_nonnull msg_info,
 }
 
 void streamVideoMessage (VideoStream::MessageInfo * const mt_nonnull msg_info,
+			 PagePool                 * const mt_nonnull page_pool,
 			 PagePool::PageListHead   * const mt_nonnull page_list,
 			 Size                       const msg_len,
 			 void                     * const _session)
@@ -115,6 +125,25 @@ void streamVideoMessage (VideoStream::MessageInfo * const mt_nonnull msg_info,
     client_session->takeRtmpConnRef (&rtmp_conn_ref);
     if (!rtmp_conn_ref)
 	return;
+
+    bool got_keyframe = false;
+    if (msg_info->is_keyframe) {
+	got_keyframe = true;
+    } else
+    if (!client_session->keyframe_sent) {
+	++client_session->no_keyframe_counter;
+	if (client_session->no_keyframe_counter >= no_keyframe_limit) {
+	    got_keyframe = true;
+	} else {
+	  // Waiting for a keyframe, dropping current video frame.
+	    return;
+	}
+    }
+
+    if (got_keyframe) {
+	client_session->no_keyframe_counter = 0;
+	client_session->keyframe_sent = true;
+    }
 
     RtmpConnection::MessageInfo rtmp_msg_info;
     rtmp_msg_info.msg_stream_id = RtmpConnection::DefaultMessageStreamId;
@@ -161,6 +190,20 @@ Result startWatching (ConstMemory const &stream_name,
 	return Result::Success;
     }
     client_session->watching = true;
+
+    {
+	VideoStream::SavedFrame saved_frame;
+	if (video_stream->getSavedKeyframe (&saved_frame)) {
+	    RtmpConnection::MessageInfo rtmp_msg_info;
+	    rtmp_msg_info.msg_stream_id = RtmpConnection::DefaultMessageStreamId;
+	    rtmp_msg_info.timestamp = (Uint32) saved_frame.msg_info.timestamp;
+	    rtmp_msg_info.prechunk_size = saved_frame.msg_info.prechunk_size;
+
+	    client_session->rtmp_server.sendVideoMessage (&rtmp_msg_info, &saved_frame.page_list, saved_frame.msg_len);
+
+	    saved_frame.page_pool->msgUnref (saved_frame.page_list.first);
+	}
+    }
 
     video_stream->getEventInformer()->subscribe (&video_event_handler, client_session, NULL /* ref_data */, client_session);
 
