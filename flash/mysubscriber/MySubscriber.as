@@ -14,6 +14,8 @@ import flash.net.URLRequest;
 import flash.events.Event;
 import flash.events.NetStatusEvent;
 import flash.events.MouseEvent;
+import flash.utils.setInterval;
+import flash.utils.clearInterval;
 
 //[SWF(width='640', height='480')]
 [SWF(backgroundColor=0)]
@@ -40,6 +42,12 @@ public class MySubscriber extends Sprite
     // reported by flash.
     private var stage_width : int;
     private var stage_height : int;
+
+    private var channel_uri : String;
+    private var stream_name : String;
+
+    private var reconnect_interval : uint;
+    private var reconnect_timer : uint;
 
     private function doResize () : void
     {
@@ -84,7 +92,7 @@ public class MySubscriber extends Sprite
     private function repositionMessage (msg : Loader) : void
     {
 	msg.x = (stage_width - msg.width) / 2;
-	msg.y = (stage_height - msg.height) * (3.0 / 4.0);
+	msg.y = (stage_height - msg.height) * (4.0 / 5.0);
     }
 
     private function repositionMessages () : void
@@ -134,7 +142,7 @@ public class MySubscriber extends Sprite
 	video.visible = true;
     }
 
-    private function showConecting () : void
+    private function showConnecting () : void
     {
 	msg_connecting.setVisible (true);
 	msg_buffering.setVisible (false);
@@ -162,62 +170,126 @@ public class MySubscriber extends Sprite
 	msg_error.setVisible (false);
     }
 
-    private function onNetStatus (event : NetStatusEvent) : void
+    private function onStreamNetStatus (event : NetStatusEvent) : void
     {
 	trace ("--- STREAM STATUS");
 	trace (event.info.code);
 
 	if (event.info.code == "NetStream.Buffer.Full") {
-//	    doResize ();
+	    reconnect_interval = 0;
+	    video.removeEventListener (Event.ENTER_FRAME, onEnterFrame);
+
+	    repositionVideo ();
 	    showVideo ();
+	    hideMessages ();
 	}
     }
 
-    public function setChannel (uri : String, stream_name : String) : void
+    private function onEnterFrame (event : Event) : void
     {
-	trace ("--- setChannel: " + uri);
+	reconnect_interval = 0;
+	repositionVideo ();
+	showVideo ();
+    }
 
-//        showSplash ();
+    private function doReconnect () : void
+    {
+	doSetChannel (channel_uri, stream_name, true /* reconnect */);
+    }
+
+    private function reconnectTick () : void
+    {
+	trace ("--- reconnectTick");
+
+	if (reconnect_interval < 60000)
+	    reconnect_interval *= 2;
+
+	doReconnect ();
+    }
+
+    private function onConnNetStatus (event : NetStatusEvent) : void
+    {
+	trace ("--- CONN STATUS");
+	trace (event.info.code);
+
+	if (event.info.code == "NetConnection.Connect.Success") {
+	    if (reconnect_timer) {
+		clearInterval (reconnect_timer);
+		reconnect_timer = 0;
+	    }
+
+	    showBuffering ();
+
+	    var stream : NetStream = new NetStream (conn);
+	    stream.bufferTime = 5;
+	    stream.client = new MyStreamClient();
+
+	    video.attachNetStream (stream);
+
+	    stream.addEventListener (NetStatusEvent.NET_STATUS, onStreamNetStatus);
+
+	    video.addEventListener (NetStatusEvent.NET_STATUS,
+		function (event : NetStatusEvent) : void {
+		    trace ("--- VIDEO STATUS");
+		    trace (event.info.code);
+		}
+	    );
+
+	    video.addEventListener (Event.ENTER_FRAME, onEnterFrame);
+
+	    stream.play (stream_name);
+	} else
+	if (event.info.code == "NetConnection.Connect.Closed") {
+	    video.removeEventListener (Event.ENTER_FRAME, onEnterFrame);
+	    splash.setVisible (false);
+	    showError ();
+
+	    if (!reconnect_timer) {
+		if (reconnect_interval == 0) {
+		    reconnect_interval = 2000;
+		    doReconnect ();
+		    return;
+		}
+
+		reconnect_timer = setInterval (reconnectTick, reconnect_interval);
+	    }
+	}
+    }
+
+    public function setChannel (uri : String, stream_name_ : String) : void
+    {
+	doSetChannel (uri, stream_name_, false /* reconnect */);
+    }
+
+    public function doSetChannel (uri : String, stream_name_ : String, reconnect : Boolean) : void
+    {
+	trace ("--- doSetChannel: " + uri);
+
+	showConnecting ();
+
+	if (!reconnect)
+	    reconnect_interval = 0;
+
+	if (reconnect_timer) {
+	    clearInterval (reconnect_timer);
+	}
+	reconnect_timer = setInterval (reconnectTick, 3000);
+
+	channel_uri = uri;
+	stream_name = stream_name_;
 
 	if (conn != null) {
+	    conn.removeEventListener (NetStatusEvent.NET_STATUS, onConnNetStatus);
 	    conn.close ();
 	}
 
 	conn = new NetConnection();
 	conn.objectEncoding = ObjectEncoding.AMF0;
-//	conn.connect ("rtmp://10.0.0.3:8083");
-//	conn.connect ("rtmp://10.0.0.3:1935");
 	conn.connect (uri);
 
 	trace ("--- connecting...");
 
-	conn.addEventListener (NetStatusEvent.NET_STATUS,
-	    function (event : NetStatusEvent) : void {
-		trace ("--- CONN STATUS");
-		trace (event.info.code);
-
-		if (event.info.code == "NetConnection.Connect.Success") {
-		    var stream : NetStream = new NetStream (conn);
-		    stream.bufferTime = 5;
-		    stream.client = new MyStreamClient();
-
-		    video.attachNetStream (stream);
-
-		    stream.addEventListener (NetStatusEvent.NET_STATUS, onNetStatus);
-
-		    video.addEventListener (NetStatusEvent.NET_STATUS,
-			function (event : NetStatusEvent) : void {
-			    trace ("--- VIDEO STATUS");
-			    trace (event.info.code);
-			}
-		    );
-
-		    stream.play (stream_name);
-		} else {
-		    // TODO if (error) => show error message
-		}
-	    }
-	);
+	conn.addEventListener (NetStatusEvent.NET_STATUS, onConnNetStatus);
     }
 
     private function toggleFullscreen (event : MouseEvent) : void
@@ -281,13 +353,16 @@ public class MySubscriber extends Sprite
 
     public function MySubscriber()
     {
+	reconnect_interval = 0;
+	reconnect_timer = 0;
+
 	stage.scaleMode = StageScaleMode.NO_SCALE;
 	stage.align = StageAlign.TOP_LEFT;
 
         stage_width = stage.stageWidth;
         stage_height = stage.stageHeight;
 
-	splash = createLoadedElement ("dark.png", true /* visible */);
+	splash = createLoadedElement ("splash.png", true /* visible */);
 
 	video = new Video();
 	video.width = 320;
