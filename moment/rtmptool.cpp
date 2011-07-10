@@ -4,12 +4,38 @@
 #include <moment/libmoment.h>
 
 #include <mycpp/mycpp.h>
+#include <mycpp/cmdline.h>
 
 
 using namespace M;
 using namespace Moment;
 
 namespace {
+
+mt_const struct Options
+{
+    bool help;
+    Uint32 num_clients;
+
+    bool got_server_addr;
+    IpAddress server_addr;
+
+    Ref<String> channel;
+    Ref<String> out_file;
+
+    Uint32 report_interval;
+
+    Options ()
+	: help (false),
+	  num_clients (1),
+	  got_server_addr (false),
+	  channel (grab (new String ("red5StreamDemo"))),
+	  report_interval (0)
+    {
+    }
+};
+
+Options options;
 
 class RtmpClient : public DependentCodeReferenced
 {
@@ -167,7 +193,7 @@ RtmpClient::commandMessageCallback (RtmpConnection::MessageInfo * const mt_nonnu
 
 		self->glob_stream_id = lround (stream_id);
 
-		self->rtmp_conn.sendPlay ("red5StreamDemo");
+		self->rtmp_conn.sendPlay (options.channel->mem());
 
 		self->conn_state = ConnectionState_Streaming;
 	    } break;
@@ -224,13 +250,15 @@ RtmpClient::videoMessage (RtmpConnection::MessageInfo * const mt_nonnull /* msg_
 
     RtmpClient * const self = static_cast <RtmpClient*> (_self);
 
-    static int debug_counter = 1031;
-    ++debug_counter;
-    if (debug_counter >= 1031) {
-	debug_counter = 0;
+    if (options.report_interval) {
+	static Uint32 debug_counter = options.report_interval;
+	++debug_counter;
+	if (debug_counter >= options.report_interval) {
+	    debug_counter = 0;
 
-	logs->print (ConstMemory::forObject (self->id_char));
-	logs->flush ();
+	    logs->print (ConstMemory::forObject (self->id_char));
+	    logs->flush ();
+	}
     }
 
     return Result::Success;
@@ -291,9 +319,6 @@ RtmpClient::RtmpClient (Object * const coderef_container,
 
 Result doTest (void)
 {
-    MyCpp::myCppInit ();
-    libMaryInit ();
-
     PagePool page_pool (4096 /* page_size */, 4096 /* min_pages */);
 
     ServerApp server_app (NULL /* coderef_container */);
@@ -302,15 +327,17 @@ Result doTest (void)
 	return Result::Failure;
     }
 
-    IpAddress addr;
-    if (!setIpAddress ("localhost:8083", &addr)) {
-	logE_ (_func, "setIpAddress() failed");
-	return Result::Failure;
+    IpAddress addr = options.server_addr;
+    if (!options.got_server_addr) {
+	if (!setIpAddress ("localhost:8083", &addr)) {
+	    logE_ (_func, "setIpAddress() failed");
+	    return Result::Failure;
+	}
     }
 
     {
 	Byte id_char = 'a';
-	for (Uint32 i = 0; i < 250; ++i) {
+	for (Uint32 i = 0; i < options.num_clients; ++i) {
 	    logD_ (_func, "Starting client, id_char: ", ConstMemory::forObject (id_char));
 
 	    // Note that RtmpClient objects are never freed.
@@ -333,10 +360,153 @@ Result doTest (void)
     return Result::Success;
 }
 
+static void
+printUsage ()
+{
+    outs->print ("Usage: rtmptool [options]\n"
+		 "Options:\n"
+		 "  -n --num-clients <N> - Simulate N simultaneous clients.\n"
+		 "  -s --server-addr - Server address, IP:PORT.\n"
+		 "  -c --channel - Name of the channel to subscribe to.\n"
+		 "  -h --help - Show help message.\n"
+		 "  -r --report-interval - Interval between video frame reports.\n"
+//		 "  -o --out_file - Output file name.\n"
+		 );
+    outs->flush ();
+}
+
+bool cmdline_help (char const * /* short_name */,
+		   char const * /* long_name */,
+		   char const * /* value */,
+		   void       * /* opt_data */,
+		   void       * /* cb_data */)
+{
+    options.help = true;
+    return true;
+}
+
+bool cmdline_num_clients (char const * /* short_name */,
+			  char const * /* long_name */,
+			  char const *value,
+			  void       * /* opt_data */,
+			  void       * /* cb_data */)
+{
+    if (!strToUint32_safe (value, &options.num_clients)) {
+	logE_ (_func, "Invalid value \"", value, "\" "
+	       "for --num-clients (number expected): ", exc->toString());
+	exit (EXIT_FAILURE);
+    }
+
+    return true;
+}
+
+bool cmdline_server_addr (char const * /* short_name */,
+			  char const * /* long_name */,
+			  char const *value,
+			  void       * /* opt_data */,
+			  void       * /* cb_data */)
+{
+    if (!setIpAddress (ConstMemory (value, strlen (value)), &options.server_addr)) {
+	logE_ (_func, "Invalid value \"", value, "\""
+	       "for --server-addr (IP:PORT expected)");
+	exit (EXIT_FAILURE);
+    }
+
+    options.got_server_addr = true;
+    return true;
+}
+
+bool cmdline_channel (char const * /* short_name */,
+		      char const * /* long_name */,
+		      char const *value,
+		      void       * /* opt_data */,
+		      void       * /* cb_data */)
+{
+    options.channel = grab (new String (value));
+    return true;
+}
+
+bool cmdline_out_file (char const * /* short_name */,
+		       char const * /* long_name */,
+		       char const *value,
+		       void       * /* opt_data */,
+		       void       * /* cb_data */)
+{
+    options.out_file = grab (new String (value));
+    return true;
+}
+
+bool cmdline_report_interval (char const * /* short_name */,
+			      char const * /* long_name */,
+			      char const *value,
+			      void       * /* opt_data */,
+			      void       * /* cb_data */)
+{
+    if (!strToUint32_safe (value, &options.report_interval)) {
+	logE_ (_func, "Invalid value \"", value, "\" "
+	       "for --report-interval (number expected): ", exc->toString());
+	exit (EXIT_FAILURE);
+    }
+
+    return true;
+}
+
 } // namespace {}
 
-int main (void)
+int main (int argc, char **argv)
 {
+    MyCpp::myCppInit ();
+    libMaryInit ();
+
+    {
+	unsigned const num_opts = 6;
+	MyCpp::CmdlineOption opts [num_opts];
+
+	opts [0].short_name = "h";
+	opts [0].long_name  = "help";
+	opts [0].with_value = false;
+	opts [0].opt_data   = NULL;
+	opts [0].opt_callback = cmdline_help;
+
+	opts [1].short_name = "n";
+	opts [1].long_name  = "num-clients";
+	opts [1].with_value = true;
+	opts [1].opt_data   = NULL;
+	opts [1].opt_callback = cmdline_num_clients;
+
+	opts [2].short_name = "s";
+	opts [2].long_name  = "server-addr";
+	opts [2].with_value = true;
+	opts [2].opt_data   = NULL;
+	opts [2].opt_callback = cmdline_server_addr;
+
+	opts [3].short_name = "c";
+	opts [3].long_name  = "channel";
+	opts [3].with_value = true;
+	opts [3].opt_data   = NULL;
+	opts [3].opt_callback = cmdline_channel;
+
+	opts [4].short_name = "o";
+	opts [4].long_name  = "out-file";
+	opts [4].with_value = true;
+	opts [4].opt_data   = NULL;
+	opts [4].opt_callback = cmdline_out_file;
+
+	opts [5].short_name = "r";
+	opts [5].long_name  = "report-interval";
+	opts [5].with_value = true;
+	opts [5].opt_data   = NULL;
+	opts [5].opt_callback = cmdline_report_interval;
+
+	MyCpp::ArrayIterator<MyCpp::CmdlineOption> opts_iter (opts, num_opts);
+	MyCpp::parseCmdline (&argc, &argv, opts_iter, NULL /* callback */, NULL /* callback_data */);
+    }
+
+    if (options.help) {
+	printUsage ();
+	return 0;
+    }
+
     if (doTest ())
 	return 0;
 
