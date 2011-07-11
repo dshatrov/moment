@@ -397,6 +397,7 @@ public:
 		      ConstMemory  const &mem,
 		      Uint32              prechunk_size);
 
+    // TODO 'page_pool' parameter is needed.
     // @prechunk_size - If 0, then message data is not prechunked.
     void sendMessagePages (MessageDesc const      * mt_nonnull mdesc,
 			   ChunkStream            * mt_nonnull chunk_stream,

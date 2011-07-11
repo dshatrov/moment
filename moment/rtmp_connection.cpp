@@ -308,9 +308,9 @@ RtmpConnection::fillPrechunkedPages (PrechunkContext        * const  prechunk_ct
 {
     msg_timestamp = debugMangleTimestamp (msg_timestamp);
 
-    logD (chunk, _func, mem.len(), " bytes");
-
     Size const prechunk_size = PrechunkSize;
+
+    logD (chunk, _func, mem.len(), " bytes, prechunk_size: ", prechunk_size);
 
     Size total_filled = 0;
 
@@ -494,6 +494,8 @@ RtmpConnection::sendRawPages (PagePool::Page * const first_page,
 void
 RtmpConnection::resetPacket ()
 {
+    logD (chunk, _func_);
+
     conn_state = ReceiveState::BasicHeader;
     cs_id = 0;
     cs_id__fmt = CsIdFormat::Unknown;
@@ -921,6 +923,8 @@ RtmpConnection::processMessage (ChunkStream * const chunk_stream)
 		logE_ (_func, "SetChunkSize: bad chunk size: ", chunk_size);
 		return Result::Failure;
 	    }
+
+	    logD (msg, _func, "SetChunkSize: new chunk size: ", chunk_size);
 
 	    in_chunk_size = chunk_size;
 	} break;
@@ -1512,7 +1516,7 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 
 		bool has_extended_timestamp = false;
 		if (timestamp == 0x00ffffff)
-		    has_extended_timestamp = false;
+		    has_extended_timestamp = true;
 		else
 		    recv_chunk_stream->in_msg_timestamp = timestamp;
 
@@ -1616,7 +1620,7 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 
 		bool has_extended_timestamp = false;
 		if (timestamp_delta == 0x00ffffff)
-		    has_extended_timestamp = 1;
+		    has_extended_timestamp = true;
 		else
 		    recv_chunk_stream->in_msg_timestamp += timestamp_delta;
 
@@ -2105,11 +2109,10 @@ RtmpConnection::RtmpConnection (Object * const coderef_container)
 RtmpConnection::~RtmpConnection ()
 {
     if (ping_send_timer)
-	// TODO Ensure that ping_send_timer is periodical.
 	timers->deleteTimer (ping_send_timer);
 
     // TODO Release chunk streams
-    // TODO Release unsent messages
+    // TODO Release incomplete messages in chunk streams.
 }
 
 }
