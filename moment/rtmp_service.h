@@ -48,6 +48,7 @@ private:
 	DeferredConnectionSender conn_sender;
 	ConnectionReceiver conn_receiver;
 	RtmpConnection rtmp_conn;
+	DeferredProcessor::Registration deferred_reg;
 
 	mt_const PollGroup::PollableKey pollable_key;
 

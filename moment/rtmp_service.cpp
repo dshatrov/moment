@@ -51,6 +51,8 @@ RtmpService::destroySession (ClientSession * const session)
 
     poll_group->removePollable (session->pollable_key);
 
+    session->deferred_reg.release ();
+
     // TODO close TCP connection explicitly.
 
     session_list.remove (session);
@@ -82,11 +84,14 @@ RtmpService::acceptOneConnection ()
     }
 
     session->conn_sender.setConnection (&session->tcp_conn);
+    session->conn_sender.setDeferredRegistration (&session->deferred_reg);
+
     session->rtmp_conn.setBackend (Cb<RtmpConnection::Backend> (&rtmp_conn_backend, session, session));
     session->rtmp_conn.setSender (&session->conn_sender);
+
     session->conn_receiver.setFrontend (session->rtmp_conn.getReceiverFrontend());
 
-    if (!(session->pollable_key = poll_group->addPollable (session->tcp_conn.getPollable()))) {
+    if (!(session->pollable_key = poll_group->addPollable (session->tcp_conn.getPollable(), &session->deferred_reg))) {
 	logE (rtmp_service, _func, "PollGroup::addPollable() failed: ", exc->toString());
 	return true;
     }
@@ -173,7 +178,7 @@ RtmpService::start ()
     if (!tcp_server.listen ())
 	return Result::Failure;
 
-    if (!poll_group->addPollable (tcp_server.getPollable()))
+    if (!poll_group->addPollable (tcp_server.getPollable(), NULL /* ret_reg */))
 	return Result::Failure;
 
     return Result::Success;

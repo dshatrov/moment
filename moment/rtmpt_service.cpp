@@ -80,7 +80,7 @@ RtmptService::acceptOneConnection ()
 	assert (res == TcpServer::AcceptResult::Accepted);
     }
 
-    PollGroup::PollableKey pollable_key = poll_group->addPollable (tcp_conn->getPollable());
+    PollGroup::PollableKey pollable_key = poll_group->addPollable (tcp_conn->getPollable(), NULL /* ret_reg */);
     if (!pollable_key) {
 	delete tcp_conn;
 	logE_ (_func, "PollGroup::addPollable() failed: ", exc->toString ());
@@ -131,7 +131,7 @@ RtmptService::start ()
     if (!tcp_server.listen ())
 	return Result::Failure;
 
-    if (!poll_group->addPollable (tcp_server.getPollable()))
+    if (!poll_group->addPollable (tcp_server.getPollable(), NULL /* ret_reg */))
 	return Result::Failure;
 
     return Result::Success;

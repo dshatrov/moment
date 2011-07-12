@@ -34,6 +34,8 @@ LogGroup libMary_logGroup_close  ("rtmp_conn_close", LogLevel::D);
 }
 
 Sender::Frontend const RtmpConnection::sender_frontend = {
+    // TODO
+    NULL /* senderStateChanged */,
     senderClosed
 };
 

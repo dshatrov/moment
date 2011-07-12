@@ -249,6 +249,10 @@ RtmpServer::commandMessage (RtmpConnection::MessageInfo * const mt_nonnull msg_i
 
     ConstMemory method_mem (method_name, method_name_len);
     if (!compare (method_mem, "connect")) {
+//	decoder.decodeNumber ();
+//	decoder.beginObject ();
+	// TODO Decode URL
+
 	return rtmp_conn->doConnect (msg_info);
     } else
     if (!compare (method_mem, "createStream")) {

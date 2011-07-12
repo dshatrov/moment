@@ -283,7 +283,7 @@ RtmpClient::start (PollGroup * const  poll_group,
 	return Result::Failure;
     }
 
-    poll_group->addPollable (tcp_conn.getPollable());
+    poll_group->addPollable (tcp_conn.getPollable(), NULL /* ret_reg */);
     return Result::Success;
 }
 
