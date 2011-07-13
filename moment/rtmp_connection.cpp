@@ -1152,7 +1152,7 @@ RtmpConnection::senderStateChanged (Sender::SendState   const send_state,
 {
     RtmpConnection * const self = static_cast <RtmpConnection*> (_self);
 
-    logD_ (_func_);
+//    logD_ (_func_);
 
   // Note that we're not allowed to call Sender's methods while in this callback.
 

@@ -26,6 +26,10 @@ namespace Moment {
 
 namespace {
 
+namespace {
+LogGroup libMary_logGroup_framedrop ("mod_rtmp_framedrop", LogLevel::N);
+}
+
 RtmpService rtmp_service (NULL);
 RtmptService rtmpt_service (NULL);
 
@@ -118,7 +122,7 @@ void streamAudioMessage (VideoStream::MessageInfo * const mt_nonnull msg_info,
 
     if (client_session->overloaded) {
       // Connection overloaded, dropping this audio frame.
-	logD_ (_func, "Connection overloaded, dropping audio frame");
+	logD (framedrop, _func, "Connection overloaded, dropping audio frame");
 	client_session->mutex.unlock ();
 	return;
     }
@@ -155,7 +159,7 @@ void streamVideoMessage (VideoStream::MessageInfo * const mt_nonnull msg_info,
       // have to wait for the next keyframe after we've dropped a frame.
       // We do not care about disposable frames yet.
 
-	logD_ (_func, "Connection overloaded, dropping video frame");
+	logD (framedrop, _func, "Connection overloaded, dropping video frame");
 
 	client_session->no_keyframe_counter = 0;
 	client_session->keyframe_sent = false;
@@ -277,23 +281,23 @@ void sendStateChanged (Sender::SendState   const send_state,
 
     switch (send_state) {
 	case Sender::ConnectionReady:
-	    logD_ (_func, "ConnectionReady");
+	    logD (framedrop, _func, "ConnectionReady");
 	    client_session->mutex.lock ();
 	    client_session->overloaded = false;
 	    client_session->mutex.unlock ();
 	    break;
 	case Sender::ConnectionOverloaded:
-	    logD_ (_func, "ConnectionOverloaded");
+	    logD (framedrop, _func, "ConnectionOverloaded");
 	    client_session->mutex.lock ();
 	    client_session->overloaded = true;
 	    client_session->mutex.unlock ();
 	    break;
 	case Sender::QueueSoftLimit:
-	    logD_ (_func, "QueueSoftLimit");
+	    logD (framedrop, _func, "QueueSoftLimit");
 	    // TODO Block input from the client.
 	    break;
 	case Sender::QueueHardLimit:
-	    logD_ (_func, "QueueHardLimit");
+	    logD (framedrop, _func, "QueueHardLimit");
 	    destroyClientSession (client_session);
 	    break;
 	default:
