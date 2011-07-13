@@ -42,9 +42,11 @@ public:
     // holds. See takeRtmpConnRef().
     RtmpServer rtmp_server;
 
+    mt_mutex (mutex) bool overloaded;
+
     // Used from streamVideoMessage() only.
-    Count no_keyframe_counter;
-    bool keyframe_sent;
+    mt_mutex (mutex) Count no_keyframe_counter;
+    mt_mutex (mutex) bool keyframe_sent;
 
     // Synchronized by rtmp_server.
     bool watching;
@@ -74,6 +76,7 @@ public:
 
     ClientSession ()
 	: valid (true),
+	  overloaded (false),
 	  no_keyframe_counter (0),
 	  keyframe_sent (false),
 	  watching (false)
@@ -87,6 +90,14 @@ public:
     }
 #endif
 };
+
+void destroyClientSession (ClientSession * const client_session)
+{
+    if (!client_session->invalidate())
+	return;
+
+    client_session->unref ();
+}
 
 void streamAudioMessage (VideoStream::MessageInfo * const mt_nonnull msg_info,
 			 PagePool                 * const mt_nonnull page_pool,
@@ -102,6 +113,17 @@ void streamAudioMessage (VideoStream::MessageInfo * const mt_nonnull msg_info,
     client_session->takeRtmpConnRef (&rtmp_conn_ref);
     if (!rtmp_conn_ref)
 	return;
+
+    client_session->mutex.lock ();
+
+    if (client_session->overloaded) {
+      // Connection overloaded, dropping this audio frame.
+	logD_ (_func, "Connection overloaded, dropping audio frame");
+	client_session->mutex.unlock ();
+	return;
+    }
+
+    client_session->mutex.unlock ();
 
     RtmpConnection::MessageInfo rtmp_msg_info;
     rtmp_msg_info.msg_stream_id = RtmpConnection::DefaultMessageStreamId;
@@ -126,6 +148,22 @@ void streamVideoMessage (VideoStream::MessageInfo * const mt_nonnull msg_info,
     if (!rtmp_conn_ref)
 	return;
 
+    client_session->mutex.lock ();
+
+    if (client_session->overloaded) {
+      // Connection overloaded, dropping this video frame. In general, we'll
+      // have to wait for the next keyframe after we've dropped a frame.
+      // We do not care about disposable frames yet.
+
+	logD_ (_func, "Connection overloaded, dropping video frame");
+
+	client_session->no_keyframe_counter = 0;
+	client_session->keyframe_sent = false;
+
+	client_session->mutex.unlock ();
+	return;
+    }
+
     bool got_keyframe = false;
     if (msg_info->is_keyframe) {
 	got_keyframe = true;
@@ -136,6 +174,7 @@ void streamVideoMessage (VideoStream::MessageInfo * const mt_nonnull msg_info,
 	    got_keyframe = true;
 	} else {
 	  // Waiting for a keyframe, dropping current video frame.
+	    client_session->mutex.unlock ();
 	    return;
 	}
     }
@@ -144,6 +183,8 @@ void streamVideoMessage (VideoStream::MessageInfo * const mt_nonnull msg_info,
 	client_session->no_keyframe_counter = 0;
 	client_session->keyframe_sent = true;
     }
+
+    client_session->mutex.unlock ();
 
     RtmpConnection::MessageInfo rtmp_msg_info;
     rtmp_msg_info.msg_stream_id = RtmpConnection::DefaultMessageStreamId;
@@ -229,6 +270,37 @@ Result commandMessage (RtmpConnection::MessageInfo * const mt_nonnull msg_info,
     return client_session->rtmp_server.commandMessage (msg_info, page_list, msg_len, amf_encoding);
 }
 
+void sendStateChanged (Sender::SendState   const send_state,
+		       void              * const _client_session)
+{
+    ClientSession * const client_session = static_cast <ClientSession*> (_client_session);
+
+    switch (send_state) {
+	case Sender::ConnectionReady:
+	    logD_ (_func, "ConnectionReady");
+	    client_session->mutex.lock ();
+	    client_session->overloaded = false;
+	    client_session->mutex.unlock ();
+	    break;
+	case Sender::ConnectionOverloaded:
+	    logD_ (_func, "ConnectionOverloaded");
+	    client_session->mutex.lock ();
+	    client_session->overloaded = true;
+	    client_session->mutex.unlock ();
+	    break;
+	case Sender::QueueSoftLimit:
+	    logD_ (_func, "QueueSoftLimit");
+	    // TODO Block input from the client.
+	    break;
+	case Sender::QueueHardLimit:
+	    logD_ (_func, "QueueHardLimit");
+	    destroyClientSession (client_session);
+	    break;
+	default:
+	    unreachable();
+    }
+}
+
 void closed (Exception * const exc,
 	     void      * const _client_session)
 {
@@ -238,10 +310,7 @@ void closed (Exception * const exc,
 	logE_ (_func, exc->toString());
 
     ClientSession * const client_session = static_cast <ClientSession*> (_client_session);
-    if (!client_session->invalidate())
-	return;
-
-    client_session->unref ();
+    destroyClientSession (client_session);
 }
 
 RtmpConnection::Frontend const rtmp_frontend = {
@@ -249,6 +318,7 @@ RtmpConnection::Frontend const rtmp_frontend = {
     commandMessage,
     NULL /* audioMessage */,
     NULL /* videoMessage */,
+    sendStateChanged,
     closed
 };
 

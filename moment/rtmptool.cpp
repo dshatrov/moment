@@ -115,6 +115,7 @@ RtmpConnection::Frontend const RtmpClient::rtmp_conn_frontend = {
     commandMessageCallback,
     audioMessage,
     videoMessage,
+    NULL /* sendStateChanged */,
     closed
 };
 

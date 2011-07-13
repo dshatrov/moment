@@ -34,8 +34,7 @@ LogGroup libMary_logGroup_close  ("rtmp_conn_close", LogLevel::D);
 }
 
 Sender::Frontend const RtmpConnection::sender_frontend = {
-    // TODO
-    NULL /* senderStateChanged */,
+    senderStateChanged,
     senderClosed
 };
 
@@ -1145,6 +1144,32 @@ RtmpConnection::processUserControlMessage (ChunkStream * const chunk_stream)
     }
 
     return Result::Success;
+}
+
+void
+RtmpConnection::senderStateChanged (Sender::SendState   const send_state,
+				    void              * const _self)
+{
+    RtmpConnection * const self = static_cast <RtmpConnection*> (_self);
+
+    logD_ (_func_);
+
+  // Note that we're not allowed to call Sender's methods while in this callback.
+
+    self->frontend.call (self->frontend->sendStateChanged, /* ( */ send_state /* ) */);
+
+#if 0
+    switch (send_state) {
+	case Sender::ConnectionReady:
+	    break;
+	case Sender::ConnectionOverloaded:
+	    break;
+	case Sender::QueueSoftLimit:
+	    break;
+	case Sender::QueueHardLimit:
+	    break;
+    }
+#endif
 }
 
 void

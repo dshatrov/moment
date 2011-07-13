@@ -86,6 +86,9 @@ public:
 				Size                    msg_len,
 				void                   *cb_data);
 
+	void (*sendStateChanged) (Sender::SendState send_state,
+				  void *cb_data);
+
 	void (*closed) (Exception *exc_ mt_exc_kind ((IoException, InternalException)),
 			void *cb_data);
     };
@@ -470,6 +473,9 @@ private:
   mt_iface (Sender::Frontend)
 
     static Sender::Frontend const sender_frontend;
+
+    static void senderStateChanged (Sender::SendState  send_state,
+				    void              *_self);
 
     static void senderClosed (Exception *exc_,
 			      void      *_self);
