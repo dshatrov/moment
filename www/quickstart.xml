@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE mync SYSTEM "entities.dtd">
+
+<moment>
+<content>
+	<pagename>
+		<eng>Quick Start</eng>
+		<rus>Установка и запуск</rus>
+	</pagename>
+	<title>
+		<eng>Quick Start</eng>
+		<rus>Установка и запуск</rus>
+	</title>
+	<p>
+		<eng>
+                    Test text.
+		</eng>
+		<rus>
+                    Тестовый текст.
+		</rus>
+	</p>
+</content>
+</moment>
+

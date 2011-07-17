@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE mync SYSTEM "entities.dtd">
+
+<moment>
+<content>
+	<pagename>
+		<eng>Licensing</eng>
+		<rus>Лицензия</rus>
+	</pagename>
+	<title>
+		<eng>Licensing</eng>
+		<rus>Лицензия</rus>
+	</title>
+	<p>
+		<eng>
+                    <p>
+                    If you want to use Moment Video Server or its libraries in a commercial product,
+                    contact us: <a href="mailto:momentsolutions@gmail.com">momentserver@gmail.com</a>
+                    </p>
+
+                    <p>
+                    Moment's team could help you by providing support, adding features you need,
+                    or by developing complete streaming solutions.
+                    Contact us for details:  <a href="mailto:momentsolutions@gmail.com">momentserver@gmail.com</a>
+                    </p>
+
+                    <p>
+                    Moment Video Server is open source software licensed under the
+                    <a title="GNU General Public License" href="gpl.html">GPL license</a>.
+                    </p>
+		</eng>
+		<rus>
+                    <p>
+                    Если вы хотите использовать видеосервер "Moment" или его библиотеки в своём продукте —
+                    свяжитесь с нами: <a href="mailto:momentsolutions@gmail.com">momentserver@gmail.com</a>
+                    </p>
+
+                    <p>
+                    Команда разработчиков видеосервера "Moment" предоставляет поддержку, разрабатывает
+                    новые модули и законченные решения для потокового вещания видео.
+                    Свяжитесь с нами, чтобы узнать подробности:
+                    <a href="mailto:momentsolutions@gmail.com">momentserver@gmail.com</a>
+                    </p>
+
+                    <p>
+                    Иходный код видеосервера "Moment" доступен под
+                    <a title="GNU General Public License" href="gpl.html">лицензией GPL</a>.
+                    </p>
+		</rus>
+	</p>
+</content>
+</moment>
+
