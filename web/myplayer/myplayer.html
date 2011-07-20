@@ -110,39 +110,38 @@
     <td style="height: 100%">
 <!--      <div id="menu_container" style="width: 200px; height: 100%; background-color: #111111; overflow: auto;"> -->
       <div id="menu_fix" style="height: 100%; width: 200px; overflow: auto;">
-      <div id="menu_container" style="height: 100%; background-color: #111111; border-left: 1px solid #222222">
-        <div id="menu" style="display: block;">
+        <div id="menu_container" style="height: 100%; background-color: #111111; border-left: 1px solid #222222">
+          <div id="menu" style="display: block;">
 <!--
           <div style="padding: 1px; border-bottom: 5px solid #444444; vertical-align: bottom; text-align: center;"><h3><span style="color: #777777;">Каналы</span></h3></div>
           <div style="padding: 1px; border-bottom: 5px solid #444444; vertical-align: bottom; text-align: center;"><div style="display: inline-block"><h3><span style="color: #777777;">Каналы</span></h3></div><div style="display: inline-block; 100%; background-color: #666666">HIDE</div></div>
           <div style="padding: 1px; border-bottom: 5px solid #444444; vertical-align: bottom; text-align: center;"><div style="display: inline-block"><h3><span style="color: #777777;">Каналы</span></h3></div><div style="display: inline-block; 100%; background-color: #666666">HIDE</div></div>
 -->
           <div style="padding: 0; border-bottom: 5px solid #444444; vertical-align: bottom; text-align: center;">
+<!--
             <table style="width: 100%; border: 0;" cellpadding="0" cellspacing="0">
               <tr>
                 <td>
-                  <h3><span style="color: #777777;">Каналы</span></h3>
+-->
+                  <h3><span style="color: #777777;">Channels</span></h3>
+<!--
                 </td>
-                <!--
                 <script type="text/javascript">
                   function hide_menu() {
                     document.getElementById ("menu").style.display = "none";
 //                    document.getElementById ("show_menu").style.display="block";
                   }
                 </script>
-                -->
-                <!--
                 <td style="width: 30px;" class="menuentry_one" onclick="hide_menu()">
                   HIDE
                 </td>
-                -->
               </tr>
             </table>
+-->
           </div>
           </div>
         </div>
         <script type="text/javascript">
-
           var menu = document.getElementById ("menu");
 
           $.get ("playlist.json",
