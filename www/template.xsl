@@ -21,7 +21,7 @@
 
 <xsl:variable name="main_width">900</xsl:variable>
 <xsl:variable name="logo_height">62</xsl:variable>
-<xsl:variable name="menubar_height">47</xsl:variable>
+<xsl:variable name="menubar_height">40</xsl:variable>
 <xsl:variable name="langbar_width">117</xsl:variable>
 
 <xsl:template match="moment">
@@ -42,6 +42,14 @@
 <!--  <link rel="stylesheet" type="text/css" href="moment.css"/> -->
   <link rel="icon" type="image/vnd.microsoft.icon" href="favicon.ico"/>
   <style type="text/css">
+    body {
+      font-size: 14px;
+    }
+
+    dd {
+      margin-bottom: 1em;
+    }
+
     img {
       border: 0;
       vertical-align: bottom;
@@ -80,7 +88,7 @@
     }
 
     .menu a:hover {
-      color: /* #525278 */ /* #33335a */ #252569;
+      color: /* #525278 */ /* #33335a */ /* #252569 */ #4b4b58;
     }
 
     .menuitem {
@@ -107,9 +115,7 @@
     }
 
     .langbar {
-/*      border-left: 1px solid #c1c3d9ff; */
-      border-left: 1px solid rgba(193, 195, 217, .38);
-/*      border-left: 1px solid rgba(255, 255, 255, .3); */
+      border-left: 1px solid rgba(180, 183, 218, .2);
       float: right;
       position: relative;
       z-index: 4;
@@ -121,7 +127,15 @@
       line-height: <xsl:value-of select="$menubar_height"/>px;
       text-align: center;
       width: <xsl:value-of select="$langbar_width"/>px;
-      color: #1b1b38;
+/*      color: #4b4b78; */
+    }
+
+    .langbar a {
+      color: #4b4b68;
+    }
+
+    .langbar a:hover {
+      color: #7b7ba8;
     }
 
     .langbar_image_div {
@@ -145,7 +159,8 @@
       padding: 13px;
       padding-top: 18px;
       padding-bottom: 20px;
-      background-color: /* #f0f0f0 */ #e9e9f7;
+      background-color: /* #f0f0f0 */ /* #e9e9f7 */ /* #e8e8ff */ /* #eeeefb */ #f3f3fb;
+      -moz-border-radius: 15px;
       border-radius: 15px;
       text-align: center;
       font-size: small;
@@ -179,7 +194,8 @@
       position: absolute;
       bottom: 0;
       width: <xsl:value-of select="$main_width"/>px;
-      border-top: 2px solid /* #e1e1e1 */ /* #e0e1f0 */ /* #dcddee */ #d1d3e9 /* #616187 */ /* #7f7faf */;
+/*      border-top: 2px solid #d1d3e9; */
+      border-top: 2px solid #e4e5f1;
       padding-top: 20px;
       margin-top: 60px;
       margin-bottom: 20px;
