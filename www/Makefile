@@ -3,7 +3,8 @@
 all:	index.html              \
         quickstart.html         \
         licensing.html          \
-        developers.html
+        developers.html         \
+        gpl.html
 
 %.html: %.xml template.xsl postprocess.xsl entities.dtd
 	xsltproc --nonet -o "$*.tmp.xml" --stringparam name "$*" --stringparam suffix "" template.xsl "$<"

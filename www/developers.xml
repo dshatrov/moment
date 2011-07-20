@@ -4,22 +4,57 @@
 
 <moment>
 <content>
-	<pagename>
-		<eng>Developers</eng>
-		<rus>Разработчикам</rus>
-	</pagename>
-	<title>
-		<eng>Developers</eng>
-		<rus>Разработчикам</rus>
-	</title>
-	<p>
-		<eng>
-                    Test text.
-		</eng>
-		<rus>
-                    Тестовый текст.
-		</rus>
-	</p>
+  <pagename>
+    <eng>Developers</eng>
+    <rus>Разработчикам</rus>
+  </pagename>
+  <title>
+    <eng>Developers</eng>
+    <rus>Разработчикам</rus>
+  </title>
+  <eng>
+    <p>
+    Test text.
+    </p>
+  </eng>
+  <rus>
+    <p>
+    Исходный код видеосервера &laquo;Moment&raquo; размещён <a href="http://github.com/erdizz">на GitHub</a>.
+    </p>
+    <p>
+    Краткое описание git-модулей, из которых состоит сервер в базовой конфигурации, в порядке сборки:
+    </p>
+    <ul>
+      <li>
+        <b>libmary</b> &mdash; базовая библиотека. Цикл обработки событий, файлы, таймеры, работа
+        с сетевыми соединениями, поддержка многопоточности, кроссплатформенность;
+      </li>
+      <li>
+        <b>mycpp</b> &mdash; вторичная базовая библиотека, унаследованная от <a href="http://mync.sourceforge.net/index.ru.html">проекта MyNC</a>;
+      </li>
+      <li>
+        <b>mylang</b> &mdash; библиотека для работы с машинными языками;
+      </li>
+      <li>
+        <b>pargen</b> &mdash; генератор парсеров;
+      </li>
+      <li>
+        <b>scruffy</b> &mdash; препроцессор для конфигурационных файлов;
+      </li>
+      <li>
+        <b>libmoment</b> &mdash; базовая библиотека видеосервера. Поддержка протоколов RTMP, RTMPT;
+      </li>
+      <li>
+        <b>moment</b> &mdash; собственно видеосервер. Модули mod_rtmp и mod_file;
+      </li>
+      <li>
+        <b>videochat</b> &mdash; простой сервер видеочата;
+      </li>
+      <li>
+        <b>moment-gst</b> &mdash; интеграция с <a href="http://gstreamer.freedesktop.org">gstreamer</a> (модуль mod_gst).
+      </li>
+    </ul>
+  </rus>
 </content>
 </moment>
 
