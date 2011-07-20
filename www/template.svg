@@ -1049,7 +1049,7 @@
        xlink:href="#linearGradient4393"
        id="linearGradient4470"
        gradientUnits="userSpaceOnUse"
-       gradientTransform="translate(2609.9803,-756.19007)"
+       gradientTransform="translate(2623.5159,-758.27246)"
        x1="113.49618"
        y1="169.67644"
        x2="113.49618"
@@ -1379,6 +1379,16 @@
        y1="159.52643"
        x2="947.68994"
        y2="126.82933" />
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#linearGradient4393"
+       id="linearGradient3635"
+       gradientUnits="userSpaceOnUse"
+       gradientTransform="translate(3666.7953,-672.89431)"
+       x1="113.49618"
+       y1="169.67644"
+       x2="113.49618"
+       y2="112.86956" />
   </defs>
   <sodipodi:namedview
      id="base"
@@ -1387,9 +1397,9 @@
      borderopacity="1.0"
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
-     inkscape:zoom="0.10839742"
-     inkscape:cx="0"
-     inkscape:cy="266.26158"
+     inkscape:zoom="0.48021651"
+     inkscape:cx="2911.0424"
+     inkscape:cy="1692.5746"
      inkscape:current-layer="layer1"
      inkscape:document-units="px"
      showgrid="false"
@@ -3663,12 +3673,12 @@
        inkscape:connector-curvature="0"
        sodipodi:nodetypes="ccsccsccc" />
     <rect
-       style="opacity:0.61776056999999995;fill:url(#linearGradient4470);fill-opacity:1;stroke:none"
+       style="opacity:0.61776057;fill:url(#linearGradient4470);fill-opacity:1;stroke:none"
        id="rect4468"
        width="1002"
        height="52"
-       x="2623.9805"
-       y="-638.19006"
+       x="2637.5161"
+       y="-640.27246"
        ry="10.12823"
        inkscape:export-filename="/home/ubuntu/files/my_dev/momentvideo/moment/www/img/menubar.png"
        inkscape:export-xdpi="80.839996"
@@ -4263,5 +4273,16 @@
        inkscape:export-filename="/home/ubuntu/files/my_dev/momentvideo/moment/www/img/arrow.png"
        inkscape:export-xdpi="91.220001"
        inkscape:export-ydpi="91.220001" />
+    <rect
+       inkscape:export-ydpi="80.839996"
+       inkscape:export-xdpi="80.839996"
+       inkscape:export-filename="/home/ubuntu/files/my_dev/momentvideo/moment/www/img/menubar.png"
+       ry="10.12823"
+       y="-547.60596"
+       x="3680.7957"
+       height="44.712749"
+       width="1002.0002"
+       id="rect3633"
+       style="opacity:0.61776056999999995;fill:url(#linearGradient3635);fill-opacity:1;stroke:none" />
   </g>
 </svg>
