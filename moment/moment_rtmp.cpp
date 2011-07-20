@@ -27,6 +27,7 @@ namespace Moment {
 namespace {
 
 namespace {
+LogGroup libMary_logGroup_mod_rtmp ("mod_rtmp", LogLevel::N);
 LogGroup libMary_logGroup_framedrop ("mod_rtmp_framedrop", LogLevel::N);
 }
 
@@ -51,6 +52,7 @@ public:
     // Used from streamVideoMessage() only.
     mt_mutex (mutex) Count no_keyframe_counter;
     mt_mutex (mutex) bool keyframe_sent;
+    mt_mutex (mutex) bool first_keyframe_sent;
 
     // Synchronized by rtmp_server.
     bool watching;
@@ -83,6 +85,7 @@ public:
 	  overloaded (false),
 	  no_keyframe_counter (0),
 	  keyframe_sent (false),
+	  first_keyframe_sent (false),
 	  watching (false)
     {
     }
@@ -119,6 +122,11 @@ void streamAudioMessage (VideoStream::MessageInfo * const mt_nonnull msg_info,
 	return;
 
     client_session->mutex.lock ();
+
+    if (!client_session->first_keyframe_sent) {
+	client_session->mutex.unlock ();
+	return;
+    }
 
     if (client_session->overloaded) {
       // Connection overloaded, dropping this audio frame.
@@ -161,6 +169,10 @@ void streamVideoMessage (VideoStream::MessageInfo * const mt_nonnull msg_info,
 
 	logD (framedrop, _func, "Connection overloaded, dropping video frame");
 
+	// TEST
+//	logs->print (".");
+//	logs->flush ();
+
 	client_session->no_keyframe_counter = 0;
 	client_session->keyframe_sent = false;
 
@@ -186,6 +198,7 @@ void streamVideoMessage (VideoStream::MessageInfo * const mt_nonnull msg_info,
     if (got_keyframe) {
 	client_session->no_keyframe_counter = 0;
 	client_session->keyframe_sent = true;
+	client_session->first_keyframe_sent = true;
     }
 
     client_session->mutex.unlock ();
@@ -216,8 +229,8 @@ Result startWatching (ConstMemory const &stream_name,
     // TODO class MomentRtmpModule
     MomentServer * const moment = MomentServer::getInstance();
 
-    logD_ (_func, "client_session 0x", fmt_hex, (UintPtr) _client_session);
-    logD_ (_func, "stream_name: ", stream_name);
+    logD (mod_rtmp, _func, "client_session 0x", fmt_hex, (UintPtr) _client_session);
+    logD (mod_rtmp, _func, "stream_name: ", stream_name);
 
     ClientSession * const client_session = static_cast <ClientSession*> (_client_session);
 
@@ -236,6 +249,7 @@ Result startWatching (ConstMemory const &stream_name,
     }
     client_session->watching = true;
 
+#if 0
     {
 	VideoStream::SavedFrame saved_frame;
 	if (video_stream->getSavedKeyframe (&saved_frame)) {
@@ -249,6 +263,7 @@ Result startWatching (ConstMemory const &stream_name,
 	    saved_frame.page_pool->msgUnref (saved_frame.page_list.first);
 	}
     }
+#endif
 
     video_stream->getEventInformer()->subscribe (&video_event_handler, client_session, NULL /* ref_data */, client_session);
 
@@ -267,7 +282,7 @@ Result commandMessage (RtmpConnection::MessageInfo * const mt_nonnull msg_info,
 		       AmfEncoding              const amf_encoding,
 		       void                   * const _client_session)
 {
-    logD_ (_func_);
+    logD (mod_rtmp, _func_);
 
     ClientSession * const client_session = static_cast <ClientSession*> (_client_session);
     // No need to call takeRtmpConnRef(), because this it rtmp_conn's callback.
@@ -308,7 +323,7 @@ void sendStateChanged (Sender::SendState   const send_state,
 void closed (Exception * const exc,
 	     void      * const _client_session)
 {
-    logD_ (_func, "client_session 0x", fmt_hex, (UintPtr) _client_session);
+    logD (mod_rtmp, _func, "client_session 0x", fmt_hex, (UintPtr) _client_session);
 
     if (exc)
 	logE_ (_func, exc->toString());
@@ -329,7 +344,7 @@ RtmpConnection::Frontend const rtmp_frontend = {
 Result clientConnected (RtmpConnection * mt_nonnull const rtmp_conn,
 			void * const /* cb_data */)
 {
-    logD_ (_func_);
+    logD (mod_rtmp, _func_);
 
     Ref<ClientSession> const client_session = grab (new ClientSession);
     client_session->rtmp_conn = rtmp_conn;
