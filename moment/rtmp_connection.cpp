@@ -30,7 +30,7 @@ LogGroup libMary_logGroup_msg    ("msg",    LogLevel::N);
 LogGroup libMary_logGroup_send   ("send",   LogLevel::N);
 LogGroup libMary_logGroup_writev ("writev", LogLevel::N);
 LogGroup libMary_logGroup_time   ("time",   LogLevel::N);
-LogGroup libMary_logGroup_close  ("rtmp_conn_close", LogLevel::D);
+LogGroup libMary_logGroup_close  ("rtmp_conn_close", LogLevel::N);
 }
 
 Sender::Frontend const RtmpConnection::sender_frontend = {
@@ -1135,7 +1135,7 @@ RtmpConnection::processUserControlMessage (ChunkStream * const chunk_stream)
 	    sendUserControl_PingResponse (timestamp);
 	} break;
 	case UserControlMessageType::PingResponse: {
-	    logD_ (/* msg, */ _func, "PingResponse");
+	    logD ( msg, _func, "PingResponse");
 
 	    ping_reply_received = true;
 	} break;

@@ -28,14 +28,14 @@ using namespace M;
 namespace Moment {
 
 namespace {
-LogGroup libMary_logGroup_rtmp_server ("rtmp_server", LogLevel::D);
+LogGroup libMary_logGroup_rtmp_server ("rtmp_server", LogLevel::I);
 }
 
 Result
 RtmpServer::doPlay (RtmpConnection::MessageInfo * const mt_nonnull msg_info,
 		    AmfDecoder * const mt_nonnull decoder)
 {
-    logD_ (_func_);
+    logD (rtmp_server, _func_);
 
     if (playing.get()) {
 	logW_ (_func, "already playing");
@@ -101,7 +101,7 @@ Result
 RtmpServer::doPublish (RtmpConnection::MessageInfo * const mt_nonnull msg_info,
 		       AmfDecoder * const mt_nonnull decoder)
 {
-    logD_ (_func_);
+    logD (rtmp_server, _func_);
 
     // XXX Ugly
     if (playing.get()) {
@@ -230,7 +230,7 @@ RtmpServer::commandMessage (RtmpConnection::MessageInfo * const mt_nonnull msg_i
 			    Size                     const msg_len,
 			    AmfEncoding              const amf_encoding)
 {
-    logD_ (_func_);
+    logD (rtmp_server, _func_);
 
     PagePool::PageListArray pl_array (page_list->first, msg_len);
     AmfDecoder decoder (AmfEncoding::AMF0, &pl_array, msg_len);
@@ -245,7 +245,7 @@ RtmpServer::commandMessage (RtmpConnection::MessageInfo * const mt_nonnull msg_i
 	return Result::Failure;
     }
 
-    logD_ (_func, "method: ", ConstMemory (method_name, method_name_len));
+    logI (rtmp_server, _func, "method: ", ConstMemory (method_name, method_name_len));
 
     ConstMemory method_mem (method_name, method_name_len);
     if (!compare (method_mem, "connect")) {

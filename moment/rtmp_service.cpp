@@ -25,7 +25,7 @@ using namespace M;
 namespace Moment {
 
 namespace {
-LogGroup libMary_logGroup_rtmp_service ("rtmp_service", LogLevel::D);
+LogGroup libMary_logGroup_rtmp_service ("rtmp_service", LogLevel::N);
 }
 
 RtmpConnection::Backend RtmpService::rtmp_conn_backend = {
@@ -56,7 +56,7 @@ RtmpService::destroySession (ClientSession * const session)
     // TODO close TCP connection explicitly.
 
     session_list.remove (session);
-    logD_ (_func, "session refcount: ", session->getRefCount());
+    logD (rtmp_service, _func, "session refcount: ", session->getRefCount());
     session->unref ();
 }
 
@@ -122,7 +122,7 @@ RtmpService::acceptOneConnection ()
 void
 RtmpService::closeRtmpConn (void * const _session)
 {
-    logD_ (_func, "session 0x", fmt_hex, (UintPtr) _session);
+    logD (rtmp_service, _func, "session 0x", fmt_hex, (UintPtr) _session);
 
     ClientSession * const session = static_cast <ClientSession*> (_session);
 
