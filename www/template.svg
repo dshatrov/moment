@@ -19,6 +19,17 @@
   <defs
      id="defs3677">
     <linearGradient
+       id="linearGradient4393">
+      <stop
+         id="stop4395"
+         offset="0"
+         style="stop-color:#d4d4e9;stop-opacity:1;" />
+      <stop
+         id="stop4397"
+         offset="1"
+         style="stop-color:#ffffff;stop-opacity:0.50196081;" />
+    </linearGradient>
+    <linearGradient
        id="linearGradient4471">
       <stop
          style="stop-color:#676fb5;stop-opacity:0.32307693;"
@@ -49,7 +60,7 @@
       <stop
          id="stop4415"
          offset="1"
-         style="stop-color:#62cb62;stop-opacity:1;" />
+         style="stop-color:#328732;stop-opacity:1;" />
     </linearGradient>
     <linearGradient
        id="linearGradient4405">
@@ -1035,14 +1046,14 @@
        y2="-51.920349" />
     <linearGradient
        inkscape:collect="always"
-       xlink:href="#linearGradient4327"
+       xlink:href="#linearGradient4393"
        id="linearGradient4470"
        gradientUnits="userSpaceOnUse"
        gradientTransform="translate(2609.9803,-756.19007)"
        x1="113.49618"
        y1="169.67644"
        x2="113.49618"
-       y2="60.513741" />
+       y2="100.50272" />
     <linearGradient
        inkscape:collect="always"
        xlink:href="#linearGradient4665-2-0"
@@ -1240,7 +1251,7 @@
        y2="203.28859" />
     <linearGradient
        inkscape:collect="always"
-       xlink:href="#linearGradient4411"
+       xlink:href="#linearGradient4405"
        id="linearGradient4401"
        gradientUnits="userSpaceOnUse"
        gradientTransform="translate(1935.0246,-969.16221)"
@@ -1250,7 +1261,7 @@
        y2="312.0531" />
     <linearGradient
        inkscape:collect="always"
-       xlink:href="#linearGradient4405"
+       xlink:href="#linearGradient4411"
        id="linearGradient4403"
        gradientUnits="userSpaceOnUse"
        gradientTransform="translate(1935.0246,-969.16221)"
@@ -1376,9 +1387,9 @@
      borderopacity="1.0"
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
-     inkscape:zoom="0.25266226"
-     inkscape:cx="2722.9396"
-     inkscape:cy="706.66843"
+     inkscape:zoom="0.10839742"
+     inkscape:cx="0"
+     inkscape:cy="266.26158"
      inkscape:current-layer="layer1"
      inkscape:document-units="px"
      showgrid="false"
@@ -3652,14 +3663,14 @@
        inkscape:connector-curvature="0"
        sodipodi:nodetypes="ccsccsccc" />
     <rect
-       style="opacity:0.61776056999999995;fill:url(#linearGradient4470);fill-opacity:1.0;stroke:none"
+       style="opacity:0.61776056999999995;fill:url(#linearGradient4470);fill-opacity:1;stroke:none"
        id="rect4468"
        width="1002"
        height="52"
        x="2623.9805"
        y="-638.19006"
        ry="10.12823"
-       inkscape:export-filename="/home/ubuntu/Desktop/www/menubar.png"
+       inkscape:export-filename="/home/ubuntu/files/my_dev/momentvideo/moment/www/img/menubar.png"
        inkscape:export-xdpi="80.839996"
        inkscape:export-ydpi="80.839996" />
     <rect
@@ -3763,12 +3774,12 @@
        inkscape:export-ydpi="89.842865"
        inkscape:export-xdpi="89.842865"
        inkscape:export-filename="/home/ubuntu/Desktop/www/arrow.png"
-       style="fill:#666666;stroke:none"
+       style="fill:#252569;stroke:none;fill-opacity:1;opacity:0.9"
        id="rect3529-0"
        width="9.1170502"
        height="7.7018991"
        x="2733.9641"
-       y="-376.53125"
+       y="-348.53125"
        ry="0" />
     <path
        inkscape:export-ydpi="89.842865"
@@ -3777,8 +3788,8 @@
        sodipodi:nodetypes="cccc"
        inkscape:connector-curvature="0"
        id="path3531-4"
-       d="m 2740.6681,-361.82764 0,-21.70535 9.4794,10.85267 z"
-       style="fill:#666666;stroke:none" />
+       d="m 2740.6681,-333.82764 0,-21.70535 9.4794,10.85267 z"
+       style="fill:#252569;stroke:none;fill-opacity:1;opacity:0.9" />
     <rect
        style="opacity:0.36679538;fill:#252569;fill-opacity:1;stroke:#000000;stroke-width:1;stroke-linecap:square;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
        id="rect4417"
@@ -4009,7 +4020,7 @@
        x="2230.8652"
        y="-764.45752"
        ry="8.5685453"
-       inkscape:export-filename="/home/ubuntu/Desktop/www/download.png"
+       inkscape:export-filename="/home/ubuntu/files/my_dev/momentvideo/moment/www/img/download.png"
        inkscape:export-xdpi="89.842865"
        inkscape:export-ydpi="89.842865" />
     <text
@@ -4019,7 +4030,7 @@
        x="2273.1433"
        style="font-size:20px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#006300;fill-opacity:1;stroke:none;font-family:Sans;-inkscape-font-specification:Sans"
        xml:space="preserve"
-       inkscape:export-filename="/home/ubuntu/Desktop/www/download.png"
+       inkscape:export-filename="/home/ubuntu/files/my_dev/momentvideo/moment/www/img/download.png"
        inkscape:export-xdpi="89.842865"
        inkscape:export-ydpi="89.842865"><tspan
          y="-738.95856"
@@ -4033,7 +4044,7 @@
        x="2322.4619"
        style="font-size:10px;font-style:normal;font-weight:bold;text-align:center;line-height:125%;letter-spacing:0px;word-spacing:0px;text-anchor:middle;fill:#006700;fill-opacity:1;stroke:none;font-family:Sans;-inkscape-font-specification:Sans Bold"
        xml:space="preserve"
-       inkscape:export-filename="/home/ubuntu/Desktop/www/download.png"
+       inkscape:export-filename="/home/ubuntu/files/my_dev/momentvideo/moment/www/img/download.png"
        inkscape:export-xdpi="89.842865"
        inkscape:export-ydpi="89.842865"><tspan
          y="-724.07074"
@@ -4051,7 +4062,7 @@
        y="-724.79688"
        id="text4365"
        sodipodi:linespacing="125%"
-       inkscape:export-filename="/home/ubuntu/Desktop/www/download.png"
+       inkscape:export-filename="/home/ubuntu/files/my_dev/momentvideo/moment/www/img/download.png"
        inkscape:export-xdpi="89.842865"
        inkscape:export-ydpi="89.842865"><tspan
          sodipodi:role="line"
@@ -4069,7 +4080,7 @@
        y="-739.92676"
        id="text4371"
        sodipodi:linespacing="125%"
-       inkscape:export-filename="/home/ubuntu/Desktop/www/download.png"
+       inkscape:export-filename="/home/ubuntu/files/my_dev/momentvideo/moment/www/img/download.png"
        inkscape:export-xdpi="89.842865"
        inkscape:export-ydpi="89.842865"><tspan
          sodipodi:role="line"
@@ -4079,7 +4090,7 @@
     <rect
        inkscape:export-ydpi="89.842865"
        inkscape:export-xdpi="89.842865"
-       inkscape:export-filename="/home/ubuntu/Desktop/www/download.ru.png"
+       inkscape:export-filename="/home/ubuntu/files/my_dev/momentvideo/moment/www/img/download.ru.png"
        ry="8.5685453"
        y="-764.45752"
        x="1978.989"
@@ -4090,7 +4101,7 @@
     <text
        inkscape:export-ydpi="89.842865"
        inkscape:export-xdpi="89.842865"
-       inkscape:export-filename="/home/ubuntu/Desktop/www/download.ru.png"
+       inkscape:export-filename="/home/ubuntu/files/my_dev/momentvideo/moment/www/img/download.ru.png"
        xml:space="preserve"
        style="font-size:20px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#006300;fill-opacity:1;stroke:none;font-family:Sans;-inkscape-font-specification:Sans"
        x="2017.3726"
@@ -4104,7 +4115,7 @@
     <text
        inkscape:export-ydpi="89.842865"
        inkscape:export-xdpi="89.842865"
-       inkscape:export-filename="/home/ubuntu/Desktop/www/download.ru.png"
+       inkscape:export-filename="/home/ubuntu/files/my_dev/momentvideo/moment/www/img/download.ru.png"
        sodipodi:linespacing="125%"
        id="text4381"
        y="-739.92676"
@@ -4118,7 +4129,7 @@
     <text
        inkscape:export-ydpi="89.842865"
        inkscape:export-xdpi="89.842865"
-       inkscape:export-filename="/home/ubuntu/Desktop/www/download.ru.png"
+       inkscape:export-filename="/home/ubuntu/files/my_dev/momentvideo/moment/www/img/download.ru.png"
        xml:space="preserve"
        style="font-size:10px;font-style:normal;font-weight:bold;text-align:center;line-height:125%;letter-spacing:0px;word-spacing:0px;text-anchor:middle;fill:#006700;fill-opacity:1;stroke:none;font-family:Sans;-inkscape-font-specification:Sans Bold"
        x="2070.5857"
@@ -4136,7 +4147,7 @@
     <text
        inkscape:export-ydpi="89.842865"
        inkscape:export-xdpi="89.842865"
-       inkscape:export-filename="/home/ubuntu/Desktop/www/download.ru.png"
+       inkscape:export-filename="/home/ubuntu/files/my_dev/momentvideo/moment/www/img/download.ru.png"
        sodipodi:linespacing="125%"
        id="text4391"
        y="-724.79688"
@@ -4245,5 +4256,12 @@
        id="rect4485"
        style="opacity:0.3;fill:url(#linearGradient4487);fill-opacity:1;stroke:#000000;stroke-width:0.1;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
        transform="scale(1,-1)" />
+    <path
+       id="path4398"
+       style="opacity:0.5;fill:#07073a;fill-opacity:1;stroke:none"
+       d="m 2694.6744,-333.82764 0,-21.70535 9.4794,10.85267 z m -6.7039,-14.70361 9.117,0 0,7.7019 -9.117,0 z"
+       inkscape:export-filename="/home/ubuntu/files/my_dev/momentvideo/moment/www/img/arrow.png"
+       inkscape:export-xdpi="91.220001"
+       inkscape:export-ydpi="91.220001" />
   </g>
 </svg>
