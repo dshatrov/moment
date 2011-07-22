@@ -56,7 +56,7 @@ printUsage ()
 {
     outs->print ("Usage: videochatd [options]\n"
 		  "Options:\n"
-		  "  -c --config <config_file>\n");
+		  "  -c --config <config_file> - Configuration file to use (default: /opt/moment/moment.conf)\n");
     outs->flush ();
 }
 
@@ -117,7 +117,7 @@ int main (int argc, char **argv)
     {
 	ConstMemory const config_filename = options.config_filename ?
 						    options.config_filename->mem() :
-						    ConstMemory ("moment.conf");
+						    ConstMemory ("/opt/moment/moment.conf");
 	if (!MConfig::parseConfig (config_filename, &config)) {
 	    logE_ (_func, "Failed to parse config file ", config_filename);
 	    return Result::Failure;
