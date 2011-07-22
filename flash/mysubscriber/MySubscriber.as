@@ -29,8 +29,23 @@ public class MySubscriber extends Sprite
     private var conn : NetConnection;
     private var video : Video;
 
-    private var playlist_button : LoadedElement;
+    private var buttons_visible : Boolean;
+
+    // Shows/hides the playlist.
+    private var playlist_button   : LoadedElement;
+
+    // Toggles fullscreen mode.
     private var fullscreen_button : LoadedElement;
+
+    // Toggles horizontal mode. In normal mode, video is scaled in such a way
+    // that it fits the screen both vertically in horizontally. In horizontal
+    // mode, only horizontal size is considered. This is useful for cutting
+    // artificial black fields on top and on bottom of the video for wide
+    // screens.
+    private var horizontal_button : LoadedElement;
+
+    // If true, then horizontal mode is enabled.
+    private var horizontal_mode : Boolean;
 
     private var splash : LoadedElement;
 
@@ -72,25 +87,49 @@ public class MySubscriber extends Sprite
         splash.obj.y = (stage_height - splash.obj.height) / 2;
     }
 
+    private function videoShouldBeHorizontal () : Boolean
+    {
+	if (stage_width == 0 || stage_height == 0)
+	    return true;
+
+	var x_aspect : Number = (0.0 + Number (video.videoWidth))  / Number (stage_width);
+	var y_aspect : Number = (0.0 + Number (video.videoHeight)) / Number (stage_height);
+
+	return x_aspect >= y_aspect;
+    }
+
     private function repositionVideo () : void
     {
-	video.width = stage_width;
-	video.height = stage_width * (video.videoHeight / video.videoWidth);
-	video.x = 0;
-	video.y = (stage_height - video.height) / 2;
+	if (horizontal_mode || videoShouldBeHorizontal()) {
+	    video.width = stage_width;
+	    video.height = stage_width * (video.videoHeight / video.videoWidth);
+	    video.x = 0;
+	    video.y = (stage_height - video.height) / 2;
+	} else {
+	    video.width = stage_height * (video.videoWidth / video.videoHeight);
+	    video.height = stage_height;
+	    video.x = (stage_width - video.width) / 2;
+	    video.y = 0;
+	}
     }
 
     private function repositionButtons () : void
     {
-	playlist_button.obj.x = stage.stageWidth  - playlist_button.obj.width - 20;
-	playlist_button.obj.y = stage.stageHeight - playlist_button.obj.height - 20;
+	horizontal_button.setVisible (buttons_visible && !videoShouldBeHorizontal());
 
-        if (stage.displayState == "fullScreen")
-          fullscreen_button.obj.x = stage.stageWidth - fullscreen_button.obj.width - 20;
-        else
-          fullscreen_button.obj.x = stage.stageWidth - fullscreen_button.obj.width - 90;
+	playlist_button.obj.x = stage_width  - playlist_button.obj.width - 20;
+	playlist_button.obj.y = stage_height - playlist_button.obj.height - 20;
+
+        if (stage.displayState == "fullScreen") {
+          fullscreen_button.obj.x = stage_width - fullscreen_button.obj.width - 20;
+	  horizontal_button.obj.x = stage_width - horizontal_button.obj.width - 90;
+	} else {
+          fullscreen_button.obj.x = stage_width - fullscreen_button.obj.width - 90;
+	  horizontal_button.obj.x = stage_width - horizontal_button.obj.width - 160;
+	}
 
 	fullscreen_button.obj.y = stage.stageHeight - fullscreen_button.obj.height - 20;
+	horizontal_button.obj.y = stage.stageHeight - horizontal_button.obj.height - 20;
     }
 
     private function repositionMessage (msg : Loader) : void
@@ -200,6 +239,7 @@ public class MySubscriber extends Sprite
 	++frame_no;
 
 	repositionVideo ();
+	repositionButtons ();
 	showVideo ();
     }
 
@@ -319,6 +359,13 @@ public class MySubscriber extends Sprite
         }
     }
 
+    private function toggleHorizontal (event : MouseEvent) : void
+    {
+	trace ("--- toggleHorizontal");
+	horizontal_mode = !horizontal_mode;
+	repositionVideo ();
+    }
+
     private function togglePlaylist (event : MouseEvent) : void
     {
         trace ("--- togglePlaylist");
@@ -327,8 +374,10 @@ public class MySubscriber extends Sprite
 
     private function hideButtonsTick () : void
     {
+	buttons_visible = false;
 	playlist_button.setVisible (false);
 	fullscreen_button.setVisible (false);
+	horizontal_button.setVisible (false);
     }
 
     private function onMouseMove (event : MouseEvent) : void
@@ -340,18 +389,23 @@ public class MySubscriber extends Sprite
 	    hide_buttons_timer = 0;
 	}
 
-        if (stage_width - (event.target.x + event.localX) > 400 ||
+/*        if (stage_width - (event.target.x + event.localX) > 400 ||
             stage_height - (event.target.y + event.localY) > 300)
         {
+	    buttons_visible = false;
 	    playlist_button.setVisible (false);
 	    fullscreen_button.setVisible (false);
-        } else {
+	    horizontal_button.setVisible (false);
+        } else */ {
 	    hide_buttons_timer = setInterval (hideButtonsTick, 5000);
+
+	    buttons_visible = true;
 
 	    if (stage.displayState != "fullScreen")
 	      playlist_button.setVisible (true);
 
 	    fullscreen_button.setVisible (true);
+	    horizontal_button.setVisible (!videoShouldBeHorizontal());
         }
     }
 
@@ -381,6 +435,9 @@ public class MySubscriber extends Sprite
 
     public function MySubscriber()
     {
+	buttons_visible = true;
+	horizontal_mode = false;
+
 	reconnect_interval = 0;
 	reconnect_timer = 0;
 
@@ -418,6 +475,9 @@ public class MySubscriber extends Sprite
 
         fullscreen_button = createLoadedElement ("fullscreen.png", true /* visible */);
 	fullscreen_button.obj.addEventListener (MouseEvent.CLICK, toggleFullscreen);
+
+	horizontal_button = createLoadedElement ("horizontal.png", true /* visible */);
+	horizontal_button.obj.addEventListener (MouseEvent.CLICK, toggleHorizontal);
 
 	msg_connecting = createLoadedElement ("connecting.png", false /* visible */);
 	msg_buffering  = createLoadedElement ("buffering.png",  false /* visible */);
