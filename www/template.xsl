@@ -232,7 +232,22 @@
     <eng><a href="developers.html"><div class="menuitem">Developers</div></a></eng>
     <rus><a href="developers.ru.html"><div class="menuitem">Разработчикам</div></a></rus>
 
-    <a href="wiki/"><div class="menuarrow"><img src="img/arrow.png" style="vertical-align: middle; margin-right: 7px; width: 16px; height: 22px"/>Wiki</div></a>
+    <eng>
+      <a href="http://momentvideo.org/wiki/">
+        <div class="menuarrow">
+	  <img src="img/arrow.png" style="vertical-align: middle; margin-right: 7px; width: 16px; height: 22px"/>
+	  Wiki
+	</div>
+      </a>
+    </eng>
+    <rus>
+      <a href="http://momentvideo.org/wiki/index.php?title=Moment:Main:Ru">
+        <div class="menuarrow">
+	  <img src="img/arrow.png" style="vertical-align: middle; margin-right: 7px; width: 16px; height: 22px"/>
+	  Wiki
+	</div>
+      </a>
+    </rus>
 
     <div class="langbar">
 <!--      <div class="langbar_image_div"> -->
