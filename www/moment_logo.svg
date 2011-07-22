@@ -488,6 +488,53 @@
        fx="15.549314"
        fy="-216.87749"
        r="20.296875" />
+    <radialGradient
+       inkscape:collect="always"
+       xlink:href="#linearGradient4398"
+       id="radialGradient3817"
+       gradientUnits="userSpaceOnUse"
+       gradientTransform="matrix(2.8668198,0.09052824,-0.06968699,2.2068248,-44.3503,362.28965)"
+       cx="337.16718"
+       cy="-515.41974"
+       fx="337.16718"
+       fy="-515.41974"
+       r="89" />
+    <filter
+       inkscape:collect="always"
+       id="filter4731"
+       x="-0.23040001"
+       width="1.4608"
+       y="-0.2504348"
+       height="1.5008696">
+      <feGaussianBlur
+         inkscape:collect="always"
+         stdDeviation="14.238257"
+         id="feGaussianBlur4733" />
+    </filter>
+    <filter
+       inkscape:collect="always"
+       id="filter4753"
+       x="-0.2304"
+       width="1.4608"
+       y="-0.25043479"
+       height="1.5008696">
+      <feGaussianBlur
+         inkscape:collect="always"
+         stdDeviation="14.238256"
+         id="feGaussianBlur4755" />
+    </filter>
+    <filter
+       inkscape:collect="always"
+       id="filter5349"
+       x="-0.22813688"
+       width="1.4562738"
+       y="-0.22813688"
+       height="1.4562738">
+      <feGaussianBlur
+         inkscape:collect="always"
+         stdDeviation="16.730038"
+         id="feGaussianBlur5351" />
+    </filter>
   </defs>
   <sodipodi:namedview
      id="base"
@@ -496,16 +543,16 @@
      borderopacity="1.0"
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
-     inkscape:zoom="0.97399389"
-     inkscape:cx="-961.12675"
-     inkscape:cy="2533.7795"
+     inkscape:zoom="0.16270422"
+     inkscape:cx="1038.4973"
+     inkscape:cy="2605.6039"
      inkscape:document-units="px"
      inkscape:current-layer="layer1"
      showgrid="false"
      showguides="true"
      inkscape:guide-bbox="true"
-     inkscape:window-width="1366"
-     inkscape:window-height="691"
+     inkscape:window-width="1280"
+     inkscape:window-height="723"
      inkscape:window-x="0"
      inkscape:window-y="24"
      inkscape:window-maximized="1"
@@ -535,6 +582,116 @@
      inkscape:label="Layer 1"
      inkscape:groupmode="layer"
      id="layer1">
+    <rect
+       style="fill:#000000;fill-opacity:1;stroke:none"
+       id="rect4902"
+       width="1697.1849"
+       height="1549.1628"
+       x="529.58905"
+       y="-2891.6873"
+       ry="122.61727" />
+    <rect
+       ry="39"
+       y="-3137.2385"
+       x="1436.1758"
+       height="176"
+       width="176"
+       id="rect5388"
+       style="opacity:0.69999999999999996;fill:#474b6b;fill-opacity:1;stroke:#ffffff;stroke-width:11;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+       inkscape:export-filename="/home/ubuntu/Desktop/svg/horizontal.png"
+       inkscape:export-xdpi="24.064171"
+       inkscape:export-ydpi="24.064171" />
+    <rect
+       inkscape:export-ydpi="24.064171"
+       inkscape:export-xdpi="24.064171"
+       inkscape:export-filename="/home/ubuntu/Desktop/svg/fullscreen.png"
+       style="opacity:0.69999999999999996;fill:#474b6b;fill-opacity:1;stroke:#ffffff;stroke-width:11;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+       id="rect5392"
+       width="176"
+       height="176"
+       x="1093.437"
+       y="-3141.7217"
+       ry="39" />
+    <rect
+       style="opacity:0.69999999999999996;fill:#474b6b;fill-opacity:1;stroke:#ffffff;stroke-width:11;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+       id="rect5396"
+       width="176"
+       height="176"
+       x="759.2334"
+       y="-3137.2385"
+       ry="39"
+       inkscape:export-filename="/home/ubuntu/Desktop/svg/playlist.png"
+       inkscape:export-xdpi="24.064171"
+       inkscape:export-ydpi="24.064171" />
+    <rect
+       style="opacity:0.7;fill:#54587e;fill-opacity:1;stroke:none;filter:url(#filter5349)"
+       id="rect5369"
+       width="176"
+       height="176"
+       x="759.2334"
+       y="-2824.8281"
+       ry="39"
+       inkscape:export-filename="/home/ubuntu/Desktop/svg/playlist.png"
+       inkscape:export-xdpi="24.064171"
+       inkscape:export-ydpi="24.064171"
+       transform="matrix(0.80345529,0,0,0.80345529,843.46157,-537.9091)" />
+    <rect
+       inkscape:export-ydpi="24.064171"
+       inkscape:export-xdpi="24.064171"
+       inkscape:export-filename="/home/ubuntu/Desktop/svg/horizontal.png"
+       style="opacity:0.7;fill:#54587e;fill-opacity:1;stroke:#ffffff;stroke-width:11;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+       id="rect4918"
+       width="176"
+       height="176"
+       x="1436.1758"
+       y="-2824.8281"
+       ry="39" />
+    <rect
+       transform="matrix(0.80345529,0,0,0.80345529,502.74888,-542.39216)"
+       inkscape:export-ydpi="24.064171"
+       inkscape:export-xdpi="24.064171"
+       inkscape:export-filename="/home/ubuntu/Desktop/svg/playlist.png"
+       ry="39"
+       y="-2824.8281"
+       x="759.2334"
+       height="176"
+       width="176"
+       id="rect5367"
+       style="opacity:0.7;fill:#54587e;fill-opacity:1;stroke:none;filter:url(#filter5349)" />
+    <rect
+       ry="39"
+       y="-2829.3113"
+       x="1093.437"
+       height="176"
+       width="176"
+       id="rect4906"
+       style="opacity:0.7;fill:#54587e;fill-opacity:1;stroke:#ffffff;stroke-width:11;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+       inkscape:export-filename="/home/ubuntu/Desktop/svg/fullscreen.png"
+       inkscape:export-xdpi="24.064171"
+       inkscape:export-ydpi="24.064171" />
+    <rect
+       style="opacity:0.69999999999999996;fill:#54587e;fill-opacity:1;stroke:none;filter:url(#filter5349)"
+       id="rect5143"
+       width="176"
+       height="176"
+       x="759.2334"
+       y="-2824.8281"
+       ry="39"
+       inkscape:export-filename="/home/ubuntu/Desktop/svg/playlist.png"
+       inkscape:export-xdpi="24.064171"
+       inkscape:export-ydpi="24.064171"
+       transform="matrix(0.80345529,0,0,0.80345529,166.51925,-537.9091)" />
+    <rect
+       inkscape:export-ydpi="24.064171"
+       inkscape:export-xdpi="24.064171"
+       inkscape:export-filename="/home/ubuntu/Desktop/svg/playlist.png"
+       ry="39"
+       y="-2824.8281"
+       x="759.2334"
+       height="176"
+       width="176"
+       id="rect4912"
+       style="opacity:0.69999999999999996;fill:#54587e;fill-opacity:1;stroke:#ffffff;stroke-width:11;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none" />
     <path
        inkscape:export-ydpi="109.0048"
        inkscape:export-xdpi="109.0048"
@@ -5163,5 +5320,695 @@
          id="tspan4441-6"
          x="-995.71667"
          y="-1521.8585">connecting...</tspan></text>
+    <rect
+       inkscape:export-ydpi="24.861879"
+       inkscape:export-xdpi="24.861879"
+       inkscape:export-filename="/home/ubuntu/Desktop/Moment Logo/playlist.png"
+       ry="39"
+       y="-844.64911"
+       x="878.65057"
+       height="176"
+       width="176"
+       id="rect3781"
+       style="opacity:0.6;fill:url(#radialGradient3817);fill-opacity:1;stroke:#bbb8b8;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none" />
+    <rect
+       inkscape:export-ydpi="24.861879"
+       inkscape:export-xdpi="24.861879"
+       inkscape:export-filename="/home/ubuntu/Desktop/Moment Logo/playlist.png"
+       ry="0"
+       y="-818.14911"
+       x="918.65057"
+       height="123"
+       width="96"
+       id="rect3783"
+       style="opacity:0.6;fill:#a7a7a7;fill-opacity:1;stroke:#ffffff;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none" />
+    <g
+       inkscape:export-ydpi="24.861879"
+       inkscape:export-xdpi="24.861879"
+       inkscape:export-filename="/home/ubuntu/Desktop/Moment Logo/playlist.png"
+       transform="translate(625.15059,-237.51126)"
+       id="g3785"
+       style="opacity:0.6;fill:#cccccc;fill-opacity:1;stroke:#ffffff;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none">
+      <path
+         style="fill:#cccccc;fill-opacity:1;stroke:#ffffff;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+         d="m 312,-557.63782 59,0"
+         id="path3787"
+         inkscape:connector-curvature="0" />
+      <path
+         inkscape:connector-curvature="0"
+         id="path3789"
+         d="m 312,-542.63782 38.4939,0"
+         style="fill:#cccccc;fill-opacity:1;stroke:#ffffff;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+         sodipodi:nodetypes="cc" />
+      <path
+         style="fill:#cccccc;fill-opacity:1;stroke:#ffffff;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+         d="m 312,-527.63782 59,0"
+         id="path3791"
+         inkscape:connector-curvature="0" />
+      <path
+         inkscape:connector-curvature="0"
+         id="path3793"
+         d="m 312,-512.63782 59,0"
+         style="fill:#cccccc;fill-opacity:1;stroke:#ffffff;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none" />
+      <path
+         style="fill:#cccccc;fill-opacity:1;stroke:#ffffff;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+         d="m 312,-497.63782 48.3934,0"
+         id="path3795"
+         inkscape:connector-curvature="0"
+         sodipodi:nodetypes="cc" />
+    </g>
+    <rect
+       inkscape:export-ydpi="24.861879"
+       inkscape:export-xdpi="24.861879"
+       inkscape:export-filename="/home/ubuntu/Desktop/Moment Logo/fullscreen.png"
+       style="opacity:0.59999999999999998;fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+       id="rect3797"
+       width="176"
+       height="176"
+       x="1138.6506"
+       y="-844.64911"
+       ry="39" />
+    <path
+       style="opacity:0.59999999999999998;fill:#000000;stroke:#ffffff;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;fill-opacity:1"
+       d="M 1166.875 -815.65625 L 1166.875 -785.25 L 1182.3125 -801.03125 L 1196.5938 -815.65625 L 1167.0625 -815.65625 L 1166.875 -815.65625 z M 1254.875 -815.65625 L 1284.5938 -785.25 L 1284.5938 -815.65625 L 1254.875 -815.65625 z M 1201.3438 -782.25 L 1201.3438 -732.21875 L 1251.375 -732.21875 L 1251.375 -782.25 L 1201.3438 -782.25 z M 1166.875 -729.65625 L 1166.875 -699.25 L 1196.5938 -699.25 L 1166.875 -729.65625 z M 1284.5938 -729.65625 L 1254.875 -699.25 L 1284.5938 -699.25 L 1284.5938 -729.65625 z "
+       id="path3799" />
+    <rect
+       ry="39"
+       y="-1080.6604"
+       x="1142.7197"
+       height="176"
+       width="176"
+       id="rect4594"
+       style="opacity:0.6;fill:#808080;fill-opacity:1;stroke:#000000;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+       inkscape:export-filename="/home/ubuntu/Desktop/Moment Logo/fullscreen.png"
+       inkscape:export-xdpi="24.861879"
+       inkscape:export-ydpi="24.861879" />
+    <path
+       id="path4596"
+       d="m 1170.9442,-1051.6675 0,30.4062 15.4375,-15.7812 14.2813,-14.625 -29.5313,0 -0.1875,0 z m 88,0 29.7188,30.4062 0,-30.4062 -29.7188,0 z m -53.5312,33.4062 0,50.03129 50.0312,0 0,-50.03129 -50.0312,0 z m -34.4688,52.59379 0,30.40625 29.7188,0 -29.7188,-30.40625 z m 117.7188,0 -29.7188,30.40625 29.7188,0 0,-30.40625 z"
+       style="opacity:0.59999999999999998;fill:#000000;fill-opacity:1;stroke:#000000;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+       inkscape:connector-curvature="0" />
+    <rect
+       inkscape:export-ydpi="24.861879"
+       inkscape:export-xdpi="24.861879"
+       inkscape:export-filename="/home/ubuntu/Desktop/Moment Logo/fullscreen.png"
+       style="opacity:0.59999999999999998;fill:#8e91ac;fill-opacity:1;stroke:#000000;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+       id="rect4598"
+       width="176"
+       height="176"
+       x="1119.5847"
+       y="-1381.7783"
+       ry="39" />
+    <path
+       inkscape:connector-curvature="0"
+       style="opacity:0.6;fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+       d="m 1147.8091,-1352.7853 0,30.4062 15.4375,-15.7812 14.2813,-14.625 -29.5313,0 -0.1875,0 z m 88,0 29.7189,30.4062 0,-30.4062 -29.7189,0 z m -53.5312,33.4062 0,50.0312 50.0312,0 0,-50.0312 -50.0312,0 z m -34.4688,52.5937 0,30.4063 29.7188,0 -29.7188,-30.4063 z m 117.7189,0 -29.7189,30.4063 29.7189,0 0,-30.4063 z"
+       id="path4600" />
+    <rect
+       ry="39"
+       y="-1688.9996"
+       x="1113.943"
+       height="176"
+       width="176"
+       id="rect4610"
+       style="opacity:0.6;fill:#000000;fill-opacity:1;stroke:#ffffff;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+       inkscape:export-filename="/home/ubuntu/Desktop/Moment Logo/fullscreen.png"
+       inkscape:export-xdpi="24.861879"
+       inkscape:export-ydpi="24.861879" />
+    <path
+       id="path4612"
+       d="m 1142.1674,-1660.0068 0,30.4062 15.4375,-15.7812 14.2813,-14.625 -29.5313,0 -0.1875,0 z m 88,0 29.7189,30.4062 0,-30.4062 -29.7189,0 z m -53.5312,33.4062 0,50.0312 50.0312,0 0,-50.0312 -50.0312,0 z m -34.4688,52.5937 0,30.4063 29.7188,0 -29.7188,-30.4063 z m 117.7189,0 -29.7189,30.4063 29.7189,0 0,-30.4063 z"
+       style="opacity:0.6;fill:#000000;fill-opacity:1;stroke:#ffffff;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+       inkscape:connector-curvature="0" />
+    <rect
+       style="opacity:0.59999999999999998;fill:#8e91ac;fill-opacity:1;stroke:#000000;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+       id="rect4614"
+       width="176"
+       height="176"
+       x="881.71313"
+       y="-1374.1504"
+       ry="39"
+       inkscape:export-filename="/home/ubuntu/Desktop/Moment Logo/playlist.png"
+       inkscape:export-xdpi="24.861879"
+       inkscape:export-ydpi="24.861879" />
+    <rect
+       style="opacity:0.6;fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+       id="rect4616"
+       width="96"
+       height="123"
+       x="921.71313"
+       y="-1347.6504"
+       ry="0"
+       inkscape:export-filename="/home/ubuntu/Desktop/Moment Logo/playlist.png"
+       inkscape:export-xdpi="24.861879"
+       inkscape:export-ydpi="24.861879" />
+    <g
+       style="opacity:0.6;fill:#cccccc;fill-opacity:1;stroke:#000000;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+       id="g4618"
+       transform="translate(628.21314,-767.01244)"
+       inkscape:export-filename="/home/ubuntu/Desktop/Moment Logo/playlist.png"
+       inkscape:export-xdpi="24.861879"
+       inkscape:export-ydpi="24.861879">
+      <path
+         inkscape:connector-curvature="0"
+         id="path4620"
+         d="m 312,-557.63782 59,0"
+         style="fill:#cccccc;fill-opacity:1;stroke:#000000;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none" />
+      <path
+         sodipodi:nodetypes="cc"
+         style="fill:#cccccc;fill-opacity:1;stroke:#000000;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+         d="m 312,-542.63782 38.4939,0"
+         id="path4622"
+         inkscape:connector-curvature="0" />
+      <path
+         inkscape:connector-curvature="0"
+         id="path4624"
+         d="m 312,-527.63782 59,0"
+         style="fill:#cccccc;fill-opacity:1;stroke:#000000;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none" />
+      <path
+         style="fill:#cccccc;fill-opacity:1;stroke:#000000;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+         d="m 312,-512.63782 59,0"
+         id="path4626"
+         inkscape:connector-curvature="0" />
+      <path
+         sodipodi:nodetypes="cc"
+         inkscape:connector-curvature="0"
+         id="path4628"
+         d="m 312,-497.63782 48.3934,0"
+         style="fill:#cccccc;fill-opacity:1;stroke:#000000;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none" />
+    </g>
+    <rect
+       ry="39"
+       y="-1379.7438"
+       x="1351.5269"
+       height="176"
+       width="176"
+       id="rect4642"
+       style="opacity:0.59999999999999998;fill:#8e91ac;fill-opacity:1;stroke:#000000;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+       inkscape:export-filename="/home/ubuntu/Desktop/Moment Logo/fullscreen.png"
+       inkscape:export-xdpi="24.861879"
+       inkscape:export-ydpi="24.861879" />
+    <path
+       id="path4644"
+       d="m 1416.8535,-1310.2221 0,36.9567 45.3467,0 0,-36.9567 z"
+       style="opacity:0.59999999999999998;fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="ccccc" />
+    <path
+       sodipodi:nodetypes="cccc"
+       id="path4648"
+       d="m 1367.8937,-1291.7439 27.5805,36.7407 0,-73.4812 z"
+       style="opacity:0.6;fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+       inkscape:connector-curvature="0" />
+    <path
+       inkscape:connector-curvature="0"
+       style="opacity:0.6;fill:#ffffff;fill-opacity:1;stroke:#000000;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+       d="m 1511.16,-1291.7439 -27.5805,36.7407 0,-73.4812 z"
+       id="path4660"
+       sodipodi:nodetypes="cccc" />
+    <rect
+       ry="39"
+       y="-1937.6715"
+       x="1121.2627"
+       height="136.44995"
+       width="148.31517"
+       id="rect4749"
+       style="opacity:0.305;fill:#191d5b;fill-opacity:1;stroke:#151a38;stroke-width:5;stroke-linecap:square;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;filter:url(#filter4731)" />
+    <rect
+       ry="39"
+       y="-1957.4465"
+       x="1107.4203"
+       height="176"
+       width="176"
+       id="rect4670"
+       style="opacity:0.6;fill:#8e91ac;fill-opacity:1;stroke:#151a38;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+       inkscape:export-filename="/home/ubuntu/Desktop/svg/fullscreen.png"
+       inkscape:export-xdpi="24.861879"
+       inkscape:export-ydpi="24.861879" />
+    <path
+       id="path4672"
+       d="m 1136.5608,-1927.6496 0,30.4062 15.4375,-15.7812 14.2813,-14.625 -29.5313,0 -0.1875,0 z m 88,0 29.7189,30.4062 0,-30.4062 -29.7189,0 z m -53.5312,33.4062 0,50.0312 50.0312,0 0,-50.0312 -50.0312,0 z m -34.4688,52.5937 0,30.4063 29.7188,0 -29.7188,-30.4063 z m 117.7189,0 -29.7189,30.4063 29.7189,0 0,-30.4063 z"
+       style="opacity:0.6;fill:#ffffff;fill-opacity:1;stroke:#151a38;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+       inkscape:connector-curvature="0" />
+    <rect
+       style="opacity:0.30499999999999999;fill:#191d5b;fill-opacity:1;stroke:#151a38;stroke-width:5;stroke-linecap:square;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;filter:url(#filter4753)"
+       id="rect4725"
+       width="148.31517"
+       height="136.44995"
+       x="787.05914"
+       y="-1935.694"
+       ry="39" />
+    <rect
+       inkscape:export-ydpi="24.861879"
+       inkscape:export-xdpi="24.861879"
+       inkscape:export-filename="/home/ubuntu/Desktop/svg/playlist.png"
+       ry="39"
+       y="-1955.469"
+       x="773.21674"
+       height="176"
+       width="176"
+       id="rect4674"
+       style="opacity:0.6;fill:#8e91ac;fill-opacity:1;stroke:#151a38;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none" />
+    <g
+       id="g4735"
+       transform="translate(-108.4964,-1.9006312)"
+       inkscape:export-filename="/home/ubuntu/Desktop/svg/playlist.png"
+       inkscape:export-xdpi="24.861879"
+       inkscape:export-ydpi="24.861879">
+      <rect
+         style="opacity:0.6;fill:#ffffff;fill-opacity:1;stroke:#151a38;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+         id="rect4676"
+         width="96"
+         height="123"
+         x="921.71313"
+         y="-1927.0684"
+         ry="0"
+         inkscape:export-filename="/home/ubuntu/Desktop/Moment Logo/playlist.png"
+         inkscape:export-xdpi="24.861879"
+         inkscape:export-ydpi="24.861879" />
+      <g
+         style="opacity:0.6;fill:#cccccc;fill-opacity:1;stroke:#151a38;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+         id="g4678"
+         transform="translate(628.21314,-1346.4304)"
+         inkscape:export-filename="/home/ubuntu/Desktop/Moment Logo/playlist.png"
+         inkscape:export-xdpi="24.861879"
+         inkscape:export-ydpi="24.861879">
+        <path
+           inkscape:connector-curvature="0"
+           id="path4680"
+           d="m 312,-557.63782 59,0"
+           style="fill:#cccccc;fill-opacity:1;stroke:#151a38;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none" />
+        <path
+           sodipodi:nodetypes="cc"
+           style="fill:#cccccc;fill-opacity:1;stroke:#151a38;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+           d="m 312,-542.63782 38.4939,0"
+           id="path4683"
+           inkscape:connector-curvature="0" />
+        <path
+           inkscape:connector-curvature="0"
+           id="path4685"
+           d="m 312,-527.63782 59,0"
+           style="fill:#cccccc;fill-opacity:1;stroke:#151a38;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none" />
+        <path
+           style="fill:#cccccc;fill-opacity:1;stroke:#151a38;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+           d="m 312,-512.63782 59,0"
+           id="path4687"
+           inkscape:connector-curvature="0" />
+        <path
+           sodipodi:nodetypes="cc"
+           inkscape:connector-curvature="0"
+           id="path4689"
+           d="m 312,-497.63782 48.3934,0"
+           style="fill:#cccccc;fill-opacity:1;stroke:#151a38;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none" />
+      </g>
+    </g>
+    <rect
+       style="opacity:0.30452675;fill:#191d5b;fill-opacity:1;stroke:#151a38;stroke-width:5;stroke-linecap:square;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;filter:url(#filter4731)"
+       id="rect4751"
+       width="148.31517"
+       height="136.44995"
+       x="1471.0096"
+       y="-1937.6715"
+       ry="39" />
+    <rect
+       inkscape:export-ydpi="24.861879"
+       inkscape:export-xdpi="24.861879"
+       inkscape:export-filename="/home/ubuntu/Desktop/svg/horizontal.png"
+       style="opacity:0.6;fill:#8e91ac;fill-opacity:1;stroke:#151a38;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+       id="rect4691"
+       width="176"
+       height="176"
+       x="1457.1672"
+       y="-1957.4465"
+       ry="39" />
+    <g
+       id="g4744"
+       transform="translate(105.64038,1.7151668)">
+      <path
+         id="path4693"
+         d="m 1416.8535,-1889.64 0,36.9567 45.3467,0 0,-36.9567 z"
+         style="opacity:0.6;fill:#ffffff;fill-opacity:1;stroke:#151a38;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+         inkscape:connector-curvature="0"
+         sodipodi:nodetypes="ccccc" />
+      <path
+         sodipodi:nodetypes="cccc"
+         id="path4695"
+         d="m 1367.8937,-1871.1618 27.5805,36.7407 0,-73.4812 z"
+         style="opacity:0.6;fill:#ffffff;fill-opacity:1;stroke:#151a38;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+         inkscape:connector-curvature="0" />
+      <path
+         inkscape:connector-curvature="0"
+         style="opacity:0.6;fill:#ffffff;fill-opacity:1;stroke:#151a38;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+         d="m 1511.16,-1871.1618 -27.5805,36.7407 0,-73.4812 z"
+         id="path4697"
+         sodipodi:nodetypes="cccc" />
+    </g>
+    <rect
+       style="opacity:0.30500004;fill:#191d5b;fill-opacity:1;stroke:#151a38;stroke-width:5;stroke-linecap:square;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;filter:url(#filter4731)"
+       id="rect4757"
+       width="148.31517"
+       height="136.44995"
+       x="1112.8727"
+       y="-2220.134"
+       ry="39"
+       inkscape:export-filename="/home/ubuntu/Desktop/svg/fullscreen.png"
+       inkscape:export-xdpi="24.861879"
+       inkscape:export-ydpi="24.861879" />
+    <rect
+       inkscape:export-ydpi="24.861879"
+       inkscape:export-xdpi="24.861879"
+       inkscape:export-filename="/home/ubuntu/Desktop/svg/fullscreen.png"
+       style="opacity:0.6;fill:#8e91ac;fill-opacity:1;stroke:#151a38;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+       id="rect4759"
+       width="176"
+       height="176"
+       x="1099.0303"
+       y="-2239.9089"
+       ry="39" />
+    <path
+       inkscape:connector-curvature="0"
+       style="opacity:0.80000000000000004;fill:#ffffff;fill-opacity:1;stroke:#282b48;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+       d="m 1128.1708,-2210.112 0,30.4062 15.4375,-15.7812 14.2813,-14.625 -29.5313,0 -0.1875,0 z m 88,0 29.7189,30.4062 0,-30.4062 -29.7189,0 z m -53.5312,33.4062 0,50.0312 50.0312,0 0,-50.0312 -50.0312,0 z m -34.4688,52.5937 0,30.4063 29.7188,0 -29.7188,-30.4063 z m 117.7189,0 -29.7189,30.4063 29.7189,0 0,-30.4063 z"
+       id="path4761"
+       inkscape:export-filename="/home/ubuntu/Desktop/svg/fullscreen.png"
+       inkscape:export-xdpi="24.861879"
+       inkscape:export-ydpi="24.861879" />
+    <rect
+       ry="39"
+       y="-2218.1565"
+       x="778.66919"
+       height="136.44995"
+       width="148.31517"
+       id="rect4763"
+       style="opacity:0.30500004;fill:#191d5b;fill-opacity:1;stroke:#151a38;stroke-width:5;stroke-linecap:square;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;filter:url(#filter4753)" />
+    <rect
+       style="opacity:0.6;fill:#8e91ac;fill-opacity:1;stroke:#151a38;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+       id="rect4765"
+       width="176"
+       height="176"
+       x="764.82678"
+       y="-2237.9314"
+       ry="39"
+       inkscape:export-filename="/home/ubuntu/Desktop/svg/playlist.png"
+       inkscape:export-xdpi="24.861879"
+       inkscape:export-ydpi="24.861879" />
+    <rect
+       style="opacity:0.80000000000000004;fill:#ffffff;fill-opacity:1;stroke:#282b48;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+       id="rect4769"
+       width="96"
+       height="123"
+       x="804.82678"
+       y="-2211.4314"
+       ry="0"
+       inkscape:export-filename="/home/ubuntu/Desktop/Moment Logo/playlist.png"
+       inkscape:export-xdpi="24.861879"
+       inkscape:export-ydpi="24.861879" />
+    <g
+       style="opacity:0.80000000000000004;fill:#cccccc;fill-opacity:1;stroke:#282b48;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+       id="g4771"
+       transform="translate(511.32677,-1630.7934)"
+       inkscape:export-filename="/home/ubuntu/Desktop/Moment Logo/playlist.png"
+       inkscape:export-xdpi="24.861879"
+       inkscape:export-ydpi="24.861879">
+      <path
+         inkscape:connector-curvature="0"
+         id="path4773"
+         d="m 312,-557.63782 59,0"
+         style="fill:#cccccc;fill-opacity:1;stroke:#282b48;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none" />
+      <path
+         sodipodi:nodetypes="cc"
+         style="fill:#cccccc;fill-opacity:1;stroke:#282b48;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+         d="m 312,-542.63782 38.4939,0"
+         id="path4775"
+         inkscape:connector-curvature="0" />
+      <path
+         inkscape:connector-curvature="0"
+         id="path4777"
+         d="m 312,-527.63782 59,0"
+         style="fill:#cccccc;fill-opacity:1;stroke:#282b48;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none" />
+      <path
+         style="fill:#cccccc;fill-opacity:1;stroke:#282b48;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+         d="m 312,-512.63782 59,0"
+         id="path4779"
+         inkscape:connector-curvature="0" />
+      <path
+         sodipodi:nodetypes="cc"
+         inkscape:connector-curvature="0"
+         id="path4781"
+         d="m 312,-497.63782 48.3934,0"
+         style="fill:#cccccc;fill-opacity:1;stroke:#282b48;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none" />
+    </g>
+    <rect
+       ry="39"
+       y="-2220.134"
+       x="1462.6196"
+       height="136.44995"
+       width="148.31517"
+       id="rect4783"
+       style="opacity:0.30452677;fill:#191d5b;fill-opacity:1;stroke:#151a38;stroke-width:5;stroke-linecap:square;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;filter:url(#filter4731)" />
+    <rect
+       ry="39"
+       y="-2239.9089"
+       x="1448.7772"
+       height="176"
+       width="176"
+       id="rect4785"
+       style="opacity:0.6;fill:#8e91ac;fill-opacity:1;stroke:#151a38;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+       inkscape:export-filename="/home/ubuntu/Desktop/svg/horizontal.png"
+       inkscape:export-xdpi="24.861879"
+       inkscape:export-ydpi="24.861879" />
+    <path
+       id="path4789"
+       d="m 1514.1039,-2170.3873 0,36.9567 45.3467,0 0,-36.9567 z"
+       style="opacity:0.80000000000000004;fill:#ffffff;fill-opacity:1;stroke:#282b48;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="ccccc" />
+    <path
+       sodipodi:nodetypes="cccc"
+       id="path4791"
+       d="m 1465.1441,-2151.9091 27.5805,36.7407 0,-73.4812 z"
+       style="opacity:0.80000000000000004;fill:#ffffff;fill-opacity:1;stroke:#282b48;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+       inkscape:connector-curvature="0" />
+    <path
+       inkscape:connector-curvature="0"
+       style="opacity:0.80000000000000004;fill:#ffffff;fill-opacity:1;stroke:#282b48;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+       d="m 1608.4104,-2151.9091 -27.5805,36.7407 0,-73.4812 z"
+       id="path4793"
+       sodipodi:nodetypes="cccc" />
+    <rect
+       style="opacity:0.30500004;fill:#191d5b;fill-opacity:1;stroke:#151a38;stroke-width:5;stroke-linecap:square;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;filter:url(#filter4731)"
+       id="rect4812"
+       width="148.31517"
+       height="136.44995"
+       x="1107.2794"
+       y="-2510.9863"
+       ry="39" />
+    <rect
+       inkscape:export-ydpi="24.861879"
+       inkscape:export-xdpi="24.861879"
+       inkscape:export-filename="/home/ubuntu/Desktop/svg/fullscreen.png"
+       style="opacity:0.69999999999999996;fill:#54587e;fill-opacity:1;stroke:#ffffff;stroke-width:11;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+       id="rect4814"
+       width="176"
+       height="176"
+       x="1093.437"
+       y="-2530.7612"
+       ry="39" />
+    <path
+       inkscape:connector-curvature="0"
+       style="opacity:0.7;fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:3.50000000000000000;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+       d="m 1122.5775,-2500.9644 0,30.4062 15.4375,-15.7812 14.2813,-14.625 -29.5313,0 -0.1875,0 z m 88,0 29.7189,30.4062 0,-30.4062 -29.7189,0 z m -53.5312,33.4062 0,50.0312 50.0312,0 0,-50.0312 -50.0312,0 z m -34.4688,52.5937 0,30.4063 29.7188,0 -29.7188,-30.4063 z m 117.7189,0 -29.7189,30.4063 29.7189,0 0,-30.4063 z"
+       id="path4816" />
+    <rect
+       ry="39"
+       y="-2509.0088"
+       x="773.07581"
+       height="136.44995"
+       width="148.31517"
+       id="rect4818"
+       style="opacity:0.30500004;fill:#191d5b;fill-opacity:1;stroke:#151a38;stroke-width:5;stroke-linecap:square;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;filter:url(#filter4753)" />
+    <rect
+       style="opacity:0.59999999999999998;fill:#14183e;fill-opacity:1;stroke:#ffffff;stroke-width:3.50000000000000000;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+       id="rect4820"
+       width="176"
+       height="176"
+       x="759.2334"
+       y="-2528.7837"
+       ry="39"
+       inkscape:export-filename="/home/ubuntu/Desktop/svg/playlist.png"
+       inkscape:export-xdpi="24.861879"
+       inkscape:export-ydpi="24.861879" />
+    <path
+       style="opacity:0.7;fill:#ffffff;fill-opacity:1;stroke:none"
+       d="M 799.21875 -2502.2812 L 799.21875 -2379.2812 L 895.21875 -2379.2812 L 895.21875 -2502.2812 L 799.21875 -2502.2812 z M 817.375 -2481.7812 A 2.503123 2.503123 0 0 1 817.46875 -2481.7812 A 2.50025 2.50025 0 0 1 817.71875 -2481.7812 L 876.71875 -2481.7812 A 2.50025 2.50025 0 1 1 876.71875 -2476.7812 L 817.71875 -2476.7812 A 2.503123 2.503123 0 0 1 817.375 -2481.7812 z M 817.46875 -2466.7812 A 2.50025 2.50025 0 0 1 817.71875 -2466.7812 L 856.21875 -2466.7812 A 2.50025 2.50025 0 1 1 856.21875 -2461.7812 L 817.71875 -2461.7812 A 2.503123 2.503123 0 1 1 817.46875 -2466.7812 z M 817.46875 -2451.7812 A 2.50025 2.50025 0 0 1 817.71875 -2451.7812 L 876.71875 -2451.7812 A 2.50025 2.50025 0 1 1 876.71875 -2446.7812 L 817.71875 -2446.7812 A 2.503123 2.503123 0 1 1 817.46875 -2451.7812 z M 817.46875 -2436.7812 A 2.50025 2.50025 0 0 1 817.71875 -2436.7812 L 876.71875 -2436.7812 A 2.50025 2.50025 0 1 1 876.71875 -2431.7812 L 817.71875 -2431.7812 A 2.503123 2.503123 0 1 1 817.46875 -2436.7812 z M 817.46875 -2421.7812 A 2.50025 2.50025 0 0 1 817.71875 -2421.7812 L 866.125 -2421.7812 A 2.50025 2.50025 0 1 1 866.125 -2416.7812 L 817.71875 -2416.7812 A 2.503123 2.503123 0 1 1 817.46875 -2421.7812 z "
+       id="rect4824" />
+    <rect
+       ry="39"
+       y="-2510.9863"
+       x="1457.0264"
+       height="136.44995"
+       width="148.31517"
+       id="rect4838"
+       style="opacity:0.30452677;fill:#191d5b;fill-opacity:1;stroke:#151a38;stroke-width:5;stroke-linecap:square;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;filter:url(#filter4731)" />
+    <rect
+       ry="39"
+       y="-2530.7612"
+       x="1443.184"
+       height="176"
+       width="176"
+       id="rect4840"
+       style="opacity:0.59999999999999998;fill:#14183e;fill-opacity:1;stroke:#ffffff;stroke-width:3.50000000000000000;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none"
+       inkscape:export-filename="/home/ubuntu/Desktop/svg/horizontal.png"
+       inkscape:export-xdpi="24.861879"
+       inkscape:export-ydpi="24.861879" />
+    <path
+       id="path4844"
+       d="m 1508.5106,-2461.2396 0,36.9567 45.3467,0 0,-36.9567 z"
+       style="opacity:0.69;fill:#ffffff;fill-opacity:1;stroke:none"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="ccccc" />
+    <path
+       sodipodi:nodetypes="cccc"
+       id="path4846"
+       d="m 1459.5508,-2442.7614 27.5805,36.7407 0,-73.4812 z"
+       style="opacity:0.69;fill:#ffffff;fill-opacity:1;stroke:none"
+       inkscape:connector-curvature="0" />
+    <path
+       inkscape:connector-curvature="0"
+       style="opacity:0.69;fill:#ffffff;fill-opacity:1;stroke:none"
+       d="m 1602.8171,-2442.7614 -27.5805,36.7407 0,-73.4812 z"
+       id="path4848"
+       sodipodi:nodetypes="cccc" />
+    <path
+       id="path4914"
+       d="m 799.21875,-2798.3254 0,123 96,0 0,-123 -96,0 z m 18.15625,20.5 a 2.503123,2.503123 0 0 1 0.0937,0 2.50025,2.50025 0 0 1 0.25,0 l 59,0 a 2.50025,2.50025 0 1 1 0,5 l -59,0 a 2.5059012,2.5059012 0 0 1 -0.34375,-5 z m 0.0937,15 a 2.50025,2.50025 0 0 1 0.25,0 l 38.5,0 a 2.50025,2.50025 0 1 1 0,5 l -38.5,0 a 2.503123,2.503123 0 0 1 -0.25,-5 z m 0,15 a 2.50025,2.50025 0 0 1 0.25,0 l 59,0 a 2.50025,2.50025 0 1 1 0,5 l -59,0 a 2.503123,2.503123 0 0 1 -0.25,-5 z m 0,15 a 2.50025,2.50025 0 0 1 0.25,0 l 59,0 a 2.50025,2.50025 0 1 1 0,5 l -59,0 a 2.503123,2.503123 0 0 1 -0.25,-5 z m 0,15 a 2.50025,2.50025 0 0 1 0.25,0 l 48.40625,0 a 2.50025,2.50025 0 1 1 0,5 l -48.40625,0 a 2.503123,2.503123 0 0 1 -0.25,-5 z"
+       style="opacity:0.75;fill:#ffffff;fill-opacity:1;stroke:none"
+       inkscape:connector-curvature="0" />
+    <g
+       id="g5381"
+       transform="translate(-2.4160713e-5,-3.4852031e-5)">
+      <path
+         id="path4920"
+         d="m 1501.5024,-2755.3065 0,36.9567 45.3467,0 0,-36.9567 z"
+         style="opacity:0.75;fill:#ffffff;fill-opacity:1;stroke:none"
+         inkscape:connector-curvature="0"
+         sodipodi:nodetypes="ccccc" />
+      <path
+         sodipodi:nodetypes="cccc"
+         id="path4922"
+         d="m 1454.5426,-2736.8282 27.5805,36.7407 0,-73.4812 z"
+         style="opacity:0.75;fill:#ffffff;fill-opacity:1;stroke:none"
+         inkscape:connector-curvature="0" />
+      <path
+         inkscape:connector-curvature="0"
+         style="opacity:0.75;fill:#ffffff;fill-opacity:1;stroke:none"
+         d="m 1593.8089,-2736.8282 -27.5805,36.7407 0,-73.4812 z"
+         id="path4924"
+         sodipodi:nodetypes="cccc" />
+    </g>
+    <path
+       style="opacity:0.75;fill:#ffffff;fill-opacity:1;stroke:none"
+       d="m 1240.5714,-2766.0728 -34.3724,-34.3724 34.3724,0 z"
+       id="path4965"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cccc" />
+    <path
+       sodipodi:nodetypes="cccc"
+       inkscape:connector-curvature="0"
+       id="path4967"
+       d="m 1240.5714,-2716.549 -34.3724,34.3724 34.3724,0 z"
+       style="opacity:0.75;fill:#ffffff;fill-opacity:1;stroke:none" />
+    <path
+       style="opacity:0.75;fill:#ffffff;fill-opacity:1;stroke:none"
+       d="m 1122.3027,-2716.549 34.3724,34.3724 -34.3724,0 z"
+       id="path4969"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cccc" />
+    <rect
+       style="opacity:0.75;fill:#ffffff;fill-opacity:1;stroke:none"
+       id="rect4928"
+       width="51.38686"
+       height="51.38686"
+       x="1155.7435"
+       y="-2767.0049"
+       ry="0"
+       rx="0" />
+    <path
+       sodipodi:nodetypes="cccc"
+       inkscape:connector-curvature="0"
+       id="path4937"
+       d="m 1122.3027,-2766.0728 34.3724,-34.3724 -34.3724,0 z"
+       style="opacity:0.75;fill:#ffffff;fill-opacity:1;stroke:none" />
+    <path
+       inkscape:connector-curvature="0"
+       style="opacity:0.75;fill:#ffffff;fill-opacity:1;stroke:none"
+       d="m 799.21875,-3110.7357 0,123 96,0 0,-123 -96,0 z m 18.15625,20.5 a 2.503123,2.503123 0 0 1 0.0937,0 2.50025,2.50025 0 0 1 0.25,0 l 59,0 a 2.50025,2.50025 0 1 1 0,5 l -59,0 a 2.5059012,2.5059012 0 0 1 -0.34375,-5 z m 0.0937,15 a 2.50025,2.50025 0 0 1 0.25,0 l 38.5,0 a 2.50025,2.50025 0 1 1 0,5 l -38.5,0 a 2.503123,2.503123 0 0 1 -0.25,-5 z m 0,15 a 2.50025,2.50025 0 0 1 0.25,0 l 59,0 a 2.50025,2.50025 0 1 1 0,5 l -59,0 a 2.503123,2.503123 0 0 1 -0.25,-5 z m 0,15 a 2.50025,2.50025 0 0 1 0.25,0 l 59,0 a 2.50025,2.50025 0 1 1 0,5 l -59,0 a 2.503123,2.503123 0 0 1 -0.25,-5 z m 0,15 a 2.50025,2.50025 0 0 1 0.25,0 l 48.40625,0 a 2.50025,2.50025 0 1 1 0,5 l -48.40625,0 a 2.503123,2.503123 0 0 1 -0.25,-5 z"
+       id="path5398" />
+    <g
+       transform="translate(-2.4160713e-5,-312.41034)"
+       id="g5400">
+      <path
+         sodipodi:nodetypes="ccccc"
+         inkscape:connector-curvature="0"
+         style="opacity:0.75;fill:#ffffff;fill-opacity:1;stroke:none"
+         d="m 1501.5024,-2755.3065 0,36.9567 45.3467,0 0,-36.9567 z"
+         id="path5402" />
+      <path
+         inkscape:connector-curvature="0"
+         style="opacity:0.75;fill:#ffffff;fill-opacity:1;stroke:none"
+         d="m 1454.5426,-2736.8282 27.5805,36.7407 0,-73.4812 z"
+         id="path5404"
+         sodipodi:nodetypes="cccc" />
+      <path
+         sodipodi:nodetypes="cccc"
+         id="path5406"
+         d="m 1593.8089,-2736.8282 -27.5805,36.7407 0,-73.4812 z"
+         style="opacity:0.75;fill:#ffffff;fill-opacity:1;stroke:none"
+         inkscape:connector-curvature="0" />
+    </g>
+    <path
+       sodipodi:nodetypes="cccc"
+       inkscape:connector-curvature="0"
+       id="path5408"
+       d="m 1240.5714,-3078.4831 -34.3724,-34.3724 34.3724,0 z"
+       style="opacity:0.75;fill:#ffffff;fill-opacity:1;stroke:none" />
+    <path
+       style="opacity:0.75;fill:#ffffff;fill-opacity:1;stroke:none"
+       d="m 1240.5714,-3028.9593 -34.3724,34.3724 34.3724,0 z"
+       id="path5410"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cccc" />
+    <path
+       sodipodi:nodetypes="cccc"
+       inkscape:connector-curvature="0"
+       id="path5412"
+       d="m 1122.3027,-3028.9593 34.3724,34.3724 -34.3724,0 z"
+       style="opacity:0.75;fill:#ffffff;fill-opacity:1;stroke:none" />
+    <rect
+       rx="0"
+       ry="0"
+       y="-3079.4153"
+       x="1155.7435"
+       height="51.38686"
+       width="51.38686"
+       id="rect5414"
+       style="opacity:0.75;fill:#ffffff;fill-opacity:1;stroke:none" />
+    <path
+       style="opacity:0.75;fill:#ffffff;fill-opacity:1;stroke:none"
+       d="m 1122.3027,-3078.4831 34.3724,-34.3724 -34.3724,0 z"
+       id="path5416"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cccc" />
+    <rect
+       inkscape:export-ydpi="24.064171"
+       inkscape:export-xdpi="24.064171"
+       inkscape:export-filename="/home/ubuntu/Desktop/svg/playlist.png"
+       ry="39"
+       y="-3477.9512"
+       x="756.24469"
+       height="176"
+       width="176"
+       id="rect5449"
+       style="opacity:0.7;fill:#474b6b;fill-opacity:1;stroke:#ffffff;stroke-width:11;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none" />
   </g>
 </svg>
