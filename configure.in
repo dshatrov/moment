@@ -25,6 +25,8 @@ AM_CONDITIONAL(PLATFORM_WIN32, test x$platform_win32 = xyes)
 
 AC_CONFIG_FILES([Makefile
 		 moment/Makefile
+		 web/Makefile
+		 web/myplayer/Makefile
 		 libmoment-1.0.pc])
 AC_OUTPUT
 

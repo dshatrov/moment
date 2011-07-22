@@ -1,4 +1,4 @@
-SUBDIRS = moment
+SUBDIRS = moment web
 
 EXTRA_DIST = \
 	libmoment-1.0.pc.in
