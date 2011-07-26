@@ -9,6 +9,7 @@ myplayer_DATA = index.html		\
 		buffering.png		\
 		connecting.png		\
 		error.png		\
+		horizontal.png		\
 		fullscreen.png		\
 		playlist.png		\
 		favicon.ico
