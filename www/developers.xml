@@ -9,52 +9,86 @@
     <rus>Разработчикам</rus>
   </pagename>
   <title>
-    <eng>Developers</eng>
+    <eng>Information for Developers</eng>
     <rus>Разработчикам</rus>
   </title>
-  <eng>
-    <p>
-    Test text.
-    </p>
-  </eng>
-  <rus>
-    <p>
-    Исходный код видеосервера &laquo;Moment&raquo; размещён <a href="http://github.com/erdizz">на GitHub</a>.
-    </p>
-    <p>
-    Краткое описание git-модулей, из которых состоит сервер в базовой конфигурации, в порядке сборки:
-    </p>
-    <ul>
-      <li>
-        <b>libmary</b> &mdash; базовая библиотека. Цикл обработки событий, файлы, таймеры, работа
+
+  <p>
+    <eng>Source code of Moment VS is hosted <a href="http://github.com/erdizz">at GitHub</a>. The server is written in C++.</eng>
+    <rus>Исходный код видеосервера &laquo;Moment&raquo; размещён <a href="http://github.com/erdizz">на GitHub</a>. Сервер написан на C++.</rus>
+  </p>
+
+  <p>
+    <eng>Here's a short description of git modules which constitute Moment VS, in build order:</eng>
+    <rus>Краткое описание git-модулей, из которых состоит сервер в базовой конфигурации, в порядке сборки:</rus>
+  </p>
+
+  <ul>
+    <li>
+      <b>libmary</b> &mdash;
+      <eng>
+        base library. Event loop, files, timers, networking, multithreading, portability.
+      </eng>
+      <rus>
+        базовая библиотека. Цикл обработки событий, файлы, таймеры, работа
         с сетевыми соединениями, поддержка многопоточности, кроссплатформенность;
-      </li>
-      <li>
-        <b>mycpp</b> &mdash; вторичная базовая библиотека, унаследованная от <a href="http://mync.sourceforge.net/index.ru.html">проекта MyNC</a>;
-      </li>
-      <li>
-        <b>mylang</b> &mdash; библиотека для работы с машинными языками;
-      </li>
-      <li>
-        <b>pargen</b> &mdash; генератор парсеров;
-      </li>
-      <li>
-        <b>scruffy</b> &mdash; препроцессор для конфигурационных файлов;
-      </li>
-      <li>
-        <b>libmoment</b> &mdash; базовая библиотека видеосервера. Поддержка протоколов RTMP, RTMPT;
-      </li>
-      <li>
-        <b>moment</b> &mdash; собственно видеосервер. Модули mod_rtmp и mod_file;
-      </li>
-      <li>
-        <b>videochat</b> &mdash; простой сервер видеочата;
-      </li>
-      <li>
-        <b>moment-gst</b> &mdash; интеграция с <a href="http://gstreamer.freedesktop.org">gstreamer</a> (модуль mod_gst).
-      </li>
-    </ul>
-  </rus>
+      </rus>
+    </li>
+    <li>
+      <b>mycpp</b> &mdash;
+      <eng>
+        secondary base library inherited from the <a href="http://mync.sourceforge.net">MyNC project</a>.
+      </eng>
+      <rus>
+        вторичная базовая библиотека, унаследованная от
+        <a href="http://mync.sourceforge.net/index.ru.html">проекта MyNC</a>;
+      </rus>
+    </li>
+    <li>
+      <b>mylang</b> &mdash;
+      <eng>library for working with machine languages.</eng>
+      <rus>библиотека для работы с машинными языками;</rus>
+    </li>
+    <li>
+      <b>pargen</b> &mdash;
+      <eng>parser generator.</eng>
+      <rus>генератор парсеров;</rus>
+    </li>
+    <li>
+      <b>scruffy</b> &mdash;
+      <eng>preprocessor for configuration files;</eng>
+      <rus>препроцессор для конфигурационных файлов;</rus>
+    </li>
+    <li>
+      <b>libmoment</b> &mdash;
+      <eng>core videoserver library. Implementation of RTMP and RTMPT protocols.</eng>
+      <rus>базовая библиотека видеосервера. Поддержка протоколов RTMP, RTMPT;</rus>
+    </li>
+    <li>
+      <b>moment</b> &mdash;
+      <eng>the videoserver itself. mod_rtmp and mod_file modules.</eng>
+      <rus>собственно видеосервер. Модули mod_rtmp и mod_file;</rus>
+    </li>
+    <li>
+      <b>videochat</b> &mdash;
+      <eng>simple video chat server.</eng>
+      <rus>простой сервер видеочата;</rus>
+    </li>
+    <li>
+      <b>moment-gst</b> &mdash;
+      <eng>integration with <a href="http://gstreamer.freedesktop.org">gstreamer</a> (mod_gst module).</eng>
+      <rus>интеграция с <a href="http://gstreamer.freedesktop.org">gstreamer</a> (модуль mod_gst).</rus>
+    </li>
+  </ul>
+
+  <p>
+    <eng>
+      Source code of MyPlayer web app is located at "moment" git module, in flash/mysubscriber and web/myplayer subdirs.
+    </eng>
+    <rus>
+      Код приложения &laquo;MyPlayer&raquo; находится в модуле moment, в поддиректориях flash/mysubscriber и web/myplayer.
+    </rus>
+  </p>
 </content>
 </moment>
 
