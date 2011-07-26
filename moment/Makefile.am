@@ -105,3 +105,6 @@ rtmptool_LDFLAGS = $(COMMON_LDFLAGS)
 
 EXTRA_DIST = $(moment_private_headers) $(moment_extra_dist)
 
+myplayerdir = $(datadir)/moment
+myplayer_DATA = moment.example.conf
+
