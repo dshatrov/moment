@@ -5,7 +5,7 @@ TARGET = MySubscriber.swf
 all: $(TARGET)
 
 $(TARGET): MySubscriber.as
-	mxmlc -debug=true $^
+	/opt/flex/bin/mxmlc -debug=true $^
 
 clean:
 	rm -f $(TARGET)
