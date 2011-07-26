@@ -55,6 +55,12 @@
       vertical-align: bottom;
     }
 
+    pre {
+      padding-left: 3px;
+      padding-right: 3px;
+      background-color: #f3f3fb;
+    }
+
     .main_div {
       margin-left: auto;
       margin-right: auto;
@@ -260,7 +266,7 @@
             <td>
               <xsl:element name="a">
                 <xsl:attribute name="href">
-                  <xsl:value-of select="$name"/><xsl:text>.html</xsl:text>
+                  <xsl:value-of select="$name"/><xsl:if test="$name = 'index'"><xsl:text>.en</xsl:text></xsl:if><xsl:text>.html</xsl:text>
                 </xsl:attribute>
                 <xsl:text>Eng</xsl:text>
               </xsl:element>
@@ -304,7 +310,7 @@
 
   <div class="download_outer">
     <div class="download">
-      <a href="moment-1.0.tar.gz">
+      <a href="http://downloads.sourceforge.net/moment/moment-bin-1.0.tar.gz">
       <eng><img src="img/download.png" alt="Download Moment Video Server 1.0 for Linux" style="margin-bottom: 16px; width: 183px; height: 62px"/></eng>
       <rus><img src="img/download.ru.png" alt="Загрузить Moment Video Server 1.0 для Linux" style="margin-bottom: 16px; width: 183px; height: 62px"/></rus>
       </a>
