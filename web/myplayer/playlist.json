@@ -1,3 +1,5 @@
 [
+  [ "First Example",  "rtmp://127.0.0.1:1935", "first"  ],
+  [ "Second Example", "rtmp://127.0.0.1:1935,  "second" ]
 ]
 
