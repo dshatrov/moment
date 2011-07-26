@@ -255,25 +255,40 @@ HttpService::HttpHandler http_handler = {
     NULL /* httpMessageBody */
 };
 
-void momentFile_addPath (MConfig::Section * const section,
-			 HttpService      * const http_service)
+void momentFile_addPath (ConstMemory const &path,
+			 ConstMemory const &prefix,
+			 HttpService * const http_service)
 {
     Ref<PathEntry> const path_entry = grab (new PathEntry);
 
+    path_entry->path = grab (new String (path));
+    path_entry->prefix = grab (new String (prefix));
+
+    logD_ (_func, "Adding path \"", path_entry->path, "\", prefix \"", path_entry->prefix->mem(), "\"");
+
+    http_service->addHttpHandler (Cb<HttpService::HttpHandler> (&http_handler, path_entry, NULL /* coderef_container */),
+				  path_entry->prefix->mem());
+
+    path_list.append (path_entry);
+}
+
+void momentFile_addPathForSection (MConfig::Section * const section,
+				   HttpService      * const http_service)
+{
+
+    ConstMemory path;
     {
 	MConfig::Option * const opt = section->getOption ("path");
 	MConfig::Value *val;
 	if (opt
 	    && (val = opt->getValue()))
 	{
-	    path_entry->path = grab (new String (val->mem()));
-	} else {
-	    path_entry->path = grab (new String ());
+	    path = val->mem();
 	}
     }
 
+    ConstMemory prefix;
     {
-	ConstMemory prefix;
 	{
 	    MConfig::Option * const opt = section->getOption ("prefix");
 	    MConfig::Value *val;
@@ -289,16 +304,9 @@ void momentFile_addPath (MConfig::Section * const section,
 	{
 	    prefix = prefix.region (1);
 	}
-
-	path_entry->prefix = grab (new String (prefix));
     }
 
-    logD_ (_func, "Adding path \"", path_entry->path, "\", prefix \"", path_entry->prefix->mem(), "\"");
-
-    http_service->addHttpHandler (Cb<HttpService::HttpHandler> (&http_handler, path_entry, NULL /* coderef_container */),
-				  path_entry->prefix->mem());
-
-    path_list.append (path_entry);
+    momentFile_addPath (path, prefix, http_service);
 }
 
 // Multiple file paths can be specified like this:
@@ -309,6 +317,8 @@ void momentFile_addPath (MConfig::Section * const section,
 //
 void momentFileInit ()
 {
+    logD_ (_func_);
+
     MomentServer * const moment = MomentServer::getInstance();
     ServerApp * const server_app = moment->getServerApp();
     MConfig::Config * const config = moment->getConfig();
@@ -324,13 +334,14 @@ void momentFileInit ()
 	    return;
 	}
 
-	if (enable != MConfig::Config::Boolean_True) {
+	if (enable == MConfig::Config::Boolean_False) {
 	    logI_ (_func, "Static HTTP content module is not enabled. "
 		   "Set \"", opt_name, "\" option to \"y\" to enable.");
 	    return;
 	}
     }
 
+    bool got_path = false;
     do {
 	MConfig::Section * const modfile_section = config->getSection ("mod_file");
 	if (!modfile_section)
@@ -338,14 +349,21 @@ void momentFileInit ()
 
 	MConfig::Section::iter iter (*modfile_section);
 	while (!modfile_section->iter_done (iter)) {
+	    got_path = true;
+
 	    MConfig::SectionEntry * const sect_entry = modfile_section->iter_next (iter);
 	    if (sect_entry->getType() == MConfig::SectionEntry::Type_Section
 		&& sect_entry->getName().len() == 0)
 	    {
-		momentFile_addPath (static_cast <MConfig::Section*> (sect_entry), http_service);
+		momentFile_addPathForSection (static_cast <MConfig::Section*> (sect_entry), http_service);
 	    }
 	}
     } while (0);
+
+    if (!got_path) {
+      // Default setup.
+	momentFile_addPath ("/opt/moment/myplayer", "moment", http_service);
+    }
 }
 
 void momentFileUnload ()
