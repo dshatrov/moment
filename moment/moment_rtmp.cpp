@@ -381,7 +381,7 @@ void momentRtmpInit ()
 	    return;
 	}
 
-	if (enable != MConfig::Config::Boolean_True) {
+	if (enable == MConfig::Config::Boolean_False) {
 	    logI_ (_func, "Unrestricted RTMP access module is not enabled. "
 		   "Set \"", opt_name, "\" option to \"y\" to enable.");
 	    return;
@@ -401,9 +401,10 @@ void momentRtmpInit ()
 	    return;
 	}
 
-	{
+	do {
 	    ConstMemory const opt_name = "mod_rtmp/rtmp_bind";
-	    ConstMemory const rtmp_bind = config->getString (opt_name);
+	    ConstMemory rtmp_bind = config->getString_default (opt_name, ":1935");
+
 	    logD_ (_func, opt_name, ": ", rtmp_bind);
 	    if (!rtmp_bind.isNull ()) {
 		IpAddress addr;
@@ -414,7 +415,7 @@ void momentRtmpInit ()
 
 		if (!rtmp_service.bind (addr)) {
 		    logE_ (_func, "rtmp_service.bind() faled: ", exc->toString());
-		    return;
+		    break;
 		}
 
 		if (!rtmp_service.start ()) {
@@ -426,7 +427,7 @@ void momentRtmpInit ()
 		       "and won't accept any connections. "
 		       "Set \"", opt_name, "\" option to bind the service.");
 	    }
-	}
+	} while (0);
     }
 
     {
@@ -442,12 +443,12 @@ void momentRtmpInit ()
 	    return;
 	}
 
-	IpAddress addr;
-	{
+	do {
 	    ConstMemory const opt_name = "mod_rtmp/rtmpt_bind";
-	    ConstMemory const rtmpt_bind = config->getString (opt_name);
+	    ConstMemory const rtmpt_bind = config->getString_default (opt_name, ":8081");
 	    logD_ (_func, opt_name, ": ", rtmpt_bind);
 	    if (!rtmpt_bind.isNull ()) {
+		IpAddress addr;
 		if (!setIpAddress (rtmpt_bind, &addr)) {
 		    logE_ (_func, "setIpAddress() failed (rtmpt)");
 		    return;
@@ -455,7 +456,7 @@ void momentRtmpInit ()
 
 		if (!rtmpt_service.bind (addr)) {
 		    logE_ (_func, "rtmpt_service.bind() faled: ", exc->toString());
-		    return;
+		    break;
 		}
 
 		if (!rtmpt_service.start ()) {
@@ -467,7 +468,7 @@ void momentRtmpInit ()
 		       "and won't accept any connections. "
 		       "Set \"", opt_name, "\" option to \"y\" to bind the service.");
 	    }
-	}
+	} while (0);
     }
 }
 
