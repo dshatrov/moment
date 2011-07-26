@@ -1,4 +1,4 @@
-#include <libmoment/libmoment.h>
+#include <moment/libmoment.h>
 
 
 using namespace M;
@@ -74,7 +74,7 @@ pollIterationEnd (void * const)
     RtmpConnection::pollIterationEnd ();
 }
 
-SelectPollGroup::Frontend const poll_frontend = {
+PollGroup::Frontend const poll_frontend = {
     pollIterationBegin,
     pollIterationEnd
 };
