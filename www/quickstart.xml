@@ -30,9 +30,9 @@
   </h2>
 
   <p>
-    <eng>Download Moment VS installation package: </eng>
-    <rus>Скачайте установочный архив видеосервера &laquo;Moment&raquo;: </rus>
-    http://url.to.download
+    <eng>Download <a href="http://downloads.sourceforge.net/moment/moment-bin-1.0.tar.gz">Moment VS installation package</a>.</eng>
+    <rus>Скачайте <a href="http://downloads.sourceforge.net/moment/moment-bin-1.0.tar.gz">установочный архив</a>
+    видеосервера &laquo;Moment&raquo;.</rus>
    </p>
 
   <p>
@@ -116,7 +116,7 @@
     <rus>
       Установка завершена! Теперь можно смотреть видео со страницы сервера:
     </rus>
-    <a href="http://localhost:8080">http://localhost:8080</a>
+    <a href="http://localhost:8080/moment/">http://localhost:8080/moment/</a>
   </p>
 </content>
 </moment>
