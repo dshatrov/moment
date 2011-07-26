@@ -38,7 +38,7 @@ struct Options {
     }
 };
 
-const Count default__page_pool__min_pages    = 128;
+const Count default__page_pool__min_pages    = 512;
 const Time  default__http__keepalive_timeout =  60;
 
 Options options;
@@ -166,9 +166,9 @@ int main (int argc, char **argv)
 	    return EXIT_FAILURE;
 	}
 
-	{
+	do {
 	    ConstMemory const opt_name = "http/http_bind";
-	    ConstMemory const http_bind = config.getString (opt_name);
+	    ConstMemory const http_bind = config.getString_default (opt_name, ":8080");
 	    logD_ (_func, opt_name, ": ", http_bind);
 	    if (!http_bind.isNull ()) {
 		IpAddress addr;
@@ -179,7 +179,7 @@ int main (int argc, char **argv)
 
 		if (!http_service.bind (addr)) {
 		    logE_ (_func, "http_service.bind() faled: ", exc->toString());
-		    return EXIT_FAILURE;
+		    break;
 		}
 
 		if (!http_service.start ()) {
@@ -191,7 +191,7 @@ int main (int argc, char **argv)
 		       "and won't accept any connections. "
 		       "Set \"", opt_name, "\" option to bind the service.");
 	    }
-	}
+	} while (0);
     }
 
     logD_ (_func, "CREATING MOMENT SERVER");
