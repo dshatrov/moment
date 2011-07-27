@@ -209,6 +209,10 @@
       font-size: small;
       color: /* #636363 */ #616187;
     }
+
+    .footer a {
+      color: #616187;
+    }
   </style>
 </head>
 
@@ -226,7 +230,7 @@
   <div class="menu" style="text-align: center; position: relative; z-index: 3">
     <img src="img/menubar.png" class="menubar_image"/>
 
-    <eng><a href="./"><div class="menuitem" style="padding-left: 30px">Home</div></a></eng>
+    <eng><a href="index.en.html"><div class="menuitem" style="padding-left: 30px">Home</div></a></eng>
     <rus><a href="index.ru.html"><div class="menuitem" style="padding-left: 30px">Главная</div></a></rus>
 
     <eng><a href="quickstart.html"><div class="menuitem">Quick Start</div></a></eng>
@@ -324,8 +328,8 @@
   </div>
 
   <div class="footer">
-    <eng>Copyright (c) 2011 Dmitry Shatrov</eng>
-    <rus>(c) 2011 Дмитрий Шатров</rus>
+    <eng>Copyright (c) 2011 <a href="mailto:shatrov@gmail.com">Dmitry Shatrov</a></eng>
+    <rus>(c) 2011 <a href="mailto:shatrov@gmail.com">Дмитрий Шатров</a></rus>
   </div>
 
 </div>
