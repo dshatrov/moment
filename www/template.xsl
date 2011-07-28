@@ -314,7 +314,7 @@
 
   <div class="download_outer">
     <div class="download">
-      <a href="http://downloads.sourceforge.net/moment/moment-bin-1.0.tar.gz">
+      <a href="http://downloads.sourceforge.net/moment/moment-bin-1.0.1.tar.gz">
       <eng><img src="img/download.png" alt="Download Moment Video Server 1.0 for Linux" style="margin-bottom: 16px; width: 183px; height: 62px"/></eng>
       <rus><img src="img/download.ru.png" alt="Загрузить Moment Video Server 1.0 для Linux" style="margin-bottom: 16px; width: 183px; height: 62px"/></rus>
       </a>

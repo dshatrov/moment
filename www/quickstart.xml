@@ -30,8 +30,8 @@
   </h2>
 
   <p>
-    <eng>Download <a href="http://downloads.sourceforge.net/moment/moment-bin-1.0.tar.gz">Moment VS installation package</a>.</eng>
-    <rus>Скачайте <a href="http://downloads.sourceforge.net/moment/moment-bin-1.0.tar.gz">установочный архив</a>
+    <eng>Download <a href="http://downloads.sourceforge.net/moment/moment-bin-1.0.1.tar.gz">Moment VS installation package</a>.</eng>
+    <rus>Скачайте <a href="http://downloads.sourceforge.net/moment/moment-bin-1.0.1.tar.gz">установочный архив</a>
     видеосервера &laquo;Moment&raquo;.</rus>
    </p>
 
@@ -39,7 +39,7 @@
     <eng>Unpack the archive into /opt directory with the following command:</eng>
     <rus>Распакуйте полученный архив в директорию /opt, выполнив команду:</rus>
   </p>
-<pre>tar -C /opt -xzf moment-1.0.tar.gz</pre>
+<pre>tar -C /opt -xzf moment-1.0.1.tar.gz</pre>
 
   <p>
     <eng>/opt/moment directory will be created as the result. This directory contains
