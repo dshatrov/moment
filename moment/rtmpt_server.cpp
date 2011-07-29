@@ -525,7 +525,7 @@ RtmptServer::httpClosed (Exception * const exc,
 
     self->mutex.lock ();
     self->conn_list.remove (rtmpt_conn);
-    logD_ (_func, "--- rtmpt_conn refcount: ", rtmpt_conn->getRefCount());
+//    logD_ (_func, "--- rtmpt_conn refcount: ", rtmpt_conn->getRefCount());
     self->mutex.unlock ();
 
     rtmpt_conn->unref ();
