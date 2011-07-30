@@ -33,6 +33,7 @@ moment_private_headers =
 moment_target_headers =		\
 	libmoment.h		\
 				\
+	types.h			\
 	amf_encoder.h		\
 	amf_decoder.h		\
 	rtmp_connection.h	\

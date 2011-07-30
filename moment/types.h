@@ -17,32 +17,27 @@
 */
 
 
-#ifndef __LIBMOMENT__LIBMOMENT_H__
-#define __LIBMOMENT__LIBMOMENT_H__
-
-
-#include <libmary/libmary.h>
-
-#include <moment/types.h>
-
-#include <moment/amf_encoder.h>
-#include <moment/amf_decoder.h>
-
-#include <moment/rtmp_connection.h>
-#include <moment/rtmp_server.h>
-#include <moment/rtmp_service.h>
-#include <moment/rtmpt_server.h>
-#include <moment/rtmpt_service.h>
-
-#include <moment/video_stream.h>
-
-#include <moment/moment_server.h>
+#ifndef __LIBMOMENT__TYPES_H__
+#define __LIBMOMENT__TYPES_H__
 
 
 namespace Moment {
 
+class VideoCodec {
+public:
+    enum Value {
+	SorensonH263,
+	ScreenVideo
+    };
+    operator Value () const { return value; }
+    VideoCodec (Value const value) : value (value) {}
+    VideoCodec () {}
+private:
+    Value value;
+};
+
 }
 
 
-#endif /* __LIBMOMENT__LIBMOMENT_H__ */
+#endif /* __LIBMOMENT__TYPES_H__ */
 
