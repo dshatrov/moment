@@ -150,7 +150,7 @@ private:
 
 	~RtmptConnection ()
 	{
-	    logD_ (_func, "0x", fmt_hex, (UintPtr) this);
+//	    logD_ (_func, "0x", fmt_hex, (UintPtr) this);
 	    delete conn;
 	}
     };
