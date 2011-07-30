@@ -59,15 +59,21 @@
       <eng>preprocessor for configuration files;</eng>
       <rus>препроцессор для конфигурационных файлов;</rus>
     </li>
+    <!--
     <li>
       <b>libmoment</b> &mdash;
       <eng>core videoserver library. Implementation of RTMP and RTMPT protocols.</eng>
       <rus>базовая библиотека видеосервера. Поддержка протоколов RTMP, RTMPT;</rus>
     </li>
+    -->
     <li>
       <b>moment</b> &mdash;
+      <!--
       <eng>the videoserver itself. mod_rtmp and mod_file modules.</eng>
       <rus>собственно видеосервер. Модули mod_rtmp и mod_file;</rus>
+      -->
+      <eng>core videoserver library and the videoserver itself. Implementation of RTMP and RTMPT protocols, mod_rtmp and mod_file modules.</eng>
+      <rus>собственно видеосервер и его базовая библиотека. Поддержка протоколов RTMP и RTMPT, модули mod_rtmp и mod_file;</rus>
     </li>
     <li>
       <b>videochat</b> &mdash;
