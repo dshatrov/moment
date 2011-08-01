@@ -20,8 +20,10 @@
 	    doctype-system="http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"/>
 
 <xsl:variable name="main_width">900</xsl:variable>
-<xsl:variable name="logo_height">62</xsl:variable>
+<!--<xsl:variable name="main_width">914</xsl:variable>-->
+<xsl:variable name="logo_height">72</xsl:variable>
 <xsl:variable name="menubar_height">40</xsl:variable>
+<!--<xsl:variable name="menubar_height">49</xsl:variable>-->
 <xsl:variable name="langbar_width">117</xsl:variable>
 
 <xsl:template match="moment">
@@ -41,6 +43,10 @@
   </title>
 <!--  <link rel="stylesheet" type="text/css" href="moment.css"/> -->
   <link rel="icon" type="image/vnd.microsoft.icon" href="favicon.ico"/>
+  <xsl:if test="$name = 'index'">
+    <eng><link rel="alternate" type="application/rss+xml" title="RSS" href="http://momentvideo.org/feed.xml"/></eng>
+    <rus><link rel="alternate" type="application/rss+xml" title="RSS" href="http://momentvideo.org/feed.ru.xml"/></rus>
+  </xsl:if>
   <style type="text/css">
     body {
       font-size: 14px;
@@ -73,10 +79,10 @@
 
     .logo_image {
       vertical-align: bottom;
-      padding: 20px;
+      padding: 15px;
       height: <xsl:value-of select="$logo_height"/>px;
       position: relative;
-      z-index: 2;
+      z-index: 20;
     }
 
     .menubar_image {
@@ -85,7 +91,7 @@
       position: absolute;
       top: 0;
       left: 0;
-      z-index: 2;
+      z-index: 20;
     }
 
     .menu a {
@@ -100,7 +106,7 @@
     .menuitem {
       float: left;
       position: relative;
-      z-index: 5;
+      z-index: 50;
       padding-left: 20px;
       padding-right: 20px;
       height: <xsl:value-of select="$menubar_height"/>px;
@@ -111,7 +117,7 @@
     .menuarrow {
       float: left;
       position: relative;
-      z-index: 5;
+      z-index: 50;
       display: table-cell;
       vertical-align: middle;
       margin-left: 40px;
@@ -124,7 +130,7 @@
       border-left: 1px solid rgba(180, 183, 218, .2);
       float: right;
       position: relative;
-      z-index: 4;
+      z-index: 40;
       margin-right: 8px;
       padding-left: 6px;
       display: table-cell;
@@ -148,7 +154,7 @@
       position: absolute;
       top: 0;
       right: 0;
-      z-index: 5;
+      z-index: 50;
       height: <xsl:value-of select="$menubar_height"/>px;
       display: table-cell;
       vertical-align: middle;
@@ -220,14 +226,17 @@
 <div class="main_div">
 
   <div>
-    <img src="img/logo.png" alt="Moment Video Server" class="logo_image"/>
+    <img src="img/logo2.png" alt="Moment Video Server" class="logo_image"/>
   </div>
 
-  <div style="position: absolute; z-index: 1; top: 0; right: 0">
-    <img src="img/slogan.png" alt="Live streaming made easy." style="vertical-align: bottom; padding-right: 40px"/>
+  <div style="position: absolute; z-index: 10; top: 0; right: 0">
+    <img src="img/slogan2.png" alt="Live streaming made easy." style="vertical-align: bottom; padding-right: 36px"/>
   </div>
 
-  <div class="menu" style="text-align: center; position: relative; z-index: 3">
+  <div style="position: relative; z-index: 9">
+  <img src="img/menubar_shadow.png" style="vertical-align: bottom; position: absolute; z-index: 9; left: -10px; top: -9px"/>
+  </div>
+  <div class="menu" style="text-align: center; position: relative; z-index: 30">
     <img src="img/menubar.png" class="menubar_image"/>
 
     <eng><a href="index.en.html"><div class="menuitem" style="padding-left: 30px">Home</div></a></eng>
