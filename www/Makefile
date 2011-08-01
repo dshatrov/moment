@@ -5,6 +5,7 @@ all:	index.html              \
         licensing.html          \
         developers.html         \
         gpl.html		\
+	feed.xml		\
 	fix
 
 fix: index.html index.ru.html
@@ -22,7 +23,12 @@ fix: index.html index.ru.html
 	xsltproc --nonet -o "$*.ru.html" --stringparam lang rus postprocess.xsl "$*.tmp.xml"
 	rm -f "$*.tmp.xml"
 
+%.xml: %.src.xml postprocess_rss.xsl
+	xsltproc --nonet -o "$*.xml" --stringparam lang eng postprocess_rss.xsl "$<"
+	xsltproc --nonet -o "$*.ru.xml" --stringparam lang rus postprocess_rss.xsl "$<"
+
 clean:
 	rm -f *.tmp.xml
 	rm -f *.html
+	rm -f feed.xml feed.ru.xml
 
