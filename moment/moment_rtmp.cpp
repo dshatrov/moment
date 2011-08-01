@@ -414,7 +414,7 @@ void momentRtmpInit ()
 		}
 
 		if (!rtmp_service.bind (addr)) {
-		    logE_ (_func, "rtmp_service.bind() faled: ", exc->toString());
+		    logE_ (_func, "rtmp_service.bind() failed: ", exc->toString());
 		    break;
 		}
 
@@ -455,7 +455,7 @@ void momentRtmpInit ()
 		}
 
 		if (!rtmpt_service.bind (addr)) {
-		    logE_ (_func, "rtmpt_service.bind() faled: ", exc->toString());
+		    logE_ (_func, "rtmpt_service.bind() failed: ", exc->toString());
 		    break;
 		}
 

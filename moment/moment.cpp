@@ -178,7 +178,7 @@ int main (int argc, char **argv)
 		}
 
 		if (!http_service.bind (addr)) {
-		    logE_ (_func, "http_service.bind() faled: ", exc->toString());
+		    logE_ (_func, "http_service.bind() failed: ", exc->toString());
 		    break;
 		}
 
