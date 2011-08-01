@@ -19,6 +19,42 @@
   <defs
      id="defs3677">
     <linearGradient
+       inkscape:collect="always"
+       id="linearGradient4784">
+      <stop
+         style="stop-color:#070093;stop-opacity:1;"
+         offset="0"
+         id="stop4786" />
+      <stop
+         style="stop-color:#070093;stop-opacity:0;"
+         offset="1"
+         id="stop4788" />
+    </linearGradient>
+    <linearGradient
+       inkscape:collect="always"
+       id="linearGradient4678">
+      <stop
+         style="stop-color:#070093;stop-opacity:1;"
+         offset="0"
+         id="stop4680" />
+      <stop
+         style="stop-color:#070093;stop-opacity:0;"
+         offset="1"
+         id="stop4682" />
+    </linearGradient>
+    <linearGradient
+       inkscape:collect="always"
+       id="linearGradient4406">
+      <stop
+         style="stop-color:#e3e2f6;stop-opacity:1;"
+         offset="0"
+         id="stop4408" />
+      <stop
+         style="stop-color:#e3e2f6;stop-opacity:0;"
+         offset="1"
+         id="stop4410" />
+    </linearGradient>
+    <linearGradient
        id="linearGradient4393">
       <stop
          id="stop4395"
@@ -1389,6 +1425,262 @@
        y1="169.67644"
        x2="113.49618"
        y2="112.86956" />
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#linearGradient4393"
+       id="linearGradient3633"
+       gradientUnits="userSpaceOnUse"
+       gradientTransform="translate(3670.9601,-502.138)"
+       x1="113.49618"
+       y1="169.67644"
+       x2="113.49618"
+       y2="112.86956" />
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#linearGradient4406"
+       id="linearGradient4412"
+       x1="3788.6892"
+       y1="-325.33975"
+       x2="3788.6892"
+       y2="-431.04221"
+       gradientUnits="userSpaceOnUse"
+       gradientTransform="matrix(0.99578899,0,0,0.88228926,17.627138,-41.727667)" />
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#linearGradient4678"
+       id="linearGradient4684"
+       x1="3711.6028"
+       y1="-261.09689"
+       x2="3711.6028"
+       y2="-401.61725"
+       gradientUnits="userSpaceOnUse" />
+    <filter
+       inkscape:collect="always"
+       id="filter4714"
+       x="-0.015195747"
+       width="1.0303915"
+       y="-0.34053242"
+       height="1.6810648">
+      <feGaussianBlur
+         inkscape:collect="always"
+         stdDeviation="6.3442254"
+         id="feGaussianBlur4716" />
+    </filter>
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#linearGradient4393"
+       id="linearGradient4720"
+       gradientUnits="userSpaceOnUse"
+       gradientTransform="translate(3676.0831,-347.82229)"
+       x1="113.49618"
+       y1="169.67644"
+       x2="113.49618"
+       y2="112.86956" />
+    <filter
+       inkscape:collect="always"
+       id="filter4780"
+       x="-0.0069503897"
+       width="1.0139008"
+       y="-0.13091873"
+       height="1.2618375">
+      <feGaussianBlur
+         inkscape:collect="always"
+         stdDeviation="2.9289767"
+         id="feGaussianBlur4782" />
+    </filter>
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#linearGradient4784"
+       id="linearGradient4790"
+       x1="3744.1396"
+       y1="-170.14456"
+       x2="3744.1396"
+       y2="-263.56384"
+       gradientUnits="userSpaceOnUse" />
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#linearGradient4393-6"
+       id="linearGradient4720-7"
+       gradientUnits="userSpaceOnUse"
+       gradientTransform="translate(3677.7071,-228.33533)"
+       x1="113.49618"
+       y1="169.67644"
+       x2="113.49618"
+       y2="112.86956" />
+    <linearGradient
+       id="linearGradient4393-6">
+      <stop
+         id="stop4395-3"
+         offset="0"
+         style="stop-color:#d4d4e9;stop-opacity:1;" />
+      <stop
+         id="stop4397-4"
+         offset="1"
+         style="stop-color:#ffffff;stop-opacity:0.50196081;" />
+    </linearGradient>
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#linearGradient4784-6"
+       id="linearGradient4790-3"
+       x1="3744.1396"
+       y1="-170.14456"
+       x2="3744.1396"
+       y2="-263.56384"
+       gradientUnits="userSpaceOnUse" />
+    <linearGradient
+       inkscape:collect="always"
+       id="linearGradient4784-6">
+      <stop
+         style="stop-color:#070093;stop-opacity:1;"
+         offset="0"
+         id="stop4786-2" />
+      <stop
+         style="stop-color:#070093;stop-opacity:0;"
+         offset="1"
+         id="stop4788-4" />
+    </linearGradient>
+    <filter
+       color-interpolation-filters="sRGB"
+       inkscape:collect="always"
+       id="filter4780-6"
+       x="-0.0069503896"
+       width="1.0139008"
+       y="-0.13091873"
+       height="1.2618375">
+      <feGaussianBlur
+         inkscape:collect="always"
+         stdDeviation="2.9289767"
+         id="feGaussianBlur4782-1" />
+    </filter>
+    <linearGradient
+       y2="-263.56384"
+       x2="3744.1396"
+       y1="-170.14456"
+       x1="3744.1396"
+       gradientUnits="userSpaceOnUse"
+       id="linearGradient4907"
+       xlink:href="#linearGradient4784-6"
+       inkscape:collect="always" />
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#linearGradient4784-6"
+       id="linearGradient4970"
+       gradientUnits="userSpaceOnUse"
+       x1="3744.1396"
+       y1="-170.14456"
+       x2="3744.1396"
+       y2="-263.56384" />
+    <linearGradient
+       id="linearGradient4393-6-0">
+      <stop
+         id="stop4395-3-1"
+         offset="0"
+         style="stop-color:#d4d4e9;stop-opacity:1;" />
+      <stop
+         id="stop4397-4-9"
+         offset="1"
+         style="stop-color:#ffffff;stop-opacity:0.50196081;" />
+    </linearGradient>
+    <linearGradient
+       y2="-263.56384"
+       x2="3744.1396"
+       y1="-170.14456"
+       x1="3744.1396"
+       gradientUnits="userSpaceOnUse"
+       id="linearGradient4907-7"
+       xlink:href="#linearGradient4784-6-8"
+       inkscape:collect="always" />
+    <linearGradient
+       inkscape:collect="always"
+       id="linearGradient4784-6-8">
+      <stop
+         style="stop-color:#070093;stop-opacity:1;"
+         offset="0"
+         id="stop4786-2-5" />
+      <stop
+         style="stop-color:#070093;stop-opacity:0;"
+         offset="1"
+         id="stop4788-4-9" />
+    </linearGradient>
+    <radialGradient
+       inkscape:collect="always"
+       xlink:href="#linearGradient4670-7"
+       id="radialGradient5065"
+       gradientUnits="userSpaceOnUse"
+       gradientTransform="matrix(6.2311828,-0.04489088,0.03733627,5.1825534,2589.4759,-194.44236)"
+       cx="15.549314"
+       cy="-216.87749"
+       fx="15.549314"
+       fy="-216.87749"
+       r="20.296875" />
+    <filter
+       inkscape:collect="always"
+       id="filter5195"
+       x="-0.012996176"
+       width="1.0259924"
+       y="-0.1565528"
+       height="1.3131056">
+      <feGaussianBlur
+         inkscape:collect="always"
+         stdDeviation="1.8723145"
+         id="feGaussianBlur5197" />
+    </filter>
+    <filter
+       inkscape:collect="always"
+       id="filter5277">
+      <feGaussianBlur
+         inkscape:collect="always"
+         stdDeviation="2.2668961"
+         id="feGaussianBlur5279" />
+    </filter>
+    <filter
+       inkscape:collect="always"
+       id="filter5285"
+       x="-0.017544837"
+       width="1.0350897"
+       y="-0.21134628"
+       height="1.4226926">
+      <feGaussianBlur
+         inkscape:collect="always"
+         stdDeviation="2.5276245"
+         id="feGaussianBlur5287" />
+    </filter>
+    <filter
+       inkscape:collect="always"
+       id="filter5293"
+       x="-0.017582515"
+       width="1.035165"
+       y="-0.20602792"
+       height="1.4120558">
+      <feGaussianBlur
+         inkscape:collect="always"
+         stdDeviation="1.7669192"
+         id="feGaussianBlur5295" />
+    </filter>
+    <filter
+       inkscape:collect="always"
+       id="filter5299">
+      <feGaussianBlur
+         inkscape:collect="always"
+         stdDeviation="4.2973485"
+         id="feGaussianBlur5301" />
+    </filter>
+    <filter
+       inkscape:collect="always"
+       id="filter5309">
+      <feGaussianBlur
+         inkscape:collect="always"
+         stdDeviation="3.6804273"
+         id="feGaussianBlur5311" />
+    </filter>
+    <filter
+       inkscape:collect="always"
+       id="filter5325">
+      <feGaussianBlur
+         inkscape:collect="always"
+         stdDeviation="4.2138369"
+         id="feGaussianBlur5327" />
+    </filter>
   </defs>
   <sodipodi:namedview
      id="base"
@@ -1397,16 +1689,16 @@
      borderopacity="1.0"
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
-     inkscape:zoom="0.48021651"
-     inkscape:cx="2911.0424"
-     inkscape:cy="1692.5746"
+     inkscape:zoom="2.1519754"
+     inkscape:cx="3154.5801"
+     inkscape:cy="1697.3762"
      inkscape:current-layer="layer1"
      inkscape:document-units="px"
      showgrid="false"
      showguides="true"
      inkscape:guide-bbox="true"
-     inkscape:window-width="1366"
-     inkscape:window-height="691"
+     inkscape:window-width="1440"
+     inkscape:window-height="876"
      inkscape:window-x="0"
      inkscape:window-y="24"
      inkscape:window-maximized="1" />
@@ -1426,6 +1718,174 @@
      id="layer1"
      inkscape:label="Layer 1"
      inkscape:groupmode="layer">
+    <path
+       inkscape:connector-curvature="0"
+       inkscape:export-ydpi="89.839996"
+       inkscape:export-xdpi="89.839996"
+       inkscape:export-filename="/home/ubuntu/Desktop/www/slogan.png"
+       id="path5297"
+       d="m 2870.5001,-953.80424 c -93.7194,87.62681 -157.7327,111.0171 -316.5312,134.5 265.4496,-25.02404 355.8857,-97.2995 432.75,-134.5 l -116.2188,0 z"
+       style="font-size:medium;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-indent:0;text-align:start;text-decoration:none;line-height:normal;letter-spacing:normal;word-spacing:normal;text-transform:none;direction:ltr;block-progression:tb;writing-mode:lr-tb;text-anchor:start;baseline-shift:baseline;color:#000000;fill:url(#linearGradient4445);fill-opacity:1;stroke:none;stroke-width:20;marker:none;visibility:visible;display:inline;overflow:visible;enable-background:accumulate;font-family:Sans;-inkscape-font-specification:Sans;filter:url(#filter5299)" />
+    <text
+       sodipodi:linespacing="125%"
+       id="text5099"
+       y="-1316.082"
+       x="2748.7104"
+       style="font-size:36px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:start;line-height:125%;letter-spacing:0px;word-spacing:0px;writing-mode:lr-tb;text-anchor:start;fill:#31314d;fill-opacity:1;stroke:#05058e;font-family:WenQuanYi Micro Hei;-inkscape-font-specification:WenQuanYi Micro Hei;stroke-opacity:1;opacity:0.14999999999999999;filter:url(#filter5285)"
+       xml:space="preserve"
+       inkscape:export-filename="/home/erdizz/files/my_dev/momentvideo/moment/www/img/logo.png"
+       inkscape:export-xdpi="80.839996"
+       inkscape:export-ydpi="80.839996"><tspan
+         y="-1316.082"
+         x="2748.7104"
+         id="tspan5101"
+         sodipodi:role="line">Moment Video Server</tspan></text>
+    <text
+       inkscape:export-ydpi="89.839996"
+       inkscape:export-xdpi="89.839996"
+       inkscape:export-filename="/home/erdizz/files/my_dev/momentvideo/moment/www/img/slogan.png"
+       sodipodi:linespacing="125%"
+       id="text5289"
+       y="-886.46332"
+       x="3016.9199"
+       style="font-size:20.58267593000000062px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:start;line-height:125%;letter-spacing:0px;word-spacing:0px;writing-mode:lr-tb;text-anchor:start;fill:#0b0b28;fill-opacity:1;stroke:none;font-family:WenQuanYi Micro Hei;-inkscape-font-specification:WenQuanYi Micro Hei;filter:url(#filter5293);opacity:0.15"
+       xml:space="preserve"><tspan
+         y="-886.46332"
+         x="3016.9199"
+         id="tspan5291"
+         sodipodi:role="line">Live streaming made easy.</tspan></text>
+    <text
+       inkscape:export-ydpi="80.839996"
+       inkscape:export-xdpi="80.839996"
+       inkscape:export-filename="/home/erdizz/files/my_dev/momentvideo/moment/www/img/logo.png"
+       xml:space="preserve"
+       style="font-size:36px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:start;line-height:125%;letter-spacing:0px;word-spacing:0px;writing-mode:lr-tb;text-anchor:start;fill:#0b0b28;fill-opacity:1;stroke:none;font-family:WenQuanYi Micro Hei;-inkscape-font-specification:WenQuanYi Micro Hei"
+       x="2748.7104"
+       y="-1316.082"
+       id="text5061"
+       sodipodi:linespacing="125%"><tspan
+         sodipodi:role="line"
+         id="tspan5063"
+         x="2748.7104"
+         y="-1316.082">Moment Video Server</tspan></text>
+    <path
+       inkscape:export-ydpi="80.839996"
+       inkscape:export-xdpi="80.839996"
+       inkscape:export-filename="/home/erdizz/files/my_dev/momentvideo/moment/www/img/logo.png"
+       id="path5079"
+       d="m 2658.9982,-1364.3632 c -2.6206,0 -4.738,2.1005 -4.738,4.738 l 0,60.0862 c 0,2.6374 2.1174,4.738 4.738,4.738 l 60.4631,0 c 2.6207,0 4.738,-2.1006 4.738,-4.738 l 0,-60.0862 c 0,-2.6375 -2.1173,-4.738 -4.738,-4.738 l -60.4631,0 z m -0.3769,5.7071 5.761,0 c 0.4196,0 0.7538,0.2858 0.7538,0.646 l 0,4.415 c 0,0.3602 -0.3342,0.6462 -0.7538,0.6462 l -5.761,0 c -0.4195,0 -0.7537,-0.286 -0.7537,-0.6462 l 0,-4.415 c 0,-0.3602 0.3342,-0.646 0.7537,-0.646 z m 55.456,0 5.7609,0 c 0.4196,0 0.7538,0.2858 0.7538,0.646 l 0,4.415 c 0,0.3602 -0.3342,0.6462 -0.7538,0.6462 l -5.7609,0 c -0.4196,0 -0.7538,-0.286 -0.7538,-0.6462 l 0,-4.415 c 0,-0.3602 0.3342,-0.646 0.7538,-0.646 z m -55.456,13.1371 5.761,0 c 0.4196,0 0.7538,0.2859 0.7538,0.6461 l 0,4.415 c 0,0.3602 -0.3342,0.646 -0.7538,0.646 l -5.761,0 c -0.4195,0 -0.7537,-0.2858 -0.7537,-0.646 l 0,-4.415 c 0,-0.3602 0.3342,-0.6461 0.7537,-0.6461 z m 55.456,0 5.7609,0 c 0.4196,0 0.7538,0.2859 0.7538,0.6461 l 0,4.415 c 0,0.3602 -0.3342,0.646 -0.7538,0.646 l -5.7609,0 c -0.4196,0 -0.7538,-0.2858 -0.7538,-0.646 l 0,-4.415 c 0,-0.3602 0.3342,-0.6461 0.7538,-0.6461 z m -43.9341,0.9691 1.6691,0 6.5686,0 1.0768,0 0.4307,0.9692 9.476,19.9211 9.2067,-19.8673 0.4308,-1.023 1.0768,0 6.5686,0 1.669,0 0,1.6691 0,26.5974 0,1.669 -1.669,0 -4.4688,0 -1.6691,0 0,-1.669 0,-14.7525 -7.2146,15.4523 -0.5385,0.9692 -0.9691,0 -4.9533,0 -1.0768,0 -0.4308,-0.9692 -7.3761,-15.5061 0,14.8063 0,1.669 -1.6153,0 -4.5226,0 -1.6691,0 0,-1.669 0,-26.5974 0,-1.6691 z m -11.5219,12.1142 5.761,0 c 0.4196,0 0.7538,0.2858 0.7538,0.646 l 0,4.415 c 0,0.3602 -0.3342,0.6462 -0.7538,0.6462 l -5.761,0 c -0.4195,0 -0.7537,-0.286 -0.7537,-0.6462 l 0,-4.415 c 0,-0.3602 0.3342,-0.646 0.7537,-0.646 z m 55.456,0 5.7609,0 c 0.4196,0 0.7538,0.2858 0.7538,0.646 l 0,4.415 c 0,0.3602 -0.3342,0.6462 -0.7538,0.6462 l -5.7609,0 c -0.4196,0 -0.7538,-0.286 -0.7538,-0.6462 l 0,-4.415 c 0,-0.3602 0.3342,-0.646 0.7538,-0.646 z m -55.456,13.1371 5.761,0 c 0.4196,0 0.7538,0.2859 0.7538,0.6461 l 0,4.415 c 0,0.3602 -0.3342,0.646 -0.7538,0.646 l -5.761,0 c -0.4195,0 -0.7537,-0.2858 -0.7537,-0.646 l 0,-4.415 c 0,-0.3602 0.3342,-0.6461 0.7537,-0.6461 z m 55.456,0 5.7609,0 c 0.4196,0 0.7538,0.2859 0.7538,0.6461 l 0,4.415 c 0,0.3602 -0.3342,0.646 -0.7538,0.646 l -5.7609,0 c -0.4196,0 -0.7538,-0.2858 -0.7538,-0.646 l 0,-4.415 c 0,-0.3602 0.3342,-0.6461 0.7538,-0.6461 z m -55.456,13.0834 5.761,0 c 0.4196,0 0.7538,0.2858 0.7538,0.646 l 0,4.4149 c 0,0.3602 -0.3342,0.6462 -0.7538,0.6462 l -5.761,0 c -0.4195,0 -0.7537,-0.286 -0.7537,-0.6462 l 0,-4.4149 c 0,-0.3602 0.3342,-0.646 0.7537,-0.646 z m 55.456,0 5.7609,0 c 0.4196,0 0.7538,0.2858 0.7538,0.646 l 0,4.4149 c 0,0.3602 -0.3342,0.6462 -0.7538,0.6462 l -5.7609,0 c -0.4196,0 -0.7538,-0.286 -0.7538,-0.6462 l 0,-4.4149 c 0,-0.3602 0.3342,-0.646 0.7538,-0.646 z"
+       style="fill:url(#radialGradient5065);fill-opacity:1;stroke:none;opacity:0.80000000000000004;filter:url(#filter5277)"
+       inkscape:connector-curvature="0" />
+    <rect
+       style="fill:#ffffff;fill-opacity:1;stroke:none"
+       id="rect5097"
+       width="67.067703"
+       height="66.398941"
+       x="2655.6196"
+       y="-1362.7842"
+       ry="3.8965476"
+       inkscape:export-filename="/home/erdizz/files/my_dev/momentvideo/moment/www/img/logo.png"
+       inkscape:export-xdpi="80.839996"
+       inkscape:export-ydpi="80.839996" />
+    <path
+       inkscape:connector-curvature="0"
+       style="fill:url(#radialGradient5065);fill-opacity:1;stroke:none"
+       d="m 2658.9982,-1364.3632 c -2.6206,0 -4.738,2.1005 -4.738,4.738 l 0,60.0862 c 0,2.6374 2.1174,4.738 4.738,4.738 l 60.4631,0 c 2.6207,0 4.738,-2.1006 4.738,-4.738 l 0,-60.0862 c 0,-2.6375 -2.1173,-4.738 -4.738,-4.738 l -60.4631,0 z m -0.3769,5.7071 5.761,0 c 0.4196,0 0.7538,0.2858 0.7538,0.646 l 0,4.415 c 0,0.3602 -0.3342,0.6462 -0.7538,0.6462 l -5.761,0 c -0.4195,0 -0.7537,-0.286 -0.7537,-0.6462 l 0,-4.415 c 0,-0.3602 0.3342,-0.646 0.7537,-0.646 z m 55.456,0 5.7609,0 c 0.4196,0 0.7538,0.2858 0.7538,0.646 l 0,4.415 c 0,0.3602 -0.3342,0.6462 -0.7538,0.6462 l -5.7609,0 c -0.4196,0 -0.7538,-0.286 -0.7538,-0.6462 l 0,-4.415 c 0,-0.3602 0.3342,-0.646 0.7538,-0.646 z m -55.456,13.1371 5.761,0 c 0.4196,0 0.7538,0.2859 0.7538,0.6461 l 0,4.415 c 0,0.3602 -0.3342,0.646 -0.7538,0.646 l -5.761,0 c -0.4195,0 -0.7537,-0.2858 -0.7537,-0.646 l 0,-4.415 c 0,-0.3602 0.3342,-0.6461 0.7537,-0.6461 z m 55.456,0 5.7609,0 c 0.4196,0 0.7538,0.2859 0.7538,0.6461 l 0,4.415 c 0,0.3602 -0.3342,0.646 -0.7538,0.646 l -5.7609,0 c -0.4196,0 -0.7538,-0.2858 -0.7538,-0.646 l 0,-4.415 c 0,-0.3602 0.3342,-0.6461 0.7538,-0.6461 z m -43.9341,0.9691 1.6691,0 6.5686,0 1.0768,0 0.4307,0.9692 9.476,19.9211 9.2067,-19.8673 0.4308,-1.023 1.0768,0 6.5686,0 1.669,0 0,1.6691 0,26.5974 0,1.669 -1.669,0 -4.4688,0 -1.6691,0 0,-1.669 0,-14.7525 -7.2146,15.4523 -0.5385,0.9692 -0.9691,0 -4.9533,0 -1.0768,0 -0.4308,-0.9692 -7.3761,-15.5061 0,14.8063 0,1.669 -1.6153,0 -4.5226,0 -1.6691,0 0,-1.669 0,-26.5974 0,-1.6691 z m -11.5219,12.1142 5.761,0 c 0.4196,0 0.7538,0.2858 0.7538,0.646 l 0,4.415 c 0,0.3602 -0.3342,0.6462 -0.7538,0.6462 l -5.761,0 c -0.4195,0 -0.7537,-0.286 -0.7537,-0.6462 l 0,-4.415 c 0,-0.3602 0.3342,-0.646 0.7537,-0.646 z m 55.456,0 5.7609,0 c 0.4196,0 0.7538,0.2858 0.7538,0.646 l 0,4.415 c 0,0.3602 -0.3342,0.6462 -0.7538,0.6462 l -5.7609,0 c -0.4196,0 -0.7538,-0.286 -0.7538,-0.6462 l 0,-4.415 c 0,-0.3602 0.3342,-0.646 0.7538,-0.646 z m -55.456,13.1371 5.761,0 c 0.4196,0 0.7538,0.2859 0.7538,0.6461 l 0,4.415 c 0,0.3602 -0.3342,0.646 -0.7538,0.646 l -5.761,0 c -0.4195,0 -0.7537,-0.2858 -0.7537,-0.646 l 0,-4.415 c 0,-0.3602 0.3342,-0.6461 0.7537,-0.6461 z m 55.456,0 5.7609,0 c 0.4196,0 0.7538,0.2859 0.7538,0.6461 l 0,4.415 c 0,0.3602 -0.3342,0.646 -0.7538,0.646 l -5.7609,0 c -0.4196,0 -0.7538,-0.2858 -0.7538,-0.646 l 0,-4.415 c 0,-0.3602 0.3342,-0.6461 0.7538,-0.6461 z m -55.456,13.0834 5.761,0 c 0.4196,0 0.7538,0.2858 0.7538,0.646 l 0,4.4149 c 0,0.3602 -0.3342,0.6462 -0.7538,0.6462 l -5.761,0 c -0.4195,0 -0.7537,-0.286 -0.7537,-0.6462 l 0,-4.4149 c 0,-0.3602 0.3342,-0.646 0.7537,-0.646 z m 55.456,0 5.7609,0 c 0.4196,0 0.7538,0.2858 0.7538,0.646 l 0,4.4149 c 0,0.3602 -0.3342,0.6462 -0.7538,0.6462 l -5.7609,0 c -0.4196,0 -0.7538,-0.286 -0.7538,-0.6462 l 0,-4.4149 c 0,-0.3602 0.3342,-0.646 0.7538,-0.646 z"
+       id="path5059"
+       inkscape:export-filename="/home/erdizz/files/my_dev/momentvideo/moment/www/img/logo.png"
+       inkscape:export-xdpi="80.839996"
+       inkscape:export-ydpi="80.839996" />
+    <rect
+       transform="matrix(0.99671075,0,0,0.93933735,17.810792,208.73493)"
+       inkscape:export-ydpi="80.839996"
+       inkscape:export-xdpi="80.839996"
+       inkscape:export-filename="/home/erdizz/files/my_dev/momentvideo/moment/www/img/menubar_shadow.png"
+       ry="12.162631"
+       y="-227.02452"
+       x="3685.3894"
+       height="53.693954"
+       width="1011.3885"
+       id="rect4966"
+       style="opacity:0.38076926;fill:none;stroke:url(#linearGradient4970);stroke-opacity:1;filter:url(#filter4780-6)" />
+    <rect
+       style="fill:#ffffff;fill-opacity:1;stroke:none"
+       id="rect4968"
+       width="1008.0618"
+       height="50.436737"
+       x="3691.0784"
+       y="-4.5176902"
+       ry="11.424813"
+       inkscape:export-filename="/home/ubuntu/files/my_dev/momentvideo/moment/www/img/menubar.png"
+       inkscape:export-xdpi="80.839996"
+       inkscape:export-ydpi="80.839996" />
+    <rect
+       style="opacity:0.38076926;fill:none;stroke:url(#linearGradient4907);stroke-opacity:1;filter:url(#filter4780-6)"
+       id="rect4726-2"
+       width="1011.3885"
+       height="53.693954"
+       x="3685.3894"
+       y="-227.02452"
+       ry="12.162631"
+       inkscape:export-filename="/home/ubuntu/files/my_dev/momentvideo/moment/www/img/menubar.png"
+       inkscape:export-xdpi="80.839996"
+       inkscape:export-ydpi="80.839996"
+       transform="matrix(0.99671075,0,0,0.93933735,15.40942,107.34366)" />
+    <rect
+       inkscape:export-ydpi="80.839996"
+       inkscape:export-xdpi="80.839996"
+       inkscape:export-filename="/home/ubuntu/files/my_dev/momentvideo/moment/www/img/menubar.png"
+       ry="11.424813"
+       y="-105.90896"
+       x="3688.677"
+       height="50.436737"
+       width="1008.0618"
+       id="rect4722-1"
+       style="fill:#ffffff;fill-opacity:1;stroke:none" />
+    <rect
+       style="fill:none;fill-opacity:1;stroke:url(#linearGradient4790);stroke-opacity:1;opacity:0.38076923000000001;filter:url(#filter4780)"
+       id="rect4726"
+       width="1011.3885"
+       height="53.693954"
+       x="3685.3894"
+       y="-227.02452"
+       ry="12.162631"
+       inkscape:export-filename="/home/ubuntu/files/my_dev/momentvideo/moment/www/img/menubar.png"
+       inkscape:export-xdpi="80.839996"
+       inkscape:export-ydpi="80.839996" />
+    <rect
+       inkscape:export-ydpi="80.839996"
+       inkscape:export-xdpi="80.839996"
+       inkscape:export-filename="/home/ubuntu/files/my_dev/momentvideo/moment/www/img/menubar.png"
+       ry="12.162631"
+       y="-227.02452"
+       x="3685.3894"
+       height="53.693954"
+       width="1011.3885"
+       id="rect4722"
+       style="fill:#ffffff;fill-opacity:1;stroke:none" />
+    <rect
+       inkscape:export-ydpi="80.839996"
+       inkscape:export-xdpi="80.839996"
+       inkscape:export-filename="/home/ubuntu/files/my_dev/momentvideo/moment/www/img/menubar.png"
+       ry="10.12823"
+       y="-376.84964"
+       x="3684.9604"
+       height="44.712749"
+       width="1002.0002"
+       id="rect4470"
+       style="opacity:0.61776056999999995;fill:none;stroke:url(#linearGradient4684);stroke-opacity:1;filter:url(#filter4714)"
+       transform="matrix(1.0051062,0,0,1.075103,-21.374542,26.623513)" />
+    <rect
+       inkscape:export-ydpi="80.839996"
+       inkscape:export-xdpi="80.839996"
+       inkscape:export-filename="/home/ubuntu/files/my_dev/momentvideo/moment/www/img/menubar.png"
+       ry="11.405987"
+       y="-379.67007"
+       x="3681.9536"
+       height="50.353622"
+       width="1008.0139"
+       id="rect3635"
+       style="opacity:0.61776056999999995;fill:none;stroke:url(#linearGradient4412);stroke-width:2.34330677999999981;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none" />
     <rect
        style="fill:#ffffff;fill-opacity:1;stroke:none"
        id="rect5542"
@@ -3613,7 +4073,7 @@
        style="font-size:medium;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-indent:0;text-align:start;text-decoration:none;line-height:normal;letter-spacing:normal;word-spacing:normal;text-transform:none;direction:ltr;block-progression:tb;writing-mode:lr-tb;text-anchor:start;baseline-shift:baseline;color:#000000;fill:url(#linearGradient4445);fill-opacity:1;stroke:none;stroke-width:20;marker:none;visibility:visible;display:inline;overflow:visible;enable-background:accumulate;font-family:Sans;-inkscape-font-specification:Sans"
        d="m 2870.5001,-953.80424 c -93.7194,87.62681 -157.7327,111.0171 -316.5312,134.5 265.4496,-25.02404 355.8857,-97.2995 432.75,-134.5 l -116.2188,0 z"
        id="path3579"
-       inkscape:export-filename="/home/ubuntu/Desktop/www/slogan.png"
+       inkscape:export-filename="/home/erdizz/files/my_dev/momentvideo/moment/www/img/slogan.png"
        inkscape:export-xdpi="89.839996"
        inkscape:export-ydpi="89.839996"
        inkscape:connector-curvature="0" />
@@ -3632,13 +4092,21 @@
        y="-886.46332"
        id="text3583"
        sodipodi:linespacing="125%"
-       inkscape:export-filename="/home/ubuntu/Desktop/www/slogan.png"
+       inkscape:export-filename="/home/erdizz/files/my_dev/momentvideo/moment/www/img/slogan.png"
        inkscape:export-xdpi="89.839996"
        inkscape:export-ydpi="89.839996"><tspan
          sodipodi:role="line"
          id="tspan3585"
          x="3016.9199"
          y="-886.46332">Live streaming made easy.</tspan></text>
+    <path
+       inkscape:connector-curvature="0"
+       inkscape:export-ydpi="89.839996"
+       inkscape:export-xdpi="89.839996"
+       inkscape:export-filename="/home/ubuntu/Desktop/www/slogan.png"
+       id="path5303"
+       d="m 2938.4063,-953.80424 c -62.1387,31.5324 -140.5104,89.6564 -306.2812,130.65625 214.3395,-25.45264 304.0026,-103.25931 424.5625,-130.65625 l -118.2813,0 z"
+       style="font-size:medium;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-indent:0;text-align:start;text-decoration:none;line-height:normal;letter-spacing:normal;word-spacing:normal;text-transform:none;direction:ltr;block-progression:tb;writing-mode:lr-tb;text-anchor:start;baseline-shift:baseline;color:#000000;fill:url(#linearGradient3599);fill-opacity:1;stroke:none;stroke-width:20;marker:none;visibility:visible;display:inline;overflow:visible;enable-background:accumulate;font-family:Sans;-inkscape-font-specification:Sans;filter:url(#filter5309)" />
     <path
        style="font-size:medium;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-indent:0;text-align:start;text-decoration:none;line-height:normal;letter-spacing:normal;word-spacing:normal;text-transform:none;direction:ltr;block-progression:tb;writing-mode:lr-tb;text-anchor:start;baseline-shift:baseline;color:#000000;fill:url(#linearGradient3601);fill-opacity:1;stroke:none;stroke-width:20;marker:none;visibility:visible;display:inline;overflow:visible;enable-background:accumulate;font-family:Sans;-inkscape-font-specification:Sans"
        d="m 3029.5313,-953.80424 c -0.356,0.0496 -0.8001,0.10779 -1.0624,0.15625 -138.917,43.76938 -164.8081,80.56386 -375.625,128.34375 221.0393,-31.92148 307.2359,-100.70745 507.1874,-128.5 l -130.5,0 z"
@@ -3648,21 +4116,31 @@
        inkscape:export-ydpi="89.839996"
        inkscape:connector-curvature="0" />
     <path
+       inkscape:connector-curvature="0"
+       inkscape:export-ydpi="89.839996"
+       inkscape:export-xdpi="89.839996"
+       inkscape:export-filename="/home/ubuntu/Desktop/www/slogan.png"
+       id="path5319"
+       d="m 3029.5313,-953.80424 c -0.356,0.0496 -0.8001,0.10779 -1.0624,0.15625 -138.917,43.76938 -164.8081,80.56386 -375.625,128.34375 221.0393,-31.92148 307.2359,-100.70745 507.1874,-128.5 l -130.5,0 z"
+       style="font-size:medium;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-indent:0;text-align:start;text-decoration:none;line-height:normal;letter-spacing:normal;word-spacing:normal;text-transform:none;direction:ltr;block-progression:tb;writing-mode:lr-tb;text-anchor:start;baseline-shift:baseline;color:#000000;fill:url(#linearGradient3601);fill-opacity:1;stroke:none;stroke-width:20;marker:none;visibility:visible;display:inline;overflow:visible;enable-background:accumulate;font-family:Sans;-inkscape-font-specification:Sans;filter:url(#filter5325)" />
+    <path
        style="opacity:0.36679538;fill:#ffffff;fill-opacity:1;stroke:none"
-       d="m 3004.8751,-953.80424 c -60.418,19.89022 -141.498,47.24221 -199.875,59.09375 -26.1278,5.07994 -52.3216,10.59711 -78.8438,13.15625 l -16.6874,11.6875 c 1.0925,-0.0187 2.1946,0.0518 3.2812,-0.0625 4.0092,-0.42164 14.7753,-2.34729 17.6875,-2.875 4.89,-0.88609 9.7789,-1.76513 14.6563,-2.71875 20.8106,-4.06892 25.4982,-5.25693 47.9687,-10.15625 55.1857,-12.47503 272.5007,-46.34411 369.375,-68.125 l -157.5625,0 z"
+       d="m 3004.8751,-953.80424 c -60.418,19.89022 -141.498,47.24221 -199.875,59.09375 -26.1278,5.07994 -52.3216,10.59711 -78.8438,13.15625 l -16.6874,11.6875 c 1.0925,-0.0187 2.1946,0.0518 3.2812,-0.0625 4.0092,-0.42164 14.7753,-2.34729 17.6875,-2.875 4.89,-0.88609 9.7789,-1.76513 14.6563,-2.71875 20.8106,-4.06892 25.4982,-5.25693 47.9687,-10.15625 27.5929,-6.23751 95.718,-17.82352 169.0543,-30.5728 36.6681,-6.37463 49.0811,-8.62553 83.9396,-15.05861 35.5555,-9.22122 77.7572,-17.74539 116.3811,-22.49359 z"
        id="path3591"
        inkscape:export-filename="/home/ubuntu/Desktop/www/slogan.png"
        inkscape:export-xdpi="89.839996"
        inkscape:export-ydpi="89.839996"
-       inkscape:connector-curvature="0" />
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cccccsscsccc" />
     <path
        style="opacity:0.36679538;fill:#ffffff;fill-opacity:1;stroke:none"
-       d="m 2930.3439,-953.80424 c -17.8656,7.24417 -36.8973,14.63047 -54.5626,20.1875 -25.4617,7.32402 -51.027,14.31072 -76.9687,19.75 l -16.0937,12.3125 c 26.8753,-7.03404 53.635,-14.35866 80.2812,-22.21875 21.803,-7.03965 43.8599,-13.58813 65.125,-22.1875 6.0007,-2.42663 11.8722,-5.20064 17.7812,-7.84375 l -15.5624,0 z"
+       d="m 2920.3221,-953.96853 c -17.8656,7.24417 -43.3047,17.75202 -60.97,23.30905 -25.4617,7.32402 -34.5978,11.35346 -60.5395,16.79274 l -16.0937,12.3125 c 26.8753,-7.03404 46.4061,-14.35866 73.0523,-22.21875 21.803,-7.03965 43.8599,-13.58813 65.125,-22.1875 6.0007,-2.42663 11.8722,-5.20064 17.7812,-7.84375 z"
        id="path3593"
        inkscape:export-filename="/home/ubuntu/Desktop/www/slogan.png"
        inkscape:export-xdpi="89.839996"
        inkscape:export-ydpi="89.839996"
-       inkscape:connector-curvature="0" />
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cccccscc" />
     <path
        inkscape:export-ydpi="89.839996"
        inkscape:export-xdpi="89.839996"
@@ -4284,5 +4762,497 @@
        width="1002.0002"
        id="rect3633"
        style="opacity:0.61776056999999995;fill:url(#linearGradient3635);fill-opacity:1;stroke:none" />
+    <rect
+       style="opacity:0.61776057;fill:url(#linearGradient3633);fill-opacity:1;stroke:none"
+       id="rect3631"
+       width="1002.0002"
+       height="44.712749"
+       x="3684.9604"
+       y="-376.84964"
+       ry="10.12823"
+       inkscape:export-filename="/home/ubuntu/files/my_dev/momentvideo/moment/www/img/menubar.png"
+       inkscape:export-xdpi="80.839996"
+       inkscape:export-ydpi="80.839996" />
+    <rect
+       style="opacity:0.61776057;fill:url(#linearGradient4720);fill-opacity:1;stroke:none"
+       id="rect4718"
+       width="1002.0002"
+       height="44.712749"
+       x="3690.0835"
+       y="-222.53394"
+       ry="10.12823"
+       inkscape:export-filename="/home/ubuntu/files/my_dev/momentvideo/moment/www/img/menubar.png"
+       inkscape:export-xdpi="80.839996"
+       inkscape:export-ydpi="80.839996" />
+    <text
+       xml:space="preserve"
+       style="font-size:40px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Sans"
+       x="3722.9824"
+       y="-183.9821"
+       id="text4792"
+       sodipodi:linespacing="125%"><tspan
+         sodipodi:role="line"
+         id="tspan4794"></tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:20px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#0b0b28;fill-opacity:1;stroke:none;font-family:Sans"
+       x="3708.4719"
+       y="-193.56197"
+       id="text4800"
+       sodipodi:linespacing="125%"
+       inkscape:export-filename="/home/ubuntu/Desktop/template.png"
+       inkscape:export-xdpi="89.842865"
+       inkscape:export-ydpi="89.842865"><tspan
+         sodipodi:role="line"
+         id="tspan4802"
+         x="3708.4719"
+         y="-193.56197">Home</tspan></text>
+    <text
+       sodipodi:linespacing="125%"
+       id="text4804"
+       y="-193.56197"
+       x="3808.4719"
+       style="font-size:20px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#525278;fill-opacity:1;stroke:none;font-family:Sans"
+       xml:space="preserve"
+       inkscape:export-filename="/home/ubuntu/Desktop/template.png"
+       inkscape:export-xdpi="89.842865"
+       inkscape:export-ydpi="89.842865"><tspan
+         y="-193.56197"
+         x="3808.4719"
+         sodipodi:role="line"
+         id="tspan4806">Quick Start</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:20px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#0b0b28;fill-opacity:1;stroke:none;font-family:Sans"
+       x="3958.4719"
+       y="-193.56197"
+       id="text4808"
+       sodipodi:linespacing="125%"
+       inkscape:export-filename="/home/ubuntu/Desktop/template.png"
+       inkscape:export-xdpi="89.842865"
+       inkscape:export-ydpi="89.842865"><tspan
+         id="tspan4810"
+         sodipodi:role="line"
+         x="3958.4719"
+         y="-193.56197">Licensing</tspan></text>
+    <text
+       sodipodi:linespacing="125%"
+       id="text4812"
+       y="-193.56197"
+       x="4094.4719"
+       style="font-size:20px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#0b0b28;fill-opacity:1;stroke:none;font-family:Sans"
+       xml:space="preserve"
+       inkscape:export-filename="/home/ubuntu/Desktop/template.png"
+       inkscape:export-xdpi="89.842865"
+       inkscape:export-ydpi="89.842865"><tspan
+         y="-193.56197"
+         x="4094.4719"
+         sodipodi:role="line"
+         id="tspan4814">Developers</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:20px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#0b0b28;fill-opacity:1;stroke:none;font-family:Sans"
+       x="4288.0698"
+       y="-192.10884"
+       id="text4816"
+       sodipodi:linespacing="125%"
+       inkscape:export-filename="/home/ubuntu/Desktop/template.png"
+       inkscape:export-xdpi="89.842865"
+       inkscape:export-ydpi="89.842865"><tspan
+         id="tspan4818"
+         sodipodi:role="line"
+         x="4288.0698"
+         y="-192.10884">Wiki</tspan></text>
+    <rect
+       ry="0"
+       y="-202.04321"
+       x="4264.1743"
+       height="7.7018991"
+       width="9.1170502"
+       id="rect4820"
+       style="fill:#666666;stroke:none"
+       inkscape:export-filename="/home/ubuntu/Desktop/template.png"
+       inkscape:export-xdpi="89.842865"
+       inkscape:export-ydpi="89.842865" />
+    <path
+       style="fill:#666666;stroke:none"
+       d="m 4270.8785,-187.3396 0,-21.70535 9.4794,10.85267 z"
+       id="path4822"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cccc"
+       inkscape:export-filename="/home/ubuntu/Desktop/template.png"
+       inkscape:export-xdpi="89.842865"
+       inkscape:export-ydpi="89.842865" />
+    <text
+       inkscape:export-ydpi="89.842865"
+       inkscape:export-xdpi="89.842865"
+       inkscape:export-filename="/home/ubuntu/Desktop/template.png"
+       sodipodi:linespacing="125%"
+       id="text4824"
+       y="-349.56195"
+       x="3708.4719"
+       style="font-size:20px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#0b0b28;fill-opacity:1;stroke:none;font-family:Sans"
+       xml:space="preserve"><tspan
+         y="-349.56195"
+         x="3708.4719"
+         id="tspan4826"
+         sodipodi:role="line">Home</tspan></text>
+    <text
+       inkscape:export-ydpi="89.842865"
+       inkscape:export-xdpi="89.842865"
+       inkscape:export-filename="/home/ubuntu/Desktop/template.png"
+       xml:space="preserve"
+       style="font-size:20px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#525278;fill-opacity:1;stroke:none;font-family:Sans"
+       x="3808.4719"
+       y="-349.56195"
+       id="text4828"
+       sodipodi:linespacing="125%"><tspan
+         id="tspan4830"
+         sodipodi:role="line"
+         x="3808.4719"
+         y="-349.56195">Quick Start</tspan></text>
+    <text
+       inkscape:export-ydpi="89.842865"
+       inkscape:export-xdpi="89.842865"
+       inkscape:export-filename="/home/ubuntu/Desktop/template.png"
+       sodipodi:linespacing="125%"
+       id="text4832"
+       y="-349.56195"
+       x="3958.4719"
+       style="font-size:20px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#0b0b28;fill-opacity:1;stroke:none;font-family:Sans"
+       xml:space="preserve"><tspan
+         y="-349.56195"
+         x="3958.4719"
+         sodipodi:role="line"
+         id="tspan4834">Licensing</tspan></text>
+    <text
+       inkscape:export-ydpi="89.842865"
+       inkscape:export-xdpi="89.842865"
+       inkscape:export-filename="/home/ubuntu/Desktop/template.png"
+       xml:space="preserve"
+       style="font-size:20px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#0b0b28;fill-opacity:1;stroke:none;font-family:Sans"
+       x="4094.4719"
+       y="-349.56195"
+       id="text4836"
+       sodipodi:linespacing="125%"><tspan
+         id="tspan4838"
+         sodipodi:role="line"
+         x="4094.4719"
+         y="-349.56195">Developers</tspan></text>
+    <text
+       inkscape:export-ydpi="89.842865"
+       inkscape:export-xdpi="89.842865"
+       inkscape:export-filename="/home/ubuntu/Desktop/template.png"
+       sodipodi:linespacing="125%"
+       id="text4840"
+       y="-348.10883"
+       x="4288.0698"
+       style="font-size:20px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#0b0b28;fill-opacity:1;stroke:none;font-family:Sans"
+       xml:space="preserve"><tspan
+         y="-348.10883"
+         x="4288.0698"
+         sodipodi:role="line"
+         id="tspan4842">Wiki</tspan></text>
+    <rect
+       inkscape:export-ydpi="89.842865"
+       inkscape:export-xdpi="89.842865"
+       inkscape:export-filename="/home/ubuntu/Desktop/template.png"
+       style="fill:#666666;stroke:none"
+       id="rect4844"
+       width="9.1170502"
+       height="7.7018991"
+       x="4264.1743"
+       y="-358.04321"
+       ry="0" />
+    <path
+       inkscape:export-ydpi="89.842865"
+       inkscape:export-xdpi="89.842865"
+       inkscape:export-filename="/home/ubuntu/Desktop/template.png"
+       sodipodi:nodetypes="cccc"
+       inkscape:connector-curvature="0"
+       id="path4846"
+       d="m 4270.8785,-343.3396 0,-21.70535 9.4794,10.85267 z"
+       style="fill:#666666;stroke:none" />
+    <text
+       xml:space="preserve"
+       style="font-size:20px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#0b0b28;fill-opacity:1;stroke:none;font-family:Sans"
+       x="3708.4719"
+       y="-517.56195"
+       id="text4848"
+       sodipodi:linespacing="125%"
+       inkscape:export-filename="/home/ubuntu/Desktop/template.png"
+       inkscape:export-xdpi="89.842865"
+       inkscape:export-ydpi="89.842865"><tspan
+         sodipodi:role="line"
+         id="tspan4850"
+         x="3708.4719"
+         y="-517.56195">Home</tspan></text>
+    <text
+       sodipodi:linespacing="125%"
+       id="text4852"
+       y="-517.56195"
+       x="3808.4719"
+       style="font-size:20px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#525278;fill-opacity:1;stroke:none;font-family:Sans"
+       xml:space="preserve"
+       inkscape:export-filename="/home/ubuntu/Desktop/template.png"
+       inkscape:export-xdpi="89.842865"
+       inkscape:export-ydpi="89.842865"><tspan
+         y="-517.56195"
+         x="3808.4719"
+         sodipodi:role="line"
+         id="tspan4854">Quick Start</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:20px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#0b0b28;fill-opacity:1;stroke:none;font-family:Sans"
+       x="3958.4719"
+       y="-517.56195"
+       id="text4856"
+       sodipodi:linespacing="125%"
+       inkscape:export-filename="/home/ubuntu/Desktop/template.png"
+       inkscape:export-xdpi="89.842865"
+       inkscape:export-ydpi="89.842865"><tspan
+         id="tspan4858"
+         sodipodi:role="line"
+         x="3958.4719"
+         y="-517.56195">Licensing</tspan></text>
+    <text
+       sodipodi:linespacing="125%"
+       id="text4860"
+       y="-517.56195"
+       x="4094.4719"
+       style="font-size:20px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#0b0b28;fill-opacity:1;stroke:none;font-family:Sans"
+       xml:space="preserve"
+       inkscape:export-filename="/home/ubuntu/Desktop/template.png"
+       inkscape:export-xdpi="89.842865"
+       inkscape:export-ydpi="89.842865"><tspan
+         y="-517.56195"
+         x="4094.4719"
+         sodipodi:role="line"
+         id="tspan4862">Developers</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:20px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#0b0b28;fill-opacity:1;stroke:none;font-family:Sans"
+       x="4288.0698"
+       y="-516.10883"
+       id="text4864"
+       sodipodi:linespacing="125%"
+       inkscape:export-filename="/home/ubuntu/Desktop/template.png"
+       inkscape:export-xdpi="89.842865"
+       inkscape:export-ydpi="89.842865"><tspan
+         id="tspan4866"
+         sodipodi:role="line"
+         x="4288.0698"
+         y="-516.10883">Wiki</tspan></text>
+    <rect
+       ry="0"
+       y="-526.04321"
+       x="4264.1743"
+       height="7.7018991"
+       width="9.1170502"
+       id="rect4868"
+       style="fill:#666666;stroke:none"
+       inkscape:export-filename="/home/ubuntu/Desktop/template.png"
+       inkscape:export-xdpi="89.842865"
+       inkscape:export-ydpi="89.842865" />
+    <path
+       style="fill:#666666;stroke:none"
+       d="m 4270.8785,-511.3396 0,-21.70535 9.4794,10.85267 z"
+       id="path4870"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cccc"
+       inkscape:export-filename="/home/ubuntu/Desktop/template.png"
+       inkscape:export-xdpi="89.842865"
+       inkscape:export-ydpi="89.842865" />
+    <rect
+       style="opacity:0.61776057;fill:url(#linearGradient4720-7);fill-opacity:1;stroke:none"
+       id="rect4718-0"
+       width="1002.0002"
+       height="44.712749"
+       x="3691.7075"
+       y="-103.04697"
+       ry="10.12823"
+       inkscape:export-filename="/home/ubuntu/files/my_dev/momentvideo/moment/www/img/menubar.png"
+       inkscape:export-xdpi="80.839996"
+       inkscape:export-ydpi="80.839996" />
+    <text
+       xml:space="preserve"
+       style="font-size:20px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#0b0b28;fill-opacity:1;stroke:none;font-family:Sans"
+       x="3710.0959"
+       y="-74.075012"
+       id="text4800-9"
+       sodipodi:linespacing="125%"
+       inkscape:export-filename="/home/ubuntu/Desktop/template.png"
+       inkscape:export-xdpi="89.842865"
+       inkscape:export-ydpi="89.842865"><tspan
+         sodipodi:role="line"
+         id="tspan4802-0"
+         x="3710.0959"
+         y="-74.075012">Home</tspan></text>
+    <text
+       sodipodi:linespacing="125%"
+       id="text4804-5"
+       y="-74.075012"
+       x="3810.0959"
+       style="font-size:20px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#525278;fill-opacity:1;stroke:none;font-family:Sans"
+       xml:space="preserve"
+       inkscape:export-filename="/home/ubuntu/Desktop/template.png"
+       inkscape:export-xdpi="89.842865"
+       inkscape:export-ydpi="89.842865"><tspan
+         y="-74.075012"
+         x="3810.0959"
+         sodipodi:role="line"
+         id="tspan4806-6">Quick Start</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:20px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#0b0b28;fill-opacity:1;stroke:none;font-family:Sans"
+       x="3960.0959"
+       y="-74.075012"
+       id="text4808-5"
+       sodipodi:linespacing="125%"
+       inkscape:export-filename="/home/ubuntu/Desktop/template.png"
+       inkscape:export-xdpi="89.842865"
+       inkscape:export-ydpi="89.842865"><tspan
+         id="tspan4810-9"
+         sodipodi:role="line"
+         x="3960.0959"
+         y="-74.075012">Licensing</tspan></text>
+    <text
+       sodipodi:linespacing="125%"
+       id="text4812-4"
+       y="-74.075012"
+       x="4096.0957"
+       style="font-size:20px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#0b0b28;fill-opacity:1;stroke:none;font-family:Sans"
+       xml:space="preserve"
+       inkscape:export-filename="/home/ubuntu/Desktop/template.png"
+       inkscape:export-xdpi="89.842865"
+       inkscape:export-ydpi="89.842865"><tspan
+         y="-74.075012"
+         x="4096.0957"
+         sodipodi:role="line"
+         id="tspan4814-3">Developers</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:20px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#0b0b28;fill-opacity:1;stroke:none;font-family:Sans"
+       x="4289.6938"
+       y="-72.621887"
+       id="text4816-1"
+       sodipodi:linespacing="125%"
+       inkscape:export-filename="/home/ubuntu/Desktop/template.png"
+       inkscape:export-xdpi="89.842865"
+       inkscape:export-ydpi="89.842865"><tspan
+         id="tspan4818-0"
+         sodipodi:role="line"
+         x="4289.6938"
+         y="-72.621887">Wiki</tspan></text>
+    <rect
+       ry="0"
+       y="-82.556267"
+       x="4265.7983"
+       height="7.7018991"
+       width="9.1170502"
+       id="rect4820-1"
+       style="fill:#666666;stroke:none"
+       inkscape:export-filename="/home/ubuntu/Desktop/template.png"
+       inkscape:export-xdpi="89.842865"
+       inkscape:export-ydpi="89.842865" />
+    <path
+       style="fill:#666666;stroke:none"
+       d="m 4272.5025,-67.85265 0,-21.70535 9.4794,10.85267 z"
+       id="path4822-2"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cccc"
+       inkscape:export-filename="/home/ubuntu/Desktop/template.png"
+       inkscape:export-xdpi="89.842865"
+       inkscape:export-ydpi="89.842865" />
+    <text
+       inkscape:export-ydpi="89.842865"
+       inkscape:export-xdpi="89.842865"
+       inkscape:export-filename="/home/ubuntu/Desktop/template.png"
+       sodipodi:linespacing="125%"
+       id="text5035"
+       y="224.02528"
+       x="3701.709"
+       style="font-size:20px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#0b0b28;fill-opacity:1;stroke:none;font-family:Sans"
+       xml:space="preserve"><tspan
+         y="224.02528"
+         x="3701.709"
+         id="tspan5037"
+         sodipodi:role="line">Home</tspan></text>
+    <text
+       inkscape:export-ydpi="89.842865"
+       inkscape:export-xdpi="89.842865"
+       inkscape:export-filename="/home/ubuntu/Desktop/template.png"
+       xml:space="preserve"
+       style="font-size:20px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#525278;fill-opacity:1;stroke:none;font-family:Sans"
+       x="3801.709"
+       y="224.02528"
+       id="text5039"
+       sodipodi:linespacing="125%"><tspan
+         id="tspan5041"
+         sodipodi:role="line"
+         x="3801.709"
+         y="224.02528">Quick Start</tspan></text>
+    <text
+       inkscape:export-ydpi="89.842865"
+       inkscape:export-xdpi="89.842865"
+       inkscape:export-filename="/home/ubuntu/Desktop/template.png"
+       sodipodi:linespacing="125%"
+       id="text5043"
+       y="224.02528"
+       x="3951.709"
+       style="font-size:20px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#0b0b28;fill-opacity:1;stroke:none;font-family:Sans"
+       xml:space="preserve"><tspan
+         y="224.02528"
+         x="3951.709"
+         sodipodi:role="line"
+         id="tspan5045">Licensing</tspan></text>
+    <text
+       inkscape:export-ydpi="89.842865"
+       inkscape:export-xdpi="89.842865"
+       inkscape:export-filename="/home/ubuntu/Desktop/template.png"
+       xml:space="preserve"
+       style="font-size:20px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#0b0b28;fill-opacity:1;stroke:none;font-family:Sans"
+       x="4087.7087"
+       y="224.02528"
+       id="text5047"
+       sodipodi:linespacing="125%"><tspan
+         id="tspan5049"
+         sodipodi:role="line"
+         x="4087.7087"
+         y="224.02528">Developers</tspan></text>
+    <text
+       inkscape:export-ydpi="89.842865"
+       inkscape:export-xdpi="89.842865"
+       inkscape:export-filename="/home/ubuntu/Desktop/template.png"
+       sodipodi:linespacing="125%"
+       id="text5051"
+       y="225.47841"
+       x="4281.3066"
+       style="font-size:20px;font-style:normal;font-weight:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#0b0b28;fill-opacity:1;stroke:none;font-family:Sans"
+       xml:space="preserve"><tspan
+         y="225.47841"
+         x="4281.3066"
+         sodipodi:role="line"
+         id="tspan5053">Wiki</tspan></text>
+    <rect
+       inkscape:export-ydpi="89.842865"
+       inkscape:export-xdpi="89.842865"
+       inkscape:export-filename="/home/ubuntu/Desktop/template.png"
+       style="fill:#666666;stroke:none"
+       id="rect5055"
+       width="9.1170502"
+       height="7.7018991"
+       x="4257.4111"
+       y="215.54405"
+       ry="0" />
+    <path
+       inkscape:export-ydpi="89.842865"
+       inkscape:export-xdpi="89.842865"
+       inkscape:export-filename="/home/ubuntu/Desktop/template.png"
+       sodipodi:nodetypes="cccc"
+       inkscape:connector-curvature="0"
+       id="path5057"
+       d="m 4264.1155,230.24766 0,-21.70535 9.4794,10.85267 z"
+       style="fill:#666666;stroke:none" />
   </g>
 </svg>
