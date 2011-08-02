@@ -24,17 +24,286 @@ using namespace M;
 
 namespace Moment {
 
+Size
+VideoStream::AudioFrameType::toString_ (Memory const &mem,
+					Format const & /* fmt */)
+{
+    switch (value) {
+	case Unknown:
+	    return toString (mem, "Unknown");
+	case RawData:
+	    return toString (mem, "RawData");
+	case AacSequenceHeader:
+	    return toString (mem, "AacSequenceHeader");
+    }
+
+    unreachable ();
+    return 0;
+}
+
+Size
+VideoStream::VideoFrameType::toString_ (Memory const &mem,
+					Format const & /* fmt */)
+{
+    switch (value) {
+	case Unknown:
+	    return toString (mem, "Unknown");
+	case KeyFrame:
+	    return toString (mem, "KeyFrame");
+	case InterFrame:
+	    return toString (mem, "InterFrame");
+	case DisposableInterFrame:
+	    return toString (mem, "DisposableInterFrame");
+	case GeneratedKeyFrame:
+	    return toString (mem, "GeneratedKeyFrame");
+	case CommandFrame:
+	    return toString (mem, "CommandFrame");
+	case AvcSequenceHeader:
+	    return toString (mem, "AvcSequenceHeader");
+	case AvcEndOfSequence:
+	    return toString (mem, "AvcEndOfSequence");
+    }
+
+    unreachable ();
+    return 0;
+}
+
+Size
+VideoStream::AudioCodecId::toString_ (Memory const &mem,
+				      Format const & /* fmt */)
+{
+    switch (value) {
+	case Unknown:
+	    return toString (mem, "Unknown");
+	case LinearPcmPlatformEndian:
+	    return toString (mem, "LinearPcmPlatformEndian");
+	case ADPCM:
+	    return toString (mem, "ADPCM");
+	case MP3:
+	    return toString (mem, "MP3");
+	case LinearPcmLittleEndian:
+	    return toString (mem, "LinearPcmLittleEndian");
+	case Nellymoser_16kHz_mono:
+	    return toString (mem, "Nellymoser_16kHz_mono");
+	case Nellymoser_8kHz_mono:
+	    return toString (mem, "Nellymoser_8kHz_mono");
+	case Nellymoser:
+	    return toString (mem, "Nellymoser");
+	case G711ALaw:
+	    return toString (mem, "G711ALaw");
+	case G711MuLaw:
+	    return toString (mem, "G711MuLaw");
+	case AAC:
+	    return toString (mem, "AAC");
+	case Speex:
+	    return toString (mem, "Speex");
+	case MP3_8kHz:
+	    return toString (mem, "MP3_8kHz");
+	case DeviceSpecific:
+	    return toString (mem, "DeviceSpecific");
+    }
+
+    unreachable ();
+    return 0;
+}
+
+Size
+VideoStream::VideoCodecId::toString_ (Memory const &mem,
+				      Format const & /* fmt */)
+{
+    switch (value) {
+	case Unknown:
+	    return toString (mem, "Unknown");
+	case SorensonH263:
+	    return toString (mem, "SorensonH263");
+	case ScreenVideo:
+	    return toString (mem, "ScreenVideo");
+	case ScreenVideoV2:
+	    return toString (mem, "ScreenVideoV2");
+	case VP6:
+	    return toString (mem, "VP6");
+	case VP6Alpha:
+	    return toString (mem, "VP6Alpha");
+	case AVC:
+	    return toString (mem, "AVC");
+    }
+
+    unreachable ();
+    return 0;
+}
+
+VideoStream::VideoFrameType
+VideoStream::VideoFrameType::fromFlvFrameType (Byte const flv_frame_type)
+{
+    switch (flv_frame_type) {
+	case 1:
+	    return KeyFrame;
+	case 2:
+	    return InterFrame;
+	case 3:
+	    return DisposableInterFrame;
+	case 4:
+	    return GeneratedKeyFrame;
+	case 5:
+	    return CommandFrame;
+    }
+
+    return Unknown;
+}
+
+Byte
+VideoStream::VideoFrameType::toFlvFrameType () const
+{
+    switch (value) {
+	case Unknown:
+	    return 0;
+	case KeyFrame:
+	    return 1;
+	case InterFrame:
+	    return 2;
+	case DisposableInterFrame:
+	    return 3;
+	case GeneratedKeyFrame:
+	    return 4;
+	case CommandFrame:
+	case AvcSequenceHeader:
+	case AvcEndOfSequence:
+	    return 5;
+    }
+
+    unreachable ();
+    return 0;
+}
+
+VideoStream::AudioCodecId
+VideoStream::AudioCodecId::fromFlvCodecId (Byte const flv_codec_id)
+{
+    switch (flv_codec_id) {
+	case 0:
+	    return LinearPcmPlatformEndian;
+	case 1:
+	    return ADPCM;
+	case 2:
+	    return MP3;
+	case 3:
+	    return LinearPcmLittleEndian;
+	case 4:
+	    return Nellymoser_16kHz_mono;
+	case 5:
+	    return Nellymoser_8kHz_mono;
+	case 6:
+	    return Nellymoser;
+	case 7:
+	    return G711ALaw;
+	case 8:
+	    return G711MuLaw;
+	case 10:
+	    return AAC;
+	case 11:
+	    return Speex;
+	case 14:
+	    return MP3_8kHz;
+	case 15:
+	    return DeviceSpecific;
+    }
+
+    return Unknown;
+}
+
+Byte
+VideoStream::AudioCodecId::toFlvCodecId () const
+{
+    switch (value) {
+	case Unknown:
+	    return (Byte) -1;
+	case LinearPcmPlatformEndian:
+	    return 0;
+	case ADPCM:
+	    return 1;
+	case MP3:
+	    return 2;
+	case LinearPcmLittleEndian:
+	    return 3;
+	case Nellymoser_16kHz_mono:
+	    return 4;
+	case Nellymoser_8kHz_mono:
+	    return 5;
+	case Nellymoser:
+	    return 6;
+	case G711ALaw:
+	    return 7;
+	case G711MuLaw:
+	    return 8;
+	case AAC:
+	    return 10;
+	case Speex:
+	    return 11;
+	case MP3_8kHz:
+	    return 14;
+	case DeviceSpecific:
+	    return 15;
+    }
+
+    unreachable ();
+    return (Byte) -1;
+}
+
+VideoStream::VideoCodecId
+VideoStream::VideoCodecId::fromFlvCodecId (Byte const flv_codec_id)
+{
+    switch (flv_codec_id) {
+	case 2:
+	    return SorensonH263;
+	case 3:
+	    return ScreenVideo;
+	case 4:
+	    return VP6;
+	case 5:
+	    return VP6Alpha;
+	case 6:
+	    return ScreenVideoV2;
+	case 7:
+	    return AVC;
+    }
+
+    return Unknown;
+}
+
+Byte
+VideoStream::VideoCodecId::toFlvCodecId () const
+{
+    switch (value) {
+	case Unknown:
+	    return 0;
+	case SorensonH263:
+	    return 2;
+	case ScreenVideo:
+	    return 3;
+	case VP6:
+	    return 4;
+	case VP6Alpha:
+	    return 5;
+	case ScreenVideoV2:
+	    return 6;
+	case AVC:
+	    return 7;
+    }
+
+    unreachable ();
+    return 0;
+}
+
 namespace {
     struct InformAudioMessage_Data {
-	VideoStream::MessageInfo *msg_info;
-	PagePool                 *page_pool;
-	PagePool::PageListHead   *page_list;
-	Size                      msg_len;
+	VideoStream::AudioMessageInfo *msg_info;
+	PagePool                      *page_pool;
+	PagePool::PageListHead        *page_list;
+	Size                           msg_len;
 
-	InformAudioMessage_Data (VideoStream::MessageInfo * const msg_info,
-				 PagePool                 * const page_pool,
-				 PagePool::PageListHead   * const page_list,
-				 Size                       const msg_len)
+	InformAudioMessage_Data (VideoStream::AudioMessageInfo * const msg_info,
+				 PagePool                      * const page_pool,
+				 PagePool::PageListHead        * const page_list,
+				 Size                            const msg_len)
 	    : msg_info (msg_info),
 	      page_pool (page_pool),
 	      page_list (page_list),
@@ -59,15 +328,15 @@ VideoStream::informAudioMessage (EventHandler * const event_handler,
 
 namespace {
     struct InformVideoMessage_Data {
-	VideoStream::MessageInfo *msg_info;
-	PagePool                 *page_pool;
-	PagePool::PageListHead   *page_list;
-	Size                      msg_len;
+	VideoStream::VideoMessageInfo *msg_info;
+	PagePool                      *page_pool;
+	PagePool::PageListHead        *page_list;
+	Size                           msg_len;
 
-	InformVideoMessage_Data (VideoStream::MessageInfo * const msg_info,
-				 PagePool                 * const page_pool,
-				 PagePool::PageListHead   * const page_list,
-				 Size                       const msg_len)
+	InformVideoMessage_Data (VideoStream::VideoMessageInfo * const msg_info,
+				 PagePool                      * const page_pool,
+				 PagePool::PageListHead        * const page_list,
+				 Size                            const msg_len)
 	    : msg_info (msg_info),
 	      page_pool (page_pool),
 	      page_list (page_list),
@@ -134,7 +403,7 @@ VideoStream::informClosed (EventHandler * const event_handler,
 }
 
 void
-VideoStream::fireAudioMessage (MessageInfo            * const mt_nonnull msg_info,
+VideoStream::fireAudioMessage (AudioMessageInfo       * const mt_nonnull msg_info,
 			       PagePool               * const mt_nonnull page_pool,
 			       PagePool::PageListHead * const mt_nonnull page_list,
 			       Size                     const msg_len)
@@ -144,7 +413,7 @@ VideoStream::fireAudioMessage (MessageInfo            * const mt_nonnull msg_inf
 }
 
 void
-VideoStream::fireVideoMessage (MessageInfo            * const mt_nonnull msg_info,
+VideoStream::fireVideoMessage (VideoMessageInfo       * const mt_nonnull msg_info,
 			       PagePool               * const mt_nonnull page_pool,
 			       PagePool::PageListHead * const mt_nonnull page_list,
 			       Size                     const msg_len)

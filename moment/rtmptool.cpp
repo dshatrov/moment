@@ -78,15 +78,15 @@ private:
 					  AmfEncoding                  amf_encoding,
 					  void                        *_self);
 
-    static Result audioMessage (RtmpConnection::MessageInfo * mt_nonnull msg_info,
-				PagePool::PageListHead      * mt_nonnull page_list,
-				Size                         msg_len,
-				void                        *_self);
+    static Result audioMessage (VideoStream::AudioMessageInfo * mt_nonnull msg_info,
+				PagePool::PageListHead        * mt_nonnull page_list,
+				Size                           msg_len,
+				void                          *_self);
 
-    static Result videoMessage (RtmpConnection::MessageInfo * mt_nonnull msg_info,
-				PagePool::PageListHead      * mt_nonnull page_list,
-				Size                         msg_len,
-				void                        *_self);
+    static Result videoMessage (VideoStream::VideoMessageInfo * mt_nonnull msg_info,
+				PagePool::PageListHead        * mt_nonnull page_list,
+				Size                           msg_len,
+				void                          *_self);
 
     static void closed (Exception *exc_,
 			void      *_self);
@@ -232,20 +232,20 @@ RtmpClient::commandMessageCallback (RtmpConnection::MessageInfo * const mt_nonnu
 }
 
 Result
-RtmpClient::audioMessage (RtmpConnection::MessageInfo * const mt_nonnull /* msg_info */,
-			  PagePool::PageListHead      * const mt_nonnull /* page_list */,
-			  Size                          const /* msg_len */,
-			  void                        * const /* _self */)
+RtmpClient::audioMessage (VideoStream::AudioMessageInfo * const mt_nonnull /* msg_info */,
+			  PagePool::PageListHead        * const mt_nonnull /* page_list */,
+			  Size                            const /* msg_len */,
+			  void                          * const /* _self */)
 {
 //    logD_ (_func, "ts: ", msg_info->timestamp);
     return Result::Success;
 }
 
 Result
-RtmpClient::videoMessage (RtmpConnection::MessageInfo * const mt_nonnull /* msg_info */,
-			  PagePool::PageListHead      * const mt_nonnull /* page_list */,
-			  Size                          const /* msg_len */,
-			  void                        * const _self)
+RtmpClient::videoMessage (VideoStream::VideoMessageInfo * const mt_nonnull /* msg_info */,
+			  PagePool::PageListHead        * const mt_nonnull /* page_list */,
+			  Size                            const /* msg_len */,
+			  void                          * const _self)
 {
 //    logD_ (_func, "0x", fmt_hex, (UintPtr) _self, ", ts: ", fmt_def, msg_info->timestamp);
 

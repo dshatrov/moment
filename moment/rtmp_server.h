@@ -84,13 +84,13 @@ public:
   // sendVideoMessage() and sendAudioMessage() are here and not in
   // RtmpConnection because of audio_chunk_stream/video_chunk_stream.
 
-    void sendVideoMessage (RtmpConnection::MessageInfo * mt_nonnull msg_info,
-			   PagePool::PageListHead      * mt_nonnull page_list,
-			   Size                         msg_len);
+    void sendVideoMessage (VideoStream::MessageInfo * mt_nonnull msg_info,
+			   PagePool::PageListHead   * mt_nonnull page_list,
+			   Size                      msg_len);
 
-    void sendAudioMessage (RtmpConnection::MessageInfo * mt_nonnull msg_info,
-			   PagePool::PageListHead      * mt_nonnull page_list,
-			   Size                         msg_len);
+    void sendAudioMessage (VideoStream::MessageInfo * mt_nonnull msg_info,
+			   PagePool::PageListHead   * mt_nonnull page_list,
+			   Size                      msg_len);
 
     Result commandMessage (RtmpConnection::MessageInfo * mt_nonnull msg_info,
 			   PagePool::PageListHead      * mt_nonnull page_list,

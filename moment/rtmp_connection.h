@@ -24,6 +24,7 @@
 #include <libmary/libmary.h>
 #include <moment/amf_encoder.h>
 #include <moment/amf_decoder.h>
+#include <moment/video_stream.h>
 
 
 struct iovec;
@@ -76,15 +77,15 @@ public:
 
 	CommandMessageCallback commandMessage;
 
-	Result (*audioMessage) (MessageInfo            * mt_nonnull msg_info,
-				PagePool::PageListHead * mt_nonnull page_list,
-				Size                    msg_len,
-				void                   *cb_data);
+	Result (*audioMessage) (VideoStream::AudioMessageInfo * mt_nonnull msg_info,
+				PagePool::PageListHead        * mt_nonnull page_list,
+				Size                           msg_len,
+				void                          *cb_data);
 
-	Result (*videoMessage) (MessageInfo            * mt_nonnull msg_info,
-				PagePool::PageListHead * mt_nonnull page_list,
-				Size                    msg_len,
-				void                   *cb_data);
+	Result (*videoMessage) (VideoStream::VideoMessageInfo * mt_nonnull msg_info,
+				PagePool::PageListHead        * mt_nonnull page_list,
+				Size                           msg_len,
+				void                          *cb_data);
 
 	void (*sendStateChanged) (Sender::SendState send_state,
 				  void *cb_data);
@@ -522,11 +523,20 @@ public:
 
     void startServer ();
 
-  // TODO doConnect() and doCreateStream() belong to RtmpServer.
+  // TODO doConnect(), doCreateStream(), etc. belong to RtmpServer.
 
     Result doConnect (MessageInfo * mt_nonnull msg_info);
 
     Result doCreateStream (MessageInfo * mt_nonnull msg_info,
+			   AmfDecoder  * mt_nonnull amf_decoder);
+
+    Result doReleaseStream (MessageInfo * mt_nonnull msg_info,
+			    AmfDecoder  * mt_nonnull amf_decoder);
+
+    Result doCloseStream (MessageInfo * mt_nonnull msg_info,
+			  AmfDecoder  * mt_nonnull amf_decoder);
+
+    Result doDeleteStream (MessageInfo * mt_nonnull msg_info,
 			   AmfDecoder  * mt_nonnull amf_decoder);
 
     // Deprecated constructor.

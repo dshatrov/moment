@@ -179,7 +179,29 @@ RtmpServer::doPublish (RtmpConnection::MessageInfo * const mt_nonnull msg_info,
 	Byte msg_buf [512];
 	Size msg_len;
 	if (!encoder.encode (Memory::forObject (msg_buf), AmfEncoding::AMF0, &msg_len)) {
-	    logE_ (_func, "could not encoder reply");
+	    logE_ (_func, "could not encode reply");
+	    return Result::Failure;
+	}
+
+	rtmp_conn->sendCommandMessage_AMF0 (msg_info->msg_stream_id, ConstMemory (msg_buf, msg_len));
+    }
+
+    {
+      // Sending onStatus reply.
+
+	AmfAtom atoms [5];
+	AmfEncoder encoder (atoms);
+
+	encoder.addString ("onStatus");
+	encoder.addNumber (0.0 /* transaction_id */);
+	encoder.addNullObject ();
+	encoder.addString (ConstMemory (vs_name_buf, vs_name_len));
+	encoder.addString ("live");
+
+	Byte msg_buf [512];
+	Size msg_len;
+	if (!encoder.encode (Memory::forObject (msg_buf), AmfEncoding::AMF0, &msg_len)) {
+	    logE_ (_func, "could not encode onStatus message");
 	    return Result::Failure;
 	}
 
@@ -190,9 +212,9 @@ RtmpServer::doPublish (RtmpConnection::MessageInfo * const mt_nonnull msg_info,
 }
 
 void
-RtmpServer::sendVideoMessage (RtmpConnection::MessageInfo * const mt_nonnull msg_info,
-			      PagePool::PageListHead      * const mt_nonnull page_list,
-			      Size                          const msg_len)
+RtmpServer::sendVideoMessage (VideoStream::MessageInfo * const mt_nonnull msg_info,
+			      PagePool::PageListHead   * const mt_nonnull page_list,
+			      Size                       const msg_len)
 {
 //    logD (rtmp_server, _func);
 
@@ -208,9 +230,9 @@ RtmpServer::sendVideoMessage (RtmpConnection::MessageInfo * const mt_nonnull msg
 }
 
 void
-RtmpServer::sendAudioMessage (RtmpConnection::MessageInfo * const mt_nonnull msg_info,
-			      PagePool::PageListHead      * const mt_nonnull page_list,
-			      Size                          const msg_len)
+RtmpServer::sendAudioMessage (VideoStream::MessageInfo * const mt_nonnull msg_info,
+			      PagePool::PageListHead   * const mt_nonnull page_list,
+			      Size                       const msg_len)
 {
 //    logD (rtmp_server, _func);
 
@@ -258,8 +280,18 @@ RtmpServer::commandMessage (RtmpConnection::MessageInfo * const mt_nonnull msg_i
     if (!compare (method_mem, "createStream")) {
 	return rtmp_conn->doCreateStream (msg_info, &decoder);
     } else
+    if (!compare (method_mem, "FCPublish")) {
+      // TEMPORAL TEST
+	return rtmp_conn->doReleaseStream (msg_info, &decoder);
+    } else
+    if (!compare (method_mem, "releaseStream")) {
+	return rtmp_conn->doReleaseStream (msg_info, &decoder);
+    } else
     if (!compare (method_mem, "closeStream")) {
-      // No-op
+	return rtmp_conn->doCloseStream (msg_info, &decoder);
+    } else
+    if (!compare (method_mem, "deleteStream")) {
+	return rtmp_conn->doDeleteStream (msg_info, &decoder);
     } else
     if (!compare (method_mem, "receiveVideo")) {
       // TODO

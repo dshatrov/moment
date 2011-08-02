@@ -23,43 +23,176 @@
 
 #include <libmary/libmary.h>
 
-#include <moment/rtmp_connection.h>
+#include <moment/amf_decoder.h>
 
 
 namespace Moment {
 
 using namespace M;
 
+class RtmpConnection;
+
 class VideoStream : public Object
 {
 public:
+    class AudioFrameType
+    {
+    public:
+	enum Value {
+	    Unknown,
+	    RawData,
+	    AacSequenceHeader
+	};
+	operator Value () const { return value; }
+	AudioFrameType (Value const value) : value (value) {}
+	AudioFrameType () {}
+	Size toString_ (Memory const &mem, Format const &fmt);
+    private:
+	Value value;
+    };
+
+    class VideoFrameType
+    {
+    public:
+	enum Value {
+	    Unknown,
+	    KeyFrame,             // for AVC, a seekable frame
+	    InterFrame,           // for AVC, a non-seekable frame
+	    DisposableInterFrame, // H.264 only
+	    GeneratedKeyFrame,    // reserved for server use (according to FLV format spec.)
+	    CommandFrame,         // video info / command frame,
+	    AvcSequenceHeader,
+	    AvcEndOfSequence
+	};
+	operator Value () const { return value; }
+	VideoFrameType (Value const value) : value (value) {}
+	VideoFrameType () {}
+	Size toString_ (Memory const &mem, Format const &fmt);
+    private:
+	Value value;
+
+    public:
+	static VideoFrameType fromFlvFrameType (Byte flv_frame_type);
+
+	Byte toFlvFrameType () const;
+    };
+
+    class AudioCodecId
+    {
+    public:
+	enum Value {
+	    Unknown,
+	    LinearPcmPlatformEndian,
+	    ADPCM,
+	    MP3,
+	    LinearPcmLittleEndian,
+	    Nellymoser_16kHz_mono,
+	    Nellymoser_8kHz_mono,
+	    Nellymoser,
+	    G711ALaw,       // reserved
+	    G711MuLaw,      // reserved
+	    AAC,
+	    Speex,
+	    MP3_8kHz,       // reserved
+	    DeviceSpecific  // reserved
+	};
+	operator Value () const { return value; }
+	AudioCodecId (Value const value) : value (value) {}
+	AudioCodecId () {}
+	Size toString_ (Memory const &mem, Format const &fmt);
+    private:
+	Value value;
+
+    public:
+	static AudioCodecId fromFlvCodecId (Byte flv_codec_id);
+
+	Byte toFlvCodecId () const;
+    };
+
+    class VideoCodecId
+    {
+    public:
+	enum Value {
+	    Unknown,
+	    SorensonH263,  // Sorenson H.263
+	    ScreenVideo,   // Screen video
+	    ScreenVideoV2, // Screen video version 2
+	    VP6,           // On2 VP6
+	    VP6Alpha,      // On2 VP6 with alpha channel
+	    AVC            // h.264 / AVC
+	};
+	operator Value () const { return value; }
+	VideoCodecId (Value const value) : value (value) {}
+	VideoCodecId () {}
+	Size toString_ (Memory const &mem, Format const &fmt);
+    private:
+	Value value;
+
+    public:
+	static VideoCodecId fromFlvCodecId (Byte flv_codec_id);
+
+	Byte toFlvCodecId () const;
+    };
+
     // Must be copyable.
-    struct MessageInfo
+    class MessageInfo
     {
     public:
 	Uint64 timestamp;
-	bool is_keyframe;
 
 	// Greater than zero for prechunked messages.
 	Uint32 prechunk_size;
 
 	MessageInfo ()
 	    : timestamp (0),
-	      is_keyframe (true),
 	      prechunk_size (0)
+	{
+	}
+    };
+
+    // Must be copyable.
+    struct AudioMessageInfo : public MessageInfo
+    {
+    public:
+	AudioFrameType frame_type;
+	AudioCodecId codec_id;
+
+	AudioMessageInfo ()
+	    : frame_type (AudioFrameType::Unknown),
+	       codec_id (AudioCodecId::Unknown)
+	{
+	}
+    };
+
+    // Must be copyable.
+    struct VideoMessageInfo : public MessageInfo
+    {
+    public:
+      // Note that we ignore AVC composition time for now.
+
+	VideoFrameType frame_type;
+	VideoCodecId codec_id;
+
+	// TODO Get rid of is_keyframe in favor of frame_type.
+	bool is_keyframe;
+
+	VideoMessageInfo ()
+	    : frame_type (VideoFrameType::Unknown),
+	      codec_id (VideoCodecId::Unknown),
+	      is_keyframe (true)
 	{
 	}
     };
 
     struct EventHandler
     {
-	void (*audioMessage) (MessageInfo            * mt_nonnull msg_info,
+	void (*audioMessage) (AudioMessageInfo       * mt_nonnull msg_info,
 			      PagePool               * mt_nonnull page_pool,
 			      PagePool::PageListHead * mt_nonnull page_list,
 			      Size                    msg_len,
 			      void                  *cb_data);
 
-	void (*videoMessage) (MessageInfo            * mt_nonnull msg_info,
+	void (*videoMessage) (VideoMessageInfo       * mt_nonnull msg_info,
 			      PagePool               * mt_nonnull page_pool,
 			      PagePool::PageListHead * mt_nonnull page_list,
 			      Size                    msg_len,
@@ -76,7 +209,7 @@ public:
 
     struct SavedFrame
     {
-	VideoStream::MessageInfo msg_info;
+	VideoStream::VideoMessageInfo msg_info;
 	PagePool *page_pool;
 	PagePool::PageListHead page_list;
 	Size msg_len;
@@ -110,12 +243,12 @@ public:
 	return &event_informer;
     }
 
-    void fireAudioMessage (MessageInfo            * mt_nonnull msg_info,
+    void fireAudioMessage (AudioMessageInfo       * mt_nonnull msg_info,
 			   PagePool               * mt_nonnull page_pool,
 			   PagePool::PageListHead * mt_nonnull page_list,
 			   Size                    msg_len);
 
-    void fireVideoMessage (MessageInfo            * mt_nonnull msg_info,
+    void fireVideoMessage (VideoMessageInfo       * mt_nonnull msg_info,
 			   PagePool               * mt_nonnull page_pool,
 			   PagePool::PageListHead * mt_nonnull page_list,
 			   Size                    msg_len);
@@ -135,6 +268,9 @@ public:
 };
 
 }
+
+
+#include <moment/rtmp_connection.h>
 
 
 #endif /* __LIBMOMENT__VIDEO_STREAM__H__ */

@@ -27,6 +27,7 @@ namespace Moment {
 namespace {
 LogGroup libMary_logGroup_chunk  ("chunk",  LogLevel::N);
 LogGroup libMary_logGroup_msg    ("msg",    LogLevel::N);
+LogGroup libMary_logGroup_codec  ("codec",  LogLevel::D);
 LogGroup libMary_logGroup_send   ("send",   LogLevel::N);
 LogGroup libMary_logGroup_writev ("writev", LogLevel::N);
 LogGroup libMary_logGroup_time   ("time",   LogLevel::N);
@@ -1012,12 +1013,32 @@ RtmpConnection::processMessage (ChunkStream * const chunk_stream)
 	    logD (msg, _func, "AudioMessage");
 
 	    if (frontend && frontend->audioMessage) {
-		MessageInfo msg_info;
-		msg_info.msg_stream_id = chunk_stream->in_msg_stream_id;
-		msg_info.timestamp = chunk_stream->in_msg_timestamp;
-		msg_info.prechunk_size = (prechunking_enabled ? PrechunkSize : 0);
+		VideoStream::AudioMessageInfo audio_msg_info;
+
+		{
+		    PagePool::Page * const page = chunk_stream->page_list.first;
+		    if (page && page->data_len >= 1) {
+			Byte const codec_id = (page->getData() [0] & 0xf0) >> 4;
+
+			audio_msg_info.codec_id = VideoStream::AudioCodecId::fromFlvCodecId (codec_id);
+			audio_msg_info.frame_type = VideoStream::AudioFrameType::RawData;
+			if (audio_msg_info.codec_id == VideoStream::AudioCodecId::AAC) {
+			    if (page->data_len >= 2) {
+				if (page->getData() [1] == 0)
+				    audio_msg_info.frame_type = VideoStream::AudioFrameType::AacSequenceHeader;
+			    }
+			}
+		    } else {
+			audio_msg_info.frame_type = VideoStream::AudioFrameType::Unknown;
+			audio_msg_info.codec_id = VideoStream::AudioCodecId::Unknown;
+		    }
+		}
+
+//		msg_info.msg_stream_id = chunk_stream->in_msg_stream_id;
+		audio_msg_info.timestamp = chunk_stream->in_msg_timestamp;
+		audio_msg_info.prechunk_size = (prechunking_enabled ? PrechunkSize : 0);
 		Result res = Result::Failure;
-		frontend.call_ret<Result> (&res, frontend->audioMessage, /*(*/ &msg_info, &chunk_stream->page_list, msg_len /*)*/);
+		frontend.call_ret<Result> (&res, frontend->audioMessage, /*(*/ &audio_msg_info, &chunk_stream->page_list, msg_len /*)*/);
 		return res;
 	    }
 	} break;
@@ -1025,12 +1046,29 @@ RtmpConnection::processMessage (ChunkStream * const chunk_stream)
 	    logD (msg, _func, "VideoMessage");
 
 	    if (frontend && frontend->videoMessage) {
-		MessageInfo msg_info;
-		msg_info.msg_stream_id = chunk_stream->in_msg_stream_id;
-		msg_info.timestamp = chunk_stream->in_msg_timestamp;
-		msg_info.prechunk_size = (prechunking_enabled ? PrechunkSize : 0);
+		VideoStream::VideoMessageInfo video_msg_info;
+
+		{
+		    PagePool::Page * const page = chunk_stream->page_list.first;
+		    if (page && page->data_len >= 1) {
+			Byte const frame_type = (page->getData() [0] & 0xf0) >> 4;
+			Byte const codec_id = page->getData() [0] & 0x0f;
+
+			video_msg_info.frame_type = VideoStream::VideoFrameType::fromFlvFrameType (frame_type);
+			video_msg_info.codec_id = VideoStream::VideoCodecId::fromFlvCodecId (codec_id);
+		    } else {
+			video_msg_info.frame_type = VideoStream::VideoFrameType::Unknown;
+			video_msg_info.codec_id = VideoStream::VideoCodecId::Unknown;
+		    }
+		}
+
+		logD (codec, _func, toString (video_msg_info.codec_id), ", ", toString (video_msg_info.frame_type));
+
+//		msg_info.msg_stream_id = chunk_stream->in_msg_stream_id;
+		video_msg_info.timestamp = chunk_stream->in_msg_timestamp;
+		video_msg_info.prechunk_size = (prechunking_enabled ? PrechunkSize : 0);
 		Result res = Result::Failure;
-		frontend.call_ret<Result> (&res, frontend->videoMessage, /*(*/ &msg_info, &chunk_stream->page_list, msg_len /*)*/);
+		frontend.call_ret<Result> (&res, frontend->videoMessage, /*(*/ &video_msg_info, &chunk_stream->page_list, msg_len /*)*/);
 		return res;
 	    }
 	} break;
@@ -2028,6 +2066,99 @@ RtmpConnection::doCreateStream (MessageInfo * mt_nonnull msg_info,
 	encoder.addNumber (transaction_id);
 	encoder.addNullObject ();
 	encoder.addNumber (msg_stream_id);
+
+	Byte msg_buf [512];
+	Size msg_len;
+	if (!encoder.encode (Memory::forObject (msg_buf), AmfEncoding::AMF0, &msg_len)) {
+	    logE_ (_func, "encode() failed");
+	    return Result::Failure;
+	}
+
+	sendCommandMessage_AMF0 (msg_info->msg_stream_id, ConstMemory (msg_buf, msg_len));
+    }
+
+    return Result::Success;
+}
+
+Result
+RtmpConnection::doReleaseStream (MessageInfo * mt_nonnull msg_info,
+				 AmfDecoder  * mt_nonnull amf_decoder)
+{
+    double transaction_id;
+    if (!amf_decoder->decodeNumber (&transaction_id)) {
+	logE_ (_func, "could not decode transaction_id");
+	return Result::Failure;
+    }
+
+    {
+	AmfAtom atoms [3];
+	AmfEncoder encoder (atoms);
+
+	encoder.addString ("_result");
+	encoder.addNumber (transaction_id);
+	encoder.addNullObject ();
+
+	Byte msg_buf [512];
+	Size msg_len;
+	if (!encoder.encode (Memory::forObject (msg_buf), AmfEncoding::AMF0, &msg_len)) {
+	    logE_ (_func, "encode() failed");
+	    return Result::Failure;
+	}
+
+	sendCommandMessage_AMF0 (msg_info->msg_stream_id, ConstMemory (msg_buf, msg_len));
+    }
+
+    return Result::Success;
+}
+
+Result
+RtmpConnection::doCloseStream (MessageInfo * mt_nonnull msg_info,
+			       AmfDecoder  * mt_nonnull amf_decoder)
+{
+    double transaction_id;
+    if (!amf_decoder->decodeNumber (&transaction_id)) {
+	logE_ (_func, "could not decode transaction_id");
+	return Result::Failure;
+    }
+
+    {
+	AmfAtom atoms [3];
+	AmfEncoder encoder (atoms);
+
+	encoder.addString ("_result");
+	encoder.addNumber (transaction_id);
+	encoder.addNullObject ();
+
+	Byte msg_buf [512];
+	Size msg_len;
+	if (!encoder.encode (Memory::forObject (msg_buf), AmfEncoding::AMF0, &msg_len)) {
+	    logE_ (_func, "encode() failed");
+	    return Result::Failure;
+	}
+
+	sendCommandMessage_AMF0 (msg_info->msg_stream_id, ConstMemory (msg_buf, msg_len));
+    }
+
+    return Result::Success;
+}
+
+Result
+RtmpConnection::doDeleteStream (MessageInfo * mt_nonnull msg_info,
+				AmfDecoder  * mt_nonnull amf_decoder)
+{
+    double transaction_id;
+    if (!amf_decoder->decodeNumber (&transaction_id)) {
+	logE_ (_func, "could not decode transaction_id");
+	return Result::Failure;
+    }
+
+    {
+	AmfAtom atoms [3];
+	AmfEncoder encoder (atoms);
+
+	encoder.addString ("_result");
+	encoder.addNumber (transaction_id);
+	encoder.addNullObject ();
 
 	Byte msg_buf [512];
 	Size msg_len;

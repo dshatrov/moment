@@ -106,11 +106,11 @@ void destroyClientSession (ClientSession * const client_session)
     client_session->unref ();
 }
 
-void streamAudioMessage (VideoStream::MessageInfo * const mt_nonnull msg_info,
-			 PagePool                 * const mt_nonnull page_pool,
-			 PagePool::PageListHead   * const mt_nonnull page_list,
-			 Size                       const msg_len,
-			 void                     * const _session)
+void streamAudioMessage (VideoStream::AudioMessageInfo * const mt_nonnull msg_info,
+			 PagePool                      * const mt_nonnull page_pool,
+			 PagePool::PageListHead        * const mt_nonnull page_list,
+			 Size                            const msg_len,
+			 void                          * const _session)
 {
 //    logD_ (_func_);
 
@@ -137,19 +137,14 @@ void streamAudioMessage (VideoStream::MessageInfo * const mt_nonnull msg_info,
 
     client_session->mutex.unlock ();
 
-    RtmpConnection::MessageInfo rtmp_msg_info;
-    rtmp_msg_info.msg_stream_id = RtmpConnection::DefaultMessageStreamId;
-    rtmp_msg_info.timestamp = (Uint32) msg_info->timestamp;
-    rtmp_msg_info.prechunk_size = msg_info->prechunk_size;
-
-    client_session->rtmp_server.sendAudioMessage (&rtmp_msg_info, page_list, msg_len);
+    client_session->rtmp_server.sendAudioMessage (msg_info, page_list, msg_len);
 }
 
-void streamVideoMessage (VideoStream::MessageInfo * const mt_nonnull msg_info,
-			 PagePool                 * const mt_nonnull page_pool,
-			 PagePool::PageListHead   * const mt_nonnull page_list,
-			 Size                       const msg_len,
-			 void                     * const _session)
+void streamVideoMessage (VideoStream::VideoMessageInfo * const mt_nonnull msg_info,
+			 PagePool                      * const mt_nonnull page_pool,
+			 PagePool::PageListHead        * const mt_nonnull page_list,
+			 Size                            const msg_len,
+			 void                          * const _session)
 {
 //    logD_ (_func_);
 
@@ -203,12 +198,7 @@ void streamVideoMessage (VideoStream::MessageInfo * const mt_nonnull msg_info,
 
     client_session->mutex.unlock ();
 
-    RtmpConnection::MessageInfo rtmp_msg_info;
-    rtmp_msg_info.msg_stream_id = RtmpConnection::DefaultMessageStreamId;
-    rtmp_msg_info.timestamp = (Uint32) msg_info->timestamp;
-    rtmp_msg_info.prechunk_size = msg_info->prechunk_size;
-
-    client_session->rtmp_server.sendVideoMessage (&rtmp_msg_info, page_list, msg_len);
+    client_session->rtmp_server.sendVideoMessage (msg_info, page_list, msg_len);
 }
 
 void streamClosed (void * const /* _session */)

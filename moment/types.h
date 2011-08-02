@@ -23,6 +23,8 @@
 
 namespace Moment {
 
+#if 0
+// Replaced by VideoStream::CodecId
 class VideoCodec {
 public:
     enum Value {
@@ -35,6 +37,7 @@ public:
 private:
     Value value;
 };
+#endif
 
 }
 
