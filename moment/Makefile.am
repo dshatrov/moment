@@ -64,7 +64,10 @@ libmoment_1_0_la_SOURCES =	\
 				\
 	video_stream.cpp	\
 				\
-	moment_server.cpp
+	moment_server.cpp	\
+				\
+	hmac/sha2.c		\
+	hmac/hmac_sha2.c
 
 moment_extra_dist =
 
