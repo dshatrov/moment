@@ -445,6 +445,36 @@ RtmpServer::sendAudioMessage (VideoStream::AudioMessageInfo * const mt_nonnull m
     rtmp_conn->sendMessagePages (&mdesc, audio_chunk_stream, page_list, msg_offset, msg_info->prechunk_size);
 }
 
+void
+RtmpServer::sendInitialMessages_unlocked (VideoStream * const mt_nonnull video_stream)
+{
+    VideoStream::SavedFrame saved_frame;
+
+    if (video_stream->getSavedMetaData_unlocked (&saved_frame)) {
+	sendVideoMessage (&saved_frame.msg_info,
+			  &saved_frame.page_list,
+			  saved_frame.msg_len,
+			  saved_frame.msg_offset);
+	saved_frame.page_pool->msgUnref (saved_frame.page_list.first);
+    }
+
+    if (video_stream->getSavedAvcSeqHdr_unlocked (&saved_frame)) {
+	sendVideoMessage (&saved_frame.msg_info,
+			  &saved_frame.page_list,
+			  saved_frame.msg_len,
+			  saved_frame.msg_offset);
+	saved_frame.page_pool->msgUnref (saved_frame.page_list.first);
+    }
+
+    if (video_stream->getSavedKeyframe_unlocked (&saved_frame)) {
+	sendVideoMessage (&saved_frame.msg_info,
+			  &saved_frame.page_list,
+			  saved_frame.msg_len,
+			  saved_frame.msg_offset);
+	saved_frame.page_pool->msgUnref (saved_frame.page_list.first);
+    }
+}
+
 Result
 RtmpServer::commandMessage (RtmpConnection::MessageInfo * const mt_nonnull msg_info,
 			    PagePool::PageListHead * const page_list,

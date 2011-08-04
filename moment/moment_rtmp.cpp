@@ -269,6 +269,7 @@ Result startWatching (ConstMemory const &stream_name,
     client_session->watching = true;
 
 #if 0
+// Deprecated, moved to RtmpServer::sendInitialMessages_unlocked.
     {
 	VideoStream::SavedFrame saved_frame;
 	if (video_stream->getSavedKeyframe (&saved_frame)) {
@@ -284,7 +285,10 @@ Result startWatching (ConstMemory const &stream_name,
     }
 #endif
 
-    video_stream->getEventInformer()->subscribe (&video_event_handler, client_session, NULL /* ref_data */, client_session);
+    video_stream->lock ();
+    client_session->rtmp_server.sendInitialMessages_unlocked (video_stream);
+    video_stream->getEventInformer()->subscribe_unlocked (&video_event_handler, client_session, NULL /* ref_data */, client_session);
+    video_stream->unlock ();
 
     return Result::Success;
 }

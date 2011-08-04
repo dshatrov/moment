@@ -94,6 +94,9 @@ public:
 			   Size                           msg_len,
 			   Size                           msg_offset);
 
+    // Helper method. Sends saved onMetaData, AvcSequenceHeader, KeyFrame.
+    void sendInitialMessages_unlocked (VideoStream * mt_nonnull video_stream);
+
     Result commandMessage (RtmpConnection::MessageInfo * mt_nonnull msg_info,
 			   PagePool::PageListHead      * mt_nonnull page_list,
 			   Size                         msg_len,

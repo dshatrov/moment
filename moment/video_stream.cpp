@@ -435,6 +435,8 @@ VideoStream::fireVideoMessage (VideoMessageInfo       * const mt_nonnull msg_inf
 			       Size                     const msg_len,
 			       Size                     const msg_offset)
 {
+    bool saved_a_frame = false;
+
     switch (msg_info->frame_type) {
 	case VideoFrameType::KeyFrame: {
 	    mutex.lock ();
@@ -447,14 +449,38 @@ VideoStream::fireVideoMessage (VideoMessageInfo       * const mt_nonnull msg_inf
 	    saved_keyframe.page_pool = page_pool;
 	    saved_keyframe.page_list = *page_list;
 	    saved_keyframe.msg_len = msg_len;
+	    saved_keyframe.msg_offset = msg_offset;
 
 	    page_pool->msgRef (page_list->first);
 
-	    mutex.unlock ();
+	    saved_a_frame = true;
 	} break;
 	case VideoFrameType::AvcSequenceHeader: {
+	    mutex.lock ();
+
+	    if (got_saved_avc_seq_hdr)
+		saved_avc_seq_hdr.page_pool->msgUnref (saved_avc_seq_hdr.page_list.first);
+
+	    got_saved_avc_seq_hdr = true;
+	    saved_avc_seq_hdr.msg_info = *msg_info;
+	    saved_avc_seq_hdr.page_pool = page_pool;
+	    saved_avc_seq_hdr.page_list = *page_list;
+	    saved_avc_seq_hdr.msg_len = msg_len;
+	    saved_avc_seq_hdr.msg_offset = msg_offset;
+
+	    page_pool->msgRef (page_list->first);
+
+	    saved_a_frame = true;
 	} break;
 	case VideoFrameType::AvcEndOfSequence: {
+	    mutex.lock ();
+
+	    if (got_saved_avc_seq_hdr)
+		saved_avc_seq_hdr.page_pool->msgUnref (saved_avc_seq_hdr.page_list.first);
+
+	    got_saved_avc_seq_hdr = false;
+
+	    mutex.unlock ();
 	} break;
 	case VideoFrameType::RtmpSetMetaData: {
 	    mutex.lock ();
@@ -467,10 +493,11 @@ VideoStream::fireVideoMessage (VideoMessageInfo       * const mt_nonnull msg_inf
 	    saved_metadata.page_pool = page_pool;
 	    saved_metadata.page_list = *page_list;
 	    saved_metadata.msg_len = msg_len;
+	    saved_metadata.msg_offset = msg_offset;
 
 	    page_pool->msgRef (page_list->first);
 
-	    mutex.unlock ();
+	    saved_a_frame = true;
 	} break;
 	case VideoFrameType::RtmpClearMetaData: {
 	    mutex.lock ();
@@ -488,7 +515,13 @@ VideoStream::fireVideoMessage (VideoMessageInfo       * const mt_nonnull msg_inf
     }
 
     InformVideoMessage_Data inform_data (msg_info, page_pool, page_list, msg_len, msg_offset);
-    event_informer.informAll (informVideoMessage, &inform_data);
+
+    if (saved_a_frame) {
+	event_informer.informAll_unlocked (informVideoMessage, &inform_data);
+	mutex.unlock ();
+    } else {
+	event_informer.informAll (informVideoMessage, &inform_data);
+    }
 }
 
 void
@@ -545,9 +578,29 @@ VideoStream::getSavedMetaData_unlocked (SavedFrame * const mt_nonnull ret_frame)
     return true;
 }
 
+bool
+VideoStream::getSavedAvcSeqHdr (SavedFrame * const mt_nonnull ret_frame)
+{
+  StateMutexLock l (&mutex);
+    return getSavedAvcSeqHdr_unlocked (ret_frame);
+}
+
+bool
+VideoStream::getSavedAvcSeqHdr_unlocked (SavedFrame * const mt_nonnull ret_frame)
+{
+    if (!got_saved_avc_seq_hdr)
+	return false;
+
+    saved_avc_seq_hdr.page_pool->msgRef (saved_avc_seq_hdr.page_list.first);
+    *ret_frame = saved_avc_seq_hdr;
+
+    return true;
+}
+
 VideoStream::VideoStream ()
     : got_saved_keyframe (false),
       got_saved_metadata (false),
+      got_saved_avc_seq_hdr (false),
       event_informer (this, &mutex)
 {
 }
@@ -561,6 +614,9 @@ VideoStream::~VideoStream ()
 
     if (got_saved_metadata)
 	saved_metadata.page_pool->msgUnref (saved_metadata.page_list.first);
+
+    if (got_saved_avc_seq_hdr)
+	saved_avc_seq_hdr.page_pool->msgUnref (saved_avc_seq_hdr.page_list.first);
 }
 
 }

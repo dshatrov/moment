@@ -225,6 +225,11 @@ public:
 	PagePool *page_pool;
 	PagePool::PageListHead page_list;
 	Size msg_len;
+	Size msg_offset;
+    };
+
+    class FrameSaver
+    {
     };
 
 private:
@@ -233,6 +238,9 @@ private:
 
     mt_mutex (mutex) bool got_saved_metadata;
     mt_mutex (mutex) SavedFrame saved_metadata;
+
+    mt_mutex (mutex) bool got_saved_avc_seq_hdr;
+    mt_mutex (mutex) SavedFrame saved_avc_seq_hdr;
 
     Informer_<EventHandler> event_informer;
 
@@ -293,9 +301,13 @@ public:
 
     bool getSavedKeyframe_unlocked (SavedFrame * mt_nonnull ret_frame);
 
-    bool getSavedMetaData (SavedFrame * mt_nonnull ref_frame);
+    bool getSavedMetaData (SavedFrame * mt_nonnull ret_frame);
 
-    bool getSavedMetaData_unlocked (SavedFrame * mt_nonnull ref_frame);
+    bool getSavedMetaData_unlocked (SavedFrame * mt_nonnull ret_frame);
+
+    bool getSavedAvcSeqHdr (SavedFrame * mt_nonnull ret_frame);
+
+    bool getSavedAvcSeqHdr_unlocked (SavedFrame * mt_nonnull ret_frame);
 
     VideoStream ();
 
