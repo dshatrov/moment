@@ -56,6 +56,11 @@ public:
 
     Result skipObject ();
 
+    Size getCurOffset ()
+    {
+	return cur_offset;
+    }
+
     AmfDecoder (AmfEncoding const encoding,
 		Array * const array,
 		Size const msg_len)
