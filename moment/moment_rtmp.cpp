@@ -22,6 +22,11 @@
 #include <moment/libmoment.h>
 
 
+//#define MOMENT_RTMP__WAIT_FOR_KEYFRAME
+//#define MOMENT_RTMP__AUDIO_WAITS_VIDEO
+//#define MOMENT_RTMP__FLOW_CONTROL
+
+
 namespace Moment {
 
 namespace {
@@ -34,7 +39,9 @@ LogGroup libMary_logGroup_framedrop ("mod_rtmp_framedrop", LogLevel::N);
 RtmpService rtmp_service (NULL);
 RtmptService rtmpt_service (NULL);
 
+#ifdef MOMENT_RTMP__WAIT_FOR_KEYFRAME
 Count no_keyframe_limit = 25;
+#endif
 
 class ClientSession : public Object
 {
@@ -47,12 +54,16 @@ public:
     // holds. See takeRtmpConnRef().
     RtmpServer rtmp_server;
 
+#ifdef MOMENT_RTMP__FLOW_CONTROL
     mt_mutex (mutex) bool overloaded;
+#endif
 
+#ifdef MOMENT_RTMP__WAIT_FOR_KEYFRAME
     // Used from streamVideoMessage() only.
     mt_mutex (mutex) Count no_keyframe_counter;
     mt_mutex (mutex) bool keyframe_sent;
     mt_mutex (mutex) bool first_keyframe_sent;
+#endif
 
     // Synchronized by rtmp_server.
     bool watching;
@@ -82,10 +93,14 @@ public:
 
     ClientSession ()
 	: valid (true),
+#ifdef MOMENT_RTMP__FLOW_CONTROL
 	  overloaded (false),
+#endif
+#ifdef MOMENT_RMP__WAIT_FOR_KEYFRAME
 	  no_keyframe_counter (0),
 	  keyframe_sent (false),
 	  first_keyframe_sent (false),
+#endif
 	  watching (false)
     {
     }
@@ -110,6 +125,7 @@ void streamAudioMessage (VideoStream::AudioMessageInfo * const mt_nonnull msg_in
 			 PagePool                      * const mt_nonnull page_pool,
 			 PagePool::PageListHead        * const mt_nonnull page_list,
 			 Size                            const msg_len,
+			 Size                            const msg_offset,
 			 void                          * const _session)
 {
 //    logD_ (_func_);
@@ -123,27 +139,32 @@ void streamAudioMessage (VideoStream::AudioMessageInfo * const mt_nonnull msg_in
 
     client_session->mutex.lock ();
 
+#ifdef MOMENT_RTMP__AUDIO_WAITS_VIDEO
     if (!client_session->first_keyframe_sent) {
 	client_session->mutex.unlock ();
 	return;
     }
+#endif
 
+#ifdef MOMENT_RTMP__FLOW_CONTROL
     if (client_session->overloaded) {
       // Connection overloaded, dropping this audio frame.
 	logD (framedrop, _func, "Connection overloaded, dropping audio frame");
 	client_session->mutex.unlock ();
 	return;
     }
+#endif
 
     client_session->mutex.unlock ();
 
-    client_session->rtmp_server.sendAudioMessage (msg_info, page_list, msg_len);
+    client_session->rtmp_server.sendAudioMessage (msg_info, page_list, msg_len, msg_offset);
 }
 
 void streamVideoMessage (VideoStream::VideoMessageInfo * const mt_nonnull msg_info,
 			 PagePool                      * const mt_nonnull page_pool,
 			 PagePool::PageListHead        * const mt_nonnull page_list,
 			 Size                            const msg_len,
+			 Size                            const msg_offset,
 			 void                          * const _session)
 {
 //    logD_ (_func_);
@@ -157,6 +178,7 @@ void streamVideoMessage (VideoStream::VideoMessageInfo * const mt_nonnull msg_in
 
     client_session->mutex.lock ();
 
+#ifdef MOMENT_RTMP__FLOW_CONTROL
     if (client_session->overloaded) {
       // Connection overloaded, dropping this video frame. In general, we'll
       // have to wait for the next keyframe after we've dropped a frame.
@@ -168,13 +190,17 @@ void streamVideoMessage (VideoStream::VideoMessageInfo * const mt_nonnull msg_in
 //	logs->print (".");
 //	logs->flush ();
 
+#ifdef MOMENT_RTMP__WAIT_FOR_KEYFRAME
 	client_session->no_keyframe_counter = 0;
 	client_session->keyframe_sent = false;
+#endif
 
 	client_session->mutex.unlock ();
 	return;
     }
+#endif // MOMENT_RTMP__FLOW_CONTROL
 
+#ifdef MOMENT_RTMP__WAIT_FOR_KEYFRAME
     bool got_keyframe = false;
     if (msg_info->is_keyframe) {
 	got_keyframe = true;
@@ -195,10 +221,13 @@ void streamVideoMessage (VideoStream::VideoMessageInfo * const mt_nonnull msg_in
 	client_session->keyframe_sent = true;
 	client_session->first_keyframe_sent = true;
     }
+#endif
 
     client_session->mutex.unlock ();
 
-    client_session->rtmp_server.sendVideoMessage (msg_info, page_list, msg_len);
+//    logD_ (_func, "sending ", toString (msg_info->codec_id), ", ", toString (msg_info->frame_type));
+
+    client_session->rtmp_server.sendVideoMessage (msg_info, page_list, msg_len, msg_offset);
 }
 
 void streamClosed (void * const /* _session */)
@@ -287,15 +316,19 @@ void sendStateChanged (Sender::SendState   const send_state,
     switch (send_state) {
 	case Sender::ConnectionReady:
 	    logD (framedrop, _func, "ConnectionReady");
+#ifdef MOMNET_RTMP__FLOW_CONTROL
 	    client_session->mutex.lock ();
 	    client_session->overloaded = false;
 	    client_session->mutex.unlock ();
+#endif
 	    break;
 	case Sender::ConnectionOverloaded:
 	    logD (framedrop, _func, "ConnectionOverloaded");
+#ifdef MOMENT_RTMP__FLOW_CONTROL
 	    client_session->mutex.lock ();
 	    client_session->overloaded = true;
 	    client_session->mutex.unlock ();
+#endif
 	    break;
 	case Sender::QueueSoftLimit:
 	    logD (framedrop, _func, "QueueSoftLimit");
@@ -398,8 +431,13 @@ void momentRtmpInit ()
 	    logD_ (_func, opt_name, ": ", rtmp_bind);
 	    if (!rtmp_bind.isNull ()) {
 		IpAddress addr;
-		if (!setIpAddress (rtmp_bind, &addr)) {
-		    logE_ (_func, "setIpAddress() failed (rtmp)");
+		if (!setIpAddress_default (rtmp_bind,
+					   ConstMemory() /* default_host */,
+					   1935          /* default_port */,
+					   true          /* allow_any_host */,
+					   &addr))
+		{
+		    logE_ (_func, "setIpAddress_default() failed (rtmp)");
 		    return;
 		}
 
@@ -439,8 +477,13 @@ void momentRtmpInit ()
 	    logD_ (_func, opt_name, ": ", rtmpt_bind);
 	    if (!rtmpt_bind.isNull ()) {
 		IpAddress addr;
-		if (!setIpAddress (rtmpt_bind, &addr)) {
-		    logE_ (_func, "setIpAddress() failed (rtmpt)");
+		if (!setIpAddress_default (rtmpt_bind,
+					   ConstMemory() /* default_host */,
+					   8081          /* default_port */,
+					   true          /* allow_any_host */,
+					   &addr))
+		{
+		    logE_ (_func, "setIpAddress_default() failed (rtmpt)");
 		    return;
 		}
 

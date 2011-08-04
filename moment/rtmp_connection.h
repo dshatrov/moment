@@ -57,7 +57,6 @@ public:
 	Uint32 msg_stream_id;
 	Uint32 timestamp;
 
-	// TODO Make use of this field.
 	Uint32 prechunk_size;
 
 	// TODO Put all information about a message here,
@@ -80,11 +79,13 @@ public:
 	Result (*audioMessage) (VideoStream::AudioMessageInfo * mt_nonnull msg_info,
 				PagePool::PageListHead        * mt_nonnull page_list,
 				Size                           msg_len,
+				Size                           msg_offset,
 				void                          *cb_data);
 
 	Result (*videoMessage) (VideoStream::VideoMessageInfo * mt_nonnull msg_info,
 				PagePool::PageListHead        * mt_nonnull page_list,
 				Size                           msg_len,
+				Size                           msg_offset,
 				void                          *cb_data);
 
 	void (*sendStateChanged) (Sender::SendState send_state,
@@ -208,7 +209,7 @@ private:
     {
     public:
 	enum Value {
-	    StreamBegin = 0,
+	    StreamBegin      = 0,
 	    StreamEof        = 1,
 	    StreamDry        = 2,
 	    SetBufferLength  = 3,
@@ -299,6 +300,9 @@ private:
     Size in_chunk_size;
     Size out_chunk_size;
 
+    Size out_got_first_timestamp;
+    Uint32 out_first_timestamp;
+
     bool extended_timestamp_is_delta;
     bool ignore_extended_timestamp;
 
@@ -355,9 +359,12 @@ public:
     class MessageDesc;
 
 private:
+    Uint32 mangleOutTimestamp (Uint32 timestamp);
+
     Size fillMessageHeader (MessageDesc const * mt_nonnull mdesc,
 			    ChunkStream       * mt_nonnull chunk_stream,
-			    Byte              * mt_nonnull header_buf);
+			    Byte              * mt_nonnull header_buf,
+			    Uint32             timestamp);
 
     // TODO rename to resetChunk()
     void resetPacket ();
@@ -440,7 +447,7 @@ public:
 
   // Extra send utility methods.
 
-    void sendConnect ();
+    void sendConnect (ConstMemory const &app_name);
 
     void sendCreateStream ();
 
@@ -538,6 +545,11 @@ public:
 
     Result doDeleteStream (MessageInfo * mt_nonnull msg_info,
 			   AmfDecoder  * mt_nonnull amf_decoder);
+
+    Result fireVideoMessage (VideoStream::VideoMessageInfo *video_msg_info,
+			     PagePool::PageListHead        *page_list,
+			     Size                           msg_len,
+			     Size                           msg_offset);
 
     // Deprecated constructor.
     RtmpConnection (Object   *coderef_container,

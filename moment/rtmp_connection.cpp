@@ -17,6 +17,10 @@
 */
 
 
+#include <libmary/types.h>
+#include "hmac/hmac_sha2.h"
+
+
 #include <moment/rtmp_connection.h>
 
 
@@ -25,13 +29,15 @@ using namespace M;
 namespace Moment {
 
 namespace {
-LogGroup libMary_logGroup_chunk  ("chunk",  LogLevel::N);
-LogGroup libMary_logGroup_msg    ("msg",    LogLevel::N);
-LogGroup libMary_logGroup_codec  ("codec",  LogLevel::D);
-LogGroup libMary_logGroup_send   ("send",   LogLevel::N);
-LogGroup libMary_logGroup_writev ("writev", LogLevel::N);
-LogGroup libMary_logGroup_time   ("time",   LogLevel::N);
-LogGroup libMary_logGroup_close  ("rtmp_conn_close", LogLevel::N);
+LogGroup libMary_logGroup_chunk     ("rtmp_chunk",      LogLevel::N);
+LogGroup libMary_logGroup_msg       ("rtmp_msg",        LogLevel::N);
+LogGroup libMary_logGroup_codec     ("rtmp_codec",      LogLevel::N);
+LogGroup libMary_logGroup_send      ("rtmp_send",       LogLevel::N);
+LogGroup libMary_logGroup_writev    ("rtmp_writev",     LogLevel::N);
+LogGroup libMary_logGroup_time      ("rtmp_time",       LogLevel::N);
+LogGroup libMary_logGroup_close     ("rtmp_conn_close", LogLevel::N);
+LogGroup libMary_logGroup_proto_in  ("rtmp_proto_in",   LogLevel::N);
+LogGroup libMary_logGroup_proto_out ("rtmp_proto_out",  LogLevel::N);
 }
 
 Sender::Frontend const RtmpConnection::sender_frontend = {
@@ -70,19 +76,40 @@ RtmpConnection::getChunkStream (Uint32 const chunk_stream_id,
     return chunk_stream_node->value;
 }
 
+Uint32
+RtmpConnection::mangleOutTimestamp (Uint32 const timestamp)
+{
+    if (!out_got_first_timestamp) {
+	if (timestamp != 0) {
+	    out_first_timestamp = timestamp;
+	    out_got_first_timestamp = true;
+	    return 0;
+	} else {
+	    return timestamp;
+	}
+    }
+
+    if (out_first_timestamp <= timestamp)
+	return timestamp - out_first_timestamp;
+
+    return 0;
+}
+
+#if 0
+// Deprecated
 static inline Uint32 debugMangleTimestamp (Uint32 const timestamp)
 {
-//    return timestamp;
-    return timestamp + 0x00ffafff; // Extended timesatmps debugging.
+    return timestamp;
+//    return timestamp + 0x00ffafff; // Extended timesatmps debugging.
 }
+#endif
 
 Size
 RtmpConnection::fillMessageHeader (MessageDesc const * const mt_nonnull mdesc,
 				   ChunkStream       * const mt_nonnull chunk_stream,
-				   Byte              * const mt_nonnull header_buf)
+				   Byte              * const mt_nonnull header_buf,
+				   Uint32              const timestamp)
 {
-    Uint32 const timestamp = debugMangleTimestamp (mdesc->timestamp);
-
     bool has_extended_timestamp = false;
     Uint32 extended_timestamp = 0;
 
@@ -305,10 +332,10 @@ RtmpConnection::fillPrechunkedPages (PrechunkContext        * const  prechunk_ct
 				     PagePool               * const  page_pool,
 				     PagePool::PageListHead * const  page_list,
 				     Uint32                   const  chunk_stream_id,
-				     Uint32                          msg_timestamp,
+				     Uint32                   const  msg_timestamp,
 				     bool                     const  first_chunk)
 {
-    msg_timestamp = debugMangleTimestamp (msg_timestamp);
+// Deprecated    msg_timestamp = mangleOutTimestamp (msg_timestamp);
 
     Size const prechunk_size = PrechunkSize;
 
@@ -367,6 +394,8 @@ RtmpConnection::sendMessage (MessageDesc const * const mt_nonnull mdesc,
 			     ConstMemory const &mem,
 			     Uint32             prechunk_size)
 {
+    logD (send, _func, "prechunk_size: ", prechunk_size, ", PrechunkSize: ", (unsigned) PrechunkSize);
+
     PagePool::PageListHead page_list;
     if (prechunk_size > 0) {
 	page_pool->getFillPages (&page_list, mem);
@@ -401,6 +430,8 @@ RtmpConnection::sendMessagePages (MessageDesc const      * const mt_nonnull mdes
 				  Uint32                         prechunk_size,
 				  bool                     const take_ownership)
 {
+    logD (send, _func, "prechunk_size: ", prechunk_size);
+
     if (is_closed) {
 	logD (close, _func, "0x", fmt_hex, (UintPtr) this, " is closed");
 	// TODO unref pages if (bool take_ownership).
@@ -408,9 +439,15 @@ RtmpConnection::sendMessagePages (MessageDesc const      * const mt_nonnull mdes
 	return;
     }
 
+    Uint32 const timestamp = mangleOutTimestamp (mdesc->timestamp);
+
+    logD (proto_out, _func, "ts ", timestamp, " (orig ", mdesc->timestamp, "), tid ", mdesc->msg_type_id,
+	  ", msid ", mdesc->msg_stream_id, ", csid ", chunk_stream->chunk_stream_id,
+	  ", mlen ", mdesc->msg_len, ", hdrc ", mdesc->cs_hdr_comp ? "true" : "false");
+
     Sender::MessageEntry_Pages * const msg_pages =
 	    Sender::MessageEntry_Pages::createNew (MaxHeaderLen);
-    msg_pages->header_len = fillMessageHeader (mdesc, chunk_stream, msg_pages->getHeaderData());
+    msg_pages->header_len = fillMessageHeader (mdesc, chunk_stream, msg_pages->getHeaderData(), timestamp);
 #if 0
     {
 	logLock ();
@@ -420,9 +457,10 @@ RtmpConnection::sendMessagePages (MessageDesc const      * const mt_nonnull mdes
     }
 #endif
     msg_pages->page_pool = page_pool;
-    msg_pages->msg_offset = msg_offset;
 
     if (prechunk_size == 0) {
+	msg_pages->msg_offset = 0;
+
 	prechunk_size = PrechunkSize;
 
 	PrechunkContext prechunk_ctx;
@@ -436,7 +474,7 @@ RtmpConnection::sendMessagePages (MessageDesc const      * const mt_nonnull mdes
 				     page_pool,
 				     &prechunked_pages,
 				     chunk_stream->chunk_stream_id,
-				     mdesc->timestamp,
+				     timestamp,
 				     true /* first_chunk */);
 	    } else {
 		fillPrechunkedPages (&prechunk_ctx,
@@ -444,7 +482,7 @@ RtmpConnection::sendMessagePages (MessageDesc const      * const mt_nonnull mdes
 				     page_pool,
 				     &prechunked_pages,
 				     chunk_stream->chunk_stream_id,
-				     mdesc->timestamp,
+				     timestamp,
 				     false /* first_chunk */);
 	    }
 
@@ -457,6 +495,7 @@ RtmpConnection::sendMessagePages (MessageDesc const      * const mt_nonnull mdes
 	    page_pool->msgUnref (page_list->first);
     } else {
 	msg_pages->first_page = page_list->first;
+	msg_pages->msg_offset = msg_offset;
 
 	if (!take_ownership)
 	    page_pool->msgRef (page_list->first);
@@ -521,6 +560,14 @@ RtmpConnection::resetMessage (ChunkStream * const mt_nonnull chunk_stream)
 void
 RtmpConnection::sendSetChunkSize (Uint32 const chunk_size)
 {
+    logD (proto_out, _func, chunk_size);
+
+    if (chunk_size < MinChunkSize ||
+	chunk_size > MaxChunkSize)
+    {
+	logE_ (_func, "bad chunk size: ", chunk_size);
+    }
+
     Byte msg [4];
 
     msg [0] = (chunk_size >> 24) & 0xff;
@@ -744,19 +791,21 @@ RtmpConnection::sendCommandMessage_AMF0 (Uint32 const msg_stream_id,
 }
 
 void
-RtmpConnection::sendConnect ()
+RtmpConnection::sendConnect (ConstMemory const &app_name)
 {
-    AmfAtom atoms [16];
+//    AmfAtom atoms [16];
+    AmfAtom atoms [26];
     AmfEncoder encoder (atoms);
 
     encoder.addString ("connect");
     encoder.addNumber (1.0);
 
+#if 0
     {
 	encoder.beginObject ();
 
 	encoder.addFieldName ("app");
-	encoder.addString ("");
+	encoder.addString (app_name);
 
 	encoder.addFieldName ("flashVer");
 	encoder.addString ("LNX 10,0,22,87");
@@ -775,8 +824,47 @@ RtmpConnection::sendConnect ()
 
 	encoder.endObject ();
     }
+#endif
+    {
+	encoder.beginObject ();
 
-    Byte msg_buf [512];
+	encoder.addFieldName ("app");
+	encoder.addString (app_name);
+
+	encoder.addFieldName ("flashVer");
+	encoder.addString ("LNX 10,0,22,87");
+
+	encoder.addFieldName ("swfUrl");
+	encoder.addString ("file:///my.swf");
+
+	encoder.addFieldName ("tcUrl");
+	encoder.addString ("rtmp://172.16.0.17:1935/oflaDemo");
+
+	encoder.addFieldName ("pageUrl");
+	encoder.addString ("file://my.html");
+
+	encoder.addFieldName ("fpad");
+	encoder.addBoolean (false);
+
+	encoder.addFieldName ("capabilities");
+	encoder.addNumber (15.0);
+
+	encoder.addFieldName ("audioCodecs");
+	encoder.addNumber ((double) 0x00fff /* SUPPORT_SND_ALL */);
+
+	encoder.addFieldName ("videoCodecs");
+	encoder.addNumber ((double) 0x00ff /* SUPPORT_VID_ALL */);
+
+	encoder.addFieldName ("videoFunction");
+	encoder.addNumber (1.0);
+
+	encoder.addFieldName ("objectEncoding");
+	encoder.addNumber (0.0);
+
+	encoder.endObject ();
+    }
+
+    Byte msg_buf [1024];
     Size msg_len;
     if (!encoder.encode (Memory::forObject (msg_buf), AmfEncoding::AMF0, &msg_len)) {
 	logE_ (_func, "encode() failed");
@@ -901,13 +989,25 @@ RtmpConnection::processMessage (ChunkStream * const chunk_stream)
 {
     logD (msg, _func_);
 
+    logD (proto_in, _func, "ts ", chunk_stream->in_msg_timestamp, ", tid ", chunk_stream->in_msg_type_id,
+	  ", msid ", chunk_stream->in_msg_stream_id, ", csid ", chunk_stream->chunk_stream_id,
+	  ", mlen ", chunk_stream->in_msg_len);
+
+#if 0
+    {
+	PagePool::Page * const page = chunk_stream->page_list.first;
+	if (page)
+	    hexdump (logs, page->mem());
+    }
+#endif
+
     Byte const *msg_buf = chunk_stream->page_list.first->getData();
     Size const msg_len = chunk_stream->in_msg_len;
 
     logD (msg, _func, "message type id: ", chunk_stream->in_msg_type_id);
     switch (chunk_stream->in_msg_type_id) {
 	case RtmpMessageType::SetChunkSize: {
-	    logD (msg, _func, "SetChunkSize");
+	    logD (proto_in, _func, "SetChunkSize");
 
 	    if (msg_len < 4) {
 		logE_ (_func, "SetChunkSize message is too short (", msg_len, " bytes)");
@@ -926,14 +1026,14 @@ RtmpConnection::processMessage (ChunkStream * const chunk_stream)
 		return Result::Failure;
 	    }
 
-	    logD (msg, _func, "SetChunkSize: new chunk size: ", chunk_size);
+	    logD (proto_in, _func, "SetChunkSize: new chunk size: ", chunk_size);
 
 	    in_chunk_size = chunk_size;
 	} break;
 	case RtmpMessageType::Abort: {
 	    // TODO Verify that Abort is handled correctly.
 
-	    logD (msg, _func, "Abort");
+	    logD (proto_in, _func, "Abort");
 
 	    if (msg_len < 4) {
 		logE_ (_func, "Abort message is too short (", msg_len, " bytes)");
@@ -945,6 +1045,8 @@ RtmpConnection::processMessage (ChunkStream * const chunk_stream)
 					   ((Uint32) msg_buf [2] <<  8) |
 					   ((Uint32) msg_buf [3] <<  0);
 
+	    logD (proto_in, _func, "Abort: chunk_stream_id: ", chunk_stream_id);
+
 	    ChunkStream * const chunk_stream = getChunkStream (chunk_stream_id, false /* create */);
 	    if (!chunk_stream) {
 		logE_ (_func, "Abort: stream not found: ", chunk_stream_id);
@@ -954,7 +1056,7 @@ RtmpConnection::processMessage (ChunkStream * const chunk_stream)
 	    resetMessage (chunk_stream);
 	} break; 
 	case RtmpMessageType::Ack: {
-	    logD (msg, _func, "Ack");
+	    logD (proto_in, _func, "Ack");
 
 	    if (msg_len < 4) {
 		logE_ (_func, "Ack message is too short (", msg_len, " bytes)");
@@ -966,17 +1068,17 @@ RtmpConnection::processMessage (ChunkStream * const chunk_stream)
 					  ((Uint32) msg_buf [2] <<  8) |
 					  ((Uint32) msg_buf [3] <<  0);
 
-	    logD (msg, _func, "Ack: ", bytes_received);
+	    logD (proto_in, _func, "Ack: bytes_received", bytes_received);
 
 	    // TODO Handle acks.
 	} break;
 	case RtmpMessageType::UserControl: {
-	    logD (msg, _func, "UserControl");
+	    logD (proto_in, _func, "UserControl");
 
 	    return processUserControlMessage (chunk_stream);
 	} break;
 	case RtmpMessageType::WindowAckSize: {
-	    logD (msg, _func, "WindowAckSize");
+	    logD (proto_in, _func, "WindowAckSize");
 
 	    if (msg_len < 4) {
 		logE_ (_func, "WindowAckSize message is too short (", msg_len, " bytes)");
@@ -988,10 +1090,12 @@ RtmpConnection::processMessage (ChunkStream * const chunk_stream)
 				     ((Uint32) msg_buf [2] <<  8) |
 				     ((Uint32) msg_buf [3] <<  0);
 
+	    logD (proto_in, _func, "WindowAckSize: wack_size: ", wack_size);
+
 	    remote_wack_size = wack_size;
 	} break;
 	case RtmpMessageType::SetPeerBandwidth: {
-	    logD (msg, _func, "SetPeerBandwidth");
+	    logD (proto_in, _func, "SetPeerBandwidth");
 
 	    if (msg_len < 5) {
 		logE_ (_func, "SetPeerBandwidth message is too short (", msg_len, " bytes)");
@@ -1003,6 +1107,8 @@ RtmpConnection::processMessage (ChunkStream * const chunk_stream)
 				     ((Uint32) msg_buf [2] <<  8) |
 				     ((Uint32) msg_buf [3] <<  0);
 
+	    logD (proto_in, _func, "SetPeerBandwidth: wack_size: ", wack_size);
+
 	    // Unused
 	    // Byte const limit_type = msg_buf [4];
 
@@ -1010,7 +1116,7 @@ RtmpConnection::processMessage (ChunkStream * const chunk_stream)
 		sendWindowAckSize (local_wack_size);
 	} break;
 	case RtmpMessageType::AudioMessage: {
-	    logD (msg, _func, "AudioMessage");
+	    logD (proto_in, _func, "AudioMessage");
 
 	    if (frontend && frontend->audioMessage) {
 		VideoStream::AudioMessageInfo audio_msg_info;
@@ -1022,6 +1128,7 @@ RtmpConnection::processMessage (ChunkStream * const chunk_stream)
 
 			audio_msg_info.codec_id = VideoStream::AudioCodecId::fromFlvCodecId (codec_id);
 			audio_msg_info.frame_type = VideoStream::AudioFrameType::RawData;
+
 			if (audio_msg_info.codec_id == VideoStream::AudioCodecId::AAC) {
 			    if (page->data_len >= 2) {
 				if (page->getData() [1] == 0)
@@ -1038,12 +1145,12 @@ RtmpConnection::processMessage (ChunkStream * const chunk_stream)
 		audio_msg_info.timestamp = chunk_stream->in_msg_timestamp;
 		audio_msg_info.prechunk_size = (prechunking_enabled ? PrechunkSize : 0);
 		Result res = Result::Failure;
-		frontend.call_ret<Result> (&res, frontend->audioMessage, /*(*/ &audio_msg_info, &chunk_stream->page_list, msg_len /*)*/);
+		frontend.call_ret<Result> (&res, frontend->audioMessage, /*(*/ &audio_msg_info, &chunk_stream->page_list, msg_len, 0 /* msg_offset */ /*)*/);
 		return res;
 	    }
 	} break;
 	case RtmpMessageType::VideoMessage: {
-	    logD (msg, _func, "VideoMessage");
+	    logD (proto_in, _func, "VideoMessage");
 
 	    if (frontend && frontend->videoMessage) {
 		VideoStream::VideoMessageInfo video_msg_info;
@@ -1056,48 +1163,59 @@ RtmpConnection::processMessage (ChunkStream * const chunk_stream)
 
 			video_msg_info.frame_type = VideoStream::VideoFrameType::fromFlvFrameType (frame_type);
 			video_msg_info.codec_id = VideoStream::VideoCodecId::fromFlvCodecId (codec_id);
+
+			if (video_msg_info.codec_id == VideoStream::VideoCodecId::AVC) {
+			    if (page->data_len >= 2) {
+				if (page->getData() [1] == 0)
+				    video_msg_info.frame_type = VideoStream::VideoFrameType::AvcSequenceHeader;
+				else
+				if (page->getData() [1] == 2)
+				    video_msg_info.frame_type = VideoStream::VideoFrameType::AvcEndOfSequence;
+			    }
+			}
 		    } else {
 			video_msg_info.frame_type = VideoStream::VideoFrameType::Unknown;
 			video_msg_info.codec_id = VideoStream::VideoCodecId::Unknown;
 		    }
 		}
 
-		logD (codec, _func, toString (video_msg_info.codec_id), ", ", toString (video_msg_info.frame_type));
+		logD (codec, _func, video_msg_info.codec_id, ", ", video_msg_info.frame_type);
 
 //		msg_info.msg_stream_id = chunk_stream->in_msg_stream_id;
 		video_msg_info.timestamp = chunk_stream->in_msg_timestamp;
 		video_msg_info.prechunk_size = (prechunking_enabled ? PrechunkSize : 0);
+
 		Result res = Result::Failure;
-		frontend.call_ret<Result> (&res, frontend->videoMessage, /*(*/ &video_msg_info, &chunk_stream->page_list, msg_len /*)*/);
+		frontend.call_ret<Result> (&res, frontend->videoMessage, /*(*/ &video_msg_info, &chunk_stream->page_list, msg_len, 0 /* msg_offset */ /*)*/);
 		return res;
 	    }
 	} break;
 	case RtmpMessageType::Data_AMF3: {
-	    logD (msg, _func, "Data_AMF3");
+	    logD (proto_in, _func, "Data_AMF3");
 	    return callCommandMessage (chunk_stream, AmfEncoding::AMF3);
 	} break;
 	case RtmpMessageType::Data_AMF0: {
-	    logD (msg, _func, "Data_AMF0");
+	    logD (proto_in, _func, "Data_AMF0");
 	    return callCommandMessage (chunk_stream, AmfEncoding::AMF0);
 	} break;
 	case RtmpMessageType::SharedObject_AMF3: {
-	    logD (msg, _func, "SharedObject_AMF3");
+	    logD (proto_in, _func, "SharedObject_AMF3");
 	  // No-op
 	} break;
 	case RtmpMessageType::SharedObject_AMF0: {
-	    logD (msg, _func, "SharedObject_AMF0");
+	    logD (proto_in, _func, "SharedObject_AMF0");
 	  // No-op
 	} break;
 	case RtmpMessageType::Command_AMF3: {
-	    logD (msg, _func, "Command_AMF3");
+	    logD (proto_in, _func, "Command_AMF3");
 	    return callCommandMessage (chunk_stream, AmfEncoding::AMF3);
 	} break;
 	case RtmpMessageType::Command_AMF0: {
-	    logD (msg, _func, "Command_AMF0");
+	    logD (proto_in, _func, "Command_AMF0");
 	    return callCommandMessage (chunk_stream, AmfEncoding::AMF0);
 	} break;
 	case RtmpMessageType::Aggregate: {
-	    logD (msg, _func, "Aggregate");
+	    logD (proto_in, _func, "Aggregate");
 	  // No-op
 	} break;
 	default:
@@ -1111,10 +1229,19 @@ Result
 RtmpConnection::callCommandMessage (ChunkStream * const chunk_stream,
 				    AmfEncoding const amf_encoding)
 {
+    if (logLevelOn (proto_in, LogLevel::Debug)) {
+	if (chunk_stream->page_list.first) {
+	    logD (proto_in, _func);
+	    hexdump (ConstMemory (chunk_stream->page_list.first->getData(),
+				  chunk_stream->page_list.first->data_len));
+	}
+    }
+
     if (frontend && frontend->commandMessage) {
 	MessageInfo msg_info;
 	msg_info.msg_stream_id = chunk_stream->in_msg_stream_id;
 	msg_info.timestamp = chunk_stream->in_msg_timestamp;
+	msg_info.prechunk_size = 0;
 
 	Result res = Result::Failure;
 	frontend.call_ret<Result> (&res, frontend->commandMessage, /*(*/
@@ -1138,28 +1265,28 @@ RtmpConnection::processUserControlMessage (ChunkStream * const chunk_stream)
 			   ((Uint32) msg_buf [1] << 0);
     switch (uc_type) {
 	case UserControlMessageType::StreamBegin: {
-	    logD (msg, _func, "StreamBegin");
+	    logD (proto_in, _func, "StreamBegin");
 	  // No-op
 	} break;
 	case UserControlMessageType::StreamEof: {
-	    logD (msg, _func, "StreamEof");
+	    logD (proto_in, _func, "StreamEof");
 	  // No-op
 	} break;
 	case UserControlMessageType::StreamDry: {
-	    logD (msg, _func, "StreamDry");
+	    logD (proto_in, _func, "StreamDry");
 	  // No-op
 	} break;
 	case UserControlMessageType::SetBufferLength: {
-	    logD (msg, _func, "SetBufferLength");
+	    logD (proto_in, _func, "SetBufferLength");
 	  // No-op
 	} break;
 	case UserControlMessageType::StreamIsRecorded: {
 	  // TODO Send "stream is recorded" to clients?
-	    logD (msg, _func, "StreamIsRecorded");
+	    logD (proto_in, _func, "StreamIsRecorded");
 	  // No-op
 	} break;
 	case UserControlMessageType::PingRequest: {
-	    logD (msg, _func, "PingRequest");
+	    logD (proto_in, _func, "PingRequest");
 
 	    if (msg_len < 6) {
 		logE_ (_func, "PingRequest message is too short (", msg_len, " bytes)");
@@ -1173,7 +1300,7 @@ RtmpConnection::processUserControlMessage (ChunkStream * const chunk_stream)
 	    sendUserControl_PingResponse (timestamp);
 	} break;
 	case UserControlMessageType::PingResponse: {
-	    logD ( msg, _func, "PingResponse");
+	    logD (proto_in, _func, "PingResponse");
 
 	    ping_reply_received = true;
 	} break;
@@ -1230,6 +1357,47 @@ RtmpConnection::processInput (Memory const &mem,
 {
     RtmpConnection * const self = static_cast <RtmpConnection*> (_self);
     return self->doProcessInput (mem, ret_accepted);
+}
+
+static Byte glob_fms_key [68] = {
+    0x47, 0x65, 0x6e, 0x75,  0x69, 0x6e, 0x65, 0x20,
+    0x41, 0x64, 0x6f, 0x62,  0x65, 0x20, 0x46, 0x6c,
+    0x61, 0x73, 0x68, 0x20,  0x4d, 0x65, 0x64, 0x69,
+    0x61, 0x20, 0x53, 0x65,  0x72, 0x76, 0x65, 0x72,
+    0x20, 0x30, 0x30, 0x31,  0xf0, 0xee, 0xc2, 0x4a,
+    0x80, 0x68, 0xbe, 0xe8,  0x2e, 0x00, 0xd0, 0xd1,
+    0x02, 0x9e, 0x7e, 0x57,  0x6e, 0xec, 0x5d, 0x2d,
+    0x29, 0x80, 0x6f, 0xab,  0x93, 0xb8, 0xe6, 0x36,
+    0xcf, 0xeb, 0x31, 0xae
+};
+
+static Uint32
+getDigestOffset (Byte const * const msg,
+		 int          const handshake_scheme)
+{
+    Uint32 server_digest_offs;
+    switch (handshake_scheme) {
+	case 0:
+	    server_digest_offs = (Uint32) msg [ 8] +
+				 (Uint32) msg [ 9] +
+				 (Uint32) msg [10] +
+				 (Uint32) msg [11];
+	    server_digest_offs %= 728;
+	    server_digest_offs += 12;
+	    break;
+	case 1:
+	    server_digest_offs = (Uint32) msg [772] +
+				 (Uint32) msg [773] +
+				 (Uint32) msg [774] +
+				 (Uint32) msg [775];
+	    server_digest_offs %= 728;
+	    server_digest_offs += 776;
+	    break;
+	default:
+	    unreachable ();
+    }
+
+    return server_digest_offs;
 }
 
 Receiver::ProcessInputResult
@@ -1318,6 +1486,7 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 			msg_c2 [6] = (time >> 16) & 0xff;
 			msg_c2 [7] = (time >> 24) & 0xff;
 		    }
+
 		    memcpy (msg_c2 + 8, data, 1536 - 8);
 		    sendRawPages (page_list.first, 0 /* msg_offset */);
 		}
@@ -1384,6 +1553,25 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 		}
 
 		{
+		  // Sending S0
+
+		    Sender::MessageEntry_Pages * const msg_pages =
+			    Sender::MessageEntry_Pages::createNew (1);
+
+		    msg_pages->getHeaderData() [0] = 3;
+		    msg_pages->header_len = 1;
+
+		    msg_pages->page_pool  = NULL;
+		    msg_pages->first_page = NULL;
+		    msg_pages->msg_offset = 0;
+
+		    sender->sendMessage (msg_pages);
+		    sender->flush ();
+		}
+
+#if 0
+// Old handshake code.
+		{
 		    PagePool::PageListHead page_list;
 		    page_pool->getPages (&page_list, 1537 /* len */);
 		    assert (page_list.first->data_len >= 1537);
@@ -1397,6 +1585,7 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 			msg_s1 [4] = (time >> 24) & 0xff;
 		    }
 		    memset (msg_s1 + 5, 0 , 4);
+
 		    {
 			unsigned n = 0;
 			for (unsigned i = 9; i < 1537; ++i) {
@@ -1407,6 +1596,7 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 
 		    sendRawPages (page_list.first, 0 /* msg_offset */);
 		}
+#endif
 
 		conn_state = ReceiveState::ServerWaitC1;
 	    } break;
@@ -1422,14 +1612,99 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 
 		{
 		    PagePool::PageListHead page_list;
+		    page_pool->getPages (&page_list, 3072);
+		    // We want pages to be large enough to hold both S1 and S2,
+		    // just because it is easier to code things this way.
+		    // This is likely the largest of such page size requirements.
+		    assert (page_list.first->data_len >= 3072);
+		    Byte * const msg = page_list.first->getData();
+
+		    Uint32 const client_version = (data [4] << 24) |
+						  (data [5] << 16) |
+						  (data [6] <<  8) |
+						  (data [7] <<  0);
+
+		    // 0 - for players before 10.0.32.18
+		    // 1 - for newer players
+		    int handshake_scheme = 0;
+		    if (client_version >= 0x80000302)
+			handshake_scheme = 1;
+
+		    {
+			Uint32 const time = getTimeMilliseconds ();
+//			Uint32 const time = getTime ();
+//			Uint32 const time = 0;
+			msg [0] = (time >>  0) & 0xff;
+			msg [1] = (time >>  8) & 0xff;
+			msg [2] = (time >> 16) & 0xff;
+			msg [3] = (time >> 24) & 0xff;
+		    }
+
+		    {
+			msg [4] = 3;
+			msg [5] = 0;
+			msg [6] = 2;
+			msg [7] = 1;
+		    }
+
+		    {
+		      // Generating some "random" data.
+			unsigned n = rand() % 3072;
+			for (unsigned i = 8; i < 3072 - 8; ++i) {
+			    n = (3072 + i + n) % 317;
+			    msg [i] = n;
+			}
+		    }
+
+		    {
+		      // Computing 32-byte validation code for S1.
+
+			Uint32 const server_digest_offs = getDigestOffset (msg, handshake_scheme);
+
+			Byte server_hash_buf [1536 - 32];
+			memcpy (server_hash_buf, msg, server_digest_offs);
+			memcpy (server_hash_buf + server_digest_offs,
+				msg + server_digest_offs + 32,
+				sizeof (server_hash_buf) - server_digest_offs);
+
+			hmac_sha256 (glob_fms_key, 36,
+				     server_hash_buf, sizeof (server_hash_buf),
+				     msg + server_digest_offs, 32);
+		    }
+
+		    {
+		      // Computing 32-byte validation code for S2.
+
+			Uint32 const client_digest_offs = getDigestOffset (data, handshake_scheme);
+
+			Byte hash_key [32];
+			hmac_sha256 (glob_fms_key, sizeof (glob_fms_key),
+				     const_cast <unsigned char*> (data + client_digest_offs), 32,
+				     hash_key, sizeof (hash_key));
+
+			hmac_sha256 (hash_key, sizeof (hash_key),
+				     msg + 1536, 1536 - 32,
+				     msg + (1536 * 2 - 32), sizeof (hash_key));
+		    }
+
+		    sendRawPages (page_list.first, 0 /* msg_offset */);
+		}
+
+
+#if 0
+// Old handshake code.
+		{
+		    PagePool::PageListHead page_list;
 		    page_pool->getPages (&page_list, 1536 /* len */);
 		    assert (page_list.first->data_len >= 1536);
 		    Byte * const msg_s2 = page_list.first->getData();
 		    memcpy (msg_s2, data, 4);
 		    memset (msg_s2 + 4, 0, 4);
+
 		    memcpy (msg_s2 + 8, data, 1536 - 8);
 		    sendRawPages (page_list.first, 0 /* msg_offset */);
 		}
+#endif
 
 		{
 		    data += 1536;
@@ -1798,7 +2073,7 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 #endif
 
 		    Size tofill = msg_left;
-		    assert (chunk_offset < tofill);
+		    assert (chunk_offset <= tofill);
 		    tofill -= chunk_offset;
 		    if (tofill > len)
 			tofill = len;
@@ -1810,6 +2085,9 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 			Uint32 const out_chunk_stream_id =
 				(recv_chunk_stream->in_msg_type_id == RtmpMessageType::AudioMessage ?
 					 DefaultAudioChunkStreamId : DefaultVideoChunkStreamId);
+			// TODO Prepare two prechunked variants for messages larger than 64KB (largest chunk size).
+			// One version for normal timestamps, the other for extended timestamps.
+			// The same applies to moment-gst.
 			fillPrechunkedPages (&recv_chunk_stream->in_prechunk_ctx,
 					     ConstMemory (data, tofill),
 					     page_pool,
@@ -1965,6 +2243,7 @@ RtmpConnection::startClient ()
 	msg_c1 [3] = (time >> 16) & 0xff;
 	msg_c1 [4] = (time >> 24) & 0xff;
     }
+
     memset (msg_c1 + 5, 0, 4);
     {
 	unsigned n = 0;
@@ -1991,11 +2270,27 @@ RtmpConnection::doConnect (MessageInfo * const mt_nonnull msg_info)
     sendUserControl_StreamBegin (0 /* msg_stream_id */);
 
     {
-	AmfAtom atoms [18];
+	AmfAtom atoms [19];
 	AmfEncoder encoder (atoms);
 
 	encoder.addString ("_result");
-	encoder.addNumber (1.0);
+	encoder.addNumber (1.0); // FIXME Incorrect transaction_id?
+	encoder.addNullObject ();
+
+	{
+	    encoder.beginObject ();
+
+	    encoder.addFieldName ("level");
+	    encoder.addString ("status");
+
+	    encoder.addFieldName ("code");
+	    encoder.addString ("NetConnection.Connect.Success");
+
+	    encoder.addFieldName ("description");
+	    encoder.addString ("Connection succeeded.");
+
+	    encoder.endObject ();
+	}
 
 	{
 	    encoder.beginObject ();
@@ -2013,22 +2308,7 @@ RtmpConnection::doConnect (MessageInfo * const mt_nonnull msg_info)
 	    encoder.endObject ();
 	}
 
-	{
-	    encoder.beginObject ();
-
-	    encoder.addFieldName ("level");
-	    encoder.addString ("status");
-
-	    encoder.addFieldName ("code");
-	    encoder.addString ("NetConnection.Connect.Success");
-
-	    encoder.addFieldName ("description");
-	    encoder.addString ("Connection succeded");
-
-	    encoder.endObject ();
-	}
-
-	Byte msg_buf [512];
+	Byte msg_buf [1024];
 	Size msg_len;
 	if (!encoder.encode (Memory::forObject (msg_buf), AmfEncoding::AMF0, &msg_len)) {
 	    logE_ (_func, "encode() failed");
@@ -2036,8 +2316,9 @@ RtmpConnection::doConnect (MessageInfo * const mt_nonnull msg_info)
 	}
 
 	sendCommandMessage_AMF0 (msg_info->msg_stream_id, ConstMemory (msg_buf, msg_len));
-	logD (send, _func, "msg_len: ", msg_len);
-	if (logLevelOn (send, LogLevel::Debug))
+
+	logD (proto_out, _func, "msg_len: ", msg_len);
+	if (logLevelOn (proto_out, LogLevel::Debug))
 	    hexdump (ConstMemory (msg_buf, msg_len));
     }
 
@@ -2173,6 +2454,17 @@ RtmpConnection::doDeleteStream (MessageInfo * mt_nonnull msg_info,
     return Result::Success;
 }
 
+Result
+RtmpConnection::fireVideoMessage (VideoStream::VideoMessageInfo * const video_msg_info,
+				  PagePool::PageListHead        * const page_list,
+				  Size                            const msg_len,
+				  Size                            const msg_offset)
+{
+    Result res = Result::Failure;
+    frontend.call_ret<Result> (&res, frontend->videoMessage, /*(*/ video_msg_info, page_list, msg_len, msg_offset /*)*/);
+    return res;
+}
+
 // Deprecated constructor
 RtmpConnection::RtmpConnection (Object     * const coderef_container,
 				Timers     * mt_nonnull const timers,
@@ -2193,6 +2485,9 @@ RtmpConnection::RtmpConnection (Object     * const coderef_container,
 
       in_chunk_size  (DefaultChunkSize),
       out_chunk_size (DefaultChunkSize),
+
+      out_got_first_timestamp (false),
+      out_first_timestamp (0),
 
       extended_timestamp_is_delta (false),
       ignore_extended_timestamp (false),
@@ -2241,6 +2536,9 @@ RtmpConnection::RtmpConnection (Object * const coderef_container)
 
       in_chunk_size  (DefaultChunkSize),
       out_chunk_size (DefaultChunkSize),
+
+      out_got_first_timestamp (false),
+      out_first_timestamp (0),
 
       extended_timestamp_is_delta (false),
       ignore_extended_timestamp (false),

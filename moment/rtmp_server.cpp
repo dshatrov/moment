@@ -43,7 +43,8 @@ RtmpServer::doPlay (RtmpConnection::MessageInfo * const mt_nonnull msg_info,
     }
     playing.set (1);
 
-    if (!decoder->decodeNumber (NULL /* ret_number */)) {
+    double transaction_id;
+    if (!decoder->decodeNumber (&transaction_id)) {
 	logE_ (_func, "could not decode transaction_id");
 	return Result::Failure;
     }
@@ -89,10 +90,109 @@ RtmpServer::doPlay (RtmpConnection::MessageInfo * const mt_nonnull msg_info,
     // TODO 
 
 //    if (!playing) {
-	// TODO send SetChunkSize
 	// TODO send StreamIsRecorded
+//        rtmp_conn->sendUserControl_StreamIsRecorded (msg_info->msg_stream_id);
 	rtmp_conn->sendUserControl_StreamBegin (msg_info->msg_stream_id);
 //    }
+
+    {
+      // Sending onStatus reply "Reset".
+
+	AmfAtom atoms [15];
+	AmfEncoder encoder (atoms);
+
+	encoder.addString ("onStatus");
+	encoder.addNumber (0.0 /* transaction_id */);
+	encoder.addNullObject ();
+
+	encoder.beginObject ();
+
+	encoder.addFieldName ("level");
+	encoder.addString ("status");
+
+	encoder.addFieldName ("code");
+	encoder.addString ("NetStream.Play.Reset");
+
+	Ref<String> description_str = makeString ("Playing and resetting ", ConstMemory (vs_name_buf, vs_name_len), ".");
+	encoder.addFieldName ("description");
+	encoder.addString (description_str->mem());
+
+	encoder.addFieldName ("details");
+	encoder.addString (ConstMemory (vs_name_buf, vs_name_len));
+
+	encoder.addFieldName ("clientid");
+	encoder.addNumber (1.0);
+
+	encoder.endObject ();
+
+	Byte msg_buf [4096];
+	Size msg_len;
+	if (!encoder.encode (Memory::forObject (msg_buf), AmfEncoding::AMF0, &msg_len)) {
+	    logE_ (_func, "could not encode onStatus message");
+	    return Result::Failure;
+	}
+
+	rtmp_conn->sendCommandMessage_AMF0 (msg_info->msg_stream_id, ConstMemory (msg_buf, msg_len));
+    }
+
+    {
+      // Sending onStatus reply "Start".
+
+	AmfAtom atoms [15];
+	AmfEncoder encoder (atoms);
+
+	encoder.addString ("onStatus");
+	encoder.addNumber (0.0 /* transaction_id */);
+	encoder.addNullObject ();
+
+	encoder.beginObject ();
+
+	encoder.addFieldName ("level");
+	encoder.addString ("status");
+
+	encoder.addFieldName ("code");
+	encoder.addString ("NetStream.Play.Start");
+
+	Ref<String> description_str = makeString ("Started playing ", ConstMemory (vs_name_buf, vs_name_len), ".");
+	encoder.addFieldName ("description");
+	encoder.addString (description_str->mem());
+
+	encoder.addFieldName ("details");
+	encoder.addString (ConstMemory (vs_name_buf, vs_name_len));
+
+	encoder.addFieldName ("clientid");
+	encoder.addNumber (1.0);
+
+	encoder.endObject ();
+
+	Byte msg_buf [4096];
+	Size msg_len;
+	if (!encoder.encode (Memory::forObject (msg_buf), AmfEncoding::AMF0, &msg_len)) {
+	    logE_ (_func, "could not encode onStatus message");
+	    return Result::Failure;
+	}
+
+	rtmp_conn->sendCommandMessage_AMF0 (msg_info->msg_stream_id, ConstMemory (msg_buf, msg_len));
+    }
+
+    {
+	AmfAtom atoms [4];
+	AmfEncoder encoder (atoms);
+
+	encoder.addString ("_result");
+	encoder.addNumber (transaction_id);
+	encoder.addNullObject ();
+	encoder.addNullObject ();
+
+	Byte msg_buf [512];
+	Size msg_len;
+	if (!encoder.encode (Memory::forObject (msg_buf), AmfEncoding::AMF0, &msg_len)) {
+	    logE_ (_func, "could not encode reply");
+	    return Result::Failure;
+	}
+
+	rtmp_conn->sendCommandMessage_AMF0 (msg_info->msg_stream_id, ConstMemory (msg_buf, msg_len));
+    }
 
     return Result::Success;
 }
@@ -110,7 +210,8 @@ RtmpServer::doPublish (RtmpConnection::MessageInfo * const mt_nonnull msg_info,
     }
     playing.set (1);
 
-    if (!decoder->decodeNumber (NULL /* ret_number */)) {
+    double transaction_id;
+    if (!decoder->decodeNumber (&transaction_id)) {
 	logE_ (_func, "could not decode transaction_id");
 	return Result::Failure;
     }
@@ -172,7 +273,7 @@ RtmpServer::doPublish (RtmpConnection::MessageInfo * const mt_nonnull msg_info,
 	AmfEncoder encoder (atoms);
 
 	encoder.addString ("_result");
-	encoder.addNumber (1.0 /* transaction_id */);
+	encoder.addNumber (transaction_id);
 	encoder.addNullObject ();
 	encoder.addNullObject ();
 
@@ -186,6 +287,7 @@ RtmpServer::doPublish (RtmpConnection::MessageInfo * const mt_nonnull msg_info,
 	rtmp_conn->sendCommandMessage_AMF0 (msg_info->msg_stream_id, ConstMemory (msg_buf, msg_len));
     }
 
+#if 0
     {
       // Sending onStatus reply.
 
@@ -207,32 +309,129 @@ RtmpServer::doPublish (RtmpConnection::MessageInfo * const mt_nonnull msg_info,
 
 	rtmp_conn->sendCommandMessage_AMF0 (msg_info->msg_stream_id, ConstMemory (msg_buf, msg_len));
     }
+#endif
+
+    {
+      // Sending onStatus reply "Reset".
+
+	AmfAtom atoms [15];
+	AmfEncoder encoder (atoms);
+
+	encoder.addString ("onStatus");
+	encoder.addNumber (0.0 /* transaction_id */);
+	encoder.addNullObject ();
+
+	encoder.beginObject ();
+
+	encoder.addFieldName ("level");
+	encoder.addString ("status");
+
+	encoder.addFieldName ("code");
+	encoder.addString ("NetStream.Play.Reset");
+
+	Ref<String> description_str = makeString ("Playing and resetting ", ConstMemory (vs_name_buf, vs_name_len), ".");
+	encoder.addFieldName ("description");
+	encoder.addString (description_str->mem());
+
+	encoder.addFieldName ("details");
+	encoder.addString (ConstMemory (vs_name_buf, vs_name_len));
+
+	encoder.addFieldName ("clientid");
+	encoder.addNumber (1.0);
+
+	encoder.endObject ();
+
+	Byte msg_buf [4096];
+	Size msg_len;
+	if (!encoder.encode (Memory::forObject (msg_buf), AmfEncoding::AMF0, &msg_len)) {
+	    logE_ (_func, "could not encode onStatus message");
+	    return Result::Failure;
+	}
+
+	rtmp_conn->sendCommandMessage_AMF0 (msg_info->msg_stream_id, ConstMemory (msg_buf, msg_len));
+    }
+
+    {
+      // Sending onStatus reply "Start".
+
+	AmfAtom atoms [15];
+	AmfEncoder encoder (atoms);
+
+	encoder.addString ("onStatus");
+	encoder.addNumber (0.0 /* transaction_id */);
+	encoder.addNullObject ();
+
+	encoder.beginObject ();
+
+	encoder.addFieldName ("level");
+	encoder.addString ("status");
+
+	encoder.addFieldName ("code");
+	encoder.addString ("NetStream.Play.Start");
+
+	Ref<String> description_str = makeString ("Started playing ", ConstMemory (vs_name_buf, vs_name_len), ".");
+	encoder.addFieldName ("description");
+	encoder.addString (description_str->mem());
+
+	encoder.addFieldName ("details");
+	encoder.addString (ConstMemory (vs_name_buf, vs_name_len));
+
+	encoder.addFieldName ("clientid");
+	encoder.addNumber (1.0);
+
+	encoder.endObject ();
+
+	Byte msg_buf [4096];
+	Size msg_len;
+	if (!encoder.encode (Memory::forObject (msg_buf), AmfEncoding::AMF0, &msg_len)) {
+	    logE_ (_func, "could not encode onStatus message");
+	    return Result::Failure;
+	}
+
+	rtmp_conn->sendCommandMessage_AMF0 (msg_info->msg_stream_id, ConstMemory (msg_buf, msg_len));
+    }
 
     return Result::Success;
 }
 
 void
-RtmpServer::sendVideoMessage (VideoStream::MessageInfo * const mt_nonnull msg_info,
-			      PagePool::PageListHead   * const mt_nonnull page_list,
-			      Size                       const msg_len)
+RtmpServer::sendVideoMessage (VideoStream::VideoMessageInfo * const mt_nonnull msg_info,
+			      PagePool::PageListHead        * const mt_nonnull page_list,
+			      Size                            const msg_len,
+			      Size                            const msg_offset)
 {
 //    logD (rtmp_server, _func);
+
+    // TODO Do not ignore RtmpClearMetaData.
+    if (msg_info->frame_type == VideoStream::VideoFrameType::RtmpClearMetaData)
+	return;
 
     RtmpConnection::MessageDesc mdesc;
     mdesc.timestamp = msg_info->timestamp;
 //    logD_ (_func, "timestamp: 0x", fmt_hex, msg_info->timestamp);
-    mdesc.msg_type_id = RtmpConnection::RtmpMessageType::VideoMessage;
+
+    RtmpConnection::ChunkStream *chunk_stream;
+    if (msg_info->frame_type == VideoStream::VideoFrameType::RtmpSetMetaData) {
+	mdesc.timestamp = 0;
+	mdesc.msg_type_id = RtmpConnection::RtmpMessageType::Data_AMF0;
+	chunk_stream = rtmp_conn->data_chunk_stream;
+    } else {
+	mdesc.msg_type_id = RtmpConnection::RtmpMessageType::VideoMessage;
+	chunk_stream = video_chunk_stream;
+    }
+
     mdesc.msg_stream_id = RtmpConnection::DefaultMessageStreamId;
     mdesc.msg_len = msg_len;
     mdesc.cs_hdr_comp = true;
 
-    rtmp_conn->sendMessagePages (&mdesc, video_chunk_stream, page_list, 0 /* msg_offset */, msg_info->prechunk_size);
+    rtmp_conn->sendMessagePages (&mdesc, chunk_stream, page_list, msg_offset, msg_info->prechunk_size);
 }
 
 void
-RtmpServer::sendAudioMessage (VideoStream::MessageInfo * const mt_nonnull msg_info,
-			      PagePool::PageListHead   * const mt_nonnull page_list,
-			      Size                       const msg_len)
+RtmpServer::sendAudioMessage (VideoStream::AudioMessageInfo * const mt_nonnull msg_info,
+			      PagePool::PageListHead        * const mt_nonnull page_list,
+			      Size                            const msg_len,
+			      Size                            const msg_offset)
 {
 //    logD (rtmp_server, _func);
 
@@ -243,14 +442,14 @@ RtmpServer::sendAudioMessage (VideoStream::MessageInfo * const mt_nonnull msg_in
     mdesc.msg_len = msg_len;
     mdesc.cs_hdr_comp = true;
 
-    rtmp_conn->sendMessagePages (&mdesc, audio_chunk_stream, page_list, 0 /* msg_offset */, msg_info->prechunk_size);
+    rtmp_conn->sendMessagePages (&mdesc, audio_chunk_stream, page_list, msg_offset, msg_info->prechunk_size);
 }
 
 Result
 RtmpServer::commandMessage (RtmpConnection::MessageInfo * const mt_nonnull msg_info,
 			    PagePool::PageListHead * const page_list,
 			    Size                     const msg_len,
-			    AmfEncoding              const amf_encoding)
+			    AmfEncoding              const /* amf_encoding */)
 {
     logD (rtmp_server, _func_);
 
@@ -306,6 +505,52 @@ RtmpServer::commandMessage (RtmpConnection::MessageInfo * const mt_nonnull msg_i
     } else
     if (!compare (method_mem, "publish")) {
 	return doPublish (msg_info, &decoder);
+    } else
+    if (!compare (method_mem, "@setDataFrame")) {
+#if 0
+	logD_ (_func, method_mem);
+
+	{
+	    PagePool::Page * const page = page_list->first;
+	    logD_ (_func, "page: 0x", fmt_hex, (UintPtr) page);
+	    if (page)
+		hexdump (logs, page->mem());
+	}
+#endif
+
+	Size const msg_offset = decoder.getCurOffset ();
+	assert (msg_offset <= msg_len);
+//	logD_ (_func, "msg_offset: ", msg_offset);
+
+	VideoStream::VideoMessageInfo video_msg_info;
+	video_msg_info.timestamp = msg_info->timestamp;
+	video_msg_info.prechunk_size = msg_info->prechunk_size;
+	video_msg_info.frame_type = VideoStream::VideoFrameType::RtmpSetMetaData;
+	video_msg_info.codec_id = VideoStream::VideoCodecId::Unknown;
+
+	return rtmp_conn->fireVideoMessage (&video_msg_info, page_list, msg_len - msg_offset, msg_offset);
+    } else
+    if (!compare (method_mem, "@clearDataFrame")) {
+#if 0
+	logD_ (_func, method_mem);
+
+	{
+	    PagePool::Page * const page = page_list->first;
+	    if (page)
+		hexdump (logs, page->mem());
+	}
+#endif
+
+	Size const msg_offset = decoder.getCurOffset ();
+	assert (msg_offset <= msg_len);
+
+	VideoStream::VideoMessageInfo video_msg_info;
+	video_msg_info.timestamp = msg_info->timestamp;
+	video_msg_info.prechunk_size = msg_info->prechunk_size;
+	video_msg_info.frame_type = VideoStream::VideoFrameType::RtmpClearMetaData;
+	video_msg_info.codec_id = VideoStream::VideoCodecId::Unknown;
+
+	return rtmp_conn->fireVideoMessage (&video_msg_info, page_list, msg_len - msg_offset, msg_offset);
     } else {
 	if (frontend && frontend->commandMessage) {
 	    CommandResult res;

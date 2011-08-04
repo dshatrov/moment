@@ -62,7 +62,12 @@ public:
 	    GeneratedKeyFrame,    // reserved for server use (according to FLV format spec.)
 	    CommandFrame,         // video info / command frame,
 	    AvcSequenceHeader,
-	    AvcEndOfSequence
+	    AvcEndOfSequence,
+
+	  // The following message types should be sent to clients as RTMP
+	  // command messages.
+	    RtmpSetMetaData,
+	    RtmpClearMetaData
 	};
 	operator Value () const { return value; }
 	VideoFrameType (Value const value) : value (value) {}
@@ -170,6 +175,11 @@ public:
     public:
       // Note that we ignore AVC composition time for now.
 
+	enum MessageType {
+	    VideoFrame,
+	    Metadata
+	};
+
 	VideoFrameType frame_type;
 	VideoCodecId codec_id;
 
@@ -190,12 +200,14 @@ public:
 			      PagePool               * mt_nonnull page_pool,
 			      PagePool::PageListHead * mt_nonnull page_list,
 			      Size                    msg_len,
+			      Size                    msg_offset,
 			      void                  *cb_data);
 
 	void (*videoMessage) (VideoMessageInfo       * mt_nonnull msg_info,
 			      PagePool               * mt_nonnull page_pool,
 			      PagePool::PageListHead * mt_nonnull page_list,
 			      Size                    msg_len,
+			      Size                    msg_offset,
 			      void                   *cb_data);
 
 	void (*rtmpCommandMessage) (RtmpConnection    * mt_nonnull conn,
@@ -219,6 +231,9 @@ private:
     mt_mutex (mutex) bool got_saved_keyframe;
     mt_mutex (mutex) SavedFrame saved_keyframe;
 
+    mt_mutex (mutex) bool got_saved_metadata;
+    mt_mutex (mutex) SavedFrame saved_metadata;
+
     Informer_<EventHandler> event_informer;
 
     static void informAudioMessage (EventHandler *event_handler,
@@ -238,6 +253,8 @@ private:
 			      void *inform_data);
 
 public:
+    // It is guaranteed that the informer can be controlled with
+    // VideoStream::lock/unlock() methods.
     Informer_<EventHandler>* getEventInformer ()
     {
 	return &event_informer;
@@ -246,12 +263,14 @@ public:
     void fireAudioMessage (AudioMessageInfo       * mt_nonnull msg_info,
 			   PagePool               * mt_nonnull page_pool,
 			   PagePool::PageListHead * mt_nonnull page_list,
-			   Size                    msg_len);
+			   Size                    msg_len,
+			   Size                    msg_offset);
 
     void fireVideoMessage (VideoMessageInfo       * mt_nonnull msg_info,
 			   PagePool               * mt_nonnull page_pool,
 			   PagePool::PageListHead * mt_nonnull page_list,
-			   Size                    msg_len);
+			   Size                    msg_len,
+			   Size                    msg_offset);
 
     void fireRtmpCommandMessage (RtmpConnection    * mt_nonnull conn,
 				 MessageInfo       * mt_nonnull msg_info,
@@ -260,7 +279,23 @@ public:
 
     void close ();
 
+    void lock ()
+    {
+	mutex.lock ();
+    }
+
+    void unlock ()
+    {
+	mutex.lock ();
+    }
+
     bool getSavedKeyframe (SavedFrame * mt_nonnull ret_frame);
+
+    bool getSavedKeyframe_unlocked (SavedFrame * mt_nonnull ret_frame);
+
+    bool getSavedMetaData (SavedFrame * mt_nonnull ref_frame);
+
+    bool getSavedMetaData_unlocked (SavedFrame * mt_nonnull ref_frame);
 
     VideoStream ();
 

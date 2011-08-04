@@ -81,11 +81,13 @@ private:
     static Result audioMessage (VideoStream::AudioMessageInfo * mt_nonnull msg_info,
 				PagePool::PageListHead        * mt_nonnull page_list,
 				Size                           msg_len,
+				Size                           msg_offset,
 				void                          *_self);
 
     static Result videoMessage (VideoStream::VideoMessageInfo * mt_nonnull msg_info,
 				PagePool::PageListHead        * mt_nonnull page_list,
 				Size                           msg_len,
+				Size                           msg_offset,
 				void                          *_self);
 
     static void closed (Exception *exc_,
@@ -146,7 +148,7 @@ RtmpClient::handshakeComplete (void * const _self)
 
     RtmpClient * const self = static_cast <RtmpClient*> (_self);
 
-    self->rtmp_conn.sendConnect ();
+    self->rtmp_conn.sendConnect ("oflaDemo");
     self->conn_state = ConnectionState_ConnectSent;
 
     return Result::Success;
@@ -159,7 +161,7 @@ RtmpClient::commandMessageCallback (RtmpConnection::MessageInfo * const mt_nonnu
 				    AmfEncoding                   const /* amf_encoding */,
 				    void                        * const _self)
 {
-    logD_ (_func, "ts: ", msg_info->timestamp);
+//    logD_ (_func, "ts: ", msg_info->timestamp);
 
     RtmpClient * const self = static_cast <RtmpClient*> (_self);
 
@@ -176,7 +178,7 @@ RtmpClient::commandMessageCallback (RtmpConnection::MessageInfo * const mt_nonnu
 	return Result::Failure;
     }
 
-    logD_ (_func, "method: ", ConstMemory (method_name, method_name_len));
+//    logD_ (_func, "method: ", ConstMemory (method_name, method_name_len));
 
     ConstMemory method (method_name, method_name_len);
     if (!compare (method, "_result")) {
@@ -219,13 +221,29 @@ RtmpClient::commandMessageCallback (RtmpConnection::MessageInfo * const mt_nonnu
 		;
 	}
     } else
-    if (!compare (method, "onMetaData") == 0) {
+    if (!compare (method, "onMetaData")) {
       // No-op
     } else
-    if (!compare (method, "onStatus") == 0) {
+    if (!compare (method, "onStatus")) {
       // No-op
+
+#if 0
+	{
+	    PagePool::Page * const page = page_list->first;
+	    if (page)
+		hexdump (logs, page->mem());
+	}
+#endif
     } else {
 	logW_ (_func, "unknown method: ", method);
+
+#if 0
+	{
+	    PagePool::Page * const page = page_list->first;
+	    if (page)
+		hexdump (logs, page->mem());
+	}
+#endif
     }
 
     return Result::Success;
@@ -235,6 +253,7 @@ Result
 RtmpClient::audioMessage (VideoStream::AudioMessageInfo * const mt_nonnull /* msg_info */,
 			  PagePool::PageListHead        * const mt_nonnull /* page_list */,
 			  Size                            const /* msg_len */,
+			  Size                            const /* msg_offset */,
 			  void                          * const /* _self */)
 {
 //    logD_ (_func, "ts: ", msg_info->timestamp);
@@ -245,6 +264,7 @@ Result
 RtmpClient::videoMessage (VideoStream::VideoMessageInfo * const mt_nonnull /* msg_info */,
 			  PagePool::PageListHead        * const mt_nonnull /* page_list */,
 			  Size                            const /* msg_len */,
+			  Size                            const /* msg_offset */,
 			  void                          * const _self)
 {
 //    logD_ (_func, "0x", fmt_hex, (UintPtr) _self, ", ts: ", fmt_def, msg_info->timestamp);
@@ -330,7 +350,7 @@ Result doTest (void)
 
     IpAddress addr = options.server_addr;
     if (!options.got_server_addr) {
-	if (!setIpAddress ("localhost:8083", &addr)) {
+	if (!setIpAddress ("localhost:1935", &addr)) {
 	    logE_ (_func, "setIpAddress() failed");
 	    return Result::Failure;
 	}
@@ -407,8 +427,13 @@ bool cmdline_server_addr (char const * /* short_name */,
 			  void       * /* opt_data */,
 			  void       * /* cb_data */)
 {
-    if (!setIpAddress (ConstMemory (value, strlen (value)), &options.server_addr)) {
-	logE_ (_func, "Invalid value \"", value, "\""
+    if (!setIpAddress_default (ConstMemory (value, strlen (value)),
+			       ConstMemory(),
+			       1935  /* default_port */,
+			       false /* allow_any_host */,
+			       &options.server_addr))
+    {
+	logE_ (_func, "Invalid value \"", value, "\" "
 	       "for --server-addr (IP:PORT expected)");
 	exit (EXIT_FAILURE);
     }
