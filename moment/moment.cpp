@@ -172,8 +172,13 @@ int main (int argc, char **argv)
 	    logD_ (_func, opt_name, ": ", http_bind);
 	    if (!http_bind.isNull ()) {
 		IpAddress addr;
-		if (!setIpAddress (http_bind, &addr)) {
-		    logE_ (_func, "setIpAddress() failed (http)");
+		if (!setIpAddress_default (http_bind,
+					   ConstMemory() /* default_host */,
+					   8080          /* default_port */,
+					   true          /* allow_any_host */,
+					   &addr))
+		{
+		    logE_ (_func, "setIpAddress_default() failed (http)");
 		    return EXIT_FAILURE;
 		}
 
