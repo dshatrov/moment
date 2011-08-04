@@ -80,8 +80,8 @@ PagePool *page_pool = NULL;
 
 Result httpRequest (HttpRequest  * const mt_nonnull req,
 		    Sender       * const mt_nonnull conn_sender,
-		    Memory const &msg_body,
-		    void        ** const mt_nonnull ret_msg_data,
+		    Memory const & /* msg_body */,
+		    void        ** const mt_nonnull /* ret_msg_data */,
 		    void         * const _path_entry)
 {
     PathEntry * const path_entry = static_cast <PathEntry*> (_path_entry);
@@ -320,7 +320,7 @@ void momentFileInit ()
     logD_ (_func_);
 
     MomentServer * const moment = MomentServer::getInstance();
-    ServerApp * const server_app = moment->getServerApp();
+//    ServerApp * const server_app = moment->getServerApp();
     MConfig::Config * const config = moment->getConfig();
     HttpService * const http_service = moment->getHttpService ();
 
