@@ -84,6 +84,9 @@ AmfEncoder::encode (Memory          const &mem,
 		cur_pos += 3 + atom.string.len;
 		break;
 
+#if 0
+// Replaced with AmfAtom::Null
+
 	    case AmfAtom::NullObject:
 		if (buf_len - cur_pos >= 4) {
 		    buf [cur_pos + 0] = AmfMarker::Object;
@@ -96,6 +99,7 @@ AmfEncoder::encode (Memory          const &mem,
 
 		cur_pos += 4;
 		break;
+#endif
 
 	    case AmfAtom::BeginObject:
 		if (buf_len - cur_pos >= 1) {
@@ -131,6 +135,7 @@ AmfEncoder::encode (Memory          const &mem,
 		cur_pos += 2 + atom.string.len;
 		break;
 
+	    case AmfAtom::NullObject:
 	    case AmfAtom::Null:
 		if (buf_len - cur_pos >= 1) {
 		    buf [cur_pos] = AmfMarker::Null;
