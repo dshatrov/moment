@@ -446,11 +446,12 @@ RtmpServer::sendAudioMessage (VideoStream::AudioMessageInfo * const mt_nonnull m
 }
 
 void
-RtmpServer::sendInitialMessages_unlocked (VideoStream * const mt_nonnull video_stream)
+RtmpServer::sendInitialMessages_unlocked (VideoStream::FrameSaver * const mt_nonnull frame_saver)
 {
     VideoStream::SavedFrame saved_frame;
 
-    if (video_stream->getSavedMetaData_unlocked (&saved_frame)) {
+    if (frame_saver->getSavedMetaData (&saved_frame)) {
+	saved_frame.msg_info.timestamp = 0;
 	sendVideoMessage (&saved_frame.msg_info,
 			  &saved_frame.page_list,
 			  saved_frame.msg_len,
@@ -458,7 +459,8 @@ RtmpServer::sendInitialMessages_unlocked (VideoStream * const mt_nonnull video_s
 	saved_frame.page_pool->msgUnref (saved_frame.page_list.first);
     }
 
-    if (video_stream->getSavedAvcSeqHdr_unlocked (&saved_frame)) {
+    if (frame_saver->getSavedAvcSeqHdr (&saved_frame)) {
+	saved_frame.msg_info.timestamp = 0;
 	sendVideoMessage (&saved_frame.msg_info,
 			  &saved_frame.page_list,
 			  saved_frame.msg_len,
@@ -466,7 +468,8 @@ RtmpServer::sendInitialMessages_unlocked (VideoStream * const mt_nonnull video_s
 	saved_frame.page_pool->msgUnref (saved_frame.page_list.first);
     }
 
-    if (video_stream->getSavedKeyframe_unlocked (&saved_frame)) {
+    if (frame_saver->getSavedKeyframe (&saved_frame)) {
+	saved_frame.msg_info.timestamp = 0;
 	sendVideoMessage (&saved_frame.msg_info,
 			  &saved_frame.page_list,
 			  saved_frame.msg_len,

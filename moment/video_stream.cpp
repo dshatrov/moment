@@ -300,6 +300,61 @@ VideoStream::VideoCodecId::toFlvCodecId () const
     return 0;
 }
 
+bool
+VideoStream::FrameSaver::getSavedKeyframe (SavedFrame * const mt_nonnull ret_frame)
+{
+    if (!got_saved_keyframe)
+	return false;
+
+    saved_keyframe.page_pool->msgRef (saved_keyframe.page_list.first);
+    *ret_frame = saved_keyframe;
+
+    return true;
+}
+
+bool
+VideoStream::FrameSaver::getSavedMetaData (SavedFrame * const mt_nonnull ret_frame)
+{
+    if (!got_saved_metadata)
+	return false;
+
+    saved_metadata.page_pool->msgRef (saved_metadata.page_list.first);
+    *ret_frame = saved_metadata;
+
+    return true;
+}
+
+bool
+VideoStream::FrameSaver::getSavedAvcSeqHdr (SavedFrame * const mt_nonnull ret_frame)
+{
+    if (!got_saved_avc_seq_hdr)
+	return false;
+
+    saved_avc_seq_hdr.page_pool->msgRef (saved_avc_seq_hdr.page_list.first);
+    *ret_frame = saved_avc_seq_hdr;
+
+    return true;
+}
+
+VideoStream::FrameSaver::FrameSaver ()
+    : got_saved_keyframe (false),
+      got_saved_metadata (false),
+      got_saved_avc_seq_hdr (false)
+{
+}
+
+VideoStream::FrameSaver::~FrameSaver ()
+{
+    if (got_saved_keyframe)
+	saved_keyframe.page_pool->msgUnref (saved_keyframe.page_list.first);
+
+    if (got_saved_metadata)
+	saved_metadata.page_pool->msgUnref (saved_metadata.page_list.first);
+
+    if (got_saved_avc_seq_hdr)
+	saved_avc_seq_hdr.page_pool->msgUnref (saved_avc_seq_hdr.page_list.first);
+}
+
 namespace {
     struct InformAudioMessage_Data {
 	VideoStream::AudioMessageInfo *msg_info;
@@ -435,93 +490,14 @@ VideoStream::fireVideoMessage (VideoMessageInfo       * const mt_nonnull msg_inf
 			       Size                     const msg_len,
 			       Size                     const msg_offset)
 {
-    bool saved_a_frame = false;
+    mutex.lock ();
 
-    switch (msg_info->frame_type) {
-	case VideoFrameType::KeyFrame: {
-	    mutex.lock ();
-
-	    if (got_saved_keyframe)
-		saved_keyframe.page_pool->msgUnref (saved_keyframe.page_list.first);
-
-	    got_saved_keyframe = true;
-	    saved_keyframe.msg_info = *msg_info;
-	    saved_keyframe.page_pool = page_pool;
-	    saved_keyframe.page_list = *page_list;
-	    saved_keyframe.msg_len = msg_len;
-	    saved_keyframe.msg_offset = msg_offset;
-
-	    page_pool->msgRef (page_list->first);
-
-	    saved_a_frame = true;
-	} break;
-	case VideoFrameType::AvcSequenceHeader: {
-	    mutex.lock ();
-
-	    if (got_saved_avc_seq_hdr)
-		saved_avc_seq_hdr.page_pool->msgUnref (saved_avc_seq_hdr.page_list.first);
-
-	    got_saved_avc_seq_hdr = true;
-	    saved_avc_seq_hdr.msg_info = *msg_info;
-	    saved_avc_seq_hdr.page_pool = page_pool;
-	    saved_avc_seq_hdr.page_list = *page_list;
-	    saved_avc_seq_hdr.msg_len = msg_len;
-	    saved_avc_seq_hdr.msg_offset = msg_offset;
-
-	    page_pool->msgRef (page_list->first);
-
-	    saved_a_frame = true;
-	} break;
-	case VideoFrameType::AvcEndOfSequence: {
-	    mutex.lock ();
-
-	    if (got_saved_avc_seq_hdr)
-		saved_avc_seq_hdr.page_pool->msgUnref (saved_avc_seq_hdr.page_list.first);
-
-	    got_saved_avc_seq_hdr = false;
-
-	    mutex.unlock ();
-	} break;
-	case VideoFrameType::RtmpSetMetaData: {
-	    mutex.lock ();
-
-	    if (got_saved_metadata)
-		saved_metadata.page_pool->msgUnref (saved_metadata.page_list.first);
-
-	    got_saved_metadata = true;
-	    saved_metadata.msg_info = *msg_info;
-	    saved_metadata.page_pool = page_pool;
-	    saved_metadata.page_list = *page_list;
-	    saved_metadata.msg_len = msg_len;
-	    saved_metadata.msg_offset = msg_offset;
-
-	    page_pool->msgRef (page_list->first);
-
-	    saved_a_frame = true;
-	} break;
-	case VideoFrameType::RtmpClearMetaData: {
-	    mutex.lock ();
-
-	    if (got_saved_metadata)
-		saved_metadata.page_pool->msgUnref (saved_metadata.page_list.first);
-
-	    got_saved_metadata = false;
-
-	    mutex.unlock ();
-	} break;
-	default:
-	  // No-op
-	    ;
-    }
+    frame_saver.processVideoFrame (msg_info, page_pool, page_list, msg_len, msg_offset);
 
     InformVideoMessage_Data inform_data (msg_info, page_pool, page_list, msg_len, msg_offset);
+    event_informer.informAll_unlocked (informVideoMessage, &inform_data);
 
-    if (saved_a_frame) {
-	event_informer.informAll_unlocked (informVideoMessage, &inform_data);
-	mutex.unlock ();
-    } else {
-	event_informer.informAll (informVideoMessage, &inform_data);
-    }
+    mutex.unlock ();
 }
 
 void
@@ -540,83 +516,80 @@ VideoStream::close ()
     event_informer.informAll (informClosed, NULL /* inform_data */);
 }
 
-bool
-VideoStream::getSavedKeyframe (SavedFrame * const mt_nonnull ret_frame)
+void
+VideoStream::FrameSaver::processVideoFrame (VideoMessageInfo       * const mt_nonnull msg_info,
+					    PagePool               * const mt_nonnull page_pool,
+					    PagePool::PageListHead * const mt_nonnull page_list,
+					    Size                     const msg_len,
+					    Size                     const msg_offset)
 {
-  StateMutexLock l (&mutex);
-    return getSavedKeyframe_unlocked (ret_frame);
-}
+    switch (msg_info->frame_type) {
+	case VideoFrameType::KeyFrame: {
+	    if (got_saved_keyframe)
+		saved_keyframe.page_pool->msgUnref (saved_keyframe.page_list.first);
 
-bool
-VideoStream::getSavedKeyframe_unlocked (SavedFrame * const mt_nonnull ret_frame)
-{
-    if (!got_saved_keyframe)
-	return false;
+	    got_saved_keyframe = true;
+	    saved_keyframe.msg_info = *msg_info;
+	    saved_keyframe.page_pool = page_pool;
+	    saved_keyframe.page_list = *page_list;
+	    saved_keyframe.msg_len = msg_len;
+	    saved_keyframe.msg_offset = msg_offset;
 
-    saved_keyframe.page_pool->msgRef (saved_keyframe.page_list.first);
-    *ret_frame = saved_keyframe;
+	    page_pool->msgRef (page_list->first);
+	} break;
+	case VideoFrameType::AvcSequenceHeader: {
+	    if (got_saved_avc_seq_hdr)
+		saved_avc_seq_hdr.page_pool->msgUnref (saved_avc_seq_hdr.page_list.first);
 
-    return true;
-}
+	    got_saved_avc_seq_hdr = true;
+	    saved_avc_seq_hdr.msg_info = *msg_info;
+	    saved_avc_seq_hdr.page_pool = page_pool;
+	    saved_avc_seq_hdr.page_list = *page_list;
+	    saved_avc_seq_hdr.msg_len = msg_len;
+	    saved_avc_seq_hdr.msg_offset = msg_offset;
 
-bool
-VideoStream::getSavedMetaData (SavedFrame * const mt_nonnull ret_frame)
-{
-  StateMutexLock l (&mutex);
-    return getSavedMetaData_unlocked (ret_frame);
-}
+	    page_pool->msgRef (page_list->first);
+	} break;
+	case VideoFrameType::AvcEndOfSequence: {
+	    if (got_saved_avc_seq_hdr)
+		saved_avc_seq_hdr.page_pool->msgUnref (saved_avc_seq_hdr.page_list.first);
 
-bool
-VideoStream::getSavedMetaData_unlocked (SavedFrame * const mt_nonnull ret_frame)
-{
-    if (!got_saved_metadata)
-	return false;
+	    got_saved_avc_seq_hdr = false;
+	} break;
+	case VideoFrameType::RtmpSetMetaData: {
+	    if (got_saved_metadata)
+		saved_metadata.page_pool->msgUnref (saved_metadata.page_list.first);
 
-    saved_metadata.page_pool->msgRef (saved_metadata.page_list.first);
-    *ret_frame = saved_metadata;
+	    got_saved_metadata = true;
+	    saved_metadata.msg_info = *msg_info;
+	    saved_metadata.page_pool = page_pool;
+	    saved_metadata.page_list = *page_list;
+	    saved_metadata.msg_len = msg_len;
+	    saved_metadata.msg_offset = msg_offset;
 
-    return true;
-}
+	    page_pool->msgRef (page_list->first);
+	} break;
+	case VideoFrameType::RtmpClearMetaData: {
+	    if (got_saved_metadata)
+		saved_metadata.page_pool->msgUnref (saved_metadata.page_list.first);
 
-bool
-VideoStream::getSavedAvcSeqHdr (SavedFrame * const mt_nonnull ret_frame)
-{
-  StateMutexLock l (&mutex);
-    return getSavedAvcSeqHdr_unlocked (ret_frame);
-}
-
-bool
-VideoStream::getSavedAvcSeqHdr_unlocked (SavedFrame * const mt_nonnull ret_frame)
-{
-    if (!got_saved_avc_seq_hdr)
-	return false;
-
-    saved_avc_seq_hdr.page_pool->msgRef (saved_avc_seq_hdr.page_list.first);
-    *ret_frame = saved_avc_seq_hdr;
-
-    return true;
+	    got_saved_metadata = false;
+	} break;
+	default:
+	  // No-op
+	    ;
+    }
 }
 
 VideoStream::VideoStream ()
-    : got_saved_keyframe (false),
-      got_saved_metadata (false),
-      got_saved_avc_seq_hdr (false),
-      event_informer (this, &mutex)
+    : event_informer (this, &mutex)
 {
 }
 
 VideoStream::~VideoStream ()
 {
+  // This lock ensures data consistency for 'frame_saver's destructor.
   StateMutexLock l (&mutex);
-
-    if (got_saved_keyframe)
-	saved_keyframe.page_pool->msgUnref (saved_keyframe.page_list.first);
-
-    if (got_saved_metadata)
-	saved_metadata.page_pool->msgUnref (saved_metadata.page_list.first);
-
-    if (got_saved_avc_seq_hdr)
-	saved_avc_seq_hdr.page_pool->msgUnref (saved_avc_seq_hdr.page_list.first);
 }
 
 }

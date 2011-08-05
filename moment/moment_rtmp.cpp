@@ -286,7 +286,7 @@ Result startWatching (ConstMemory const &stream_name,
 #endif
 
     video_stream->lock ();
-    client_session->rtmp_server.sendInitialMessages_unlocked (video_stream);
+    client_session->rtmp_server.sendInitialMessages_unlocked (video_stream->getFrameSaver());
     video_stream->getEventInformer()->subscribe_unlocked (&video_event_handler, client_session, NULL /* ref_data */, client_session);
     video_stream->unlock ();
 

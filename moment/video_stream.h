@@ -228,19 +228,38 @@ public:
 	Size msg_offset;
     };
 
-    class FrameSaver
+    mt_unsafe class FrameSaver
     {
+    private:
+	bool got_saved_keyframe;
+	SavedFrame saved_keyframe;
+
+	bool got_saved_metadata;
+	SavedFrame saved_metadata;
+
+	bool got_saved_avc_seq_hdr;
+	SavedFrame saved_avc_seq_hdr;
+
+    public:
+	void processVideoFrame (VideoMessageInfo       * mt_nonnull msg_info,
+				PagePool               * mt_nonnull page_pool,
+				PagePool::PageListHead * mt_nonnull page_list,
+				Size                    msg_len,
+				Size                    msg_offset);
+
+	bool getSavedKeyframe (SavedFrame * mt_nonnull ret_frame);
+
+	bool getSavedMetaData (SavedFrame * mt_nonnull ret_frame);
+
+	bool getSavedAvcSeqHdr (SavedFrame * mt_nonnull ret_frame);
+
+	FrameSaver ();
+
+	~FrameSaver ();
     };
 
 private:
-    mt_mutex (mutex) bool got_saved_keyframe;
-    mt_mutex (mutex) SavedFrame saved_keyframe;
-
-    mt_mutex (mutex) bool got_saved_metadata;
-    mt_mutex (mutex) SavedFrame saved_metadata;
-
-    mt_mutex (mutex) bool got_saved_avc_seq_hdr;
-    mt_mutex (mutex) SavedFrame saved_avc_seq_hdr;
+    mt_mutex (mutex) FrameSaver frame_saver;
 
     Informer_<EventHandler> event_informer;
 
@@ -261,6 +280,12 @@ private:
 			      void *inform_data);
 
 public:
+    // Returned FrameSaver must be synchronized manually with VideoStream::lock/unlock().
+    FrameSaver* getFrameSaver ()
+    {
+	return &frame_saver;
+    }
+
     // It is guaranteed that the informer can be controlled with
     // VideoStream::lock/unlock() methods.
     Informer_<EventHandler>* getEventInformer ()
@@ -294,20 +319,8 @@ public:
 
     void unlock ()
     {
-	mutex.lock ();
+	mutex.unlock ();
     }
-
-    bool getSavedKeyframe (SavedFrame * mt_nonnull ret_frame);
-
-    bool getSavedKeyframe_unlocked (SavedFrame * mt_nonnull ret_frame);
-
-    bool getSavedMetaData (SavedFrame * mt_nonnull ret_frame);
-
-    bool getSavedMetaData_unlocked (SavedFrame * mt_nonnull ret_frame);
-
-    bool getSavedAvcSeqHdr (SavedFrame * mt_nonnull ret_frame);
-
-    bool getSavedAvcSeqHdr_unlocked (SavedFrame * mt_nonnull ret_frame);
 
     VideoStream ();
 
