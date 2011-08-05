@@ -63,7 +63,6 @@ public:
 	    CommandFrame,         // video info / command frame,
 	    AvcSequenceHeader,
 	    AvcEndOfSequence,
-
 	  // The following message types should be sent to clients as RTMP
 	  // command messages.
 	    RtmpSetMetaData,

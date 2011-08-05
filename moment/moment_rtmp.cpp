@@ -22,9 +22,9 @@
 #include <moment/libmoment.h>
 
 
-//#define MOMENT_RTMP__WAIT_FOR_KEYFRAME
-//#define MOMENT_RTMP__AUDIO_WAITS_VIDEO
-//#define MOMENT_RTMP__FLOW_CONTROL
+#define MOMENT_RTMP__WAIT_FOR_KEYFRAME
+#define MOMENT_RTMP__AUDIO_WAITS_VIDEO
+#define MOMENT_RTMP__FLOW_CONTROL
 
 
 namespace Moment {
@@ -179,7 +179,12 @@ void streamVideoMessage (VideoStream::VideoMessageInfo * const mt_nonnull msg_in
     client_session->mutex.lock ();
 
 #ifdef MOMENT_RTMP__FLOW_CONTROL
-    if (client_session->overloaded) {
+    if (client_session->overloaded
+	&& (   msg_info->frame_type != VideoStream::VideoFrameType::KeyFrame
+	    || msg_info->frame_type != VideoStream::VideoFrameType::InterFrame
+	    || msg_info->frame_type != VideoStream::VideoFrameType::DisposableInterFrame
+	    || msg_info->frame_type != VideoStream::VideoFrameType::GeneratedKeyFrame))
+    {
       // Connection overloaded, dropping this video frame. In general, we'll
       // have to wait for the next keyframe after we've dropped a frame.
       // We do not care about disposable frames yet.
@@ -202,7 +207,7 @@ void streamVideoMessage (VideoStream::VideoMessageInfo * const mt_nonnull msg_in
 
 #ifdef MOMENT_RTMP__WAIT_FOR_KEYFRAME
     bool got_keyframe = false;
-    if (msg_info->is_keyframe) {
+    if (msg_info->frame_type == VideoStream::VideoFrameType::KeyFrame) {
 	got_keyframe = true;
     } else
     if (!client_session->keyframe_sent) {
