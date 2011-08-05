@@ -67,33 +67,23 @@ RtmpServer::doPlay (RtmpConnection::MessageInfo * const mt_nonnull msg_info,
     }
 
     {
-	Result res;
-	if (!frontend.call_ret<Result> (&res, frontend->startWatching, /*(*/ ConstMemory (vs_name_buf, vs_name_len) /*)*/)) {
-	    logE_ (_func, "frontend gone");
+	AmfAtom atoms [4];
+	AmfEncoder encoder (atoms);
+
+	encoder.addString ("_result");
+	encoder.addNumber (transaction_id);
+	encoder.addNullObject ();
+	encoder.addNullObject ();
+
+	Byte msg_buf [512];
+	Size msg_len;
+	if (!encoder.encode (Memory::forObject (msg_buf), AmfEncoding::AMF0, &msg_len)) {
+	    logE_ (_func, "could not encode reply");
 	    return Result::Failure;
 	}
 
-	if (!res) {
-	    logE_ (_func, "frontend->startWatching() failed");
-	    return Result::Failure;
-	}
+	rtmp_conn->sendCommandMessage_AMF0 (msg_info->msg_stream_id, ConstMemory (msg_buf, msg_len));
     }
-
-#if 0
-    if (!video_stream) {
-	logE_ (_func, "could not find video stream");
-	// TODO sendSimpleError? (No reply required for play?)
-	return Result::Success;
-    }
-#endif
-
-    // TODO 
-
-//    if (!playing) {
-	// TODO send StreamIsRecorded
-//        rtmp_conn->sendUserControl_StreamIsRecorded (msg_info->msg_stream_id);
-	rtmp_conn->sendUserControl_StreamBegin (msg_info->msg_stream_id);
-//    }
 
     {
       // Sending onStatus reply "Reset".
@@ -136,6 +126,35 @@ RtmpServer::doPlay (RtmpConnection::MessageInfo * const mt_nonnull msg_info,
     }
 
     {
+	Result res;
+	if (!frontend.call_ret<Result> (&res, frontend->startWatching, /*(*/ ConstMemory (vs_name_buf, vs_name_len) /*)*/)) {
+	    logE_ (_func, "frontend gone");
+	    return Result::Failure;
+	}
+
+	if (!res) {
+	    logE_ (_func, "frontend->startWatching() failed");
+	    return Result::Failure;
+	}
+    }
+
+#if 0
+    if (!video_stream) {
+	logE_ (_func, "could not find video stream");
+	// TODO sendSimpleError? (No reply required for play?)
+	return Result::Success;
+    }
+#endif
+
+    // TODO 
+
+//    if (!playing) {
+	// TODO send StreamIsRecorded
+//        rtmp_conn->sendUserControl_StreamIsRecorded (msg_info->msg_stream_id);
+	rtmp_conn->sendUserControl_StreamBegin (msg_info->msg_stream_id);
+//    }
+
+    {
       // Sending onStatus reply "Start".
 
 	AmfAtom atoms [15];
@@ -169,25 +188,6 @@ RtmpServer::doPlay (RtmpConnection::MessageInfo * const mt_nonnull msg_info,
 	Size msg_len;
 	if (!encoder.encode (Memory::forObject (msg_buf), AmfEncoding::AMF0, &msg_len)) {
 	    logE_ (_func, "could not encode onStatus message");
-	    return Result::Failure;
-	}
-
-	rtmp_conn->sendCommandMessage_AMF0 (msg_info->msg_stream_id, ConstMemory (msg_buf, msg_len));
-    }
-
-    {
-	AmfAtom atoms [4];
-	AmfEncoder encoder (atoms);
-
-	encoder.addString ("_result");
-	encoder.addNumber (transaction_id);
-	encoder.addNullObject ();
-	encoder.addNullObject ();
-
-	Byte msg_buf [512];
-	Size msg_len;
-	if (!encoder.encode (Memory::forObject (msg_buf), AmfEncoding::AMF0, &msg_len)) {
-	    logE_ (_func, "could not encode reply");
 	    return Result::Failure;
 	}
 
