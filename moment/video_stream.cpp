@@ -300,6 +300,83 @@ VideoStream::VideoCodecId::toFlvCodecId () const
     return 0;
 }
 
+void
+VideoStream::FrameSaver::processVideoFrame (VideoMessageInfo       * const mt_nonnull msg_info,
+					    PagePool               * const mt_nonnull page_pool,
+					    PagePool::PageListHead * const mt_nonnull page_list,
+					    Size                     const msg_len,
+					    Size                     const msg_offset)
+{
+    logD_ (_func, "0x", fmt_hex, (UintPtr) this);
+
+    switch (msg_info->frame_type) {
+	case VideoFrameType::KeyFrame: {
+	    logD_ (_func, msg_info->frame_type);
+
+	    if (got_saved_keyframe)
+		saved_keyframe.page_pool->msgUnref (saved_keyframe.page_list.first);
+
+	    got_saved_keyframe = true;
+	    saved_keyframe.msg_info = *msg_info;
+	    saved_keyframe.page_pool = page_pool;
+	    saved_keyframe.page_list = *page_list;
+	    saved_keyframe.msg_len = msg_len;
+	    saved_keyframe.msg_offset = msg_offset;
+
+	    page_pool->msgRef (page_list->first);
+	} break;
+	case VideoFrameType::AvcSequenceHeader: {
+	    logD_ (_func, msg_info->frame_type);
+
+	    if (got_saved_avc_seq_hdr)
+		saved_avc_seq_hdr.page_pool->msgUnref (saved_avc_seq_hdr.page_list.first);
+
+	    got_saved_avc_seq_hdr = true;
+	    saved_avc_seq_hdr.msg_info = *msg_info;
+	    saved_avc_seq_hdr.page_pool = page_pool;
+	    saved_avc_seq_hdr.page_list = *page_list;
+	    saved_avc_seq_hdr.msg_len = msg_len;
+	    saved_avc_seq_hdr.msg_offset = msg_offset;
+
+	    page_pool->msgRef (page_list->first);
+	} break;
+	case VideoFrameType::AvcEndOfSequence: {
+	    logD_ (_func, msg_info->frame_type);
+
+	    if (got_saved_avc_seq_hdr)
+		saved_avc_seq_hdr.page_pool->msgUnref (saved_avc_seq_hdr.page_list.first);
+
+	    got_saved_avc_seq_hdr = false;
+	} break;
+	case VideoFrameType::RtmpSetMetaData: {
+	    logD_ (_func, msg_info->frame_type);
+
+	    if (got_saved_metadata)
+		saved_metadata.page_pool->msgUnref (saved_metadata.page_list.first);
+
+	    got_saved_metadata = true;
+	    saved_metadata.msg_info = *msg_info;
+	    saved_metadata.page_pool = page_pool;
+	    saved_metadata.page_list = *page_list;
+	    saved_metadata.msg_len = msg_len;
+	    saved_metadata.msg_offset = msg_offset;
+
+	    page_pool->msgRef (page_list->first);
+	} break;
+	case VideoFrameType::RtmpClearMetaData: {
+	    logD_ (_func, msg_info->frame_type);
+
+	    if (got_saved_metadata)
+		saved_metadata.page_pool->msgUnref (saved_metadata.page_list.first);
+
+	    got_saved_metadata = false;
+	} break;
+	default:
+	  // No-op
+	    ;
+    }
+}
+
 bool
 VideoStream::FrameSaver::getSavedKeyframe (SavedFrame * const mt_nonnull ret_frame)
 {
@@ -514,71 +591,6 @@ void
 VideoStream::close ()
 {
     event_informer.informAll (informClosed, NULL /* inform_data */);
-}
-
-void
-VideoStream::FrameSaver::processVideoFrame (VideoMessageInfo       * const mt_nonnull msg_info,
-					    PagePool               * const mt_nonnull page_pool,
-					    PagePool::PageListHead * const mt_nonnull page_list,
-					    Size                     const msg_len,
-					    Size                     const msg_offset)
-{
-    switch (msg_info->frame_type) {
-	case VideoFrameType::KeyFrame: {
-	    if (got_saved_keyframe)
-		saved_keyframe.page_pool->msgUnref (saved_keyframe.page_list.first);
-
-	    got_saved_keyframe = true;
-	    saved_keyframe.msg_info = *msg_info;
-	    saved_keyframe.page_pool = page_pool;
-	    saved_keyframe.page_list = *page_list;
-	    saved_keyframe.msg_len = msg_len;
-	    saved_keyframe.msg_offset = msg_offset;
-
-	    page_pool->msgRef (page_list->first);
-	} break;
-	case VideoFrameType::AvcSequenceHeader: {
-	    if (got_saved_avc_seq_hdr)
-		saved_avc_seq_hdr.page_pool->msgUnref (saved_avc_seq_hdr.page_list.first);
-
-	    got_saved_avc_seq_hdr = true;
-	    saved_avc_seq_hdr.msg_info = *msg_info;
-	    saved_avc_seq_hdr.page_pool = page_pool;
-	    saved_avc_seq_hdr.page_list = *page_list;
-	    saved_avc_seq_hdr.msg_len = msg_len;
-	    saved_avc_seq_hdr.msg_offset = msg_offset;
-
-	    page_pool->msgRef (page_list->first);
-	} break;
-	case VideoFrameType::AvcEndOfSequence: {
-	    if (got_saved_avc_seq_hdr)
-		saved_avc_seq_hdr.page_pool->msgUnref (saved_avc_seq_hdr.page_list.first);
-
-	    got_saved_avc_seq_hdr = false;
-	} break;
-	case VideoFrameType::RtmpSetMetaData: {
-	    if (got_saved_metadata)
-		saved_metadata.page_pool->msgUnref (saved_metadata.page_list.first);
-
-	    got_saved_metadata = true;
-	    saved_metadata.msg_info = *msg_info;
-	    saved_metadata.page_pool = page_pool;
-	    saved_metadata.page_list = *page_list;
-	    saved_metadata.msg_len = msg_len;
-	    saved_metadata.msg_offset = msg_offset;
-
-	    page_pool->msgRef (page_list->first);
-	} break;
-	case VideoFrameType::RtmpClearMetaData: {
-	    if (got_saved_metadata)
-		saved_metadata.page_pool->msgUnref (saved_metadata.page_list.first);
-
-	    got_saved_metadata = false;
-	} break;
-	default:
-	  // No-op
-	    ;
-    }
 }
 
 VideoStream::VideoStream ()
