@@ -54,6 +54,11 @@ public:
     // holds. See takeRtmpConnRef().
     RtmpServer rtmp_server;
 
+    // We create 'video_stream' immediately after creating the session to allow
+    // unlocked access to the pointer.
+    mt_const Ref<VideoStream> video_stream;
+    mt_mutex (mutex) MomentServer::VideoStreamKey video_stream_key;
+
 #ifdef MOMENT_RTMP__FLOW_CONTROL
     mt_mutex (mutex) bool overloaded;
 #endif
@@ -68,6 +73,7 @@ public:
     // Synchronized by rtmp_server.
     bool watching;
 
+#if 0
     // Returns 'false' if ClientSession is invalid already.
     bool invalidate ()
     {
@@ -76,6 +82,7 @@ public:
 	valid = false;
 	return ret_valid;
     }
+#endif
 
     // Secures a reference to rtmp_conn so that it is safe to call rtmp_server's
     // methods.
@@ -103,6 +110,7 @@ public:
 #endif
 	  watching (false)
     {
+	video_stream = grab (new VideoStream);
     }
 
 #if 0
@@ -115,8 +123,24 @@ public:
 
 void destroyClientSession (ClientSession * const client_session)
 {
-    if (!client_session->invalidate())
+    client_session->mutex.lock ();
+
+    if (!client_session->valid) {
+	client_session->mutex.unlock ();
 	return;
+    }
+
+    MomentServer::VideoStreamKey const video_stream_key = client_session->video_stream_key;
+
+    client_session->mutex.unlock ();
+
+    client_session->video_stream->close ();
+
+    if (video_stream_key) {
+	// TODO class MomentRtmpModule
+	MomentServer * const moment = MomentServer::getInstance();
+	moment->removeVideoStream (video_stream_key);
+    }
 
     client_session->unref ();
 }
@@ -247,6 +271,26 @@ VideoStream::EventHandler /* TODO Allow consts in Informer_ */ /* const */ video
     streamClosed
 };
 
+Result startStreaming (ConstMemory const &stream_name,
+		       void * const _client_session)
+{
+    logD_ (_func, "stream_name: ", stream_name);
+
+    // TODO class MomentRtmpModule
+    MomentServer * const moment = MomentServer::getInstance();
+
+    ClientSession * const client_session = static_cast <ClientSession*> (_client_session);
+
+    MomentServer::VideoStreamKey const video_stream_key =
+	moment->addVideoStream (client_session->video_stream, stream_name);
+
+    client_session->mutex.lock ();
+    client_session->video_stream_key = video_stream_key;
+    client_session->mutex.unlock ();
+
+    return Result::Success;
+}
+
 Result startWatching (ConstMemory const &stream_name,
 		      void * const _client_session)
 {
@@ -299,12 +343,37 @@ Result startWatching (ConstMemory const &stream_name,
 }
 
 RtmpServer::Frontend const rtmp_server_frontend = {
-    NULL /* startStreaming */, // TODO Accept arbitrary incoming streams, if enabled.
+    startStreaming /* startStreaming */,
     startWatching,
     NULL /* commandMessage */
 };
 
+Result audioMessage (VideoStream::AudioMessageInfo * const mt_nonnull msg_info,
+		     PagePool                      * const mt_nonnull page_pool,
+		     PagePool::PageListHead        * const mt_nonnull page_list,
+		     Size                            const msg_len,
+		     Size                            const msg_offset,
+		     void                          * const _client_session)
+{
+    ClientSession * const client_session = static_cast <ClientSession*> (_client_session);
+    client_session->video_stream->fireAudioMessage (msg_info, page_pool, page_list, msg_len, msg_offset);
+    return Result::Success;
+}
+
+Result videoMessage (VideoStream::VideoMessageInfo * const mt_nonnull msg_info,
+		     PagePool                      * const mt_nonnull page_pool,
+		     PagePool::PageListHead        * const mt_nonnull page_list,
+		     Size                            const msg_len,
+		     Size                            const msg_offset,
+		     void                          * const _client_session)
+{
+    ClientSession * const client_session = static_cast <ClientSession*> (_client_session);
+    client_session->video_stream->fireVideoMessage (msg_info, page_pool, page_list, msg_len, msg_offset);
+    return Result::Success;
+}
+
 Result commandMessage (RtmpConnection::MessageInfo * const mt_nonnull msg_info,
+		       PagePool               * const page_pool,
 		       PagePool::PageListHead * const mt_nonnull page_list,
 		       Size                     const msg_len,
 		       AmfEncoding              const amf_encoding,
@@ -314,7 +383,7 @@ Result commandMessage (RtmpConnection::MessageInfo * const mt_nonnull msg_info,
 
     ClientSession * const client_session = static_cast <ClientSession*> (_client_session);
     // No need to call takeRtmpConnRef(), because this it rtmp_conn's callback.
-    return client_session->rtmp_server.commandMessage (msg_info, page_list, msg_len, amf_encoding);
+    return client_session->rtmp_server.commandMessage (msg_info, page_pool, page_list, msg_len, amf_encoding);
 }
 
 void sendStateChanged (Sender::SendState   const send_state,
@@ -367,8 +436,8 @@ void closed (Exception * const exc,
 RtmpConnection::Frontend const rtmp_frontend = {
     NULL /* handshakeComplete */,
     commandMessage,
-    NULL /* audioMessage */,
-    NULL /* videoMessage */,
+    audioMessage /* audioMessage */,
+    videoMessage /* videoMessage */,
     sendStateChanged,
     closed
 };

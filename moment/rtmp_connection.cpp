@@ -562,8 +562,8 @@ RtmpConnection::sendSetChunkSize (Uint32 const chunk_size)
 {
     logD (proto_out, _func, chunk_size);
 
-    if (chunk_size < MinChunkSize ||
-	chunk_size > MaxChunkSize)
+    if (chunk_size < MinChunkSize /* ||
+	chunk_size > MaxChunkSize */)
     {
 	logE_ (_func, "bad chunk size: ", chunk_size);
     }
@@ -920,7 +920,8 @@ RtmpConnection::sendPlay (ConstMemory const &stream_name)
 	// unreachable ();
     }
 
-    sendCommandMessage_AMF0 (CommandMessageStreamId, ConstMemory (msg_buf, msg_len));
+//    sendCommandMessage_AMF0 (CommandMessageStreamId, ConstMemory (msg_buf, msg_len));
+    sendCommandMessage_AMF0 (1, ConstMemory (msg_buf, msg_len));
 }
 
 void
@@ -969,7 +970,7 @@ RtmpConnection::pingTimerTick (void * const _self)
   // TODO Synchronization for ping_reply_received.
 
     if (!self->ping_reply_received) {
-	logE_ (_func, "no ping reply");
+	logE_ (_func, "no ping reply, rtmp_conn 0x", fmt_hex, (UintPtr) self);
 	logD (close, _func, "0x", fmt_hex, (UintPtr) self, " closing");
 	self->is_closed = true;
 	{
@@ -1019,8 +1020,8 @@ RtmpConnection::processMessage (ChunkStream * const chunk_stream)
 				      ((Uint32) msg_buf [2] <<  8) |
 				      ((Uint32) msg_buf [3] <<  0);
 
-	    if (chunk_size < MinChunkSize ||
-		chunk_size > MaxChunkSize)
+	    if (chunk_size < MinChunkSize /* ||
+		chunk_size > MaxChunkSize */)
 	    {
 		logE_ (_func, "SetChunkSize: bad chunk size: ", chunk_size);
 		return Result::Failure;
@@ -1049,8 +1050,8 @@ RtmpConnection::processMessage (ChunkStream * const chunk_stream)
 
 	    ChunkStream * const chunk_stream = getChunkStream (chunk_stream_id, false /* create */);
 	    if (!chunk_stream) {
-		logE_ (_func, "Abort: stream not found: ", chunk_stream_id);
-		return Result::Failure;
+		logW_ (_func, "Abort: stream not found: ", chunk_stream_id);
+		return Result::Success;
 	    }
 
 	    resetMessage (chunk_stream);
@@ -1145,7 +1146,7 @@ RtmpConnection::processMessage (ChunkStream * const chunk_stream)
 		audio_msg_info.timestamp = chunk_stream->in_msg_timestamp;
 		audio_msg_info.prechunk_size = (prechunking_enabled ? PrechunkSize : 0);
 		Result res = Result::Failure;
-		frontend.call_ret<Result> (&res, frontend->audioMessage, /*(*/ &audio_msg_info, &chunk_stream->page_list, msg_len, 0 /* msg_offset */ /*)*/);
+		frontend.call_ret<Result> (&res, frontend->audioMessage, /*(*/ &audio_msg_info, page_pool, &chunk_stream->page_list, msg_len, 0 /* msg_offset */ /*)*/);
 		return res;
 	    }
 	} break;
@@ -1186,7 +1187,7 @@ RtmpConnection::processMessage (ChunkStream * const chunk_stream)
 		video_msg_info.prechunk_size = (prechunking_enabled ? PrechunkSize : 0);
 
 		Result res = Result::Failure;
-		frontend.call_ret<Result> (&res, frontend->videoMessage, /*(*/ &video_msg_info, &chunk_stream->page_list, msg_len, 0 /* msg_offset */ /*)*/);
+		frontend.call_ret<Result> (&res, frontend->videoMessage, /*(*/ &video_msg_info, page_pool, &chunk_stream->page_list, msg_len, 0 /* msg_offset */ /*)*/);
 		return res;
 	    }
 	} break;
@@ -1246,6 +1247,7 @@ RtmpConnection::callCommandMessage (ChunkStream * const chunk_stream,
 	Result res = Result::Failure;
 	frontend.call_ret<Result> (&res, frontend->commandMessage, /*(*/
 		&msg_info,
+		page_pool,
 		&chunk_stream->page_list,
 		chunk_stream->in_msg_len,
 		amf_encoding /*)*/);
@@ -2455,13 +2457,14 @@ RtmpConnection::doDeleteStream (MessageInfo * mt_nonnull msg_info,
 }
 
 Result
-RtmpConnection::fireVideoMessage (VideoStream::VideoMessageInfo * const video_msg_info,
-				  PagePool::PageListHead        * const page_list,
+RtmpConnection::fireVideoMessage (VideoStream::VideoMessageInfo * const mt_nonnull video_msg_info,
+				  PagePool                      * const mt_nonnull page_pool,
+				  PagePool::PageListHead        * const mt_nonnull page_list,
 				  Size                            const msg_len,
 				  Size                            const msg_offset)
 {
     Result res = Result::Failure;
-    frontend.call_ret<Result> (&res, frontend->videoMessage, /*(*/ video_msg_info, page_list, msg_len, msg_offset /*)*/);
+    frontend.call_ret<Result> (&res, frontend->videoMessage, /*(*/ video_msg_info, page_pool, page_list, msg_len, msg_offset /*)*/);
     return res;
 }
 

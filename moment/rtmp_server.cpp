@@ -480,6 +480,7 @@ RtmpServer::sendInitialMessages_unlocked (VideoStream::FrameSaver * const mt_non
 
 Result
 RtmpServer::commandMessage (RtmpConnection::MessageInfo * const mt_nonnull msg_info,
+			    PagePool               * const page_pool,
 			    PagePool::PageListHead * const page_list,
 			    Size                     const msg_len,
 			    AmfEncoding              const /* amf_encoding */)
@@ -561,7 +562,7 @@ RtmpServer::commandMessage (RtmpConnection::MessageInfo * const mt_nonnull msg_i
 	video_msg_info.frame_type = VideoStream::VideoFrameType::RtmpSetMetaData;
 	video_msg_info.codec_id = VideoStream::VideoCodecId::Unknown;
 
-	return rtmp_conn->fireVideoMessage (&video_msg_info, page_list, msg_len - msg_offset, msg_offset);
+	return rtmp_conn->fireVideoMessage (&video_msg_info, page_pool, page_list, msg_len - msg_offset, msg_offset);
     } else
     if (!compare (method_mem, "@clearDataFrame")) {
 #if 0
@@ -583,7 +584,7 @@ RtmpServer::commandMessage (RtmpConnection::MessageInfo * const mt_nonnull msg_i
 	video_msg_info.frame_type = VideoStream::VideoFrameType::RtmpClearMetaData;
 	video_msg_info.codec_id = VideoStream::VideoCodecId::Unknown;
 
-	return rtmp_conn->fireVideoMessage (&video_msg_info, page_list, msg_len - msg_offset, msg_offset);
+	return rtmp_conn->fireVideoMessage (&video_msg_info, page_pool, page_list, msg_len - msg_offset, msg_offset);
     } else {
 	if (frontend && frontend->commandMessage) {
 	    CommandResult res;

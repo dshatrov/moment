@@ -65,6 +65,7 @@ public:
     };
 
     typedef Result (*CommandMessageCallback) (MessageInfo            * mt_nonnull msg_info,
+					      PagePool               * mt_nonnull page_pool,
 					      PagePool::PageListHead * mt_nonnull page_list,
 					      Size                     msg_len,
 					      AmfEncoding              amf_encoding,
@@ -77,12 +78,14 @@ public:
 	CommandMessageCallback commandMessage;
 
 	Result (*audioMessage) (VideoStream::AudioMessageInfo * mt_nonnull msg_info,
+			        PagePool                      * mt_nonnull page_pool,
 				PagePool::PageListHead        * mt_nonnull page_list,
 				Size                           msg_len,
 				Size                           msg_offset,
 				void                          *cb_data);
 
 	Result (*videoMessage) (VideoStream::VideoMessageInfo * mt_nonnull msg_info,
+				PagePool                      * mt_nonnull page_pool,
 				PagePool::PageListHead        * mt_nonnull page_list,
 				Size                           msg_len,
 				Size                           msg_offset,
@@ -546,8 +549,9 @@ public:
     Result doDeleteStream (MessageInfo * mt_nonnull msg_info,
 			   AmfDecoder  * mt_nonnull amf_decoder);
 
-    Result fireVideoMessage (VideoStream::VideoMessageInfo *video_msg_info,
-			     PagePool::PageListHead        *page_list,
+    Result fireVideoMessage (VideoStream::VideoMessageInfo * mt_nonnull video_msg_info,
+			     PagePool                      * mt_nonnull page_pool,
+			     PagePool::PageListHead        * mt_nonnull page_list,
 			     Size                           msg_len,
 			     Size                           msg_offset);
 

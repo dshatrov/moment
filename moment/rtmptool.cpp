@@ -20,6 +20,8 @@ mt_const struct Options
     bool got_server_addr;
     IpAddress server_addr;
 
+    bool nonfatal_errors;
+
     Ref<String> channel;
     Ref<String> out_file;
 
@@ -29,6 +31,7 @@ mt_const struct Options
 	: help (false),
 	  num_clients (1),
 	  got_server_addr (false),
+	  nonfatal_errors (false),
 	  channel (grab (new String ("red5StreamDemo"))),
 	  report_interval (0)
     {
@@ -73,18 +76,21 @@ private:
     static Result handshakeComplete (void *cb_data);
 
     static Result commandMessageCallback (RtmpConnection::MessageInfo * mt_nonnull msg_info,
+					  PagePool                    * mt_nonnull page_pool,
 					  PagePool::PageListHead      * mt_nonnull page_list,
 					  Size                         msg_len,
 					  AmfEncoding                  amf_encoding,
 					  void                        *_self);
 
     static Result audioMessage (VideoStream::AudioMessageInfo * mt_nonnull msg_info,
+				PagePool                      * mt_nonnull page_pool,
 				PagePool::PageListHead        * mt_nonnull page_list,
 				Size                           msg_len,
 				Size                           msg_offset,
 				void                          *_self);
 
     static Result videoMessage (VideoStream::VideoMessageInfo * mt_nonnull msg_info,
+				PagePool                      * mt_nonnull page_pool,
 				PagePool::PageListHead        * mt_nonnull page_list,
 				Size                           msg_len,
 				Size                           msg_offset,
@@ -138,7 +144,8 @@ void
 RtmpClient::closeRtmpConn (void * const /* cb_data */)
 {
     logI_ (_func, "Connection closed");
-    exit (0);
+    if (!options.nonfatal_errors)
+	exit (0);
 }
 
 Result
@@ -155,7 +162,8 @@ RtmpClient::handshakeComplete (void * const _self)
 }
 
 Result
-RtmpClient::commandMessageCallback (RtmpConnection::MessageInfo * const mt_nonnull msg_info,
+RtmpClient::commandMessageCallback (RtmpConnection::MessageInfo * const mt_nonnull /* msg_info */,
+				    PagePool                    * const mt_nonnull /* page_pool */,
 				    PagePool::PageListHead      * const mt_nonnull page_list,
 				    Size                          const msg_len,
 				    AmfEncoding                   const /* amf_encoding */,
@@ -251,6 +259,7 @@ RtmpClient::commandMessageCallback (RtmpConnection::MessageInfo * const mt_nonnu
 
 Result
 RtmpClient::audioMessage (VideoStream::AudioMessageInfo * const mt_nonnull /* msg_info */,
+			  PagePool                      * const mt_nonnull /* page_pool */,
 			  PagePool::PageListHead        * const mt_nonnull /* page_list */,
 			  Size                            const /* msg_len */,
 			  Size                            const /* msg_offset */,
@@ -262,6 +271,7 @@ RtmpClient::audioMessage (VideoStream::AudioMessageInfo * const mt_nonnull /* ms
 
 Result
 RtmpClient::videoMessage (VideoStream::VideoMessageInfo * const mt_nonnull /* msg_info */,
+			  PagePool                      * const mt_nonnull /* page_pool */,
 			  PagePool::PageListHead        * const mt_nonnull /* page_list */,
 			  Size                            const /* msg_len */,
 			  Size                            const /* msg_offset */,
@@ -358,6 +368,7 @@ Result doTest (void)
 
     {
 	Byte id_char = 'a';
+	// TODO "Slow start" option.
 	for (Uint32 i = 0; i < options.num_clients; ++i) {
 	    logD_ (_func, "Starting client, id_char: ", ConstMemory::forObject (id_char));
 
@@ -391,6 +402,7 @@ printUsage ()
 		 "  -c --channel - Name of the channel to subscribe to.\n"
 		 "  -h --help - Show help message.\n"
 		 "  -r --report-interval - Interval between video frame reports.\n"
+		 "  --nonfatal-errors - Do not exit on the first error.\n"
 //		 "  -o --out_file - Output file name.\n"
 		 );
     outs->flush ();
@@ -477,6 +489,16 @@ bool cmdline_report_interval (char const * /* short_name */,
     return true;
 }
 
+bool cmdline_nonfatal_errors (char const * /* short_name */,
+			      char const * /* long_name */,
+			      char const * /* value */,
+			      void       * /* opt_data */,
+			      void       * /* cb_data */)
+{
+    options.nonfatal_errors = true;
+    return true;
+}
+
 } // namespace {}
 
 int main (int argc, char **argv)
@@ -485,7 +507,7 @@ int main (int argc, char **argv)
     libMaryInit ();
 
     {
-	unsigned const num_opts = 6;
+	unsigned const num_opts = 7;
 	MyCpp::CmdlineOption opts [num_opts];
 
 	opts [0].short_name = "h";
@@ -523,6 +545,12 @@ int main (int argc, char **argv)
 	opts [5].with_value = true;
 	opts [5].opt_data   = NULL;
 	opts [5].opt_callback = cmdline_report_interval;
+
+	opts [6].short_name = NULL;
+	opts [6].long_name  = "nonfatal-errors";
+	opts [6].with_value = false;
+	opts [6].opt_data   = NULL;
+	opts [6].opt_callback = cmdline_nonfatal_errors;
 
 	MyCpp::ArrayIterator<MyCpp::CmdlineOption> opts_iter (opts, num_opts);
 	MyCpp::parseCmdline (&argc, &argv, opts_iter, NULL /* callback */, NULL /* callback_data */);

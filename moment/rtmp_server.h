@@ -98,6 +98,7 @@ public:
     void sendInitialMessages_unlocked (VideoStream::FrameSaver * mt_nonnull frame_saver);
 
     Result commandMessage (RtmpConnection::MessageInfo * mt_nonnull msg_info,
+			   PagePool                    * mt_nonnull page_pool,
 			   PagePool::PageListHead      * mt_nonnull page_list,
 			   Size                         msg_len,
 			   AmfEncoding                  amf_encoding);
