@@ -22,6 +22,10 @@
 
 using namespace M;
 
+namespace {
+LogGroup libMary_logGroup_frame_saver ("frame_saver", LogLevel::N);
+}
+
 namespace Moment {
 
 Size
@@ -307,11 +311,11 @@ VideoStream::FrameSaver::processVideoFrame (VideoMessageInfo       * const mt_no
 					    Size                     const msg_len,
 					    Size                     const msg_offset)
 {
-    logD_ (_func, "0x", fmt_hex, (UintPtr) this);
+    logD (frame_saver, _func, "0x", fmt_hex, (UintPtr) this);
 
     switch (msg_info->frame_type) {
 	case VideoFrameType::KeyFrame: {
-	    logD_ (_func, msg_info->frame_type);
+	    logD (frame_saver, _func, msg_info->frame_type);
 
 	    if (got_saved_keyframe)
 		saved_keyframe.page_pool->msgUnref (saved_keyframe.page_list.first);
@@ -326,7 +330,7 @@ VideoStream::FrameSaver::processVideoFrame (VideoMessageInfo       * const mt_no
 	    page_pool->msgRef (page_list->first);
 	} break;
 	case VideoFrameType::AvcSequenceHeader: {
-	    logD_ (_func, msg_info->frame_type);
+	    logD (frame_saver, _func, msg_info->frame_type);
 
 	    if (got_saved_avc_seq_hdr)
 		saved_avc_seq_hdr.page_pool->msgUnref (saved_avc_seq_hdr.page_list.first);
@@ -341,7 +345,7 @@ VideoStream::FrameSaver::processVideoFrame (VideoMessageInfo       * const mt_no
 	    page_pool->msgRef (page_list->first);
 	} break;
 	case VideoFrameType::AvcEndOfSequence: {
-	    logD_ (_func, msg_info->frame_type);
+	    logD (frame_saver, _func, msg_info->frame_type);
 
 	    if (got_saved_avc_seq_hdr)
 		saved_avc_seq_hdr.page_pool->msgUnref (saved_avc_seq_hdr.page_list.first);
@@ -349,7 +353,7 @@ VideoStream::FrameSaver::processVideoFrame (VideoMessageInfo       * const mt_no
 	    got_saved_avc_seq_hdr = false;
 	} break;
 	case VideoFrameType::RtmpSetMetaData: {
-	    logD_ (_func, msg_info->frame_type);
+	    logD (frame_saver, _func, msg_info->frame_type);
 
 	    if (got_saved_metadata)
 		saved_metadata.page_pool->msgUnref (saved_metadata.page_list.first);
@@ -364,7 +368,7 @@ VideoStream::FrameSaver::processVideoFrame (VideoMessageInfo       * const mt_no
 	    page_pool->msgRef (page_list->first);
 	} break;
 	case VideoFrameType::RtmpClearMetaData: {
-	    logD_ (_func, msg_info->frame_type);
+	    logD (frame_saver, _func, msg_info->frame_type);
 
 	    if (got_saved_metadata)
 		saved_metadata.page_pool->msgUnref (saved_metadata.page_list.first);
