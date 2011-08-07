@@ -38,6 +38,7 @@ using namespace M;
 class MomentServer
 {
 public:
+    // TODO Unused
     struct VideoStreamHandler
     {
 	Result (*videoStreamOpened) (VideoStream * mt_nonnull video_stream);
