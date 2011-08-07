@@ -39,7 +39,7 @@ public:
     {
     public:
 	enum Value {
-	    Unknown,
+	    Unknown = 0,
 	    RawData,
 	    AacSequenceHeader
 	};
@@ -55,7 +55,7 @@ public:
     {
     public:
 	enum Value {
-	    Unknown,
+	    Unknown = 0,
 	    KeyFrame,             // for AVC, a seekable frame
 	    InterFrame,           // for AVC, a non-seekable frame
 	    DisposableInterFrame, // H.264 only
@@ -85,7 +85,7 @@ public:
     {
     public:
 	enum Value {
-	    Unknown,
+	    Unknown = 0,
 	    LinearPcmPlatformEndian,
 	    ADPCM,
 	    MP3,
@@ -93,12 +93,12 @@ public:
 	    Nellymoser_16kHz_mono,
 	    Nellymoser_8kHz_mono,
 	    Nellymoser,
-	    G711ALaw,       // reserved
-	    G711MuLaw,      // reserved
+	    G711ALaw,      // reserved
+	    G711MuLaw,     // reserved
 	    AAC,
 	    Speex,
-	    MP3_8kHz,       // reserved
-	    DeviceSpecific  // reserved
+	    MP3_8kHz,      // reserved
+	    DeviceSpecific // reserved
 	};
 	operator Value () const { return value; }
 	AudioCodecId (Value const value) : value (value) {}
@@ -117,7 +117,7 @@ public:
     {
     public:
 	enum Value {
-	    Unknown,
+	    Unknown = 0,
 	    SorensonH263,  // Sorenson H.263
 	    ScreenVideo,   // Screen video
 	    ScreenVideoV2, // Screen video version 2
