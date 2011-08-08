@@ -103,7 +103,7 @@ public:
 #ifdef MOMENT_RTMP__FLOW_CONTROL
 	  overloaded (false),
 #endif
-#ifdef MOMENT_RMP__WAIT_FOR_KEYFRAME
+#ifdef MOMENT_RTMP__WAIT_FOR_KEYFRAME
 	  no_keyframe_counter (0),
 	  keyframe_sent (false),
 	  first_keyframe_sent (false),
@@ -394,7 +394,7 @@ void sendStateChanged (Sender::SendState   const send_state,
     switch (send_state) {
 	case Sender::ConnectionReady:
 	    logD (framedrop, _func, "ConnectionReady");
-#ifdef MOMNET_RTMP__FLOW_CONTROL
+#ifdef MOMENT_RTMP__FLOW_CONTROL
 	    client_session->mutex.lock ();
 	    client_session->overloaded = false;
 	    client_session->mutex.unlock ();
