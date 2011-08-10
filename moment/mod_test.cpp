@@ -133,7 +133,7 @@ void modTestInit ()
 	frame_buf = NULL;
     }
 
-    {
+    if (prechunk_size > 0) {
 	RtmpConnection::PrechunkContext prechunk_ctx;
 	RtmpConnection::fillPrechunkedPages (&prechunk_ctx,
 					     ConstMemory (frame_buf, frame_size),
@@ -142,6 +142,8 @@ void modTestInit ()
 					     RtmpConnection::DefaultVideoChunkStreamId,
 					     0 /* timestamp */,
 					     true /* first_chunk */);
+    } else {
+	page_pool->getFillPages (&page_list, ConstMemory (frame_buf, frame_size));
     }
 
     ConstMemory const stream_name = config->getString_default ("mod_test/stream_name", "test");
