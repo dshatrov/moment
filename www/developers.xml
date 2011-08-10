@@ -56,7 +56,7 @@
     </li>
     <li>
       <b>scruffy</b> &mdash;
-      <eng>preprocessor for configuration files;</eng>
+      <eng>preprocessor for configuration files.</eng>
       <rus>препроцессор для конфигурационных файлов;</rus>
     </li>
     <!--
@@ -66,6 +66,11 @@
       <rus>базовая библиотека видеосервера. Поддержка протоколов RTMP, RTMPT;</rus>
     </li>
     -->
+    <li>
+      <b>mconfig</b> &mdash;
+      <eng>configuration file parser.</eng>
+      <rus>парсер конфигурационных файлов;</rus>
+    </li>
     <li>
       <b>moment</b> &mdash;
       <!--
