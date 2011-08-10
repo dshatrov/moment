@@ -38,13 +38,14 @@ TcpServer::Frontend RtmpService::tcp_server_frontend = {
 
 // Either 'mutex' must be locked when calling this method, or we must be sure
 // that object's state is valid for the current thread
-// (ses acceptOneConnection()).
+// (see acceptOneConnection()).
 void
 RtmpService::destroySession (ClientSession * const session)
 {
     logD (rtmp_service, _func, "session: 0x", fmt_hex, (UintPtr) session);
 
     if (!session->valid) {
+	logD (rtmp_service, _func, "invalid session");
 	return;
     }
     session->valid = false;
@@ -66,6 +67,10 @@ RtmpService::acceptOneConnection ()
     logD (rtmp_service, _func_);
 
     Ref<ClientSession> session = grab (new ClientSession (timers, page_pool));
+
+// TEST
+//    session->traceReferences ();
+
     session->valid = true;
     session->weak_rtmp_service = this;
     session->unsafe_rtmp_service = this;
