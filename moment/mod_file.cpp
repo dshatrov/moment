@@ -21,9 +21,7 @@
 #include <cstring>
 
 #include <mycpp/list.h>
-
 #include <libmary/module_init.h>
-
 #include <moment/libmoment.h>
 
 
@@ -62,6 +60,8 @@
 	"Content-Type: text/plain\r\n" \
 	"Content-Length: ", (content_length), "\r\n"
 
+
+using namespace M;
 
 namespace Moment {
 
@@ -322,7 +322,7 @@ void momentFileInit ()
     MomentServer * const moment = MomentServer::getInstance();
 //    ServerApp * const server_app = moment->getServerApp();
     MConfig::Config * const config = moment->getConfig();
-    HttpService * const http_service = moment->getHttpService ();
+    HttpService * const http_service = moment->getHttpService();
 
     page_pool = moment->getPagePool ();
 
@@ -335,7 +335,7 @@ void momentFileInit ()
 	}
 
 	if (enable == MConfig::Config::Boolean_False) {
-	    logI_ (_func, "Static HTTP content module is not enabled. "
+	    logI_ (_func, "Static HTTP content module (mod_file) is not enabled. "
 		   "Set \"", opt_name, "\" option to \"y\" to enable.");
 	    return;
 	}
