@@ -127,6 +127,7 @@ void destroyClientSession (ClientSession * const client_session)
 
     if (!client_session->valid) {
 	client_session->mutex.unlock ();
+	logD (mod_rtmp, _func, "invalid session");
 	return;
     }
 
