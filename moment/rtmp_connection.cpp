@@ -1377,7 +1377,7 @@ static Uint32
 getDigestOffset (Byte const * const msg,
 		 int          const handshake_scheme)
 {
-    Uint32 server_digest_offs;
+    Uint32 server_digest_offs = 0;
     switch (handshake_scheme) {
 	case 0:
 	    server_digest_offs = (Uint32) msg [ 8] +
