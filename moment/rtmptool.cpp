@@ -376,7 +376,10 @@ Result doTest (void)
 	    RtmpClient *client = new RtmpClient (NULL /* coderef_container */, id_char);
 
 	    client->init (server_app.getTimers(), &page_pool);
-	    client->start (server_app.getPollGroup(), addr);
+	    if (!client->start (server_app.getPollGroup(), addr)) {
+		logE_ (_func, "client->start() failed");
+		return Result::Failure;
+	    }
 
 	    if (id_char == 'z')
 		id_char = 'a';
