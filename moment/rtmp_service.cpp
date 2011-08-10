@@ -36,6 +36,11 @@ TcpServer::Frontend RtmpService::tcp_server_frontend = {
     accepted
 };
 
+RtmpService::ClientSession::~ClientSession ()
+{
+//    logD_ (_func_);
+}
+
 // Either 'mutex' must be locked when calling this method, or we must be sure
 // that object's state is valid for the current thread
 // (see acceptOneConnection()).

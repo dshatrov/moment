@@ -60,6 +60,8 @@ private:
 	      rtmp_conn     (this /* coderef_container */, timers, page_pool)
 	{
 	}
+
+	~ClientSession ();
     };
 
     typedef IntrusiveList<ClientSession, SessionList_name> SessionList;
