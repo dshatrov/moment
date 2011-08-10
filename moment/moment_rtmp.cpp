@@ -32,7 +32,7 @@ namespace Moment {
 namespace {
 
 namespace {
-LogGroup libMary_logGroup_mod_rtmp ("mod_rtmp", LogLevel::N);
+LogGroup libMary_logGroup_mod_rtmp ("mod_rtmp", LogLevel::E);
 LogGroup libMary_logGroup_framedrop ("mod_rtmp_framedrop", LogLevel::N);
 }
 
@@ -130,6 +130,7 @@ void destroyClientSession (ClientSession * const client_session)
 	logD (mod_rtmp, _func, "invalid session");
 	return;
     }
+    client_session->valid = false;
 
     MomentServer::VideoStreamKey const video_stream_key = client_session->video_stream_key;
 
@@ -308,12 +309,12 @@ Result startWatching (ConstMemory const &stream_name,
 
     Ref<VideoStream> const video_stream = moment->getVideoStream (stream_name);
     if (!video_stream) {
-	logE_ (_func, "video stream not found: ", stream_name);
+	logE (mod_rtmp, _func, "video stream not found: ", stream_name);
 	return Result::Failure;
     }
 
     if (client_session->watching) {
-	logE_ (_func, "already watching another stream");
+	logE (mod_rtmp, _func, "already watching another stream");
 	return Result::Success;
     }
     client_session->watching = true;
@@ -428,7 +429,7 @@ void closed (Exception * const exc,
     logD (mod_rtmp, _func, "client_session 0x", fmt_hex, (UintPtr) _client_session);
 
     if (exc)
-	logE_ (_func, exc->toString());
+	logE (mod_rtmp, _func, exc->toString());
 
     ClientSession * const client_session = static_cast <ClientSession*> (_client_session);
     destroyClientSession (client_session);
