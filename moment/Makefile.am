@@ -68,7 +68,7 @@ libmoment_1_0_la_LIBADD += -lws2_32
 endif
 
 momentdir = $(libdir)/moment-1.0
-moment_LTLIBRARIES = libmoment-file-1.0.la libmoment-rtmp-1.0.la
+moment_LTLIBRARIES = libmoment-file-1.0.la libmoment-rtmp-1.0.la libmoment-test-1.0.la
 
 libmoment_file_1_0_la_SOURCES = \
 	mod_file.cpp
@@ -82,6 +82,11 @@ libmoment_rtmp_1_0_la_LIBADD = $(THIS_LIBS)
 if PLATFORM_WIN32
 libmoment_rtmp_1_0_la_LIBADD += -lws2_32
 endif
+
+libmoment_test_1_0_la_SOURCES =	\
+	mod_test.cpp
+libmoment_test_1_0_la_LDFLAGS = -no-undefined -version-info "0:0:0" $(COMMON_LDFLAGS)
+libmoment_test_1_0_la_LIBADD = $(THIS_LIBS)
 
 bin_PROGRAMS = moment rtmptool
 
