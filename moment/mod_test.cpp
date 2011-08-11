@@ -171,7 +171,7 @@ void modTestInit ()
 					     page_pool,
 					     &page_list,
 					     RtmpConnection::DefaultVideoChunkStreamId,
-					     0 /* timestamp */,
+					     start_timestamp,
 					     true /* first_chunk */);
     } else {
 	page_pool->getFillPages (&page_list, ConstMemory (frame_buf, frame_size));
