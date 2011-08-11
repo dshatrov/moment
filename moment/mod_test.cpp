@@ -36,10 +36,15 @@ Uint64 prechunk_size = 65536;
 Uint64 keyframe_interval = 10;
 Uint64 keyframe_counter = 0;
 
+Uint64 start_timestamp = 0;
+
 PagePool *page_pool = NULL;
 PagePool::PageListHead page_list;
 
 Byte *frame_buf = NULL;
+
+bool first_frame = true;
+Time timestamp_offset = 0;
 
 void frameTimerTick (void * const /* cb_data */)
 {
@@ -57,7 +62,24 @@ void frameTimerTick (void * const /* cb_data */)
 	--keyframe_counter;
     }
 
-    video_msg_info.timestamp = getTimeMilliseconds();
+    if (first_frame) {
+	timestamp_offset = getTimeMilliseconds();
+	video_msg_info.timestamp = start_timestamp;
+	first_frame = false;
+    } else {
+	Time timestamp = getTimeMilliseconds();
+	if (timestamp >= timestamp_offset)
+	    timestamp -= timestamp_offset;
+	else
+	    timestamp = 0;
+
+	timestamp += start_timestamp;
+
+	video_msg_info.timestamp = timestamp;
+    }
+
+    logD_ (_func, "timestamp: ", fmt_hex, video_msg_info.timestamp);
+
     video_msg_info.prechunk_size = prechunk_size;
     video_msg_info.codec_id = VideoStream::VideoCodecId::Unknown;
 
@@ -120,6 +142,15 @@ void modTestInit ()
     {
 	ConstMemory const opt_name = "mod_test/prechunk_size";
 	MConfig::GetResult const res = config->getUint64_default (opt_name, &prechunk_size, prechunk_size);
+	if (!res) {
+	    logE_ (_func, "Bad value for config option ", opt_name);
+	    return;
+	}
+    }
+
+    {
+	ConstMemory const opt_name = "mod_test/start_timestamp";
+	MConfig::GetResult const res = config->getUint64_default (opt_name, &start_timestamp, start_timestamp);
 	if (!res) {
 	    logE_ (_func, "Bad value for config option ", opt_name);
 	    return;
