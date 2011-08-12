@@ -47,7 +47,8 @@ public:
     enum {
 	MinChunkSize = 128,
 	MaxChunkSize = 65536,
-	PrechunkSize = 65536,
+//	PrechunkSize = 65536,
+	PrechunkSize = 128,
 	DefaultChunkSize = 128
     };
 
@@ -120,8 +121,11 @@ private:
 	//  3 bytes - chunk basic header;
 	// 11 bytes - chunk message header (type 0);
 	//  4 bytes - extended timestamp.
+	//  4 bytes - extended timestamp;
+	//  3 bytes - fix chunk basic header;
+	//  7 bytes - fix chunk message header (type 1).
 	// TODO More descriptive name
-	MaxHeaderLen = 18
+	MaxHeaderLen = 28
     };
 
     class ReceiveState
@@ -367,7 +371,8 @@ private:
     Size fillMessageHeader (MessageDesc const * mt_nonnull mdesc,
 			    ChunkStream       * mt_nonnull chunk_stream,
 			    Byte              * mt_nonnull header_buf,
-			    Uint32             timestamp);
+			    Uint32             timestamp,
+			    Uint32             prechunk_size);
 
     // TODO rename to resetChunk()
     void resetPacket ();

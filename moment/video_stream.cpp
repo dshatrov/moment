@@ -573,6 +573,8 @@ VideoStream::fireVideoMessage (VideoMessageInfo       * const mt_nonnull msg_inf
 {
     mutex.lock ();
 
+//    logD_ (_func, "timestamp: 0x", fmt_hex, (UintPtr) msg_info->timestamp);
+
     frame_saver.processVideoFrame (msg_info, page_pool, page_list, msg_len, msg_offset);
 
     InformVideoMessage_Data inform_data (msg_info, page_pool, page_list, msg_len, msg_offset);

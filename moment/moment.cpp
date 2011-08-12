@@ -144,6 +144,7 @@ int main (int argc, char **argv)
 	    }
 	}
 
+//	logD_ (_func, "min_pages: ", min_pages);
 	page_pool.setMinPages (min_pages);
     }
 

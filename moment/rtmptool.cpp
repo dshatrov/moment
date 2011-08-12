@@ -173,6 +173,9 @@ RtmpClient::commandMessageCallback (RtmpConnection::MessageInfo * const mt_nonnu
 
     RtmpClient * const self = static_cast <RtmpClient*> (_self);
 
+    if (msg_len == 0)
+	return Result::Success;
+
     PagePool::PageListArray pl_array (page_list->first, msg_len);
     AmfDecoder decoder (AmfEncoding::AMF0, &pl_array, msg_len);
 

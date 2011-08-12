@@ -487,6 +487,9 @@ RtmpServer::commandMessage (RtmpConnection::MessageInfo * const mt_nonnull msg_i
 {
     logD (rtmp_server, _func_);
 
+    if (msg_len == 0)
+	return Result::Success;
+
     PagePool::PageListArray pl_array (page_list->first, msg_len);
     AmfDecoder decoder (AmfEncoding::AMF0, &pl_array, msg_len);
 

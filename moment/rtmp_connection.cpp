@@ -79,6 +79,14 @@ RtmpConnection::getChunkStream (Uint32 const chunk_stream_id,
 Uint32
 RtmpConnection::mangleOutTimestamp (Uint32 const timestamp)
 {
+//    logD_ (_func, "timestamp: 0x", fmt_hex, timestamp);
+
+    // TEST
+//    return timestamp + 0x00ffffff;
+
+    // TEST
+//    return timestamp;
+
     if (!out_got_first_timestamp) {
 	if (timestamp != 0) {
 	    out_first_timestamp = timestamp;
@@ -108,7 +116,8 @@ Size
 RtmpConnection::fillMessageHeader (MessageDesc const * const mt_nonnull mdesc,
 				   ChunkStream       * const mt_nonnull chunk_stream,
 				   Byte              * const mt_nonnull header_buf,
-				   Uint32              const timestamp)
+				   Uint32              const timestamp,
+				   Uint32              const prechunk_size)
 {
     bool has_extended_timestamp = false;
     Uint32 extended_timestamp = 0;
@@ -139,6 +148,8 @@ RtmpConnection::fillMessageHeader (MessageDesc const * const mt_nonnull mdesc,
     }
 #endif
 
+    bool fix_header = false;
+
     // TODO cs_hdr_comp is probably unnecessary, because all messages
     // for which we explicitly set cs_hdr_comp to 0 fit into a single 128-byte
     // chunk anyway. Is 128 bytes a minimum size for a chunk?
@@ -150,12 +161,15 @@ RtmpConnection::fillMessageHeader (MessageDesc const * const mt_nonnull mdesc,
 	// TEST
 //	force_type0 = true;
 
+#if 0
+// Uniform prechunking.
 	if (chunk_stream->out_msg_timestamp >= 0x00ffffff) {
 	    // Forcing type 0 header to be sure that all type 3 headers of
 	    // this message's chunks should have extended timestamp field.
 	    // This is essential for prechunking.
 	    force_type0 = true;
 	}
+#endif
 
 	if (!timestampGreater (chunk_stream->out_msg_timestamp, timestamp)) {
 	    logW_ (_func, "!timestampGreater: ", chunk_stream->out_msg_timestamp, ", ", timestamp);
@@ -164,8 +178,18 @@ RtmpConnection::fillMessageHeader (MessageDesc const * const mt_nonnull mdesc,
 
 	if (!force_type0 &&
 	    chunk_stream->out_msg_stream_id == mdesc->msg_stream_id)
-	{
+	do {
 	    Uint32 const timestamp_delta = timestamp - chunk_stream->out_msg_timestamp;
+
+	    if (timestamp_delta >= 0x00ffffff &&
+		prechunk_size &&
+		mdesc->msg_len > prechunk_size)
+	    {
+	      // Forcing type 0 header.
+		fix_header = true;
+		break;
+	    }
+
 	    if (timestamp < chunk_stream->out_msg_timestamp) {
 		// This goes against RTMP rules and should never happen
 		// (that's what the timestampGreater() check above is for).
@@ -257,7 +281,7 @@ RtmpConnection::fillMessageHeader (MessageDesc const * const mt_nonnull mdesc,
 		header_type = 1;
 		offs += Type1_HeaderLen;
 	    }
-	}
+	} while (0);
     }
 
     if (!got_header) {
@@ -276,6 +300,12 @@ RtmpConnection::fillMessageHeader (MessageDesc const * const mt_nonnull mdesc,
 	logD (time, _func, "snd timestamp: 0x", fmt_hex, timestamp);
 
 	if (timestamp >= 0x00ffffff) {
+	    if (prechunk_size &&
+		mdesc->msg_len > prechunk_size)
+	    {
+		fix_header = true;
+	    }
+
 	    header_buf [offs + 0] = 0xff;
 	    header_buf [offs + 1] = 0xff;
 	    header_buf [offs + 2] = 0xff;
@@ -288,11 +318,22 @@ RtmpConnection::fillMessageHeader (MessageDesc const * const mt_nonnull mdesc,
 	    header_buf [offs + 2] = (timestamp >>  0) & 0xff;
 	}
 
-	header_buf [offs + 3] = (mdesc->msg_len >> 16) & 0xff;
-	header_buf [offs + 4] = (mdesc->msg_len >>  8) & 0xff;
-	header_buf [offs + 5] = (mdesc->msg_len >>  0) & 0xff;
+	if (!fix_header) {
+	    header_buf [offs + 3] = (mdesc->msg_len >> 16) & 0xff;
+	    header_buf [offs + 4] = (mdesc->msg_len >>  8) & 0xff;
+	    header_buf [offs + 5] = (mdesc->msg_len >>  0) & 0xff;
 
-	header_buf [offs + 6] = mdesc->msg_type_id;
+	    header_buf [offs + 6] = mdesc->msg_type_id;
+	} else {
+	    header_buf [offs + 3] = 0;
+	    header_buf [offs + 4] = 0;
+	    header_buf [offs + 5] = 0;
+
+	    header_buf [offs + 6] = RtmpMessageType::Data_AMF0;
+
+	    chunk_stream->out_msg_type_id = RtmpMessageType::AudioMessage;
+	    chunk_stream->out_msg_timestamp_delta = 0;
+	}
 
 	// Note that msg_stream_id is not in network byte order.
 	// This is a deviation from the spec.
@@ -316,6 +357,32 @@ RtmpConnection::fillMessageHeader (MessageDesc const * const mt_nonnull mdesc,
 	offs += 4;
     }
 
+    if (fix_header) {
+      // This is a workaround for the fact that type 3 chunks have extended
+      // timestamp field when current timestamp delta is larger than 0x00ffffff.
+      // That breaks prechunking, because different clients require different
+      // timestamps for the same message. To workaround this, we use a dummy
+      // type 0 chunk whenever we need to send a message which consists of
+      // multiple chunks with a large timestamp delta. Then we use a type 1
+      // header with timestamp delta 0. As the result, type 3 chunks that follow
+      // do not contain extended timestamp field.
+
+	header_buf [offs + 0] = (1 << 6) | (Byte) chunk_stream->chunk_stream_id;
+	offs += 1;
+
+	header_buf [offs + 0] = 0;
+	header_buf [offs + 1] = 0;
+	header_buf [offs + 2] = 0;
+
+	header_buf [offs + 3] = (mdesc->msg_len >> 16) & 0xff;
+	header_buf [offs + 4] = (mdesc->msg_len >>  8) & 0xff;
+	header_buf [offs + 5] = (mdesc->msg_len >>  0) & 0xff;
+
+	header_buf [offs + 6] = mdesc->msg_type_id;
+
+	offs += 7;
+    }
+
     // FIXME Assuming small chunk stream ids (2-63)
     header_buf [0] = (header_type << 6) | (Byte) chunk_stream->chunk_stream_id;
 
@@ -335,7 +402,7 @@ RtmpConnection::fillPrechunkedPages (PrechunkContext        * const  prechunk_ct
 				     Uint32                   const  msg_timestamp,
 				     bool                     const  first_chunk)
 {
-// Deprecated    msg_timestamp = mangleOutTimestamp (msg_timestamp);
+//    logD_ (_func, "len: ", mem.len(), ", timestamp: 0x", fmt_hex, (UintPtr) msg_timestamp);
 
     Size const prechunk_size = PrechunkSize;
 
@@ -348,6 +415,8 @@ RtmpConnection::fillPrechunkedPages (PrechunkContext        * const  prechunk_ct
     // contexts for distinct messages.
 
     while (total_filled < mem.len ()) {
+//	logD_ (_func, "total_filled: ", total_filled);
+
 	if (prechunk_ctx->prechunk_offset == 0 &&
 		!(first_chunk && total_filled == 0))
 	{
@@ -356,10 +425,17 @@ RtmpConnection::fillPrechunkedPages (PrechunkContext        * const  prechunk_ct
 	    // TODO Large chunk stream ids.
 	    assert (chunk_stream_id > 1 && chunk_stream_id < 64);
 
+#if 0
+// Uniform prechunking.
 	    if (msg_timestamp < 0x00ffffff) {
+//		logD_ (_func, "type 3 regular");
+#endif
 		Byte const header_buf = (Byte) 0xc0 | (Byte) chunk_stream_id;
 		page_pool->getFillPages (page_list, ConstMemory (&header_buf, 1));
+#if 0
+// Uniform prechunking.
 	    } else {
+//		logD_ (_func, "type 3 extended");
 		Byte header [5];
 		header [0] = (Byte) 0xc0 | (Byte) chunk_stream_id;
 		header [1] = (msg_timestamp >> 24) & 0xff;
@@ -368,6 +444,7 @@ RtmpConnection::fillPrechunkedPages (PrechunkContext        * const  prechunk_ct
 		header [4] = (msg_timestamp >>  0) & 0xff;
 		page_pool->getFillPages (page_list, ConstMemory (header, 5));
 	    }
+#endif
 	}
 
 	Size tofill;
@@ -447,7 +524,7 @@ RtmpConnection::sendMessagePages (MessageDesc const      * const mt_nonnull mdes
 
     Sender::MessageEntry_Pages * const msg_pages =
 	    Sender::MessageEntry_Pages::createNew (MaxHeaderLen);
-    msg_pages->header_len = fillMessageHeader (mdesc, chunk_stream, msg_pages->getHeaderData(), timestamp);
+    msg_pages->header_len = fillMessageHeader (mdesc, chunk_stream, msg_pages->getHeaderData(), timestamp, prechunk_size);
 #if 0
     {
 	logLock ();
@@ -1996,6 +2073,10 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 		}
 
 		bool has_extended_timestamp = false;
+#if 0
+// Commented for testing. It seems like inbound and outbound protocols are
+// different here.
+#endif
 		if (recv_chunk_stream->in_msg_timestamp_delta >= 0x00ffffff)
 		    has_extended_timestamp = true;
 
