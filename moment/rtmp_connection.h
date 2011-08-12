@@ -47,8 +47,8 @@ public:
     enum {
 	MinChunkSize = 128,
 	MaxChunkSize = 65536,
-//	PrechunkSize = 65536,
-	PrechunkSize = 128,
+	PrechunkSize = 65536,
+//	PrechunkSize = 128,
 	DefaultChunkSize = 128
     };
 
