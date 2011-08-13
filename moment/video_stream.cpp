@@ -560,6 +560,8 @@ VideoStream::fireAudioMessage (AudioMessageInfo       * const mt_nonnull msg_inf
 			       Size                     const msg_len,
 			       Size                     const msg_offset)
 {
+//    logD_ (_func, "timestamp: 0x", fmt_hex, (UintPtr) msg_info->timestamp);
+
     InformAudioMessage_Data inform_data (msg_info, page_pool, page_list, msg_len, msg_offset);
     event_informer.informAll (informAudioMessage, &inform_data);
 }
@@ -571,9 +573,9 @@ VideoStream::fireVideoMessage (VideoMessageInfo       * const mt_nonnull msg_inf
 			       Size                     const msg_len,
 			       Size                     const msg_offset)
 {
-    mutex.lock ();
-
 //    logD_ (_func, "timestamp: 0x", fmt_hex, (UintPtr) msg_info->timestamp);
+
+    mutex.lock ();
 
     frame_saver.processVideoFrame (msg_info, page_pool, page_list, msg_len, msg_offset);
 

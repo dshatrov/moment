@@ -213,6 +213,8 @@ RtmpConnection::fillMessageHeader (MessageDesc const * const mt_nonnull mdesc,
 //		    logD_ (_func, "chunk_stream 0x", fmt_hex, (UintPtr) chunk_stream, ": "
 //			   "type 3 header");
 
+		    chunk_stream->out_msg_timestamp = timestamp;
+
 		    header_type = 3;
 		    offs += Type3_HeaderLen;
 		} else {

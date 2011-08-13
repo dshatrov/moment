@@ -12,6 +12,8 @@ using namespace Moment;
 
 namespace {
 
+LogGroup libMary_logGroup_time ("rtmptool_time", LogLevel::N);
+
 mt_const struct Options
 {
     bool help;
@@ -162,14 +164,14 @@ RtmpClient::handshakeComplete (void * const _self)
 }
 
 Result
-RtmpClient::commandMessageCallback (RtmpConnection::MessageInfo * const mt_nonnull /* msg_info */,
+RtmpClient::commandMessageCallback (RtmpConnection::MessageInfo * const mt_nonnull msg_info,
 				    PagePool                    * const mt_nonnull /* page_pool */,
 				    PagePool::PageListHead      * const mt_nonnull page_list,
 				    Size                          const msg_len,
 				    AmfEncoding                   const /* amf_encoding */,
 				    void                        * const _self)
 {
-//    logD_ (_func, "ts: ", msg_info->timestamp);
+    logD (time, _func, "ts:0x ", fmt_hex, msg_info->timestamp);
 
     RtmpClient * const self = static_cast <RtmpClient*> (_self);
 
@@ -261,26 +263,26 @@ RtmpClient::commandMessageCallback (RtmpConnection::MessageInfo * const mt_nonnu
 }
 
 Result
-RtmpClient::audioMessage (VideoStream::AudioMessageInfo * const mt_nonnull /* msg_info */,
+RtmpClient::audioMessage (VideoStream::AudioMessageInfo * const mt_nonnull msg_info,
 			  PagePool                      * const mt_nonnull /* page_pool */,
 			  PagePool::PageListHead        * const mt_nonnull /* page_list */,
 			  Size                            const /* msg_len */,
 			  Size                            const /* msg_offset */,
 			  void                          * const /* _self */)
 {
-//    logD_ (_func, "ts: ", msg_info->timestamp);
+    logD (time, _func, "ts: 0x", fmt_hex, msg_info->timestamp);
     return Result::Success;
 }
 
 Result
-RtmpClient::videoMessage (VideoStream::VideoMessageInfo * const mt_nonnull /* msg_info */,
+RtmpClient::videoMessage (VideoStream::VideoMessageInfo * const mt_nonnull msg_info,
 			  PagePool                      * const mt_nonnull /* page_pool */,
 			  PagePool::PageListHead        * const mt_nonnull /* page_list */,
 			  Size                            const /* msg_len */,
 			  Size                            const /* msg_offset */,
 			  void                          * const _self)
 {
-//    logD_ (_func, "0x", fmt_hex, (UintPtr) _self, ", ts: ", fmt_def, msg_info->timestamp);
+    logD (time, _func, "ts: 0x", fmt_hex, msg_info->timestamp);
 
     RtmpClient * const self = static_cast <RtmpClient*> (_self);
 
