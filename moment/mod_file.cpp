@@ -216,21 +216,30 @@ Result httpRequest (HttpRequest  * const mt_nonnull req,
 
     PagePool::PageListHead page_list;
 
+    // TODO This doesn't work well with large files (eats too much memory).
     Size total_sent = 0;
     Byte buf [65536];
     for (;;) {
+	Size toread = sizeof (buf);
+	if (stat.size - total_sent < toread)
+	    toread = stat.size - total_sent;
+
 	Size num_read;
-	IoResult const res = native_file.read (Memory::forObject (buf), &num_read);
+	IoResult const res = native_file.read (Memory (buf, toread), &num_read);
 	if (res == IoResult::Error) {
 	    logE_ (_func, "native_file.read() failed: ", exc->toString());
 	    conn_sender->flush ();
 	    conn_sender->closeAfterFlush ();
 	    return Result::Success;
 	}
+	assert (num_read <= toread);
 
 	// TODO Double copy - not very smart.
 	page_pool->getFillPages (&page_list, ConstMemory (buf, num_read));
 	total_sent += num_read;
+	assert (total_sent <= stat.size);
+	if (total_sent == stat.size)
+	    break;
 
 	if (res == IoResult::Eof)
 	    break;
