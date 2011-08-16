@@ -87,6 +87,7 @@ public:
 	BeginObject,
 	EndObject,
 	FieldName,
+	EcmaArray,
 	Null
     };
 
@@ -96,6 +97,7 @@ private:
     union {
 	double number;
 	bool boolean;
+	Uint32 integer;
 
 	struct {
 	    Byte const *data;
@@ -104,6 +106,11 @@ private:
     };
 
 public:
+    void setEcmaArraySize (Uint32 const num_entries)
+    {
+	integer = num_entries;
+    }
+
     AmfAtom (double const number)
 	: type (Number),
 	  number (number)
@@ -150,6 +157,11 @@ private:
     Count num_encoded;
 
 public:
+    AmfAtom* getLastAtom ()
+    {
+	return &atoms [num_encoded - 1];
+    }
+
     void addNumber (double const number)
     {
 	assert (num_encoded < num_atoms);
@@ -202,6 +214,14 @@ public:
 	atoms [num_encoded].type = AmfAtom::FieldName;
 	atoms [num_encoded].string.data = field_name.mem();
 	atoms [num_encoded].string.len = field_name.len();
+	++num_encoded;
+    }
+
+    void addEcmaArray (Uint32 const num_entries)
+    {
+	assert (num_encoded < num_atoms);
+	atoms [num_encoded].type = AmfAtom::EcmaArray;
+	atoms [num_encoded].integer = num_entries;
 	++num_encoded;
     }
 

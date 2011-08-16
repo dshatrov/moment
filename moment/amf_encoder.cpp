@@ -135,6 +135,20 @@ AmfEncoder::encode (Memory          const &mem,
 		cur_pos += 2 + atom.string.len;
 		break;
 
+	    case AmfAtom::EcmaArray:
+		if (buf_len - cur_pos >= 5) {
+		    buf [cur_pos + 0] = AmfMarker::EcmaArray;
+		    buf [cur_pos + 1] = (atom.integer >> 24) & 0xff;
+		    buf [cur_pos + 2] = (atom.integer >> 16) & 0xff;
+		    buf [cur_pos + 3] = (atom.integer >>  8) & 0xff;
+		    buf [cur_pos + 4] = (atom.integer >>  0) & 0xff;
+		} else {
+		    result = Result::Failure;
+		}
+
+		cur_pos += 5;
+		break;
+
 	    case AmfAtom::NullObject:
 	    case AmfAtom::Null:
 		if (buf_len - cur_pos >= 1) {
