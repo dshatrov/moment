@@ -39,6 +39,8 @@ LogGroup libMary_logGroup_framedrop ("mod_rtmp_framedrop", LogLevel::N);
 RtmpService rtmp_service (NULL);
 RtmptService rtmpt_service (NULL);
 
+bool audio_waits_video = false;
+
 #ifdef MOMENT_RTMP__WAIT_FOR_KEYFRAME
 Count no_keyframe_limit = 25;
 #endif
@@ -166,9 +168,11 @@ void streamAudioMessage (VideoStream::AudioMessageInfo * const mt_nonnull msg_in
     client_session->mutex.lock ();
 
 #ifdef MOMENT_RTMP__AUDIO_WAITS_VIDEO
-    if (!client_session->first_keyframe_sent) {
-	client_session->mutex.unlock ();
-	return;
+    if (audio_waits_video) {
+	if (!client_session->first_keyframe_sent) {
+	    client_session->mutex.unlock ();
+	    return;
+	}
     }
 #endif
 
@@ -273,10 +277,17 @@ VideoStream::EventHandler /* TODO Allow consts in Informer_ */ /* const */ video
     streamClosed
 };
 
-Result startStreaming (ConstMemory const &stream_name,
+Result startStreaming (ConstMemory const &_stream_name,
 		       void * const _client_session)
 {
-    logD_ (_func, "stream_name: ", stream_name);
+    logD_ (_func, "stream_name: ", _stream_name);
+
+    ConstMemory stream_name = _stream_name;
+    {
+	Byte const * const name_sep = (Byte const *) memchr (stream_name.mem(), '?', stream_name.len());
+	if (name_sep)
+	    stream_name = stream_name.region (0, name_sep - stream_name.mem());
+    }
 
     // TODO class MomentRtmpModule
     MomentServer * const moment = MomentServer::getInstance();
@@ -318,23 +329,6 @@ Result startWatching (ConstMemory const &stream_name,
 	return Result::Success;
     }
     client_session->watching = true;
-
-#if 0
-// Deprecated, moved to RtmpServer::sendInitialMessages_unlocked.
-    {
-	VideoStream::SavedFrame saved_frame;
-	if (video_stream->getSavedKeyframe (&saved_frame)) {
-	    RtmpConnection::MessageInfo rtmp_msg_info;
-	    rtmp_msg_info.msg_stream_id = RtmpConnection::DefaultMessageStreamId;
-	    rtmp_msg_info.timestamp = (Uint32) saved_frame.msg_info.timestamp;
-	    rtmp_msg_info.prechunk_size = saved_frame.msg_info.prechunk_size;
-
-	    client_session->rtmp_server.sendVideoMessage (&rtmp_msg_info, &saved_frame.page_list, saved_frame.msg_len);
-
-	    saved_frame.page_pool->msgUnref (saved_frame.page_list.first);
-	}
-    }
-#endif
 
     video_stream->lock ();
     client_session->rtmp_server.sendInitialMessages_unlocked (video_stream->getFrameSaver());
@@ -582,6 +576,19 @@ void momentRtmpInit ()
 		       "Set \"", opt_name, "\" option to \"y\" to bind the service.");
 	    }
 	} while (0);
+    }
+
+    {
+	ConstMemory const opt_name = "mod_rtmp/audio_waits_video";
+	MConfig::Config::BooleanValue const opt_val = config->getBoolean (opt_name);
+	if (opt_val == MConfig::Config::Boolean_Invalid) {
+	    logE_ (_func, "Invalid value for config option ", opt_name);
+	} else
+	if (opt_val != MConfig::Config::Boolean_True) {
+	    audio_waits_video = false;
+	} else {
+	    audio_waits_video = true;
+	}
     }
 }
 
