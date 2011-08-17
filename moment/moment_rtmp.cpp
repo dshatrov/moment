@@ -42,7 +42,7 @@ RtmptService rtmpt_service (NULL);
 bool audio_waits_video = false;
 
 #ifdef MOMENT_RTMP__WAIT_FOR_KEYFRAME
-Count no_keyframe_limit = 25;
+Count no_keyframe_limit = 250; // 25 fps * 10 seconds
 #endif
 
 class ClientSession : public Object
@@ -168,7 +168,9 @@ void streamAudioMessage (VideoStream::AudioMessageInfo * const mt_nonnull msg_in
     client_session->mutex.lock ();
 
 #ifdef MOMENT_RTMP__AUDIO_WAITS_VIDEO
-    if (audio_waits_video) {
+    if (audio_waits_video
+	&& msg_info->frame_type == VideoStream::AudioFrameType::RawData)
+    {
 	if (!client_session->first_keyframe_sent) {
 	    client_session->mutex.unlock ();
 	    return;
@@ -177,7 +179,9 @@ void streamAudioMessage (VideoStream::AudioMessageInfo * const mt_nonnull msg_in
 #endif
 
 #ifdef MOMENT_RTMP__FLOW_CONTROL
-    if (client_session->overloaded) {
+    if (client_session->overloaded
+	&& msg_info->frame_type == VideoStream::AudioFrameType::RawData)
+    {
       // Connection overloaded, dropping this audio frame.
 	logD (framedrop, _func, "Connection overloaded, dropping audio frame");
 	client_session->mutex.unlock ();
@@ -210,10 +214,10 @@ void streamVideoMessage (VideoStream::VideoMessageInfo * const mt_nonnull msg_in
 
 #ifdef MOMENT_RTMP__FLOW_CONTROL
     if (client_session->overloaded
-	&& (   msg_info->frame_type != VideoStream::VideoFrameType::KeyFrame
-	    || msg_info->frame_type != VideoStream::VideoFrameType::InterFrame
-	    || msg_info->frame_type != VideoStream::VideoFrameType::DisposableInterFrame
-	    || msg_info->frame_type != VideoStream::VideoFrameType::GeneratedKeyFrame))
+	&& (   msg_info->frame_type == VideoStream::VideoFrameType::KeyFrame
+	    || msg_info->frame_type == VideoStream::VideoFrameType::InterFrame
+	    || msg_info->frame_type == VideoStream::VideoFrameType::DisposableInterFrame
+	    || msg_info->frame_type == VideoStream::VideoFrameType::GeneratedKeyFrame))
     {
       // Connection overloaded, dropping this video frame. In general, we'll
       // have to wait for the next keyframe after we've dropped a frame.
@@ -237,10 +241,15 @@ void streamVideoMessage (VideoStream::VideoMessageInfo * const mt_nonnull msg_in
 
 #ifdef MOMENT_RTMP__WAIT_FOR_KEYFRAME
     bool got_keyframe = false;
-    if (msg_info->frame_type == VideoStream::VideoFrameType::KeyFrame) {
+    if (msg_info->frame_type == VideoStream::VideoFrameType::KeyFrame ||
+	msg_info->frame_type == VideoStream::VideoFrameType::GeneratedKeyFrame)
+    {
 	got_keyframe = true;
     } else
-    if (!client_session->keyframe_sent) {
+    if (!client_session->keyframe_sent
+	&& (   msg_info->frame_type == VideoStream::VideoFrameType::InterFrame
+	    || msg_info->frame_type == VideoStream::VideoFrameType::DisposableInterFrame))
+    {
 	++client_session->no_keyframe_counter;
 	if (client_session->no_keyframe_counter >= no_keyframe_limit) {
 	    got_keyframe = true;
