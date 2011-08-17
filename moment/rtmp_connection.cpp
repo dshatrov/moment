@@ -33,7 +33,6 @@ LogGroup libMary_logGroup_chunk     ("rtmp_chunk",      LogLevel::N);
 LogGroup libMary_logGroup_msg       ("rtmp_msg",        LogLevel::N);
 LogGroup libMary_logGroup_codec     ("rtmp_codec",      LogLevel::N);
 LogGroup libMary_logGroup_send      ("rtmp_send",       LogLevel::N);
-LogGroup libMary_logGroup_writev    ("rtmp_writev",     LogLevel::N);
 LogGroup libMary_logGroup_time      ("rtmp_time",       LogLevel::N);
 LogGroup libMary_logGroup_close     ("rtmp_conn_close", LogLevel::N);
 LogGroup libMary_logGroup_proto_in  ("rtmp_proto_in",   LogLevel::N);
@@ -401,7 +400,7 @@ RtmpConnection::fillPrechunkedPages (PrechunkContext        * const  prechunk_ct
 				     PagePool               * const  page_pool,
 				     PagePool::PageListHead * const  page_list,
 				     Uint32                   const  chunk_stream_id,
-				     Uint32                   const  msg_timestamp,
+				     Uint32                   const  /* msg_timestamp */,
 				     bool                     const  first_chunk)
 {
 //    logD_ (_func, "len: ", mem.len(), ", timestamp: 0x", fmt_hex, (UintPtr) msg_timestamp);
@@ -520,7 +519,8 @@ RtmpConnection::sendMessagePages (MessageDesc const      * const mt_nonnull mdes
 
     Uint32 const timestamp = mangleOutTimestamp (mdesc->timestamp);
 
-    logD (proto_out, _func, "ts ", timestamp, " (orig ", mdesc->timestamp, "), tid ", mdesc->msg_type_id,
+    logD (proto_out, _func, "ts 0x", fmt_hex, timestamp, " (orig 0x", mdesc->timestamp, "), "
+	  "tid ", fmt_def, mdesc->msg_type_id,
 	  ", msid ", mdesc->msg_stream_id, ", csid ", chunk_stream->chunk_stream_id,
 	  ", mlen ", mdesc->msg_len, ", hdrc ", mdesc->cs_hdr_comp ? "true" : "false");
 
@@ -1069,7 +1069,8 @@ RtmpConnection::processMessage (ChunkStream * const chunk_stream)
 {
     logD (msg, _func_);
 
-    logD (proto_in, _func, "ts ", chunk_stream->in_msg_timestamp, ", tid ", chunk_stream->in_msg_type_id,
+    logD (proto_in, _func, "ts 0x", fmt_hex, chunk_stream->in_msg_timestamp, ", "
+	  "tid ", fmt_def, chunk_stream->in_msg_type_id,
 	  ", msid ", chunk_stream->in_msg_stream_id, ", csid ", chunk_stream->chunk_stream_id,
 	  ", mlen ", chunk_stream->in_msg_len);
 
@@ -1148,7 +1149,7 @@ RtmpConnection::processMessage (ChunkStream * const chunk_stream)
 					  ((Uint32) msg_buf [2] <<  8) |
 					  ((Uint32) msg_buf [3] <<  0);
 
-	    logD (proto_in, _func, "Ack: bytes_received", bytes_received);
+	    logD (proto_in, _func, "Ack: bytes_received: ", bytes_received);
 
 	    // TODO Handle acks.
 	} break;
@@ -1204,6 +1205,8 @@ RtmpConnection::processMessage (ChunkStream * const chunk_stream)
 		{
 		    PagePool::Page * const page = chunk_stream->page_list.first;
 		    if (page && page->data_len >= 1) {
+//			logD (proto_in, "audio header: 0x", fmt_hex, (unsigned) page->getData() [0]);
+
 			Byte const codec_id = (page->getData() [0] & 0xf0) >> 4;
 
 			audio_msg_info.codec_id = VideoStream::AudioCodecId::fromFlvCodecId (codec_id);
@@ -2170,16 +2173,13 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 			Uint32 const out_chunk_stream_id =
 				(recv_chunk_stream->in_msg_type_id == RtmpMessageType::AudioMessage ?
 					 DefaultAudioChunkStreamId : DefaultVideoChunkStreamId);
-			// TODO Prepare two prechunked variants for messages larger than 64KB (largest chunk size).
-			// One version for normal timestamps, the other for extended timestamps.
-			// The same applies to moment-gst.
 			fillPrechunkedPages (&recv_chunk_stream->in_prechunk_ctx,
 					     ConstMemory (data, tofill),
 					     page_pool,
 					     &recv_chunk_stream->page_list,
 					     out_chunk_stream_id,
 					     recv_chunk_stream->in_msg_timestamp,
-					     recv_chunk_stream->in_msg_offset == 0 /* first_chunk */);
+					     recv_chunk_stream->in_msg_offset == 0 && chunk_offset == 0 /* first_chunk */);
 		    } else {
 			page_pool->getFillPages (&recv_chunk_stream->page_list,
 						 ConstMemory (data, tofill));
@@ -2241,7 +2241,7 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 					     &recv_chunk_stream->page_list,
 					     out_chunk_stream_id,
 					     recv_chunk_stream->in_msg_timestamp,
-					     recv_chunk_stream->in_msg_offset == 0 /* first_chunk */);
+					     recv_chunk_stream->in_msg_offset == 0 && chunk_offset == 0 /* first_chunk */);
 		    } else {
 			page_pool->getFillPages (&recv_chunk_stream->page_list,
 						 ConstMemory (data, tofill));
@@ -2645,7 +2645,7 @@ RtmpConnection::RtmpConnection (Object * const coderef_container)
     resetPacket ();
 
     control_chunk_stream = getChunkStream (2, true /* create */);
-    data_chunk_stream    = getChunkStream (3, true /* create */);
+    data_chunk_stream    = getChunkStream (DefaultDataChunkStreamId, true /* create */);
 }
 
 RtmpConnection::~RtmpConnection ()

@@ -40,6 +40,7 @@ class RtmpConnection : public DependentCodeReferenced,
 {
 public:
     enum {
+	DefaultDataChunkStreamId  = 3,
 	DefaultAudioChunkStreamId = 4,
 	DefaultVideoChunkStreamId = 5
     };
@@ -285,6 +286,12 @@ public:
 	Uint32 out_msg_type_id;
 	Uint32 out_msg_stream_id;
 	bool   out_header_valid;
+
+    public:
+	Uint32 getChunkStreamId () const
+	{
+	    return chunk_stream_id;
+	}
     };
 
 private:
@@ -380,8 +387,8 @@ private:
     void resetMessage (ChunkStream * mt_nonnull chunk_stream);
 
 public:
-    ChunkStream *control_chunk_stream;
-    ChunkStream *data_chunk_stream;
+    mt_const ChunkStream *control_chunk_stream;
+    mt_const ChunkStream *data_chunk_stream;
 
     ChunkStream* getChunkStream (Uint32 chunk_stream_id,
 				 bool create);
