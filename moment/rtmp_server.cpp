@@ -125,27 +125,6 @@ RtmpServer::doPlay (RtmpConnection::MessageInfo * const mt_nonnull msg_info,
 	rtmp_conn->sendCommandMessage_AMF0 (msg_info->msg_stream_id, ConstMemory (msg_buf, msg_len));
     }
 
-    {
-	Result res;
-	if (!frontend.call_ret<Result> (&res, frontend->startWatching, /*(*/ ConstMemory (vs_name_buf, vs_name_len) /*)*/)) {
-	    logE_ (_func, "frontend gone");
-	    return Result::Failure;
-	}
-
-	if (!res) {
-	    logE_ (_func, "frontend->startWatching() failed");
-	    return Result::Failure;
-	}
-    }
-
-#if 0
-    if (!video_stream) {
-	logE_ (_func, "could not find video stream");
-	// TODO sendSimpleError? (No reply required for play?)
-	return Result::Success;
-    }
-#endif
-
     // TODO 
 
 //    if (!playing) {
@@ -194,6 +173,20 @@ RtmpServer::doPlay (RtmpConnection::MessageInfo * const mt_nonnull msg_info,
 	rtmp_conn->sendCommandMessage_AMF0 (msg_info->msg_stream_id, ConstMemory (msg_buf, msg_len));
     }
 
+
+    {
+	Result res;
+	if (!frontend.call_ret<Result> (&res, frontend->startWatching, /*(*/ ConstMemory (vs_name_buf, vs_name_len) /*)*/)) {
+	    logE_ (_func, "frontend gone");
+	    return Result::Failure;
+	}
+
+	if (!res) {
+	    logE_ (_func, "frontend->startWatching() failed");
+	    return Result::Failure;
+	}
+    }
+
     return Result::Success;
 }
 
@@ -233,14 +226,6 @@ RtmpServer::doPublish (RtmpConnection::MessageInfo * const mt_nonnull msg_info,
 	       "(length ", vs_name_full_len, " bytes, limit ", sizeof (vs_name_buf), " bytes)");
     }
 
-#if 0
-    if (video_stream) {
-	logW_ (_func, "already receiving a video stream, ignoring extra \"publish\" command");
-	// TODO sendSimpleResult (no reply required for publish?)
-	return Result::Success;
-    }
-#endif
-
     if (frontend && frontend->startStreaming) {
 	Result res;
 	if (!frontend.call_ret<Result> (&res, frontend->startStreaming, /*(*/ ConstMemory (vs_name_buf, vs_name_len) /*)*/)) {
@@ -253,14 +238,6 @@ RtmpServer::doPublish (RtmpConnection::MessageInfo * const mt_nonnull msg_info,
 	    return Result::Failure;
 	}
     }
-
-#if 0
-    if (!video_stream) {
-	logE_ (_func, "could not find video stream");
-	// TODO sendSimpleError
-	return Result::Success;
-    }
-#endif
 
     // TODO Subscribe for translation stop? (probably not here)
 
@@ -449,6 +426,7 @@ void
 RtmpServer::sendInitialMessages_unlocked (VideoStream::FrameSaver * const mt_nonnull frame_saver)
 {
     VideoStream::SavedFrame saved_frame;
+    VideoStream::SavedAudioFrame saved_audio_frame;
 
     if (frame_saver->getSavedMetaData (&saved_frame)) {
 	saved_frame.msg_info.timestamp = 0;
@@ -456,7 +434,14 @@ RtmpServer::sendInitialMessages_unlocked (VideoStream::FrameSaver * const mt_non
 			  &saved_frame.page_list,
 			  saved_frame.msg_len,
 			  saved_frame.msg_offset);
-	saved_frame.page_pool->msgUnref (saved_frame.page_list.first);
+    }
+
+    if (frame_saver->getSavedAacSeqHdr (&saved_audio_frame)) {
+	saved_audio_frame.msg_info.timestamp = 0;
+	sendAudioMessage (&saved_audio_frame.msg_info,
+			  &saved_audio_frame.page_list,
+			  saved_audio_frame.msg_len,
+			  saved_audio_frame.msg_offset);
     }
 
     if (frame_saver->getSavedAvcSeqHdr (&saved_frame)) {
@@ -465,7 +450,6 @@ RtmpServer::sendInitialMessages_unlocked (VideoStream::FrameSaver * const mt_non
 			  &saved_frame.page_list,
 			  saved_frame.msg_len,
 			  saved_frame.msg_offset);
-	saved_frame.page_pool->msgUnref (saved_frame.page_list.first);
     }
 
     if (frame_saver->getSavedKeyframe (&saved_frame)) {
@@ -474,7 +458,6 @@ RtmpServer::sendInitialMessages_unlocked (VideoStream::FrameSaver * const mt_non
 			  &saved_frame.page_list,
 			  saved_frame.msg_len,
 			  saved_frame.msg_offset);
-	saved_frame.page_pool->msgUnref (saved_frame.page_list.first);
     }
 }
 
@@ -610,6 +593,134 @@ RtmpServer::commandMessage (RtmpConnection::MessageInfo * const mt_nonnull msg_i
 	} else {
 	    logW_ (_func, "unknown method: ", method_mem);
 	}
+    }
+
+    return Result::Success;
+}
+
+Result
+RtmpServer::encodeMetaData (MetaData * const mt_nonnull metadata,
+			    PagePool * const mt_nonnull page_pool,
+			    PagePool::PageListHead * const mt_nonnull page_list,
+			    Size     * const ret_msg_len,
+			    VideoStream::VideoMessageInfo * const ret_msg_info)
+{
+    AmfAtom atoms [128];
+    AmfEncoder encoder (atoms);
+
+    encoder.addString ("onMetaData");
+// Unnecessary    encoder.addNumber (1.0);
+
+    encoder.addEcmaArray (0 /* num_entries */);
+    AmfAtom * const toplevel_array_atom = encoder.getLastAtom ();
+    Uint32 num_entries = 0;
+
+    if (metadata->got_flags & MetaData::VideoCodecId) {
+	encoder.addFieldName ("videocodecid");
+	encoder.addNumber (metadata->video_codec_id);
+	++num_entries;
+    }
+
+    if (metadata->got_flags & MetaData::AudioCodecId) {
+	encoder.addFieldName ("audiocodecid");
+	encoder.addNumber (metadata->audio_codec_id);
+	++num_entries;
+    }
+
+    if (metadata->got_flags & MetaData::VideoWidth) {
+	encoder.addFieldName ("width");
+	encoder.addNumber (metadata->video_width);
+	++num_entries;
+    }
+
+    if (metadata->got_flags & MetaData::VideoHeight) {
+	encoder.addFieldName ("height");
+	encoder.addNumber (metadata->video_height);
+	++num_entries;
+    }
+
+    if (metadata->got_flags & MetaData::AspectRatioX) {
+	encoder.addFieldName ("AspectRatioX");
+	encoder.addNumber (metadata->aspect_ratio_x);
+	++num_entries;
+    }
+
+    if (metadata->got_flags & MetaData::AspectRatioY) {
+	encoder.addFieldName ("AspectRatioY");
+	encoder.addNumber (metadata->aspect_ratio_y);
+	++num_entries;
+    }
+
+    if (metadata->got_flags & MetaData::VideoDataRate) {
+	encoder.addFieldName ("videodatarate");
+	encoder.addNumber (metadata->video_data_rate);
+	++num_entries;
+    }
+
+    if (metadata->got_flags & MetaData::AudioDataRate) {
+	encoder.addFieldName ("audiodatarate");
+	encoder.addNumber (metadata->audio_data_rate);
+	++num_entries;
+    }
+
+    if (metadata->got_flags & MetaData::VideoFrameRate) {
+	encoder.addFieldName ("framerate");
+	encoder.addNumber (metadata->video_frame_rate);
+	++num_entries;
+    }
+
+    if (metadata->got_flags & MetaData::AudioSampleRate) {
+	encoder.addFieldName ("audiosamplerate");
+	encoder.addNumber (metadata->audio_sample_rate);
+	++num_entries;
+    }
+
+    if (metadata->got_flags & MetaData::AudioSampleSize) {
+	encoder.addFieldName ("audiosamplesize");
+	encoder.addNumber (metadata->audio_sample_size);
+	++num_entries;
+    }
+
+    if (metadata->got_flags & MetaData::NumChannels) {
+	encoder.addFieldName ("stereo");
+	if (metadata->num_channels >= 2) {
+	    encoder.addBoolean (true);
+	} else {
+	    encoder.addBoolean (false);
+	}
+	++num_entries;
+    }
+
+    encoder.endObject ();
+
+    toplevel_array_atom->setEcmaArraySize (num_entries);
+
+    Byte msg_buf [4096];
+    Size msg_len;
+    if (!encoder.encode (Memory::forObject (msg_buf), AmfEncoding::AMF0, &msg_len)) {
+	logE_ (_func, "encode() failed");
+	return Result::Failure;
+    }
+
+    {
+	RtmpConnection::PrechunkContext prechunk_ctx;
+	RtmpConnection::fillPrechunkedPages (&prechunk_ctx,
+					     ConstMemory (msg_buf, msg_len),
+					     page_pool,
+					     page_list,
+					     RtmpConnection::DefaultDataChunkStreamId,
+					     0 /* timestamp */,
+					     true /* first_chunk */);
+    }
+
+    if (ret_msg_len)
+	*ret_msg_len = msg_len;
+
+    if (ret_msg_info) {
+	ret_msg_info->timestamp = 0;
+	ret_msg_info->prechunk_size = RtmpConnection::PrechunkSize;
+	ret_msg_info->frame_type = VideoStream::VideoFrameType::RtmpSetMetaData;
+	ret_msg_info->codec_id = VideoStream::VideoCodecId::Unknown;
     }
 
     return Result::Success;
