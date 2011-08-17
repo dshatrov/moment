@@ -171,7 +171,7 @@ RtmpClient::commandMessageCallback (RtmpConnection::MessageInfo * const mt_nonnu
 				    AmfEncoding                   const /* amf_encoding */,
 				    void                        * const _self)
 {
-    logD (time, _func, "ts:0x ", fmt_hex, msg_info->timestamp);
+    logD (time, _func, "ts:0x", fmt_hex, msg_info->timestamp);
 
     RtmpClient * const self = static_cast <RtmpClient*> (_self);
 
@@ -191,7 +191,7 @@ RtmpClient::commandMessageCallback (RtmpConnection::MessageInfo * const mt_nonnu
 	return Result::Failure;
     }
 
-//    logD_ (_func, "method: ", ConstMemory (method_name, method_name_len));
+    logD (time, _func, "method: ", ConstMemory (method_name, method_name_len));
 
     ConstMemory method (method_name, method_name_len);
     if (!compare (method, "_result")) {
@@ -236,6 +236,14 @@ RtmpClient::commandMessageCallback (RtmpConnection::MessageInfo * const mt_nonnu
     } else
     if (!compare (method, "onMetaData")) {
       // No-op
+
+#if 0
+	{
+	    PagePool::Page * const page = page_list->first;
+	    if (page)
+		hexdump (logs, page->mem());
+	}
+#endif
     } else
     if (!compare (method, "onStatus")) {
       // No-op
@@ -270,7 +278,8 @@ RtmpClient::audioMessage (VideoStream::AudioMessageInfo * const mt_nonnull msg_i
 			  Size                            const /* msg_offset */,
 			  void                          * const /* _self */)
 {
-    logD (time, _func, "ts: 0x", fmt_hex, msg_info->timestamp);
+    logD (time, _func, "ts: 0x", fmt_hex, msg_info->timestamp, " ",
+	  msg_info->codec_id, " ", msg_info->frame_type);
     return Result::Success;
 }
 
@@ -282,7 +291,8 @@ RtmpClient::videoMessage (VideoStream::VideoMessageInfo * const mt_nonnull msg_i
 			  Size                            const /* msg_offset */,
 			  void                          * const _self)
 {
-    logD (time, _func, "ts: 0x", fmt_hex, msg_info->timestamp);
+    logD (time, _func, "ts: 0x", fmt_hex, msg_info->timestamp, " ",
+	  msg_info->codec_id, " ", msg_info->frame_type);
 
     RtmpClient * const self = static_cast <RtmpClient*> (_self);
 
