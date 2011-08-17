@@ -1228,7 +1228,13 @@ RtmpConnection::processMessage (ChunkStream * const chunk_stream)
 		audio_msg_info.timestamp = chunk_stream->in_msg_timestamp;
 		audio_msg_info.prechunk_size = (prechunking_enabled ? PrechunkSize : 0);
 		Result res = Result::Failure;
-		frontend.call_ret<Result> (&res, frontend->audioMessage, /*(*/ &audio_msg_info, page_pool, &chunk_stream->page_list, msg_len, 0 /* msg_offset */ /*)*/);
+		frontend.call_ret<Result> (&res,
+					   frontend->audioMessage,
+					   /*(*/ &audio_msg_info,
+						 page_pool,
+						 &chunk_stream->page_list,
+						 msg_len,
+						 0 /* msg_offset */ /*)*/);
 		return res;
 	    }
 	} break;
@@ -1246,6 +1252,15 @@ RtmpConnection::processMessage (ChunkStream * const chunk_stream)
 
 			video_msg_info.frame_type = VideoStream::VideoFrameType::fromFlvFrameType (frame_type);
 			video_msg_info.codec_id = VideoStream::VideoCodecId::fromFlvCodecId (codec_id);
+
+#if 0
+			// TEST
+			if (video_msg_info.frame_type == VideoStream::VideoFrameType::InterFrame ||
+			    video_msg_info.frame_type == VideoStream::VideoFrameType::DisposableInterFrame)
+			{
+			    video_msg_info.frame_type = VideoStream::VideoFrameType::KeyFrame;
+			}
+#endif
 
 			if (video_msg_info.codec_id == VideoStream::VideoCodecId::AVC) {
 			    if (page->data_len >= 2) {
@@ -1269,7 +1284,13 @@ RtmpConnection::processMessage (ChunkStream * const chunk_stream)
 		video_msg_info.prechunk_size = (prechunking_enabled ? PrechunkSize : 0);
 
 		Result res = Result::Failure;
-		frontend.call_ret<Result> (&res, frontend->videoMessage, /*(*/ &video_msg_info, page_pool, &chunk_stream->page_list, msg_len, 0 /* msg_offset */ /*)*/);
+		frontend.call_ret<Result> (&res,
+					   frontend->videoMessage,
+					   /*(*/ &video_msg_info,
+						 page_pool,
+						 &chunk_stream->page_list,
+						 msg_len,
+						 0 /* msg_offset */ /*)*/);
 		return res;
 	    }
 	} break;
