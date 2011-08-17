@@ -218,9 +218,19 @@ public:
 	void (*closed) (void *cb_data);
     };
 
+    // TODO Rename to SavedVideoFrame.
     struct SavedFrame
     {
 	VideoStream::VideoMessageInfo msg_info;
+	PagePool *page_pool;
+	PagePool::PageListHead page_list;
+	Size msg_len;
+	Size msg_offset;
+    };
+
+    struct SavedAudioFrame
+    {
+	VideoStream::AudioMessageInfo msg_info;
 	PagePool *page_pool;
 	PagePool::PageListHead page_list;
 	Size msg_len;
@@ -236,10 +246,19 @@ public:
 	bool got_saved_metadata;
 	SavedFrame saved_metadata;
 
+	bool got_saved_aac_seq_hdr;
+	SavedAudioFrame saved_aac_seq_hdr;
+
 	bool got_saved_avc_seq_hdr;
 	SavedFrame saved_avc_seq_hdr;
 
     public:
+	void processAudioFrame (AudioMessageInfo       * mt_nonnull msg_info,
+				PagePool               * mt_nonnull page_pool,
+				PagePool::PageListHead * mt_nonnull page_list,
+				Size                    msg_len,
+				Size                    msg_offset);
+
 	void processVideoFrame (VideoMessageInfo       * mt_nonnull msg_info,
 				PagePool               * mt_nonnull page_pool,
 				PagePool::PageListHead * mt_nonnull page_list,
@@ -249,6 +268,8 @@ public:
 	bool getSavedKeyframe (SavedFrame * mt_nonnull ret_frame);
 
 	bool getSavedMetaData (SavedFrame * mt_nonnull ret_frame);
+
+	bool getSavedAacSeqHdr (SavedAudioFrame * mt_nonnull ret_frame);
 
 	bool getSavedAvcSeqHdr (SavedFrame * mt_nonnull ret_frame);
 

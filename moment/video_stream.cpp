@@ -305,6 +305,44 @@ VideoStream::VideoCodecId::toFlvCodecId () const
 }
 
 void
+VideoStream::FrameSaver::processAudioFrame (AudioMessageInfo       * const mt_nonnull msg_info,
+					    PagePool               * const mt_nonnull page_pool,
+					    PagePool::PageListHead * const mt_nonnull page_list,
+					    Size                     const msg_len,
+					    Size                     const msg_offset)
+{
+    logD (frame_saver, _func, "0x", fmt_hex, (UintPtr) this);
+
+#if 0
+    if (page_list->first && page_list->first->data_len >= 1)
+	logD_ (_func, "audio header: 0x", fmt_hex, (unsigned) page_list->first->getData() [0]);
+#endif
+
+    switch (msg_info->frame_type) {
+	case AudioFrameType::AacSequenceHeader: {
+	    logD (frame_saver, _func, msg_info->frame_type);
+
+	    logD_ (_func, "AAC SEQUENCE HEADER");
+
+	    if (got_saved_aac_seq_hdr)
+		saved_aac_seq_hdr.page_pool->msgUnref (saved_aac_seq_hdr.page_list.first);
+
+	    got_saved_aac_seq_hdr = true;
+	    saved_aac_seq_hdr.msg_info = *msg_info;
+	    saved_aac_seq_hdr.page_pool = page_pool;
+	    saved_aac_seq_hdr.page_list = *page_list;
+	    saved_aac_seq_hdr.msg_len = msg_len;
+	    saved_aac_seq_hdr.msg_offset = msg_offset;
+
+	    page_pool->msgRef (page_list->first);
+	} break;
+	default:
+	  // No-op
+	    ;
+    }
+}
+
+void
 VideoStream::FrameSaver::processVideoFrame (VideoMessageInfo       * const mt_nonnull msg_info,
 					    PagePool               * const mt_nonnull page_pool,
 					    PagePool::PageListHead * const mt_nonnull page_list,
@@ -387,9 +425,7 @@ VideoStream::FrameSaver::getSavedKeyframe (SavedFrame * const mt_nonnull ret_fra
     if (!got_saved_keyframe)
 	return false;
 
-    saved_keyframe.page_pool->msgRef (saved_keyframe.page_list.first);
     *ret_frame = saved_keyframe;
-
     return true;
 }
 
@@ -399,9 +435,17 @@ VideoStream::FrameSaver::getSavedMetaData (SavedFrame * const mt_nonnull ret_fra
     if (!got_saved_metadata)
 	return false;
 
-    saved_metadata.page_pool->msgRef (saved_metadata.page_list.first);
     *ret_frame = saved_metadata;
+    return true;
+}
 
+bool
+VideoStream::FrameSaver::getSavedAacSeqHdr (SavedAudioFrame * const mt_nonnull ret_frame)
+{
+    if (!got_saved_aac_seq_hdr)
+	return false;
+
+    *ret_frame = saved_aac_seq_hdr;
     return true;
 }
 
@@ -411,9 +455,7 @@ VideoStream::FrameSaver::getSavedAvcSeqHdr (SavedFrame * const mt_nonnull ret_fr
     if (!got_saved_avc_seq_hdr)
 	return false;
 
-    saved_avc_seq_hdr.page_pool->msgRef (saved_avc_seq_hdr.page_list.first);
     *ret_frame = saved_avc_seq_hdr;
-
     return true;
 }
 
@@ -431,6 +473,9 @@ VideoStream::FrameSaver::~FrameSaver ()
 
     if (got_saved_metadata)
 	saved_metadata.page_pool->msgUnref (saved_metadata.page_list.first);
+
+    if (got_saved_aac_seq_hdr)
+	saved_aac_seq_hdr.page_pool->msgUnref (saved_aac_seq_hdr.page_list.first);
 
     if (got_saved_avc_seq_hdr)
 	saved_avc_seq_hdr.page_pool->msgUnref (saved_avc_seq_hdr.page_list.first);
@@ -562,8 +607,14 @@ VideoStream::fireAudioMessage (AudioMessageInfo       * const mt_nonnull msg_inf
 {
 //    logD_ (_func, "timestamp: 0x", fmt_hex, (UintPtr) msg_info->timestamp);
 
+    mutex.lock ();
+
+    frame_saver.processAudioFrame (msg_info, page_pool, page_list, msg_len, msg_offset);
+
     InformAudioMessage_Data inform_data (msg_info, page_pool, page_list, msg_len, msg_offset);
-    event_informer.informAll (informAudioMessage, &inform_data);
+    event_informer.informAll_unlocked (informAudioMessage, &inform_data);
+
+    mutex.unlock ();
 }
 
 void
