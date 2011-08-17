@@ -182,13 +182,9 @@ public:
 	VideoFrameType frame_type;
 	VideoCodecId codec_id;
 
-	// TODO Get rid of is_keyframe in favor of frame_type.
-	bool is_keyframe;
-
 	VideoMessageInfo ()
 	    : frame_type (VideoFrameType::Unknown),
-	      codec_id (VideoCodecId::Unknown),
-	      is_keyframe (true)
+	      codec_id (VideoCodecId::Unknown)
 	{
 	}
     };

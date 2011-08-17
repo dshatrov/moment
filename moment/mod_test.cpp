@@ -54,11 +54,9 @@ void frameTimerTick (void * const /* cb_data */)
 
     if (keyframe_counter == 0) {
 	video_msg_info.frame_type = VideoStream::VideoFrameType::KeyFrame;
-	video_msg_info.is_keyframe = true;
 	keyframe_counter = keyframe_interval;
     } else {
 	video_msg_info.frame_type = VideoStream::VideoFrameType::InterFrame;
-	video_msg_info.is_keyframe = false;
 	--keyframe_counter;
     }
 
