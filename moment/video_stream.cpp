@@ -462,6 +462,7 @@ VideoStream::FrameSaver::getSavedAvcSeqHdr (SavedFrame * const mt_nonnull ret_fr
 VideoStream::FrameSaver::FrameSaver ()
     : got_saved_keyframe (false),
       got_saved_metadata (false),
+      got_saved_aac_seq_hdr (false),
       got_saved_avc_seq_hdr (false)
 {
 }
