@@ -31,9 +31,11 @@ namespace {
 struct Options {
     bool help;
     Ref<String> config_filename;
+    Uint64 exit_after;
 
     Options ()
-	: help (false)
+	: help (false),
+	  exit_after ((Uint64) -1)
     {
     }
 };
@@ -54,9 +56,10 @@ MomentServer moment_server;
 static void
 printUsage ()
 {
-    outs->print ("Usage: videochatd [options]\n"
+    outs->print ("Usage: moment [options]\n"
 		  "Options:\n"
-		  "  -c --config <config_file> - Configuration file to use (default: /opt/moment/moment.conf)\n");
+		  "  -c --config <config_file> - Configuration file to use (default: /opt/moment/moment.conf)\n"
+		  "  --exit-after <time> - Exit after specified timeout in seconds.\n");
     outs->flush ();
 }
 
@@ -82,6 +85,30 @@ cmdline_config (char const * /* short_name */,
     return true;
 }
 
+static bool
+cmdline_exit_after (char const * /* short_nmae */,
+		    char const * /* long_name */,
+		    char const *value,
+		    void       * /* opt_data */,
+		    void       * /* cb_data */)
+{
+    if (!strToUint64_safe (value, &options.exit_after)) {
+	logE_ (_func, "Invalid value \"", value, "\" "
+	       "for --exit-after (number expected): ", exc->toString());
+	exit (EXIT_FAILURE);
+    }
+
+    logD_ (_func, "options.exit_after: ", options.exit_after);
+    return true;
+}
+
+static void exitTimerTick (void * const /* cb_data */)
+{
+    logD_ (_func, "Exit timer expired (", options.exit_after, " seconds)");
+//    exit (0);
+    server_app.stop();
+}
+
 }
 
 int main (int argc, char **argv)
@@ -90,7 +117,7 @@ int main (int argc, char **argv)
     libMaryInit ();
 
     {
-	unsigned const num_opts = 2;
+	unsigned const num_opts = 3;
 	MyCpp::CmdlineOption opts [num_opts];
 
 	opts [0].short_name = "h";
@@ -104,6 +131,12 @@ int main (int argc, char **argv)
 	opts [1].with_value = true;
 	opts [1].opt_data   = NULL;
 	opts [1].opt_callback = cmdline_config;
+
+	opts [2].short_name = NULL;
+	opts [2].long_name = "exit-after";
+	opts [2].with_value = true;
+	opts [2].opt_data = NULL;
+	opts [2].opt_callback = cmdline_exit_after;
 
 	MyCpp::ArrayIterator<MyCpp::CmdlineOption> opts_iter (opts, num_opts);
 	MyCpp::parseCmdline (&argc, &argv, opts_iter, NULL /* callback */, NULL /* callbackData */);
@@ -204,6 +237,15 @@ int main (int argc, char **argv)
     if (!moment_server.init (&server_app, &page_pool, &http_service, &config)) {
 	logE_ (_func, "moment_server.init() failed: ", exc->toString());
 	return EXIT_FAILURE;
+    }
+
+    logD_ (_func, "options.exit_after: ", options.exit_after);
+    if (options.exit_after != (Uint64) -1) {
+	server_app.getTimers()->addTimer (exitTimerTick,
+					  NULL /* cb_data */,
+					  NULL /* coderef_container */,
+					  options.exit_after,
+					  false /* periodical */);
     }
 
     if (!server_app.run ()) {
