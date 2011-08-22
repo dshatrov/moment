@@ -93,7 +93,7 @@ void frameTimerTick (void * const /* cb_data */)
 	    page_pool->getPages (&tmp_page_list, frame_size);
 
 	    {
-		PagePool::Page *page = page_list.first;
+		PagePool::Page *page = tmp_page_list.first;
 		while (page) {
 		    memset (page->getData(), (int) page_fill_counter, page->data_len);
 		    page = page->getNextMsgPage();
