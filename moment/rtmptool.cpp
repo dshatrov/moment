@@ -14,8 +14,9 @@ namespace {
 
 LogGroup libMary_logGroup_time ("rtmptool_time", LogLevel::N);
 
-mt_const struct Options
+class Options
 {
+public:
     bool help;
     Uint32 num_clients;
 
@@ -40,7 +41,7 @@ mt_const struct Options
     }
 };
 
-Options options;
+mt_const Options options;
 
 class RtmpClient : public DependentCodeReferenced
 {
@@ -388,7 +389,7 @@ Result doTest (void)
 	    logD_ (_func, "Starting client, id_char: ", ConstMemory::forObject (id_char));
 
 	    // Note that RtmpClient objects are never freed.
-	    RtmpClient *client = new RtmpClient (NULL /* coderef_container */, id_char);
+	    RtmpClient * const client = new RtmpClient (NULL /* coderef_container */, id_char);
 
 	    client->init (server_app.getTimers(), &page_pool);
 	    if (!client->start (server_app.getPollGroup(), addr)) {
@@ -403,9 +404,9 @@ Result doTest (void)
 	}
     }
 
-    logD_ (_func, "Starting...");
+    logI_ (_func, "Starting...");
     server_app.run ();
-    logD_ (_func, "...Finished");
+    logI_ (_func, "...Finished");
 
     return Result::Success;
 }
@@ -447,7 +448,6 @@ bool cmdline_num_clients (char const * /* short_name */,
 	       "for --num-clients (number expected): ", exc->toString());
 	exit (EXIT_FAILURE);
     }
-
     return true;
 }
 
@@ -458,7 +458,7 @@ bool cmdline_server_addr (char const * /* short_name */,
 			  void       * /* cb_data */)
 {
     if (!setIpAddress_default (ConstMemory (value, strlen (value)),
-			       ConstMemory(),
+			       "localhost",
 			       1935  /* default_port */,
 			       false /* allow_any_host */,
 			       &options.server_addr))
@@ -467,7 +467,6 @@ bool cmdline_server_addr (char const * /* short_name */,
 	       "for --server-addr (IP:PORT expected)");
 	exit (EXIT_FAILURE);
     }
-
     options.got_server_addr = true;
     return true;
 }
@@ -503,7 +502,6 @@ bool cmdline_report_interval (char const * /* short_name */,
 	       "for --report-interval (number expected): ", exc->toString());
 	exit (EXIT_FAILURE);
     }
-
     return true;
 }
 
