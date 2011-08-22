@@ -48,6 +48,9 @@ Time timestamp_offset = 0;
 
 Uint64 burst_width = 1;
 
+bool use_same_pages = true;
+Uint32 page_fill_counter = 0;
+
 void frameTimerTick (void * const /* cb_data */)
 {
     tick_mutex.lock ();
@@ -84,7 +87,35 @@ void frameTimerTick (void * const /* cb_data */)
 	video_msg_info.prechunk_size = prechunk_size;
 	video_msg_info.codec_id = VideoStream::VideoCodecId::Unknown;
 
-	video_stream->fireVideoMessage (&video_msg_info, page_pool, &page_list, frame_size, 0 /* msg_offset */);
+	PagePool::PageListHead *page_list_ptr = &page_list;
+	PagePool::PageListHead tmp_page_list;
+	if (!use_same_pages) {
+	    page_pool->getPages (&tmp_page_list, frame_size);
+
+	    {
+		PagePool::Page *page = page_list.first;
+		while (page) {
+		    memset (page->getData(), (int) page_fill_counter, page->data_len);
+		    page = page->getNextMsgPage();
+		}
+	    }
+
+	    if (page_fill_counter < 255)
+		++page_fill_counter;
+	    else
+		page_fill_counter = 0;
+
+	    page_list_ptr = &tmp_page_list;
+	}
+
+	video_stream->fireVideoMessage (&video_msg_info,
+					page_pool,
+					page_list_ptr,
+					frame_size,
+					0 /* msg_offset */);
+
+	if (!use_same_pages)
+	    page_pool->msgUnref (tmp_page_list.first);
     }
 
     tick_mutex.unlock ();
@@ -165,6 +196,20 @@ void modTestInit ()
 	    logE_ (_func, "Bad value for config option ", opt_name);
 	    return;
 	}
+    }
+
+    {
+	ConstMemory const opt_name = "mod_test/same_pages";
+	MConfig::Config::BooleanValue const val = config->getBoolean (opt_name);
+	if (val == MConfig::Config::Boolean_Invalid) {
+	    logE_ (_func, "Invalid value for ", opt_name, ": ", config->getString (opt_name));
+	    return;
+	}
+
+	if (val == MConfig::Config::Boolean_False)
+	    use_same_pages = false;
+	else
+	    use_same_pages = true;
     }
 
     if (frame_size > 0) {
