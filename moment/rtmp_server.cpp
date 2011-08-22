@@ -173,7 +173,6 @@ RtmpServer::doPlay (RtmpConnection::MessageInfo * const mt_nonnull msg_info,
 	rtmp_conn->sendCommandMessage_AMF0 (msg_info->msg_stream_id, ConstMemory (msg_buf, msg_len));
     }
 
-
     {
 	Result res;
 	if (!frontend.call_ret<Result> (&res, frontend->startWatching, /*(*/ ConstMemory (vs_name_buf, vs_name_len) /*)*/)) {

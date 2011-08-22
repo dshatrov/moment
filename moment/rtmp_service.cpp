@@ -101,7 +101,9 @@ RtmpService::acceptOneConnection ()
 
     session->conn_receiver.setFrontend (session->rtmp_conn.getReceiverFrontend());
 
-    if (!(session->pollable_key = poll_group->addPollable (session->tcp_conn.getPollable(), &session->deferred_reg))) {
+    session->pollable_key = poll_group->addPollable (session->tcp_conn.getPollable(),
+						     &session->deferred_reg);
+    if (!session->pollable_key) {
 	logE (rtmp_service, _func, "PollGroup::addPollable() failed: ", exc->toString());
 	return true;
     }
