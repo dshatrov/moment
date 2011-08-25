@@ -566,7 +566,7 @@ namespace {
 	InformRtmpCommandMessage_Data (RtmpConnection           * const  conn,
 				       VideoStream::MessageInfo * const  msg_info,
 				       ConstMemory                const &method_name,
-				       AmfDecoder               * const amf_decoder)
+				       AmfDecoder               * const  amf_decoder)
 	    : conn (conn),
 	      msg_info (msg_info),
 	      method_name (method_name),
@@ -581,7 +581,8 @@ VideoStream::informRtmpCommandMessage (EventHandler * const event_handler,
 				       void * const cb_data,
 				       void * const _inform_data)
 {
-    InformRtmpCommandMessage_Data * const inform_data = static_cast <InformRtmpCommandMessage_Data*> (_inform_data);
+    InformRtmpCommandMessage_Data * const inform_data =
+	    static_cast <InformRtmpCommandMessage_Data*> (_inform_data);
     // TODO Save/restore amf_decoder state between  callback invocations.
     //      Viable option - abstract away the parsing process.
     event_handler->rtmpCommandMessage (inform_data->conn,
@@ -644,7 +645,7 @@ VideoStream::fireRtmpCommandMessage (RtmpConnection    * const  mt_nonnull conn,
 				     AmfDecoder        * const  mt_nonnull amf_decoder)
 {
     InformRtmpCommandMessage_Data inform_data (conn, msg_info, method_name, amf_decoder);
-    event_informer.informAll (informVideoMessage, &inform_data);
+    event_informer.informAll (informRtmpCommandMessage, &inform_data);
 }
 
 void
