@@ -58,8 +58,8 @@ printUsage ()
 {
     outs->print ("Usage: moment [options]\n"
 		  "Options:\n"
-		  "  -c --config <config_file> - Configuration file to use (default: /opt/moment/moment.conf)\n"
-		  "  --exit-after <time> - Exit after specified timeout in seconds.\n");
+		  "  -c --config <config_file>  Configuration file to use (default: /opt/moment/moment.conf)\n"
+		  "  --exit-after <number>      Exit after specified timeout in seconds.\n");
     outs->flush ();
 }
 
@@ -106,7 +106,7 @@ static void exitTimerTick (void * const /* cb_data */)
 {
     logD_ (_func, "Exit timer expired (", options.exit_after, " seconds)");
 //    exit (0);
-    server_app.stop();
+    server_app.stop ();
 }
 
 }
