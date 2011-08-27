@@ -59,7 +59,8 @@ printUsage ()
     outs->print ("Usage: moment [options]\n"
 		  "Options:\n"
 		  "  -c --config <config_file>  Configuration file to use (default: /opt/moment/moment.conf)\n"
-		  "  --exit-after <number>      Exit after specified timeout in seconds.\n");
+		  "  --exit-after <number>      Exit after specified timeout in seconds.\n"
+		  "  -h --help                  Show this help message.\n");
     outs->flush ();
 }
 
