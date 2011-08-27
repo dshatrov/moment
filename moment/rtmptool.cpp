@@ -1,3 +1,22 @@
+/*  Moment Video Server - High performance media server
+    Copyright (C) 2011 Dmitry Shatrov
+
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License along
+    with this program; if not, write to the Free Software Foundation, Inc.,
+    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+*/
+
+
 #include <libmary/types.h>
 #include <cmath>
 
@@ -12,7 +31,7 @@ using namespace Moment;
 
 namespace {
 
-LogGroup libMary_logGroup_time ("rtmptool_time", LogLevel::N);
+LogGroup libMary_logGroup_time ("rtmptool_time", LogLevel::I);
 
 class Options
 {
@@ -25,6 +44,7 @@ public:
 
     bool nonfatal_errors;
 
+    Ref<String> app_name;
     Ref<String> channel;
     Ref<String> out_file;
 
@@ -35,6 +55,7 @@ public:
 	  num_clients (1),
 	  got_server_addr (false),
 	  nonfatal_errors (false),
+	  app_name (grab (new String ("oflaDemo"))),
 	  channel (grab (new String ("red5StreamDemo"))),
 	  report_interval (0)
     {
@@ -158,7 +179,7 @@ RtmpClient::handshakeComplete (void * const _self)
 
     RtmpClient * const self = static_cast <RtmpClient*> (_self);
 
-    self->rtmp_conn.sendConnect ("oflaDemo");
+    self->rtmp_conn.sendConnect (options.app_name->mem());
     self->conn_state = ConnectionState_ConnectSent;
 
     return Result::Success;
@@ -416,13 +437,14 @@ printUsage ()
 {
     outs->print ("Usage: rtmptool [options]\n"
 		 "Options:\n"
-		 "  -n --num-clients <N> - Simulate N simultaneous clients.\n"
-		 "  -s --server-addr - Server address, IP:PORT.\n"
-		 "  -c --channel - Name of the channel to subscribe to.\n"
-		 "  -h --help - Show help message.\n"
-		 "  -r --report-interval - Interval between video frame reports.\n"
-		 "  --nonfatal-errors - Do not exit on the first error.\n"
-//		 "  -o --out_file - Output file name.\n"
+		 "  -n --num-clients <number>      Simulate N simultaneous clients (default: 1)\n"
+		 "  -s --server-addr <address>     Server address, IP:PORT (default: localhost:1935)\n"
+		 "  -a --app <string>              Application name (default: oflaDemo)\n"
+		 "  -c --channel <string>          Name of the channel to subscribe to (default: red5StreamDemo)\n"
+		 "  -h --help                      Show this help message.\n"
+		 "  -r --report-interval <number>  Interval between video frame reports (default: 0, no reports)\n"
+		 "  --nonfatal-errors              Do not exit on the first error.\n"
+//		 "  -o --out-file - Output file name.\n"
 		 );
     outs->flush ();
 }
@@ -468,6 +490,16 @@ bool cmdline_server_addr (char const * /* short_name */,
 	exit (EXIT_FAILURE);
     }
     options.got_server_addr = true;
+    return true;
+}
+
+bool cmdline_app (char const * /* short_name */,
+		  char const * /* long_name */,
+		  char const *value,
+		  void       * /* opt_data */,
+		  void       * /* cb_data */)
+{
+    options.app_name = grab (new String (value));
     return true;
 }
 
@@ -523,7 +555,7 @@ int main (int argc, char **argv)
     libMaryInit ();
 
     {
-	unsigned const num_opts = 7;
+	unsigned const num_opts = 8;
 	MyCpp::CmdlineOption opts [num_opts];
 
 	opts [0].short_name = "h";
@@ -544,29 +576,35 @@ int main (int argc, char **argv)
 	opts [2].opt_data   = NULL;
 	opts [2].opt_callback = cmdline_server_addr;
 
-	opts [3].short_name = "c";
-	opts [3].long_name  = "channel";
+	opts [3].short_name = "a";
+	opts [3].long_name  = "app";
 	opts [3].with_value = true;
 	opts [3].opt_data   = NULL;
-	opts [3].opt_callback = cmdline_channel;
+	opts [3].opt_callback = cmdline_app;
 
-	opts [4].short_name = "o";
-	opts [4].long_name  = "out-file";
+	opts [4].short_name = "c";
+	opts [4].long_name  = "channel";
 	opts [4].with_value = true;
 	opts [4].opt_data   = NULL;
-	opts [4].opt_callback = cmdline_out_file;
+	opts [4].opt_callback = cmdline_channel;
 
-	opts [5].short_name = "r";
-	opts [5].long_name  = "report-interval";
+	opts [5].short_name = "o";
+	opts [5].long_name  = "out-file";
 	opts [5].with_value = true;
 	opts [5].opt_data   = NULL;
-	opts [5].opt_callback = cmdline_report_interval;
+	opts [5].opt_callback = cmdline_out_file;
 
-	opts [6].short_name = NULL;
-	opts [6].long_name  = "nonfatal-errors";
-	opts [6].with_value = false;
+	opts [6].short_name = "r";
+	opts [6].long_name  = "report-interval";
+	opts [6].with_value = true;
 	opts [6].opt_data   = NULL;
-	opts [6].opt_callback = cmdline_nonfatal_errors;
+	opts [6].opt_callback = cmdline_report_interval;
+
+	opts [7].short_name = NULL;
+	opts [7].long_name  = "nonfatal-errors";
+	opts [7].with_value = false;
+	opts [7].opt_data   = NULL;
+	opts [7].opt_callback = cmdline_nonfatal_errors;
 
 	MyCpp::ArrayIterator<MyCpp::CmdlineOption> opts_iter (opts, num_opts);
 	MyCpp::parseCmdline (&argc, &argv, opts_iter, NULL /* callback */, NULL /* callback_data */);
