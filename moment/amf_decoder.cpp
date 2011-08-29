@@ -180,6 +180,13 @@ AmfDecoder::beginObject ()
 }
 
 Result
+AmfDecoder::skipValue ()
+{
+  // TODO
+    return Result::Failure;
+}
+
+Result
 AmfDecoder::skipObject ()
 {
     if (msg_len - cur_offset < 1) {
@@ -237,6 +244,8 @@ AmfDecoder::skipObject ()
 		    return Result::Failure;
 		break;
 	    case AmfMarker::String:
+		// TODO Implement object skipping.
+//		logD_ (_func, "String");
 		if (!decodeString (Memory(), NULL, NULL))
 		    return Result::Failure;
 		break;

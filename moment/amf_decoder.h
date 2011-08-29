@@ -54,6 +54,8 @@ public:
 
     Result beginObject ();
 
+    Result skipValue ();
+
     Result skipObject ();
 
     Size getCurOffset ()
