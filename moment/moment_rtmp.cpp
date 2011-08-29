@@ -56,9 +56,10 @@ public:
     // holds. See takeRtmpConnRef().
     RtmpServer rtmp_server;
 
-    // We create 'video_stream' immediately after creating the session to allow
-    // unlocked access to the pointer.
-    mt_const Ref<VideoStream> video_stream;
+    mt_mutex (mutex) Ref<MomentServer::ClientSession> srv_session;
+
+    mt_mutex (mutex) Ref<VideoStream> video_stream;
+    // TODO Deprecated field
     mt_mutex (mutex) MomentServer::VideoStreamKey video_stream_key;
 
 #ifdef MOMENT_RTMP__FLOW_CONTROL
@@ -112,15 +113,13 @@ public:
 #endif
 	  watching (false)
     {
-	video_stream = grab (new VideoStream);
+	logD_ (_func, "0x", fmt_hex, (UintPtr) this);
     }
 
-#if 0
     ~ClientSession ()
     {
 	logD_ (_func, "0x", fmt_hex, (UintPtr) this);
     }
-#endif
 };
 
 void destroyClientSession (ClientSession * const client_session)
@@ -134,17 +133,24 @@ void destroyClientSession (ClientSession * const client_session)
     }
     client_session->valid = false;
 
+    Ref<VideoStream> const video_stream = client_session->video_stream;
     MomentServer::VideoStreamKey const video_stream_key = client_session->video_stream_key;
+
+    Ref<MomentServer::ClientSession> const srv_session = client_session->srv_session;
+    client_session->srv_session = NULL;
 
     client_session->mutex.unlock ();
 
-    client_session->video_stream->close ();
+    // TODO class MomentRtmpModule
+    MomentServer * const moment = MomentServer::getInstance();
 
-    if (video_stream_key) {
-	// TODO class MomentRtmpModule
-	MomentServer * const moment = MomentServer::getInstance();
+    if (video_stream)
+	video_stream->close ();
+
+    if (video_stream_key)
 	moment->removeVideoStream (video_stream_key);
-    }
+
+    moment->clientDisconnected (srv_session);
 
     client_session->unref ();
 }
@@ -286,6 +292,27 @@ VideoStream::EventHandler /* TODO Allow consts in Informer_ */ /* const */ video
     streamClosed
 };
 
+Result connect (ConstMemory const &app_name,
+		void * const _client_session)
+{
+    logD_ (_func, "app_name: ", app_name);
+
+    ClientSession * const client_session = static_cast <ClientSession*> (_client_session);
+
+    // TODO class MomentRtmpModule
+    MomentServer * const moment = MomentServer::getInstance();
+
+    Ref<MomentServer::ClientSession> const srv_session = moment->rtmpClientConnected (app_name, client_session->rtmp_conn);
+    if (!srv_session)
+	return Result::Failure;
+
+    client_session->mutex.lock ();
+    client_session->srv_session = srv_session;
+    client_session->mutex.unlock ();
+
+    return Result::Success;
+}
+
 Result startStreaming (ConstMemory const &_stream_name,
 		       void * const _client_session)
 {
@@ -303,12 +330,25 @@ Result startStreaming (ConstMemory const &_stream_name,
 
     ClientSession * const client_session = static_cast <ClientSession*> (_client_session);
 
+    // 'srv_session' is created in connect(), which is synchronized with
+    // startStreaming(). No locking needed.
+    Ref<VideoStream> const video_stream = moment->startStreaming (client_session->srv_session, stream_name);
+    if (!video_stream)
+	return Result::Failure;
+
+    client_session->mutex.lock ();
+    client_session->video_stream = video_stream;
+    client_session->mutex.unlock ();
+
+#if 0
+// Deprecated
     MomentServer::VideoStreamKey const video_stream_key =
-	moment->addVideoStream (client_session->video_stream, stream_name);
+	    moment->addVideoStream (client_session->video_stream, stream_name);
 
     client_session->mutex.lock ();
     client_session->video_stream_key = video_stream_key;
     client_session->mutex.unlock ();
+#endif
 
     return Result::Success;
 }
@@ -324,20 +364,21 @@ Result startWatching (ConstMemory const &stream_name,
 
     ClientSession * const client_session = static_cast <ClientSession*> (_client_session);
 
-    // TODO Direct video stream to the client. (Subscribe to that video stream's events.
-    //      Some kind of flow control is needed.
-
-    Ref<VideoStream> const video_stream = moment->getVideoStream (stream_name);
-    if (!video_stream) {
-	logE (mod_rtmp, _func, "video stream not found: ", stream_name);
-	return Result::Failure;
-    }
-
     if (client_session->watching) {
 	logE (mod_rtmp, _func, "already watching another stream");
 	return Result::Success;
     }
     client_session->watching = true;
+
+    Ref<VideoStream> const video_stream = moment->startWatching (client_session->srv_session, stream_name);
+#if 0
+// Deprecated
+    Ref<VideoStream> const video_stream = moment->getVideoStream (stream_name);
+#endif
+    if (!video_stream) {
+	logE (mod_rtmp, _func, "video stream not found: ", stream_name);
+	return Result::Failure;
+    }
 
     video_stream->lock ();
     client_session->rtmp_server.sendInitialMessages_unlocked (video_stream->getFrameSaver());
@@ -348,6 +389,7 @@ Result startWatching (ConstMemory const &stream_name,
 }
 
 RtmpServer::Frontend const rtmp_server_frontend = {
+    connect,
     startStreaming /* startStreaming */,
     startWatching,
     NULL /* commandMessage */
@@ -361,7 +403,12 @@ Result audioMessage (VideoStream::AudioMessageInfo * const mt_nonnull msg_info,
 		     void                          * const _client_session)
 {
     ClientSession * const client_session = static_cast <ClientSession*> (_client_session);
-    client_session->video_stream->fireAudioMessage (msg_info, page_pool, page_list, msg_len, msg_offset);
+
+    // We create 'video_stream' in startStreaming()/startWatching(), which is
+    // synchronized with autioMessage(). No locking needed.
+    if (client_session->video_stream)
+	client_session->video_stream->fireAudioMessage (msg_info, page_pool, page_list, msg_len, msg_offset);
+
     return Result::Success;
 }
 
@@ -373,7 +420,12 @@ Result videoMessage (VideoStream::VideoMessageInfo * const mt_nonnull msg_info,
 		     void                          * const _client_session)
 {
     ClientSession * const client_session = static_cast <ClientSession*> (_client_session);
-    client_session->video_stream->fireVideoMessage (msg_info, page_pool, page_list, msg_len, msg_offset);
+
+    // We create 'video_stream' in startStreaming()/startWatching(), which is
+    // synchronized with videoMessage(). No locking needed.
+    if (client_session->video_stream)
+	client_session->video_stream->fireVideoMessage (msg_info, page_pool, page_list, msg_len, msg_offset);
+
     return Result::Success;
 }
 
