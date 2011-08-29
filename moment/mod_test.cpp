@@ -29,7 +29,7 @@ namespace {
 
 Mutex tick_mutex;
 
-VideoStream *video_stream = NULL;
+Ref<VideoStream> video_stream = NULL;
 Uint64 frame_size = 4096;
 Uint64 prechunk_size = 65536;
 
@@ -234,7 +234,7 @@ void modTestInit ()
 
     ConstMemory const stream_name = config->getString_default ("mod_test/stream_name", "test");
 
-    video_stream = new VideoStream;
+    video_stream = grab (new VideoStream);
     moment->addVideoStream (video_stream, stream_name);
 
     server_app->getTimers()->addTimer_microseconds (frameTimerTick,
