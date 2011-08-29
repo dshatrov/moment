@@ -270,6 +270,15 @@ public:
 
     void clientDisconnected (ClientSession * mt_nonnull client_session);
 
+    void rtmpCommandMessage (ClientSession            * const mt_nonnull client_session,
+			     RtmpConnection           * const mt_nonnull conn,
+			     VideoStream::MessageInfo * const mt_nonnull msg_info,
+			     ConstMemory        const &method_name,
+			     AmfDecoder               * const mt_nonnull amf_decoder)
+    {
+	client_session->fireRtmpCommandMessage (conn, msg_info, method_name, amf_decoder);
+    }
+
     void disconnect (ClientSession * mt_nonnull client_session);
 
     Ref<VideoStream> startWatching (ClientSession * mt_nonnull client_session,

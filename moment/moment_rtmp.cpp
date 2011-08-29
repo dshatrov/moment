@@ -388,11 +388,41 @@ Result startWatching (ConstMemory const &stream_name,
     return Result::Success;
 }
 
+RtmpServer::CommandResult server_commandMessage (RtmpConnection              * const mt_nonnull conn,
+						 ConstMemory const           &method_name,
+						 RtmpConnection::MessageInfo * const mt_nonnull msg_info,
+						 AmfDecoder                  * const mt_nonnull amf_decoder,
+						 void                        * const _client_session)
+{
+    logD_ (_func, "method_name: ", method_name);
+
+    MomentServer * const moment = MomentServer::getInstance();
+    ClientSession * const client_session = static_cast <ClientSession*> (_client_session);
+
+    client_session->mutex.lock ();
+    Ref<MomentServer::ClientSession> const srv_session = client_session->srv_session;
+    client_session->mutex.unlock ();
+
+    if (!srv_session) {
+	logW_ (_func, "No server session, command message dropped");
+	return RtmpServer::CommandResult::UnknownCommand;
+    }
+
+    {
+	VideoStream::MessageInfo vs_msg_info;
+	vs_msg_info.timestamp = msg_info->timestamp;
+	vs_msg_info.prechunk_size = msg_info->prechunk_size;
+	moment->rtmpCommandMessage (srv_session, conn, &vs_msg_info, method_name, amf_decoder);
+    }
+
+    return RtmpServer::CommandResult::Success;
+}
+
 RtmpServer::Frontend const rtmp_server_frontend = {
     connect,
     startStreaming /* startStreaming */,
     startWatching,
-    NULL /* commandMessage */
+    server_commandMessage
 };
 
 Result audioMessage (VideoStream::AudioMessageInfo * const mt_nonnull msg_info,

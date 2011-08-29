@@ -60,11 +60,11 @@ public:
 	Result (*startWatching) (ConstMemory const &stream_name,
 				 void  *cb_data);
 
-	CommandResult (*commandMessage) (RtmpConnection    *conn,
-					 ConstMemory const &method_name,
-					 RtmpConnection::MessageInfo *msg_info,
-					 AmfDecoder        *amf_decoder,
-					 void              *cb_data);
+	CommandResult (*commandMessage) (RtmpConnection              * mt_nonnull conn,
+					 ConstMemory const           &method_name,
+					 RtmpConnection::MessageInfo * mt_nonnull msg_info,
+					 AmfDecoder                  * mt_nonnull amf_decoder,
+					 void                        *cb_data);
     };
 
 private:
