@@ -54,9 +54,9 @@ typedef void (*MomentStreamClosedCallback) (void *user_data);
 
 void moment_stream_handler_init (MomentStreamHandler *stream_handler);
 
-void moment_stream_handler_set_command_message (MomentStreamHandler              *stream_handler,
-						MomentRtmpCommandMessageCallback  cb,
-						void                             *user_data);
+void moment_stream_handler_set_rtmp_command_message (MomentStreamHandler              *stream_handler,
+						     MomentRtmpCommandMessageCallback  cb,
+						     void                             *user_data);
 
 void moment_stream_handler_set_closed (MomentStreamHandler        *stream_handler,
 				       MomentStreamClosedCallback  cb,

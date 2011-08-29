@@ -112,9 +112,9 @@ void moment_stream_handler_init (MomentStreamHandler * const stream_handler)
     stream_handler->initialized = MOMENT_API_INITIALIZED_MAGIC;
 }
 
-void moment_stream_handler_set_command_message (MomentStreamHandler * const stream_handler,
-						MomentRtmpCommandMessageCallback const cb,
-						void * const user_data)
+void moment_stream_handler_set_rtmp_command_message (MomentStreamHandler              * const stream_handler,
+						     MomentRtmpCommandMessageCallback   const cb,
+						     void                             * const user_data)
 {
     stream_handler->command_cb = cb;
     stream_handler->command_cb_data = user_data;
