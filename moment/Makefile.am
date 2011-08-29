@@ -35,7 +35,12 @@ moment_target_headers =		\
 				\
 	video_stream.h		\
 				\
-	moment_server.h
+	moment_server.h		\
+				\
+	api.h			\
+	api_amf.h		\
+				\
+	module_init.h
 
 libmomentincludedir = $(includedir)/moment-1.0/moment
 libmomentinclude_HEADERS = $(moment_target_headers)
@@ -55,6 +60,8 @@ libmoment_1_0_la_SOURCES =	\
 	video_stream.cpp	\
 				\
 	moment_server.cpp	\
+				\
+	api.cpp			\
 				\
 	hmac/sha2.c		\
 	hmac/hmac_sha2.c
