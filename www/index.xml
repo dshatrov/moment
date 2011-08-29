@@ -36,7 +36,7 @@
       </p>
 
       <p>
-      Moment VS works under Linux. A port to Windows is under development.
+      Moment VS works under Linux and FreeBSD. A port to Windows is under development.
       </p>
     </eng>
     <rus>
@@ -66,7 +66,7 @@
       </p>
 
       <p>
-      &laquo;Moment&raquo; работает под управлением ОС Linux. Версия для Windows находится в разработке.
+      &laquo;Moment&raquo; работает под управлением ОС Linux и FreeBSD. Версия для Windows находится в разработке.
       </p>
     </rus>
   </p>
