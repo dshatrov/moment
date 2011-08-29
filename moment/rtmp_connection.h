@@ -545,9 +545,17 @@ public:
 
     void startServer ();
 
-  // TODO doConnect(), doCreateStream(), etc. belong to RtmpServer.
+    Uint32 getLocalWackSize () const
+    {
+	return local_wack_size;
+    }
 
-    Result doConnect (MessageInfo * mt_nonnull msg_info);
+    Uint32 getRemoteWackSize () const
+    {
+	return remote_wack_size;
+    }
+
+  // TODO doConnect(), doCreateStream(), etc. belong to RtmpServer.
 
     Result doCreateStream (MessageInfo * mt_nonnull msg_info,
 			   AmfDecoder  * mt_nonnull amf_decoder);

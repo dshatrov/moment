@@ -51,18 +51,20 @@ public:
     };
 
     struct Frontend {
-	// StartStreaming
+	Result (*connect) (ConstMemory const &app_name,
+			   void *cb_data);
+
 	Result (*startStreaming) (ConstMemory const &stream_name,
 				  void  *cb_data);
 
 	Result (*startWatching) (ConstMemory const &stream_name,
 				 void  *cb_data);
 
-	CommandResult (*commandMessage) (RtmpConnection *conn,
+	CommandResult (*commandMessage) (RtmpConnection    *conn,
 					 ConstMemory const &method_name,
 					 RtmpConnection::MessageInfo *msg_info,
-					 AmfDecoder *amf_decoder,
-					 void *cb_data);
+					 AmfDecoder        *amf_decoder,
+					 void              *cb_data);
     };
 
 private:
@@ -73,6 +75,9 @@ private:
     Cb<Frontend> frontend;
 
     AtomicInt playing;
+
+    Result doConnect (RtmpConnection::MessageInfo * mt_nonnull msg_info,
+		      AmfDecoder * const mt_nonnull decoder);
 
     Result doPlay (RtmpConnection::MessageInfo * mt_nonnull msg_info,
 		   AmfDecoder * mt_nonnull decoder);

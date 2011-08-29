@@ -32,6 +32,133 @@ LogGroup libMary_logGroup_rtmp_server ("rtmp_server", LogLevel::I);
 }
 
 Result
+RtmpServer::doConnect (RtmpConnection::MessageInfo * const mt_nonnull msg_info,
+		       AmfDecoder * const mt_nonnull decoder)
+{
+    double transaction_id;
+    if (!decoder->decodeNumber (&transaction_id)) {
+	logE_ (_func, "could not decode transaction_id");
+	return Result::Failure;
+    }
+
+#if 0
+    if (!decoder->skipObject ()) {
+	logE_ (_func, "could not skip command object");
+	return Result::Failure;
+    }
+#endif
+
+    if (!decoder->beginObject ()) {
+	logE_ (_func, "no command object");
+	return Result::Failure;
+    }
+
+    Byte app_name_buf [1024];
+    Size app_name_len;
+    for (;;) {
+	Byte field_name_buf [512];
+	Size field_name_len;
+	Size field_name_full_len;
+	if (!decoder->decodeFieldName (Memory::forObject (field_name_buf), &field_name_len, &field_name_full_len)) {
+	    logE_ (_func, "no \"app\" field in the command object");
+	    return Result::Failure;
+	}
+
+	if (equal (ConstMemory (field_name_buf, field_name_len), "app")) {
+	    Size app_name_full_len;
+	    if (!decoder->decodeString (Memory::forObject (app_name_buf), &app_name_len, &app_name_full_len)) {
+		logE_ (_func, "could not decode app name");
+		return Result::Failure;
+	    }
+	    if (app_name_full_len > app_name_len) {
+		logW_ (_func, "app name length exceeds limit "
+		       "(length ", app_name_full_len, " bytes, limit ", sizeof (app_name_buf), " bytes)");
+	    }
+	    break;
+	}
+
+	if (!decoder->skipValue ()) {
+	    logE_ (_func, "could not skip field value");
+	    return Result::Failure;
+	}
+    }
+
+    rtmp_conn->sendWindowAckSize (rtmp_conn->getLocalWackSize());
+    rtmp_conn->sendSetPeerBandwidth (rtmp_conn->getRemoteWackSize(), 2 /* dynamic limit */);
+    rtmp_conn->sendUserControl_StreamBegin (0 /* msg_stream_id */);
+
+    {
+	AmfAtom atoms [19];
+	AmfEncoder encoder (atoms);
+
+	encoder.addString ("_result");
+	encoder.addNumber (1.0); // FIXME Incorrect transaction_id?
+	encoder.addNullObject ();
+
+	{
+	    encoder.beginObject ();
+
+	    encoder.addFieldName ("level");
+	    encoder.addString ("status");
+
+	    encoder.addFieldName ("code");
+	    encoder.addString ("NetConnection.Connect.Success");
+
+	    encoder.addFieldName ("description");
+	    encoder.addString ("Connection succeeded.");
+
+	    encoder.endObject ();
+	}
+
+	{
+	    encoder.beginObject ();
+
+	    encoder.addFieldName ("fmsVer");
+	    encoder.addString ("MMNT/0,1,0,0");
+
+	    encoder.addFieldName ("capabilities");
+	    // TODO Define capabilities. Docs?
+	    encoder.addNumber (31.0);
+
+	    encoder.addFieldName ("mode");
+	    encoder.addNumber (1.0);
+
+	    encoder.endObject ();
+	}
+
+	Byte msg_buf [1024];
+	Size msg_len;
+	if (!encoder.encode (Memory::forObject (msg_buf), AmfEncoding::AMF0, &msg_len)) {
+	    logE_ (_func, "encode() failed");
+	    return Result::Failure;
+	}
+
+	rtmp_conn->sendCommandMessage_AMF0 (msg_info->msg_stream_id, ConstMemory (msg_buf, msg_len));
+
+#if 0
+	logD (proto_out, _func, "msg_len: ", msg_len);
+	if (logLevelOn (proto_out, LogLevel::Debug))
+	    hexdump (ConstMemory (msg_buf, msg_len));
+#endif
+    }
+
+    if (frontend->connect) {
+	Result res;
+	if (!frontend.call_ret<Result> (&res, frontend->connect, /*(*/ ConstMemory (app_name_buf, app_name_len) /*)*/)) {
+	    logE_ (_func, "frontend gone");
+	    return Result::Failure;
+	}
+
+	if (!res) {
+	    logE_ (_func, "frontend->connect() failed");
+	    return Result::Failure;
+	}
+    }
+
+    return Result::Success;
+}
+
+Result
 RtmpServer::doPlay (RtmpConnection::MessageInfo * const mt_nonnull msg_info,
 		    AmfDecoder * const mt_nonnull decoder)
 {
@@ -493,7 +620,7 @@ RtmpServer::commandMessage (RtmpConnection::MessageInfo * const mt_nonnull msg_i
 //	decoder.beginObject ();
 	// TODO Decode URL
 
-	return rtmp_conn->doConnect (msg_info);
+	return doConnect (msg_info, &decoder);
     } else
     if (!compare (method_mem, "createStream")) {
 	return rtmp_conn->doCreateStream (msg_info, &decoder);

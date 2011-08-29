@@ -33,9 +33,9 @@ LogGroup libMary_logGroup_chunk     ("rtmp_chunk",      LogLevel::N);
 LogGroup libMary_logGroup_msg       ("rtmp_msg",        LogLevel::N);
 LogGroup libMary_logGroup_codec     ("rtmp_codec",      LogLevel::N);
 LogGroup libMary_logGroup_send      ("rtmp_send",       LogLevel::N);
-LogGroup libMary_logGroup_time      ("rtmp_time",       LogLevel::N);
+LogGroup libMary_logGroup_time      ("rtmp_time",       LogLevel::I);
 LogGroup libMary_logGroup_close     ("rtmp_conn_close", LogLevel::N);
-LogGroup libMary_logGroup_proto_in  ("rtmp_proto_in",   LogLevel::N);
+LogGroup libMary_logGroup_proto_in  ("rtmp_proto_in",   LogLevel::I);
 LogGroup libMary_logGroup_proto_out ("rtmp_proto_out",  LogLevel::N);
 }
 
@@ -2366,69 +2366,6 @@ void
 RtmpConnection::startServer ()
 {
     conn_state = ReceiveState::ServerWaitC0;
-}
-
-Result
-RtmpConnection::doConnect (MessageInfo * const mt_nonnull msg_info)
-{
-    sendWindowAckSize (local_wack_size);
-    sendSetPeerBandwidth (remote_wack_size, 2 /* dynamic limitt */);
-    sendUserControl_StreamBegin (0 /* msg_stream_id */);
-
-    {
-	AmfAtom atoms [19];
-	AmfEncoder encoder (atoms);
-
-	encoder.addString ("_result");
-	encoder.addNumber (1.0); // FIXME Incorrect transaction_id?
-	encoder.addNullObject ();
-
-	{
-	    encoder.beginObject ();
-
-	    encoder.addFieldName ("level");
-	    encoder.addString ("status");
-
-	    encoder.addFieldName ("code");
-	    encoder.addString ("NetConnection.Connect.Success");
-
-	    encoder.addFieldName ("description");
-	    encoder.addString ("Connection succeeded.");
-
-	    encoder.endObject ();
-	}
-
-	{
-	    encoder.beginObject ();
-
-	    encoder.addFieldName ("fmsVer");
-	    encoder.addString ("MMNT/0,1,0,0");
-
-	    encoder.addFieldName ("capabilities");
-	    // TODO Define capabilities. Docs?
-	    encoder.addNumber (31.0);
-
-	    encoder.addFieldName ("mode");
-	    encoder.addNumber (1.0);
-
-	    encoder.endObject ();
-	}
-
-	Byte msg_buf [1024];
-	Size msg_len;
-	if (!encoder.encode (Memory::forObject (msg_buf), AmfEncoding::AMF0, &msg_len)) {
-	    logE_ (_func, "encode() failed");
-	    return Result::Failure;
-	}
-
-	sendCommandMessage_AMF0 (msg_info->msg_stream_id, ConstMemory (msg_buf, msg_len));
-
-	logD (proto_out, _func, "msg_len: ", msg_len);
-	if (logLevelOn (proto_out, LogLevel::Debug))
-	    hexdump (ConstMemory (msg_buf, msg_len));
-    }
-
-    return Result::Success;
 }
 
 Result
