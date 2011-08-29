@@ -211,6 +211,8 @@ public:
 				    AmfDecoder        * mt_nonnull amf_decoder,
 				    void              *cb_data);
 
+	// FIXME getVideoStream() and closed() imply a race condition.
+	// Add isClosed() method to VideoStream as a workaround.
 	void (*closed) (void *cb_data);
     };
 
