@@ -56,6 +56,11 @@ extern "C" {
 // _________________________________ Messages __________________________________
 
 struct MomentMessage {
+    PagePool::PageListHead *page_list;
+    Size msg_offset;
+    Size msg_len;
+    Size prechunk_size;
+
     PagePool::PageListArray *pl_array;
 };
 
@@ -94,7 +99,7 @@ void moment_message_get_data (MomentMessage * const message,
 struct MomentStreamHandler {
     unsigned initialized;
 
-    MomentRtmpCommandMessageCallback command_cb;
+    MomentRtmpDataMessageCallback command_cb;
     void *command_cb_data;
 
     MomentStreamClosedCallback closed_cb;
@@ -112,9 +117,9 @@ void moment_stream_handler_init (MomentStreamHandler * const stream_handler)
     stream_handler->initialized = MOMENT_API_INITIALIZED_MAGIC;
 }
 
-void moment_stream_handler_set_rtmp_command_message (MomentStreamHandler              * const stream_handler,
-						     MomentRtmpCommandMessageCallback   const cb,
-						     void                             * const user_data)
+void moment_stream_handler_set_rtmp_command_message (MomentStreamHandler           * const stream_handler,
+						     MomentRtmpDataMessageCallback   const cb,
+						     void                          * const user_data)
 {
     stream_handler->command_cb = cb;
     stream_handler->command_cb_data = user_data;
@@ -197,20 +202,25 @@ public:
     Mutex cb_mutex;
 };
 
-void stream_rtmpCommandMessage (RtmpConnection * const mt_nonnull conn,
-				VideoStream::MessageInfo * const mt_nonnull msg_info,
-				ConstMemory const &method_name,
-				AmfDecoder     * const mt_nonnull amf_decoder,
-				void           * const _stream_handler)
+void stream_rtmpCommandMessage (RtmpConnection       * const mt_nonnull conn,
+				VideoStream::Message * const mt_nonnull msg,
+				ConstMemory const    &method_name,
+				AmfDecoder           * const mt_nonnull amf_decoder,
+				void                 * const _stream_handler)
 {
     MomentStreamHandler * const stream_handler = static_cast <MomentStreamHandler*> (_stream_handler);
 
+// TODO
+#if 0
     MomentMessage msg;
+
+    msg.prechunk_size = msg_info->prechunk_size;
 
 //    PagePool::PageListArray pl_array (/* TODO */);
 
     if (stream_handler->command_cb)
 	stream_handler->command_cb (&msg, stream_handler->command_cb_data);
+#endif
 }
 
 void stream_closed (void * const _stream_handler)
@@ -263,6 +273,9 @@ struct MomentClientHandler {
 
     MomentStartStreamingCallback start_streaming_cb;
     void *start_streaming_cb_data;
+
+    MomentRtmpCommandMessageCallback rtmp_command_cb;
+    void *rtmp_command_cb_data;
 };
 
 MomentClientHandler* moment_client_handler_new ()
@@ -281,6 +294,9 @@ MomentClientHandler* moment_client_handler_new ()
 
     client_handler->start_streaming_cb = NULL;
     client_handler->start_streaming_cb_data = NULL;
+
+    client_handler->rtmp_command_cb = NULL;
+    client_handler->rtmp_command_cb_data = NULL;
 
     return client_handler;
 }
@@ -320,6 +336,14 @@ void moment_client_handler_set_start_streaming (MomentClientHandler          * c
 {
     client_handler->start_streaming_cb = cb;
     client_handler->start_streaming_cb_data = user_data;
+}
+
+void moment_client_handler_set_rtmp_command_message (MomentClientHandler              * const client_handler,
+						     MomentRtmpCommandMessageCallback   const cb,
+						     void                             * const user_data)
+{
+    client_handler->rtmp_command_cb = cb;
+    client_handler->rtmp_command_cb_data = user_data;
 }
 
 namespace {
@@ -366,15 +390,29 @@ void moment_client_session_disconnect (MomentClientSession * const api_client_se
 }
 
 namespace {
-void client_rtmpCommandMessage (RtmpConnection           * const mt_nonnull conn,
-				VideoStream::MessageInfo * const mt_nonnull msg_info,
-				ConstMemory const        &method_name,
-				AmfDecoder               * const mt_nonnull amf_decoder,
-				void                     * const _api_client_session)
+void client_rtmpCommandMessage (RtmpConnection       * const mt_nonnull conn,
+				VideoStream::Message * const mt_nonnull int_msg,
+				ConstMemory const    &method_name,
+				AmfDecoder           * const mt_nonnull amf_decoder,
+				void                 * const _api_client_session)
 {
     MomentClientSession * const api_client_session = static_cast <MomentClientSession*> (_api_client_session);
 
-  // TODO
+    MomentMessage ext_msg;
+
+    ext_msg.page_list     = &int_msg->page_list;
+    ext_msg.msg_len       = int_msg->msg_len;
+    ext_msg.msg_offset    = int_msg->msg_offset;
+    ext_msg.prechunk_size = int_msg->prechunk_size;
+
+    // TODO Initialize msg.pl_array
+
+    if (api_client_session->api_client_handler_wrapper->ext_client_handler.rtmp_command_cb) {
+	api_client_session->api_client_handler_wrapper->ext_client_handler.rtmp_command_cb (
+		&ext_msg,
+		api_client_session->client_cb_data,
+		api_client_session->api_client_handler_wrapper->ext_client_handler.rtmp_command_cb_data);
+    }
 }
 
 void client_clientDisconnected (void * const _api_client_session)
@@ -517,14 +555,28 @@ void moment_remove_client_handler (MomentClientHandlerKey const ext_client_handl
     moment->removeClientHandler (api_client_handler_wrapper->int_client_handler_key);
 }
 
-void moment_client_send_command_message (MomentClientSession * const api_client_session,
-					 unsigned char const * const msg_buf,
-					 size_t                const msg_len)
+void moment_client_send_rtmp_command_message (MomentClientSession * const api_client_session,
+					      unsigned char const * const msg_buf,
+					      size_t                const msg_len)
 {
     CodeRef conn_ref;
     RtmpConnection * const conn = api_client_session->int_client_session->getRtmpConnection (&conn_ref);
     if (conn)
 	conn->sendCommandMessage_AMF0 (RtmpConnection::DefaultMessageStreamId, ConstMemory (msg_buf, msg_len));
+}
+
+void moment_client_send_rtmp_command_message_passthrough (MomentClientSession * const api_client_session,
+							  MomentMessage       * const api_msg)
+{
+    CodeRef conn_ref;
+    RtmpConnection * const conn = api_client_session->int_client_session->getRtmpConnection (&conn_ref);
+    if (conn) {
+	conn->sendCommandMessage_AMF0_Pages (RtmpConnection::DefaultMessageStreamId,
+					     api_msg->page_list,
+					     api_msg->msg_offset,
+					     api_msg->msg_len,
+					     api_msg->prechunk_size);
+    }
 }
 
 

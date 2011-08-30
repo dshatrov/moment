@@ -99,26 +99,16 @@ private:
 
     static Result handshakeComplete (void *cb_data);
 
-    static Result commandMessageCallback (RtmpConnection::MessageInfo * mt_nonnull msg_info,
-					  PagePool                    * mt_nonnull page_pool,
-					  PagePool::PageListHead      * mt_nonnull page_list,
-					  Size                         msg_len,
-					  AmfEncoding                  amf_encoding,
-					  void                        *_self);
+    static Result commandMessageCallback (VideoStream::Message * mt_nonnull msg,
+					  Uint32                msg_stream_id,
+					  AmfEncoding           amf_encoding,
+					  void                 *_self);
 
-    static Result audioMessage (VideoStream::AudioMessageInfo * mt_nonnull msg_info,
-				PagePool                      * mt_nonnull page_pool,
-				PagePool::PageListHead        * mt_nonnull page_list,
-				Size                           msg_len,
-				Size                           msg_offset,
-				void                          *_self);
+    static Result audioMessage (VideoStream::AudioMessage * mt_nonnull msg,
+				void                      *_self);
 
-    static Result videoMessage (VideoStream::VideoMessageInfo * mt_nonnull msg_info,
-				PagePool                      * mt_nonnull page_pool,
-				PagePool::PageListHead        * mt_nonnull page_list,
-				Size                           msg_len,
-				Size                           msg_offset,
-				void                          *_self);
+    static Result videoMessage (VideoStream::VideoMessage * mt_nonnull msg,
+				void                      *_self);
 
     static void closed (Exception *exc_,
 			void      *_self);
@@ -186,22 +176,20 @@ RtmpClient::handshakeComplete (void * const _self)
 }
 
 Result
-RtmpClient::commandMessageCallback (RtmpConnection::MessageInfo * const mt_nonnull msg_info,
-				    PagePool                    * const mt_nonnull /* page_pool */,
-				    PagePool::PageListHead      * const mt_nonnull page_list,
-				    Size                          const msg_len,
-				    AmfEncoding                   const /* amf_encoding */,
-				    void                        * const _self)
+RtmpClient::commandMessageCallback (VideoStream::Message   * const mt_nonnull msg,
+				    Uint32                   const /* msg_stream_id */,
+				    AmfEncoding              const /* amf_encoding */,
+				    void                   * const _self)
 {
-    logD (time, _func, "ts:0x", fmt_hex, msg_info->timestamp);
+    logD (time, _func, "ts:0x", fmt_hex, msg->timestamp);
 
     RtmpClient * const self = static_cast <RtmpClient*> (_self);
 
-    if (msg_len == 0)
+    if (msg->msg_len == 0)
 	return Result::Success;
 
-    PagePool::PageListArray pl_array (page_list->first, msg_len);
-    AmfDecoder decoder (AmfEncoding::AMF0, &pl_array, msg_len);
+    PagePool::PageListArray pl_array (msg->page_list.first, msg->msg_len);
+    AmfDecoder decoder (AmfEncoding::AMF0, &pl_array, msg->msg_len);
 
     Byte method_name [256];
     Size method_name_len;
@@ -261,7 +249,7 @@ RtmpClient::commandMessageCallback (RtmpConnection::MessageInfo * const mt_nonnu
 
 #if 0
 	{
-	    PagePool::Page * const page = page_list->first;
+	    PagePool::Page * const page = msg->page_list->first;
 	    if (page)
 		hexdump (logs, page->mem());
 	}
@@ -272,7 +260,7 @@ RtmpClient::commandMessageCallback (RtmpConnection::MessageInfo * const mt_nonnu
 
 #if 0
 	{
-	    PagePool::Page * const page = page_list->first;
+	    PagePool::Page * const page = msg->page_list->first;
 	    if (page)
 		hexdump (logs, page->mem());
 	}
@@ -282,7 +270,7 @@ RtmpClient::commandMessageCallback (RtmpConnection::MessageInfo * const mt_nonnu
 
 #if 0
 	{
-	    PagePool::Page * const page = page_list->first;
+	    PagePool::Page * const page = msg->page_list->first;
 	    if (page)
 		hexdump (logs, page->mem());
 	}
@@ -293,28 +281,20 @@ RtmpClient::commandMessageCallback (RtmpConnection::MessageInfo * const mt_nonnu
 }
 
 Result
-RtmpClient::audioMessage (VideoStream::AudioMessageInfo * const mt_nonnull msg_info,
-			  PagePool                      * const mt_nonnull /* page_pool */,
-			  PagePool::PageListHead        * const mt_nonnull /* page_list */,
-			  Size                            const /* msg_len */,
-			  Size                            const /* msg_offset */,
-			  void                          * const /* _self */)
+RtmpClient::audioMessage (VideoStream::AudioMessage * const mt_nonnull msg,
+			  void                      * const /* _self */)
 {
-    logD (time, _func, "ts: 0x", fmt_hex, msg_info->timestamp, " ",
-	  msg_info->codec_id, " ", msg_info->frame_type);
+    logD (time, _func, "ts: 0x", fmt_hex, msg->timestamp, " ",
+	  msg->codec_id, " ", msg->frame_type);
     return Result::Success;
 }
 
 Result
-RtmpClient::videoMessage (VideoStream::VideoMessageInfo * const mt_nonnull msg_info,
-			  PagePool                      * const mt_nonnull /* page_pool */,
-			  PagePool::PageListHead        * const mt_nonnull /* page_list */,
-			  Size                            const /* msg_len */,
-			  Size                            const /* msg_offset */,
-			  void                          * const _self)
+RtmpClient::videoMessage (VideoStream::VideoMessage * const mt_nonnull msg,
+			  void                      * const _self)
 {
-    logD (time, _func, "ts: 0x", fmt_hex, msg_info->timestamp, " ",
-	  msg_info->codec_id, " ", msg_info->frame_type);
+    logD (time, _func, "ts: 0x", fmt_hex, msg->timestamp, " ",
+	  msg->codec_id, " ", msg->frame_type);
 
     RtmpClient * const self = static_cast <RtmpClient*> (_self);
 

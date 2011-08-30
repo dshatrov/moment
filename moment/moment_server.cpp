@@ -29,17 +29,17 @@ MomentServer* MomentServer::instance = NULL;
 namespace {
     class InformRtmpCommandMessage_Data {
     public:
-	RtmpConnection           * const conn;
-	VideoStream::MessageInfo * const msg_info;
-	ConstMemory const        &method_name;
-	AmfDecoder               * const amf_decoder;
+	RtmpConnection       * const conn;
+	VideoStream::Message * const msg;
+	ConstMemory const    &method_name;
+	AmfDecoder           * const amf_decoder;
 
-	InformRtmpCommandMessage_Data (RtmpConnection           * const conn,
-				       VideoStream::MessageInfo * const msg_info,
-				       ConstMemory const        &method_name,
-				       AmfDecoder               * const amf_decoder)
+	InformRtmpCommandMessage_Data (RtmpConnection       * const conn,
+				       VideoStream::Message * const msg,
+				       ConstMemory const    &method_name,
+				       AmfDecoder           * const amf_decoder)
 	    : conn (conn),
-	      msg_info (msg_info),
+	      msg (msg),
 	      method_name (method_name),
 	      amf_decoder (amf_decoder)
 	{
@@ -55,7 +55,7 @@ MomentServer::ClientSession::informRtmpCommandMessage (Events * const events,
     InformRtmpCommandMessage_Data * const inform_data =
 	    static_cast <InformRtmpCommandMessage_Data*> (_inform_data);
     events->rtmpCommandMessage (inform_data->conn,
-				inform_data->msg_info,
+				inform_data->msg,
 				inform_data->method_name,
 				inform_data->amf_decoder,
 				cb_data);
@@ -89,12 +89,12 @@ MomentServer::ClientSession::setBackend (CbDesc<Backend> const &cb)
 }
 
 void
-MomentServer::ClientSession::fireRtmpCommandMessage (RtmpConnection           * const mt_nonnull conn,
-						     VideoStream::MessageInfo * const mt_nonnull msg_info,
-						     ConstMemory        const &method_name,
-						     AmfDecoder               * const mt_nonnull amf_decoder)
+MomentServer::ClientSession::fireRtmpCommandMessage (RtmpConnection       * const mt_nonnull conn,
+						     VideoStream::Message * const mt_nonnull msg,
+						     ConstMemory const    &method_name,
+						     AmfDecoder           * const mt_nonnull amf_decoder)
 {
-    InformRtmpCommandMessage_Data inform_data (conn, msg_info, method_name, amf_decoder);
+    InformRtmpCommandMessage_Data inform_data (conn, msg, method_name, amf_decoder);
     event_informer.informAll (informRtmpCommandMessage, &inform_data);
 }
 

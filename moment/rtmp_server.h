@@ -60,11 +60,12 @@ public:
 	Result (*startWatching) (ConstMemory const &stream_name,
 				 void  *cb_data);
 
-	CommandResult (*commandMessage) (RtmpConnection              * mt_nonnull conn,
-					 ConstMemory const           &method_name,
-					 RtmpConnection::MessageInfo * mt_nonnull msg_info,
-					 AmfDecoder                  * mt_nonnull amf_decoder,
-					 void                        *cb_data);
+	CommandResult (*commandMessage) (RtmpConnection       * mt_nonnull conn,
+					 Uint32                msg_stream_id,
+					 ConstMemory const    &method_name,
+					 VideoStream::Message * mt_nonnull msg,
+					 AmfDecoder           * mt_nonnull amf_decoder,
+					 void                 *cb_data);
     };
 
 private:
@@ -76,37 +77,29 @@ private:
 
     AtomicInt playing;
 
-    Result doConnect (RtmpConnection::MessageInfo * mt_nonnull msg_info,
-		      AmfDecoder * const mt_nonnull decoder);
+    Result doConnect (Uint32      msg_stream_id,
+		      AmfDecoder * mt_nonnull decoder);
 
-    Result doPlay (RtmpConnection::MessageInfo * mt_nonnull msg_info,
+    Result doPlay (Uint32      msg_stream_id,
 		   AmfDecoder * mt_nonnull decoder);
 
-    Result doPublish (RtmpConnection::MessageInfo * mt_nonnull msg_info,
+    Result doPublish (Uint32       msg_stream_id,
 		      AmfDecoder * mt_nonnull decoder);
 
 public:
   // sendVideoMessage() and sendAudioMessage() are here and not in
   // RtmpConnection because of audio_chunk_stream/video_chunk_stream.
 
-    void sendVideoMessage (VideoStream::VideoMessageInfo * mt_nonnull msg_info,
-			   PagePool::PageListHead        * mt_nonnull page_list,
-			   Size                           msg_len,
-			   Size                           msg_offset);
+    void sendVideoMessage (VideoStream::VideoMessage * mt_nonnull msg);
 
-    void sendAudioMessage (VideoStream::AudioMessageInfo * mt_nonnull msg_info,
-			   PagePool::PageListHead        * mt_nonnull page_list,
-			   Size                           msg_len,
-			   Size                           msg_offset);
+    void sendAudioMessage (VideoStream::AudioMessage * mt_nonnull msg);
 
     // Helper method. Sends saved onMetaData, AvcSequenceHeader, KeyFrame.
     void sendInitialMessages_unlocked (VideoStream::FrameSaver * mt_nonnull frame_saver);
 
-    Result commandMessage (RtmpConnection::MessageInfo * mt_nonnull msg_info,
-			   PagePool                    * mt_nonnull page_pool,
-			   PagePool::PageListHead      * mt_nonnull page_list,
-			   Size                         msg_len,
-			   AmfEncoding                  amf_encoding);
+    Result commandMessage (VideoStream::Message * mt_nonnull msg,
+			   Uint32                msg_stream_id,
+			   AmfEncoding           amf_encoding);
 
     void setFrontend (Cb<Frontend> const &frontend)
     {
@@ -213,11 +206,9 @@ public:
 	}
     };
 
-    static Result encodeMetaData (MetaData * mt_nonnull metadata,
-				  PagePool * mt_nonnull page_pool,
-				  PagePool::PageListHead * mt_nonnull page_list,
-				  Size     *ret_msg_len,
-				  VideoStream::VideoMessageInfo *ret_msg_info);
+    static Result encodeMetaData (MetaData                  * mt_nonnull metadata,
+				  PagePool                  * mt_nonnull page_pool,
+				  VideoStream::VideoMessage *ret_msg);
 
     // TODO Deprecated constructor, delete.
     RtmpServer (RtmpConnection * const rtmp_conn)

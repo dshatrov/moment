@@ -53,45 +53,20 @@ public:
 	DefaultChunkSize = 128
     };
 
-    class MessageInfo
-    {
-    public:
-	Uint32 msg_stream_id;
-	Uint32 timestamp;
-
-	Uint32 prechunk_size;
-
-	// TODO Put all information about a message here,
-	//      including page_list, msg_len and amf_encoding.
-	// TODO Rename to class Message.
-    };
-
-    typedef Result (*CommandMessageCallback) (MessageInfo            * mt_nonnull msg_info,
-					      PagePool               * mt_nonnull page_pool,
-					      PagePool::PageListHead * mt_nonnull page_list,
-					      Size                     msg_len,
-					      AmfEncoding              amf_encoding,
-					      void                   * cb_data);
-
     struct Frontend
     {
 	Result (*handshakeComplete) (void *cb_data);
 
-	CommandMessageCallback commandMessage;
+	Result (*commandMessage) (VideoStream::Message * mt_nonnull msg,
+				  Uint32                msg_stream_id,
+				  AmfEncoding           amf_encoding,
+				  void                 * cb_data);
 
-	Result (*audioMessage) (VideoStream::AudioMessageInfo * mt_nonnull msg_info,
-			        PagePool                      * mt_nonnull page_pool,
-				PagePool::PageListHead        * mt_nonnull page_list,
-				Size                           msg_len,
-				Size                           msg_offset,
-				void                          *cb_data);
+	Result (*audioMessage) (VideoStream::AudioMessage * mt_nonnull msg,
+				void                      *cb_data);
 
-	Result (*videoMessage) (VideoStream::VideoMessageInfo * mt_nonnull msg_info,
-				PagePool                      * mt_nonnull page_pool,
-				PagePool::PageListHead        * mt_nonnull page_list,
-				Size                           msg_len,
-				Size                           msg_offset,
-				void                          *cb_data);
+	Result (*videoMessage) (VideoStream::VideoMessage * mt_nonnull msg,
+				void                      *cb_data);
 
 	void (*sendStateChanged) (Sender::SendState send_state,
 				  void *cb_data);
@@ -457,8 +432,14 @@ public:
 
     void sendUserControl_PingResponse (Uint32 timestamp);
 
-    void sendCommandMessage_AMF0 (Uint32 msg_stream_Id,
+    void sendCommandMessage_AMF0 (Uint32 msg_stream_id,
 				  ConstMemory const &mem);
+
+    void sendCommandMessage_AMF0_Pages (Uint32                  msg_stream_id,
+					PagePool::PageListHead * mt_nonnull page_list,
+					Size                    msg_offset,
+					Size                    msg_len,
+					Uint32                  prechunk_size);
 
   // Extra send utility methods.
 
@@ -557,23 +538,19 @@ public:
 
   // TODO doConnect(), doCreateStream(), etc. belong to RtmpServer.
 
-    Result doCreateStream (MessageInfo * mt_nonnull msg_info,
-			   AmfDecoder  * mt_nonnull amf_decoder);
+    Result doCreateStream (Uint32      msg_stream_id,
+			   AmfDecoder * mt_nonnull amf_decoder);
 
-    Result doReleaseStream (MessageInfo * mt_nonnull msg_info,
-			    AmfDecoder  * mt_nonnull amf_decoder);
+    Result doReleaseStream (Uint32      msg_stream_id,
+			    AmfDecoder * mt_nonnull amf_decoder);
 
-    Result doCloseStream (MessageInfo * mt_nonnull msg_info,
-			  AmfDecoder  * mt_nonnull amf_decoder);
+    Result doCloseStream (Uint32      msg_steam_id,
+			  AmfDecoder * mt_nonnull amf_decoder);
 
-    Result doDeleteStream (MessageInfo * mt_nonnull msg_info,
-			   AmfDecoder  * mt_nonnull amf_decoder);
+    Result doDeleteStream (Uint32      msg_stream_id,
+			   AmfDecoder * mt_nonnull amf_decoder);
 
-    Result fireVideoMessage (VideoStream::VideoMessageInfo * mt_nonnull video_msg_info,
-			     PagePool                      * mt_nonnull page_pool,
-			     PagePool::PageListHead        * mt_nonnull page_list,
-			     Size                           msg_len,
-			     Size                           msg_offset);
+    Result fireVideoMessage (VideoStream::VideoMessage * mt_nonnull video_msg);
 
     // Deprecated constructor.
     RtmpConnection (Object   *coderef_container,

@@ -32,7 +32,7 @@ LogGroup libMary_logGroup_rtmp_server ("rtmp_server", LogLevel::I);
 }
 
 Result
-RtmpServer::doConnect (RtmpConnection::MessageInfo * const mt_nonnull msg_info,
+RtmpServer::doConnect (Uint32       const msg_stream_id,
 		       AmfDecoder * const mt_nonnull decoder)
 {
     double transaction_id;
@@ -133,7 +133,7 @@ RtmpServer::doConnect (RtmpConnection::MessageInfo * const mt_nonnull msg_info,
 	    return Result::Failure;
 	}
 
-	rtmp_conn->sendCommandMessage_AMF0 (msg_info->msg_stream_id, ConstMemory (msg_buf, msg_len));
+	rtmp_conn->sendCommandMessage_AMF0 (msg_stream_id, ConstMemory (msg_buf, msg_len));
 
 #if 0
 	logD (proto_out, _func, "msg_len: ", msg_len);
@@ -159,7 +159,7 @@ RtmpServer::doConnect (RtmpConnection::MessageInfo * const mt_nonnull msg_info,
 }
 
 Result
-RtmpServer::doPlay (RtmpConnection::MessageInfo * const mt_nonnull msg_info,
+RtmpServer::doPlay (Uint32       const msg_stream_id,
 		    AmfDecoder * const mt_nonnull decoder)
 {
     logD (rtmp_server, _func_);
@@ -209,7 +209,7 @@ RtmpServer::doPlay (RtmpConnection::MessageInfo * const mt_nonnull msg_info,
 	    return Result::Failure;
 	}
 
-	rtmp_conn->sendCommandMessage_AMF0 (msg_info->msg_stream_id, ConstMemory (msg_buf, msg_len));
+	rtmp_conn->sendCommandMessage_AMF0 (msg_stream_id, ConstMemory (msg_buf, msg_len));
     }
 
     {
@@ -249,15 +249,15 @@ RtmpServer::doPlay (RtmpConnection::MessageInfo * const mt_nonnull msg_info,
 	    return Result::Failure;
 	}
 
-	rtmp_conn->sendCommandMessage_AMF0 (msg_info->msg_stream_id, ConstMemory (msg_buf, msg_len));
+	rtmp_conn->sendCommandMessage_AMF0 (msg_stream_id, ConstMemory (msg_buf, msg_len));
     }
 
     // TODO 
 
 //    if (!playing) {
 	// TODO send StreamIsRecorded
-//        rtmp_conn->sendUserControl_StreamIsRecorded (msg_info->msg_stream_id);
-	rtmp_conn->sendUserControl_StreamBegin (msg_info->msg_stream_id);
+//        rtmp_conn->sendUserControl_StreamIsRecorded (msg_stream_id);
+	rtmp_conn->sendUserControl_StreamBegin (msg_stream_id);
 //    }
 
     {
@@ -297,7 +297,7 @@ RtmpServer::doPlay (RtmpConnection::MessageInfo * const mt_nonnull msg_info,
 	    return Result::Failure;
 	}
 
-	rtmp_conn->sendCommandMessage_AMF0 (msg_info->msg_stream_id, ConstMemory (msg_buf, msg_len));
+	rtmp_conn->sendCommandMessage_AMF0 (msg_stream_id, ConstMemory (msg_buf, msg_len));
     }
 
     {
@@ -317,7 +317,7 @@ RtmpServer::doPlay (RtmpConnection::MessageInfo * const mt_nonnull msg_info,
 }
 
 Result
-RtmpServer::doPublish (RtmpConnection::MessageInfo * const mt_nonnull msg_info,
+RtmpServer::doPublish (Uint32       const msg_stream_id,
 		       AmfDecoder * const mt_nonnull decoder)
 {
     logD (rtmp_server, _func_);
@@ -367,7 +367,7 @@ RtmpServer::doPublish (RtmpConnection::MessageInfo * const mt_nonnull msg_info,
 
     // TODO Subscribe for translation stop? (probably not here)
 
-    rtmp_conn->sendUserControl_StreamBegin (msg_info->msg_stream_id);
+    rtmp_conn->sendUserControl_StreamBegin (msg_stream_id);
 
     {
       // TODO sendSimpleResult
@@ -387,7 +387,7 @@ RtmpServer::doPublish (RtmpConnection::MessageInfo * const mt_nonnull msg_info,
 	    return Result::Failure;
 	}
 
-	rtmp_conn->sendCommandMessage_AMF0 (msg_info->msg_stream_id, ConstMemory (msg_buf, msg_len));
+	rtmp_conn->sendCommandMessage_AMF0 (msg_stream_id, ConstMemory (msg_buf, msg_len));
     }
 
 #if 0
@@ -410,7 +410,7 @@ RtmpServer::doPublish (RtmpConnection::MessageInfo * const mt_nonnull msg_info,
 	    return Result::Failure;
 	}
 
-	rtmp_conn->sendCommandMessage_AMF0 (msg_info->msg_stream_id, ConstMemory (msg_buf, msg_len));
+	rtmp_conn->sendCommandMessage_AMF0 (msg_stream_id, ConstMemory (msg_buf, msg_len));
     }
 #endif
 
@@ -451,7 +451,7 @@ RtmpServer::doPublish (RtmpConnection::MessageInfo * const mt_nonnull msg_info,
 	    return Result::Failure;
 	}
 
-	rtmp_conn->sendCommandMessage_AMF0 (msg_info->msg_stream_id, ConstMemory (msg_buf, msg_len));
+	rtmp_conn->sendCommandMessage_AMF0 (msg_stream_id, ConstMemory (msg_buf, msg_len));
     }
 
     {
@@ -491,30 +491,27 @@ RtmpServer::doPublish (RtmpConnection::MessageInfo * const mt_nonnull msg_info,
 	    return Result::Failure;
 	}
 
-	rtmp_conn->sendCommandMessage_AMF0 (msg_info->msg_stream_id, ConstMemory (msg_buf, msg_len));
+	rtmp_conn->sendCommandMessage_AMF0 (msg_stream_id, ConstMemory (msg_buf, msg_len));
     }
 
     return Result::Success;
 }
 
 void
-RtmpServer::sendVideoMessage (VideoStream::VideoMessageInfo * const mt_nonnull msg_info,
-			      PagePool::PageListHead        * const mt_nonnull page_list,
-			      Size                            const msg_len,
-			      Size                            const msg_offset)
+RtmpServer::sendVideoMessage (VideoStream::VideoMessage * const mt_nonnull msg)
 {
 //    logD (rtmp_server, _func);
 
     // TODO Do not ignore RtmpClearMetaData.
-    if (msg_info->frame_type == VideoStream::VideoFrameType::RtmpClearMetaData)
+    if (msg->frame_type == VideoStream::VideoFrameType::RtmpClearMetaData)
 	return;
 
     RtmpConnection::MessageDesc mdesc;
-    mdesc.timestamp = msg_info->timestamp;
-//    logD_ (_func, "timestamp: 0x", fmt_hex, msg_info->timestamp);
+    mdesc.timestamp = msg->timestamp;
+//    logD_ (_func, "timestamp: 0x", fmt_hex, msg->timestamp);
 
     RtmpConnection::ChunkStream *chunk_stream;
-    if (msg_info->frame_type == VideoStream::VideoFrameType::RtmpSetMetaData) {
+    if (msg->frame_type == VideoStream::VideoFrameType::RtmpSetMetaData) {
 	mdesc.timestamp = 0;
 	mdesc.msg_type_id = RtmpConnection::RtmpMessageType::Data_AMF0;
 	chunk_stream = rtmp_conn->data_chunk_stream;
@@ -524,28 +521,25 @@ RtmpServer::sendVideoMessage (VideoStream::VideoMessageInfo * const mt_nonnull m
     }
 
     mdesc.msg_stream_id = RtmpConnection::DefaultMessageStreamId;
-    mdesc.msg_len = msg_len;
+    mdesc.msg_len = msg->msg_len;
     mdesc.cs_hdr_comp = true;
 
-    rtmp_conn->sendMessagePages (&mdesc, chunk_stream, page_list, msg_offset, msg_info->prechunk_size);
+    rtmp_conn->sendMessagePages (&mdesc, chunk_stream, &msg->page_list, msg->msg_offset, msg->prechunk_size);
 }
 
 void
-RtmpServer::sendAudioMessage (VideoStream::AudioMessageInfo * const mt_nonnull msg_info,
-			      PagePool::PageListHead        * const mt_nonnull page_list,
-			      Size                            const msg_len,
-			      Size                            const msg_offset)
+RtmpServer::sendAudioMessage (VideoStream::AudioMessage * const mt_nonnull msg)
 {
 //    logD (rtmp_server, _func);
 
     RtmpConnection::MessageDesc mdesc;
-    mdesc.timestamp = msg_info->timestamp;
+    mdesc.timestamp = msg->timestamp;
     mdesc.msg_type_id = RtmpConnection::RtmpMessageType::AudioMessage;
     mdesc.msg_stream_id = RtmpConnection::DefaultMessageStreamId;
-    mdesc.msg_len = msg_len;
+    mdesc.msg_len = msg->msg_len;
     mdesc.cs_hdr_comp = true;
 
-    rtmp_conn->sendMessagePages (&mdesc, audio_chunk_stream, page_list, msg_offset, msg_info->prechunk_size);
+    rtmp_conn->sendMessagePages (&mdesc, audio_chunk_stream, &msg->page_list, msg->msg_offset, msg->prechunk_size);
 }
 
 void
@@ -555,52 +549,38 @@ RtmpServer::sendInitialMessages_unlocked (VideoStream::FrameSaver * const mt_non
     VideoStream::SavedAudioFrame saved_audio_frame;
 
     if (frame_saver->getSavedMetaData (&saved_frame)) {
-	saved_frame.msg_info.timestamp = 0;
-	sendVideoMessage (&saved_frame.msg_info,
-			  &saved_frame.page_list,
-			  saved_frame.msg_len,
-			  saved_frame.msg_offset);
+	saved_frame.msg.timestamp = 0;
+	sendVideoMessage (&saved_frame.msg);
     }
 
     if (frame_saver->getSavedAacSeqHdr (&saved_audio_frame)) {
-	saved_audio_frame.msg_info.timestamp = 0;
-	sendAudioMessage (&saved_audio_frame.msg_info,
-			  &saved_audio_frame.page_list,
-			  saved_audio_frame.msg_len,
-			  saved_audio_frame.msg_offset);
+	saved_audio_frame.msg.timestamp = 0;
+	sendAudioMessage (&saved_audio_frame.msg);
     }
 
     if (frame_saver->getSavedAvcSeqHdr (&saved_frame)) {
-	saved_frame.msg_info.timestamp = 0;
-	sendVideoMessage (&saved_frame.msg_info,
-			  &saved_frame.page_list,
-			  saved_frame.msg_len,
-			  saved_frame.msg_offset);
+	saved_frame.msg.timestamp = 0;
+	sendVideoMessage (&saved_frame.msg);
     }
 
     if (frame_saver->getSavedKeyframe (&saved_frame)) {
-	saved_frame.msg_info.timestamp = 0;
-	sendVideoMessage (&saved_frame.msg_info,
-			  &saved_frame.page_list,
-			  saved_frame.msg_len,
-			  saved_frame.msg_offset);
+	saved_frame.msg.timestamp = 0;
+	sendVideoMessage (&saved_frame.msg);
     }
 }
 
 Result
-RtmpServer::commandMessage (RtmpConnection::MessageInfo * const mt_nonnull msg_info,
-			    PagePool               * const page_pool,
-			    PagePool::PageListHead * const page_list,
-			    Size                     const msg_len,
-			    AmfEncoding              const /* amf_encoding */)
+RtmpServer::commandMessage (VideoStream::Message * const mt_nonnull msg,
+			    Uint32                 const msg_stream_id,
+			    AmfEncoding            const /* amf_encoding */)
 {
     logD (rtmp_server, _func_);
 
-    if (msg_len == 0)
+    if (msg->msg_len == 0)
 	return Result::Success;
 
-    PagePool::PageListArray pl_array (page_list->first, msg_len);
-    AmfDecoder decoder (AmfEncoding::AMF0, &pl_array, msg_len);
+    PagePool::PageListArray pl_array (msg->page_list.first, msg->msg_len);
+    AmfDecoder decoder (AmfEncoding::AMF0, &pl_array, msg->msg_len);
 
     Byte method_name [256];
     Size method_name_len;
@@ -620,23 +600,23 @@ RtmpServer::commandMessage (RtmpConnection::MessageInfo * const mt_nonnull msg_i
 //	decoder.beginObject ();
 	// TODO Decode URL
 
-	return doConnect (msg_info, &decoder);
+	return doConnect (msg_stream_id, &decoder);
     } else
     if (!compare (method_mem, "createStream")) {
-	return rtmp_conn->doCreateStream (msg_info, &decoder);
+	return rtmp_conn->doCreateStream (msg_stream_id, &decoder);
     } else
     if (!compare (method_mem, "FCPublish")) {
       // TEMPORAL TEST
-	return rtmp_conn->doReleaseStream (msg_info, &decoder);
+	return rtmp_conn->doReleaseStream (msg_stream_id, &decoder);
     } else
     if (!compare (method_mem, "releaseStream")) {
-	return rtmp_conn->doReleaseStream (msg_info, &decoder);
+	return rtmp_conn->doReleaseStream (msg_stream_id, &decoder);
     } else
     if (!compare (method_mem, "closeStream")) {
-	return rtmp_conn->doCloseStream (msg_info, &decoder);
+	return rtmp_conn->doCloseStream (msg_stream_id, &decoder);
     } else
     if (!compare (method_mem, "deleteStream")) {
-	return rtmp_conn->doDeleteStream (msg_info, &decoder);
+	return rtmp_conn->doDeleteStream (msg_stream_id, &decoder);
     } else
     if (!compare (method_mem, "receiveVideo")) {
       // TODO
@@ -647,17 +627,17 @@ RtmpServer::commandMessage (RtmpConnection::MessageInfo * const mt_nonnull msg_i
     if (!compare (method_mem, "play") ||
 	!compare (method_mem, "pause"))
     {
-	return doPlay (msg_info, &decoder);
+	return doPlay (msg_stream_id, &decoder);
     } else
     if (!compare (method_mem, "publish")) {
-	return doPublish (msg_info, &decoder);
+	return doPublish (msg_stream_id, &decoder);
     } else
     if (!compare (method_mem, "@setDataFrame")) {
 #if 0
 	logD_ (_func, method_mem);
 
 	{
-	    PagePool::Page * const page = page_list->first;
+	    PagePool::Page * const page = msg->page_list->first;
 	    logD_ (_func, "page: 0x", fmt_hex, (UintPtr) page);
 	    if (page)
 		hexdump (logs, page->mem());
@@ -665,43 +645,53 @@ RtmpServer::commandMessage (RtmpConnection::MessageInfo * const mt_nonnull msg_i
 #endif
 
 	Size const msg_offset = decoder.getCurOffset ();
-	assert (msg_offset <= msg_len);
+	assert (msg_offset <= msg->msg_len);
 //	logD_ (_func, "msg_offset: ", msg_offset);
 
-	VideoStream::VideoMessageInfo video_msg_info;
-	video_msg_info.timestamp = msg_info->timestamp;
-	video_msg_info.prechunk_size = msg_info->prechunk_size;
-	video_msg_info.frame_type = VideoStream::VideoFrameType::RtmpSetMetaData;
-	video_msg_info.codec_id = VideoStream::VideoCodecId::Unknown;
+	VideoStream::VideoMessage video_msg;
+	video_msg.timestamp = msg->timestamp;
+	video_msg.prechunk_size = msg->prechunk_size;
+	video_msg.frame_type = VideoStream::VideoFrameType::RtmpSetMetaData;
+	video_msg.codec_id = VideoStream::VideoCodecId::Unknown;
 
-	return rtmp_conn->fireVideoMessage (&video_msg_info, page_pool, page_list, msg_len - msg_offset, msg_offset);
+	video_msg.page_pool = msg->page_pool;
+	video_msg.page_list = msg->page_list;
+	video_msg.msg_len = msg->msg_len - msg->msg_offset;
+	video_msg.msg_offset = msg->msg_offset;
+
+	return rtmp_conn->fireVideoMessage (&video_msg);
     } else
     if (!compare (method_mem, "@clearDataFrame")) {
 #if 0
 	logD_ (_func, method_mem);
 
 	{
-	    PagePool::Page * const page = page_list->first;
+	    PagePool::Page * const page = msg->page_list->first;
 	    if (page)
 		hexdump (logs, page->mem());
 	}
 #endif
 
 	Size const msg_offset = decoder.getCurOffset ();
-	assert (msg_offset <= msg_len);
+	assert (msg_offset <= msg->msg_len);
 
-	VideoStream::VideoMessageInfo video_msg_info;
-	video_msg_info.timestamp = msg_info->timestamp;
-	video_msg_info.prechunk_size = msg_info->prechunk_size;
-	video_msg_info.frame_type = VideoStream::VideoFrameType::RtmpClearMetaData;
-	video_msg_info.codec_id = VideoStream::VideoCodecId::Unknown;
+	VideoStream::VideoMessage video_msg;
+	video_msg.timestamp = msg->timestamp;
+	video_msg.prechunk_size = msg->prechunk_size;
+	video_msg.frame_type = VideoStream::VideoFrameType::RtmpClearMetaData;
+	video_msg.codec_id = VideoStream::VideoCodecId::Unknown;
 
-	return rtmp_conn->fireVideoMessage (&video_msg_info, page_pool, page_list, msg_len - msg_offset, msg_offset);
+	video_msg.page_pool = msg->page_pool;
+	video_msg.page_list = msg->page_list;
+	video_msg.msg_len = msg->msg_len - msg->msg_offset;
+	video_msg.msg_offset = msg->msg_offset;
+
+	return rtmp_conn->fireVideoMessage (&video_msg);
     } else {
 	if (frontend && frontend->commandMessage) {
 	    CommandResult res;
 	    if (!frontend.call_ret<CommandResult> (&res, frontend->commandMessage, /*(*/
-			 rtmp_conn, method_mem, msg_info, &decoder /*)*/))
+			 rtmp_conn, msg_stream_id, method_mem, msg, &decoder /*)*/))
 	    {
 		logE_ (_func, "frontend gone");
 		return Result::Failure;
@@ -725,12 +715,12 @@ RtmpServer::commandMessage (RtmpConnection::MessageInfo * const mt_nonnull msg_i
 }
 
 Result
-RtmpServer::encodeMetaData (MetaData * const mt_nonnull metadata,
-			    PagePool * const mt_nonnull page_pool,
-			    PagePool::PageListHead * const mt_nonnull page_list,
-			    Size     * const ret_msg_len,
-			    VideoStream::VideoMessageInfo * const ret_msg_info)
+RtmpServer::encodeMetaData (MetaData                  * const mt_nonnull metadata,
+			    PagePool                  * const mt_nonnull page_pool,
+			    VideoStream::VideoMessage * const ret_msg)
 {
+    PagePool::PageListHead page_list;
+
     AmfAtom atoms [128];
     AmfEncoder encoder (atoms);
 
@@ -833,20 +823,22 @@ RtmpServer::encodeMetaData (MetaData * const mt_nonnull metadata,
 	RtmpConnection::fillPrechunkedPages (&prechunk_ctx,
 					     ConstMemory (msg_buf, msg_len),
 					     page_pool,
-					     page_list,
+					     &page_list,
 					     RtmpConnection::DefaultDataChunkStreamId,
 					     0 /* timestamp */,
 					     true /* first_chunk */);
     }
 
-    if (ret_msg_len)
-	*ret_msg_len = msg_len;
+    if (ret_msg) {
+	ret_msg->timestamp = 0;
+	ret_msg->prechunk_size = RtmpConnection::PrechunkSize;
+	ret_msg->frame_type = VideoStream::VideoFrameType::RtmpSetMetaData;
+	ret_msg->codec_id = VideoStream::VideoCodecId::Unknown;
 
-    if (ret_msg_info) {
-	ret_msg_info->timestamp = 0;
-	ret_msg_info->prechunk_size = RtmpConnection::PrechunkSize;
-	ret_msg_info->frame_type = VideoStream::VideoFrameType::RtmpSetMetaData;
-	ret_msg_info->codec_id = VideoStream::VideoCodecId::Unknown;
+	ret_msg->page_pool = page_pool;
+	ret_msg->page_list = page_list;
+	ret_msg->msg_len = msg_len;
+	ret_msg->msg_offset = 0;
     }
 
     return Result::Success;

@@ -86,11 +86,12 @@ public:
     public:
 	struct Events
 	{
-	    void (*rtmpCommandMessage) (RtmpConnection           * mt_nonnull conn,
-					VideoStream::MessageInfo * mt_nonnull msg_info,
-					ConstMemory const        &method_name,
-					AmfDecoder               * mt_nonnull amf_decoder,
-					void                     *cb_data);
+	    void (*rtmpCommandMessage) (RtmpConnection       * mt_nonnull conn,
+//					Uint32                msg_stream_id,
+					VideoStream::Message * mt_nonnull msg,
+					ConstMemory const    &method_name,
+					AmfDecoder           * mt_nonnull amf_decoder,
+					void                 *cb_data);
 
 	    void (*clientDisconnected) (void *cb_data);
 	};
@@ -137,10 +138,10 @@ public:
 	void setBackend (CbDesc<Backend> const &cb);
 
     private:
-	void fireRtmpCommandMessage (RtmpConnection           * mt_nonnull conn,
-				     VideoStream::MessageInfo * mt_nonnull msg_info,
-				     ConstMemory        const &method_name,
-				     AmfDecoder               * mt_nonnull amf_decoder);
+	void fireRtmpCommandMessage (RtmpConnection       * mt_nonnull conn,
+				     VideoStream::Message * mt_nonnull msg,
+				     ConstMemory const    &method_name,
+				     AmfDecoder           * mt_nonnull amf_decoder);
 
 	void clientDisconnected ();
 
@@ -270,13 +271,13 @@ public:
 
     void clientDisconnected (ClientSession * mt_nonnull client_session);
 
-    void rtmpCommandMessage (ClientSession            * const mt_nonnull client_session,
-			     RtmpConnection           * const mt_nonnull conn,
-			     VideoStream::MessageInfo * const mt_nonnull msg_info,
-			     ConstMemory        const &method_name,
-			     AmfDecoder               * const mt_nonnull amf_decoder)
+    void rtmpCommandMessage (ClientSession        * const mt_nonnull client_session,
+			     RtmpConnection       * const mt_nonnull conn,
+			     VideoStream::Message * const mt_nonnull msg,
+			     ConstMemory const    &method_name,
+			     AmfDecoder           * const mt_nonnull amf_decoder)
     {
-	client_session->fireRtmpCommandMessage (conn, msg_info, method_name, amf_decoder);
+	client_session->fireRtmpCommandMessage (conn, msg, method_name, amf_decoder);
     }
 
     void disconnect (ClientSession * mt_nonnull client_session);

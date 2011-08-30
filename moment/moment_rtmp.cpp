@@ -150,17 +150,14 @@ void destroyClientSession (ClientSession * const client_session)
     if (video_stream_key)
 	moment->removeVideoStream (video_stream_key);
 
-    moment->clientDisconnected (srv_session);
+    if (srv_session)
+	moment->clientDisconnected (srv_session);
 
     client_session->unref ();
 }
 
-void streamAudioMessage (VideoStream::AudioMessageInfo * const mt_nonnull msg_info,
-			 PagePool                      * const mt_nonnull page_pool,
-			 PagePool::PageListHead        * const mt_nonnull page_list,
-			 Size                            const msg_len,
-			 Size                            const msg_offset,
-			 void                          * const _session)
+void streamAudioMessage (VideoStream::AudioMessage * const mt_nonnull msg,
+			 void                      * const _session)
 {
 //    logD_ (_func_);
 
@@ -175,7 +172,7 @@ void streamAudioMessage (VideoStream::AudioMessageInfo * const mt_nonnull msg_in
 
 #ifdef MOMENT_RTMP__AUDIO_WAITS_VIDEO
     if (audio_waits_video
-	&& msg_info->frame_type == VideoStream::AudioFrameType::RawData)
+	&& msg->frame_type == VideoStream::AudioFrameType::RawData)
     {
 	if (!client_session->first_keyframe_sent) {
 	    client_session->mutex.unlock ();
@@ -186,7 +183,7 @@ void streamAudioMessage (VideoStream::AudioMessageInfo * const mt_nonnull msg_in
 
 #ifdef MOMENT_RTMP__FLOW_CONTROL
     if (client_session->overloaded
-	&& msg_info->frame_type == VideoStream::AudioFrameType::RawData)
+	&& msg->frame_type == VideoStream::AudioFrameType::RawData)
     {
       // Connection overloaded, dropping this audio frame.
 	logD (framedrop, _func, "Connection overloaded, dropping audio frame");
@@ -197,15 +194,11 @@ void streamAudioMessage (VideoStream::AudioMessageInfo * const mt_nonnull msg_in
 
     client_session->mutex.unlock ();
 
-    client_session->rtmp_server.sendAudioMessage (msg_info, page_list, msg_len, msg_offset);
+    client_session->rtmp_server.sendAudioMessage (msg);
 }
 
-void streamVideoMessage (VideoStream::VideoMessageInfo * const mt_nonnull msg_info,
-			 PagePool                      * const mt_nonnull page_pool,
-			 PagePool::PageListHead        * const mt_nonnull page_list,
-			 Size                            const msg_len,
-			 Size                            const msg_offset,
-			 void                          * const _session)
+void streamVideoMessage (VideoStream::VideoMessage * const mt_nonnull msg,
+			 void                      * const _session)
 {
 //    logD_ (_func_);
 
@@ -220,10 +213,10 @@ void streamVideoMessage (VideoStream::VideoMessageInfo * const mt_nonnull msg_in
 
 #ifdef MOMENT_RTMP__FLOW_CONTROL
     if (client_session->overloaded
-	&& (   msg_info->frame_type == VideoStream::VideoFrameType::KeyFrame
-	    || msg_info->frame_type == VideoStream::VideoFrameType::InterFrame
-	    || msg_info->frame_type == VideoStream::VideoFrameType::DisposableInterFrame
-	    || msg_info->frame_type == VideoStream::VideoFrameType::GeneratedKeyFrame))
+	&& (   msg->frame_type == VideoStream::VideoFrameType::KeyFrame
+	    || msg->frame_type == VideoStream::VideoFrameType::InterFrame
+	    || msg->frame_type == VideoStream::VideoFrameType::DisposableInterFrame
+	    || msg->frame_type == VideoStream::VideoFrameType::GeneratedKeyFrame))
     {
       // Connection overloaded, dropping this video frame. In general, we'll
       // have to wait for the next keyframe after we've dropped a frame.
@@ -247,14 +240,14 @@ void streamVideoMessage (VideoStream::VideoMessageInfo * const mt_nonnull msg_in
 
 #ifdef MOMENT_RTMP__WAIT_FOR_KEYFRAME
     bool got_keyframe = false;
-    if (msg_info->frame_type == VideoStream::VideoFrameType::KeyFrame ||
-	msg_info->frame_type == VideoStream::VideoFrameType::GeneratedKeyFrame)
+    if (msg->frame_type == VideoStream::VideoFrameType::KeyFrame ||
+	msg->frame_type == VideoStream::VideoFrameType::GeneratedKeyFrame)
     {
 	got_keyframe = true;
     } else
     if (!client_session->keyframe_sent
-	&& (   msg_info->frame_type == VideoStream::VideoFrameType::InterFrame
-	    || msg_info->frame_type == VideoStream::VideoFrameType::DisposableInterFrame))
+	&& (   msg->frame_type == VideoStream::VideoFrameType::InterFrame
+	    || msg->frame_type == VideoStream::VideoFrameType::DisposableInterFrame))
     {
 	++client_session->no_keyframe_counter;
 	if (client_session->no_keyframe_counter >= no_keyframe_limit) {
@@ -275,9 +268,9 @@ void streamVideoMessage (VideoStream::VideoMessageInfo * const mt_nonnull msg_in
 
     client_session->mutex.unlock ();
 
-//    logD_ (_func, "sending ", toString (msg_info->codec_id), ", ", toString (msg_info->frame_type));
+//    logD_ (_func, "sending ", toString (msg->codec_id), ", ", toString (msgo->frame_type));
 
-    client_session->rtmp_server.sendVideoMessage (msg_info, page_list, msg_len, msg_offset);
+    client_session->rtmp_server.sendVideoMessage (msg);
 }
 
 void streamClosed (void * const /* _session */)
@@ -307,6 +300,11 @@ Result connect (ConstMemory const &app_name,
 	return Result::Failure;
 
     client_session->mutex.lock ();
+    if (!client_session->valid) {
+	assert (!client_session->srv_session);
+	client_session->mutex.unlock ();
+	return Result::Failure;
+    }
     client_session->srv_session = srv_session;
     client_session->mutex.unlock ();
 
@@ -388,11 +386,12 @@ Result startWatching (ConstMemory const &stream_name,
     return Result::Success;
 }
 
-RtmpServer::CommandResult server_commandMessage (RtmpConnection              * const mt_nonnull conn,
-						 ConstMemory const           &method_name,
-						 RtmpConnection::MessageInfo * const mt_nonnull msg_info,
-						 AmfDecoder                  * const mt_nonnull amf_decoder,
-						 void                        * const _client_session)
+RtmpServer::CommandResult server_commandMessage (RtmpConnection       * const mt_nonnull conn,
+						 Uint32                 const msg_stream_id,
+						 ConstMemory const    &method_name,
+						 VideoStream::Message * const mt_nonnull msg,
+						 AmfDecoder           * const mt_nonnull amf_decoder,
+						 void                 * const _client_session)
 {
     logD_ (_func, "method_name: ", method_name);
 
@@ -408,12 +407,7 @@ RtmpServer::CommandResult server_commandMessage (RtmpConnection              * c
 	return RtmpServer::CommandResult::UnknownCommand;
     }
 
-    {
-	VideoStream::MessageInfo vs_msg_info;
-	vs_msg_info.timestamp = msg_info->timestamp;
-	vs_msg_info.prechunk_size = msg_info->prechunk_size;
-	moment->rtmpCommandMessage (srv_session, conn, &vs_msg_info, method_name, amf_decoder);
-    }
+    moment->rtmpCommandMessage (srv_session, conn, /* TODO Unnecessary? msg_stream_id, */ msg, method_name, amf_decoder);
 
     return RtmpServer::CommandResult::Success;
 }
@@ -425,52 +419,42 @@ RtmpServer::Frontend const rtmp_server_frontend = {
     server_commandMessage
 };
 
-Result audioMessage (VideoStream::AudioMessageInfo * const mt_nonnull msg_info,
-		     PagePool                      * const mt_nonnull page_pool,
-		     PagePool::PageListHead        * const mt_nonnull page_list,
-		     Size                            const msg_len,
-		     Size                            const msg_offset,
-		     void                          * const _client_session)
+Result audioMessage (VideoStream::AudioMessage * const mt_nonnull msg,
+		     void                      * const _client_session)
 {
     ClientSession * const client_session = static_cast <ClientSession*> (_client_session);
 
     // We create 'video_stream' in startStreaming()/startWatching(), which is
     // synchronized with autioMessage(). No locking needed.
     if (client_session->video_stream)
-	client_session->video_stream->fireAudioMessage (msg_info, page_pool, page_list, msg_len, msg_offset);
+	client_session->video_stream->fireAudioMessage (msg);
 
     return Result::Success;
 }
 
-Result videoMessage (VideoStream::VideoMessageInfo * const mt_nonnull msg_info,
-		     PagePool                      * const mt_nonnull page_pool,
-		     PagePool::PageListHead        * const mt_nonnull page_list,
-		     Size                            const msg_len,
-		     Size                            const msg_offset,
-		     void                          * const _client_session)
+Result videoMessage (VideoStream::VideoMessage * const mt_nonnull msg,
+		     void                      * const _client_session)
 {
     ClientSession * const client_session = static_cast <ClientSession*> (_client_session);
 
     // We create 'video_stream' in startStreaming()/startWatching(), which is
     // synchronized with videoMessage(). No locking needed.
     if (client_session->video_stream)
-	client_session->video_stream->fireVideoMessage (msg_info, page_pool, page_list, msg_len, msg_offset);
+	client_session->video_stream->fireVideoMessage (msg);
 
     return Result::Success;
 }
 
-Result commandMessage (RtmpConnection::MessageInfo * const mt_nonnull msg_info,
-		       PagePool               * const page_pool,
-		       PagePool::PageListHead * const mt_nonnull page_list,
-		       Size                     const msg_len,
-		       AmfEncoding              const amf_encoding,
-		       void                   * const _client_session)
+Result commandMessage (VideoStream::Message * const mt_nonnull msg,
+		       Uint32                 const msg_stream_id,
+		       AmfEncoding            const amf_encoding,
+		       void                 * const _client_session)
 {
     logD (mod_rtmp, _func_);
 
     ClientSession * const client_session = static_cast <ClientSession*> (_client_session);
     // No need to call takeRtmpConnRef(), because this it rtmp_conn's callback.
-    return client_session->rtmp_server.commandMessage (msg_info, page_pool, page_list, msg_len, amf_encoding);
+    return client_session->rtmp_server.commandMessage (msg, msg_stream_id, amf_encoding);
 }
 
 void sendStateChanged (Sender::SendState   const send_state,

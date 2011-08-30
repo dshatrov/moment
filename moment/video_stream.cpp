@@ -305,36 +305,28 @@ VideoStream::VideoCodecId::toFlvCodecId () const
 }
 
 void
-VideoStream::FrameSaver::processAudioFrame (AudioMessageInfo       * const mt_nonnull msg_info,
-					    PagePool               * const mt_nonnull page_pool,
-					    PagePool::PageListHead * const mt_nonnull page_list,
-					    Size                     const msg_len,
-					    Size                     const msg_offset)
+VideoStream::FrameSaver::processAudioFrame (AudioMessage * const mt_nonnull msg)
 {
     logD (frame_saver, _func, "0x", fmt_hex, (UintPtr) this);
 
 #if 0
-    if (page_list->first && page_list->first->data_len >= 1)
-	logD_ (_func, "audio header: 0x", fmt_hex, (unsigned) page_list->first->getData() [0]);
+    if (msg.page_list->first && msg.page_list->first->data_len >= 1)
+	logD_ (_func, "audio header: 0x", fmt_hex, (unsigned) msg.page_list->first->getData() [0]);
 #endif
 
-    switch (msg_info->frame_type) {
+    switch (msg->frame_type) {
 	case AudioFrameType::AacSequenceHeader: {
-	    logD (frame_saver, _func, msg_info->frame_type);
+	    logD (frame_saver, _func, msg->frame_type);
 
 	    logD_ (_func, "AAC SEQUENCE HEADER");
 
 	    if (got_saved_aac_seq_hdr)
-		saved_aac_seq_hdr.page_pool->msgUnref (saved_aac_seq_hdr.page_list.first);
+		saved_aac_seq_hdr.msg.page_pool->msgUnref (saved_aac_seq_hdr.msg.page_list.first);
 
 	    got_saved_aac_seq_hdr = true;
-	    saved_aac_seq_hdr.msg_info = *msg_info;
-	    saved_aac_seq_hdr.page_pool = page_pool;
-	    saved_aac_seq_hdr.page_list = *page_list;
-	    saved_aac_seq_hdr.msg_len = msg_len;
-	    saved_aac_seq_hdr.msg_offset = msg_offset;
+	    saved_aac_seq_hdr.msg = *msg;
 
-	    page_pool->msgRef (page_list->first);
+	    msg->page_pool->msgRef (msg->page_list.first);
 	} break;
 	default:
 	  // No-op
@@ -343,73 +335,57 @@ VideoStream::FrameSaver::processAudioFrame (AudioMessageInfo       * const mt_no
 }
 
 void
-VideoStream::FrameSaver::processVideoFrame (VideoMessageInfo       * const mt_nonnull msg_info,
-					    PagePool               * const mt_nonnull page_pool,
-					    PagePool::PageListHead * const mt_nonnull page_list,
-					    Size                     const msg_len,
-					    Size                     const msg_offset)
+VideoStream::FrameSaver::processVideoFrame (VideoMessage * const mt_nonnull msg)
 {
     logD (frame_saver, _func, "0x", fmt_hex, (UintPtr) this);
 
-    switch (msg_info->frame_type) {
+    switch (msg->frame_type) {
 	case VideoFrameType::KeyFrame: {
-	    logD (frame_saver, _func, msg_info->frame_type);
+	    logD (frame_saver, _func, msg->frame_type);
 
 	    if (got_saved_keyframe)
-		saved_keyframe.page_pool->msgUnref (saved_keyframe.page_list.first);
+		saved_keyframe.msg.page_pool->msgUnref (saved_keyframe.msg.page_list.first);
 
 	    got_saved_keyframe = true;
-	    saved_keyframe.msg_info = *msg_info;
-	    saved_keyframe.page_pool = page_pool;
-	    saved_keyframe.page_list = *page_list;
-	    saved_keyframe.msg_len = msg_len;
-	    saved_keyframe.msg_offset = msg_offset;
+	    saved_keyframe.msg = *msg;
 
-	    page_pool->msgRef (page_list->first);
+	    msg->page_pool->msgRef (msg->page_list.first);
 	} break;
 	case VideoFrameType::AvcSequenceHeader: {
-	    logD (frame_saver, _func, msg_info->frame_type);
+	    logD (frame_saver, _func, msg->frame_type);
 
 	    if (got_saved_avc_seq_hdr)
-		saved_avc_seq_hdr.page_pool->msgUnref (saved_avc_seq_hdr.page_list.first);
+		saved_avc_seq_hdr.msg.page_pool->msgUnref (saved_avc_seq_hdr.msg.page_list.first);
 
 	    got_saved_avc_seq_hdr = true;
-	    saved_avc_seq_hdr.msg_info = *msg_info;
-	    saved_avc_seq_hdr.page_pool = page_pool;
-	    saved_avc_seq_hdr.page_list = *page_list;
-	    saved_avc_seq_hdr.msg_len = msg_len;
-	    saved_avc_seq_hdr.msg_offset = msg_offset;
+	    saved_avc_seq_hdr.msg = *msg;
 
-	    page_pool->msgRef (page_list->first);
+	    msg->page_pool->msgRef (msg->page_list.first);
 	} break;
 	case VideoFrameType::AvcEndOfSequence: {
-	    logD (frame_saver, _func, msg_info->frame_type);
+	    logD (frame_saver, _func, msg->frame_type);
 
 	    if (got_saved_avc_seq_hdr)
-		saved_avc_seq_hdr.page_pool->msgUnref (saved_avc_seq_hdr.page_list.first);
+		saved_avc_seq_hdr.msg.page_pool->msgUnref (saved_avc_seq_hdr.msg.page_list.first);
 
 	    got_saved_avc_seq_hdr = false;
 	} break;
 	case VideoFrameType::RtmpSetMetaData: {
-	    logD (frame_saver, _func, msg_info->frame_type);
+	    logD (frame_saver, _func, msg->frame_type);
 
 	    if (got_saved_metadata)
-		saved_metadata.page_pool->msgUnref (saved_metadata.page_list.first);
+		saved_metadata.msg.page_pool->msgUnref (saved_metadata.msg.page_list.first);
 
 	    got_saved_metadata = true;
-	    saved_metadata.msg_info = *msg_info;
-	    saved_metadata.page_pool = page_pool;
-	    saved_metadata.page_list = *page_list;
-	    saved_metadata.msg_len = msg_len;
-	    saved_metadata.msg_offset = msg_offset;
+	    saved_metadata.msg = *msg;
 
-	    page_pool->msgRef (page_list->first);
+	    msg->page_pool->msgRef (msg->page_list.first);
 	} break;
 	case VideoFrameType::RtmpClearMetaData: {
-	    logD (frame_saver, _func, msg_info->frame_type);
+	    logD (frame_saver, _func, msg->frame_type);
 
 	    if (got_saved_metadata)
-		saved_metadata.page_pool->msgUnref (saved_metadata.page_list.first);
+		saved_metadata.msg.page_pool->msgUnref (saved_metadata.msg.page_list.first);
 
 	    got_saved_metadata = false;
 	} break;
@@ -470,36 +446,24 @@ VideoStream::FrameSaver::FrameSaver ()
 VideoStream::FrameSaver::~FrameSaver ()
 {
     if (got_saved_keyframe)
-	saved_keyframe.page_pool->msgUnref (saved_keyframe.page_list.first);
+	saved_keyframe.msg.page_pool->msgUnref (saved_keyframe.msg.page_list.first);
 
     if (got_saved_metadata)
-	saved_metadata.page_pool->msgUnref (saved_metadata.page_list.first);
+	saved_metadata.msg.page_pool->msgUnref (saved_metadata.msg.page_list.first);
 
     if (got_saved_aac_seq_hdr)
-	saved_aac_seq_hdr.page_pool->msgUnref (saved_aac_seq_hdr.page_list.first);
+	saved_aac_seq_hdr.msg.page_pool->msgUnref (saved_aac_seq_hdr.msg.page_list.first);
 
     if (got_saved_avc_seq_hdr)
-	saved_avc_seq_hdr.page_pool->msgUnref (saved_avc_seq_hdr.page_list.first);
+	saved_avc_seq_hdr.msg.page_pool->msgUnref (saved_avc_seq_hdr.msg.page_list.first);
 }
 
 namespace {
     struct InformAudioMessage_Data {
-	VideoStream::AudioMessageInfo *msg_info;
-	PagePool                      *page_pool;
-	PagePool::PageListHead        *page_list;
-	Size                           msg_len;
-	Size                           msg_offset;
+	VideoStream::AudioMessage *msg;
 
-	InformAudioMessage_Data (VideoStream::AudioMessageInfo * const msg_info,
-				 PagePool                      * const page_pool,
-				 PagePool::PageListHead        * const page_list,
-				 Size                            const msg_len,
-				 Size                            const msg_offset)
-	    : msg_info (msg_info),
-	      page_pool (page_pool),
-	      page_list (page_list),
-	      msg_len (msg_len),
-	      msg_offset (msg_offset)
+	InformAudioMessage_Data (VideoStream::AudioMessage * const msg)
+	    : msg (msg)
 	{
 	}
     };
@@ -511,32 +475,15 @@ VideoStream::informAudioMessage (EventHandler * const event_handler,
 				 void * const _inform_data)
 {
     InformAudioMessage_Data * const inform_data = static_cast <InformAudioMessage_Data*> (_inform_data);
-    event_handler->audioMessage (inform_data->msg_info,
-				 inform_data->page_pool,
-				 inform_data->page_list,
-				 inform_data->msg_len,
-				 inform_data->msg_offset,
-				 cb_data);
+    event_handler->audioMessage (inform_data->msg, cb_data);
 }
 
 namespace {
     struct InformVideoMessage_Data {
-	VideoStream::VideoMessageInfo *msg_info;
-	PagePool                      *page_pool;
-	PagePool::PageListHead        *page_list;
-	Size                           msg_len;
-	Size                           msg_offset;
+	VideoStream::VideoMessage *msg;
 
-	InformVideoMessage_Data (VideoStream::VideoMessageInfo * const msg_info,
-				 PagePool                      * const page_pool,
-				 PagePool::PageListHead        * const page_list,
-				 Size                            const msg_len,
-				 Size                            const msg_offset)
-	    : msg_info (msg_info),
-	      page_pool (page_pool),
-	      page_list (page_list),
-	      msg_len (msg_len),
-	      msg_offset (msg_offset)
+	InformVideoMessage_Data (VideoStream::VideoMessage * const msg)
+	    : msg (msg)
 	{
 	}
     };
@@ -548,27 +495,22 @@ VideoStream::informVideoMessage (EventHandler * const event_handler,
 				 void * const _inform_data)
 {
     InformVideoMessage_Data * const inform_data = static_cast <InformVideoMessage_Data*> (_inform_data);
-    event_handler->videoMessage (inform_data->msg_info,
-				 inform_data->page_pool,
-				 inform_data->page_list,
-				 inform_data->msg_len,
-				 inform_data->msg_offset,
-				 cb_data);
+    event_handler->videoMessage (inform_data->msg, cb_data);
 }
 
 namespace {
     struct InformRtmpCommandMessage_Data {
 	RtmpConnection           *conn;
-	VideoStream::MessageInfo *msg_info;
+	VideoStream::Message     *msg;
 	ConstMemory        const &method_name;
 	AmfDecoder               *amf_decoder;
 
-	InformRtmpCommandMessage_Data (RtmpConnection           * const  conn,
-				       VideoStream::MessageInfo * const  msg_info,
-				       ConstMemory                const &method_name,
-				       AmfDecoder               * const  amf_decoder)
+	InformRtmpCommandMessage_Data (RtmpConnection       * const  conn,
+				       VideoStream::Message * const  msg,
+				       ConstMemory            const &method_name,
+				       AmfDecoder           * const  amf_decoder)
 	    : conn (conn),
-	      msg_info (msg_info),
+	      msg (msg),
 	      method_name (method_name),
 	      amf_decoder (amf_decoder)
 	{
@@ -586,7 +528,7 @@ VideoStream::informRtmpCommandMessage (EventHandler * const event_handler,
     // TODO Save/restore amf_decoder state between  callback invocations.
     //      Viable option - abstract away the parsing process.
     event_handler->rtmpCommandMessage (inform_data->conn,
-				       inform_data->msg_info,
+				       inform_data->msg,
 				       inform_data->method_name,
 				       inform_data->amf_decoder,
 				       cb_data);
@@ -601,50 +543,42 @@ VideoStream::informClosed (EventHandler * const event_handler,
 }
 
 void
-VideoStream::fireAudioMessage (AudioMessageInfo       * const mt_nonnull msg_info,
-			       PagePool               * const mt_nonnull page_pool,
-			       PagePool::PageListHead * const mt_nonnull page_list,
-			       Size                     const msg_len,
-			       Size                     const msg_offset)
+VideoStream::fireAudioMessage (AudioMessage * const mt_nonnull msg)
 {
 //    logD_ (_func, "timestamp: 0x", fmt_hex, (UintPtr) msg_info->timestamp);
 
     mutex.lock ();
 
-    frame_saver.processAudioFrame (msg_info, page_pool, page_list, msg_len, msg_offset);
+    frame_saver.processAudioFrame (msg);
 
-    InformAudioMessage_Data inform_data (msg_info, page_pool, page_list, msg_len, msg_offset);
+    InformAudioMessage_Data inform_data (msg);
     event_informer.informAll_unlocked (informAudioMessage, &inform_data);
 
     mutex.unlock ();
 }
 
 void
-VideoStream::fireVideoMessage (VideoMessageInfo       * const mt_nonnull msg_info,
-			       PagePool               * const mt_nonnull page_pool,
-			       PagePool::PageListHead * const mt_nonnull page_list,
-			       Size                     const msg_len,
-			       Size                     const msg_offset)
+VideoStream::fireVideoMessage (VideoMessage * const mt_nonnull msg)
 {
-//    logD_ (_func, "timestamp: 0x", fmt_hex, (UintPtr) msg_info->timestamp);
+//    logD_ (_func, "timestamp: 0x", fmt_hex, (UintPtr) msg->timestamp);
 
     mutex.lock ();
 
-    frame_saver.processVideoFrame (msg_info, page_pool, page_list, msg_len, msg_offset);
+    frame_saver.processVideoFrame (msg);
 
-    InformVideoMessage_Data inform_data (msg_info, page_pool, page_list, msg_len, msg_offset);
+    InformVideoMessage_Data inform_data (msg);
     event_informer.informAll_unlocked (informVideoMessage, &inform_data);
 
     mutex.unlock ();
 }
 
 void
-VideoStream::fireRtmpCommandMessage (RtmpConnection    * const  mt_nonnull conn,
-				     MessageInfo       * const  mt_nonnull msg_info,
-				     ConstMemory         const &method_name,
-				     AmfDecoder        * const  mt_nonnull amf_decoder)
+VideoStream::fireRtmpCommandMessage (RtmpConnection * const  mt_nonnull conn,
+				     Message        * const  mt_nonnull msg,
+				     ConstMemory      const &method_name,
+				     AmfDecoder     * const  mt_nonnull amf_decoder)
 {
-    InformRtmpCommandMessage_Data inform_data (conn, msg_info, method_name, amf_decoder);
+    InformRtmpCommandMessage_Data inform_data (conn, msg, method_name, amf_decoder);
     event_informer.informAll (informRtmpCommandMessage, &inform_data);
 }
 

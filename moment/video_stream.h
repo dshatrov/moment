@@ -139,29 +139,39 @@ public:
     };
 
     // Must be copyable.
-    class MessageInfo
+    class Message
     {
     public:
 	Uint64 timestamp;
 
+        PagePool *page_pool;
+        PagePool::PageListHead page_list;
+        Size msg_len;
+        Size msg_offset;
+
 	// Greater than zero for prechunked messages.
 	Uint32 prechunk_size;
 
-	MessageInfo ()
+	Message ()
 	    : timestamp (0),
+
+	      page_pool (NULL),
+	      msg_len (0),
+	      msg_offset (0),
+
 	      prechunk_size (0)
 	{
 	}
     };
 
     // Must be copyable.
-    struct AudioMessageInfo : public MessageInfo
+    struct AudioMessage : public Message
     {
     public:
 	AudioFrameType frame_type;
 	AudioCodecId codec_id;
 
-	AudioMessageInfo ()
+	AudioMessage ()
 	    : frame_type (AudioFrameType::Unknown),
 	       codec_id (AudioCodecId::Unknown)
 	{
@@ -169,7 +179,7 @@ public:
     };
 
     // Must be copyable.
-    struct VideoMessageInfo : public MessageInfo
+    struct VideoMessage : public Message
     {
     public:
       // Note that we ignore AVC composition time for now.
@@ -182,7 +192,7 @@ public:
 	VideoFrameType frame_type;
 	VideoCodecId codec_id;
 
-	VideoMessageInfo ()
+	VideoMessage ()
 	    : frame_type (VideoFrameType::Unknown),
 	      codec_id (VideoCodecId::Unknown)
 	{
@@ -191,22 +201,14 @@ public:
 
     struct EventHandler
     {
-	void (*audioMessage) (AudioMessageInfo       * mt_nonnull msg_info,
-			      PagePool               * mt_nonnull page_pool,
-			      PagePool::PageListHead * mt_nonnull page_list,
-			      Size                    msg_len,
-			      Size                    msg_offset,
-			      void                  *cb_data);
+	void (*audioMessage) (AudioMessage * mt_nonnull msg,
+			      void         *cb_data);
 
-	void (*videoMessage) (VideoMessageInfo       * mt_nonnull msg_info,
-			      PagePool               * mt_nonnull page_pool,
-			      PagePool::PageListHead * mt_nonnull page_list,
-			      Size                    msg_len,
-			      Size                    msg_offset,
-			      void                   *cb_data);
+	void (*videoMessage) (VideoMessage * mt_nonnull msg,
+			      void         *cb_data);
 
 	void (*rtmpCommandMessage) (RtmpConnection    * mt_nonnull conn,
-				    MessageInfo       * mt_nonnull msg_info,
+				    Message           * mt_nonnull msg,
 				    ConstMemory const &method_name,
 				    AmfDecoder        * mt_nonnull amf_decoder,
 				    void              *cb_data);
@@ -219,20 +221,12 @@ public:
     // TODO Rename to SavedVideoFrame.
     struct SavedFrame
     {
-	VideoStream::VideoMessageInfo msg_info;
-	PagePool *page_pool;
-	PagePool::PageListHead page_list;
-	Size msg_len;
-	Size msg_offset;
+	VideoStream::VideoMessage msg;
     };
 
     struct SavedAudioFrame
     {
-	VideoStream::AudioMessageInfo msg_info;
-	PagePool *page_pool;
-	PagePool::PageListHead page_list;
-	Size msg_len;
-	Size msg_offset;
+	VideoStream::AudioMessage msg;
     };
 
     mt_unsafe class FrameSaver
@@ -251,17 +245,9 @@ public:
 	SavedFrame saved_avc_seq_hdr;
 
     public:
-	void processAudioFrame (AudioMessageInfo       * mt_nonnull msg_info,
-				PagePool               * mt_nonnull page_pool,
-				PagePool::PageListHead * mt_nonnull page_list,
-				Size                    msg_len,
-				Size                    msg_offset);
+	void processAudioFrame (AudioMessage * mt_nonnull msg);
 
-	void processVideoFrame (VideoMessageInfo       * mt_nonnull msg_info,
-				PagePool               * mt_nonnull page_pool,
-				PagePool::PageListHead * mt_nonnull page_list,
-				Size                    msg_len,
-				Size                    msg_offset);
+	void processVideoFrame (VideoMessage * mt_nonnull msg);
 
 	bool getSavedKeyframe (SavedFrame * mt_nonnull ret_frame);
 
@@ -311,20 +297,12 @@ public:
 	return &event_informer;
     }
 
-    void fireAudioMessage (AudioMessageInfo       * mt_nonnull msg_info,
-			   PagePool               * mt_nonnull page_pool,
-			   PagePool::PageListHead * mt_nonnull page_list,
-			   Size                    msg_len,
-			   Size                    msg_offset);
+    void fireAudioMessage (AudioMessage * mt_nonnull msg);
 
-    void fireVideoMessage (VideoMessageInfo       * mt_nonnull msg_info,
-			   PagePool               * mt_nonnull page_pool,
-			   PagePool::PageListHead * mt_nonnull page_list,
-			   Size                    msg_len,
-			   Size                    msg_offset);
+    void fireVideoMessage (VideoMessage * mt_nonnull msg);
 
     void fireRtmpCommandMessage (RtmpConnection    * mt_nonnull conn,
-				 MessageInfo       * mt_nonnull msg_info,
+				 Message           * mt_nonnull msg,
 				 ConstMemory const &method_name,
 				 AmfDecoder        * mt_nonnull amf_decoder);
 

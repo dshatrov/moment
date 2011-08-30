@@ -56,19 +56,19 @@ void frameTimerTick (void * const /* cb_data */)
     tick_mutex.lock ();
 
     for (Uint64 i = 0; i < burst_width; ++i) {
-	VideoStream::VideoMessageInfo video_msg_info;
+	VideoStream::VideoMessage video_msg;
 
 	if (keyframe_counter == 0) {
-	    video_msg_info.frame_type = VideoStream::VideoFrameType::KeyFrame;
+	    video_msg.frame_type = VideoStream::VideoFrameType::KeyFrame;
 	    keyframe_counter = keyframe_interval;
 	} else {
-	    video_msg_info.frame_type = VideoStream::VideoFrameType::InterFrame;
+	    video_msg.frame_type = VideoStream::VideoFrameType::InterFrame;
 	    --keyframe_counter;
 	}
 
 	if (first_frame) {
 	    timestamp_offset = getTimeMilliseconds();
-	    video_msg_info.timestamp = start_timestamp;
+	    video_msg.timestamp = start_timestamp;
 	    first_frame = false;
 	} else {
 	    Time timestamp = getTimeMilliseconds();
@@ -79,13 +79,13 @@ void frameTimerTick (void * const /* cb_data */)
 
 	    timestamp += start_timestamp;
 
-	    video_msg_info.timestamp = timestamp;
+	    video_msg.timestamp = timestamp;
 	}
 
-//	logD_ (_func, "timestamp: ", fmt_hex, video_msg_info.timestamp);
+//	logD_ (_func, "timestamp: ", fmt_hex, video_msg.timestamp);
 
-	video_msg_info.prechunk_size = prechunk_size;
-	video_msg_info.codec_id = VideoStream::VideoCodecId::Unknown;
+	video_msg.prechunk_size = prechunk_size;
+	video_msg.codec_id = VideoStream::VideoCodecId::Unknown;
 
 	PagePool::PageListHead *page_list_ptr = &page_list;
 	PagePool::PageListHead tmp_page_list;
@@ -108,11 +108,12 @@ void frameTimerTick (void * const /* cb_data */)
 	    page_list_ptr = &tmp_page_list;
 	}
 
-	video_stream->fireVideoMessage (&video_msg_info,
-					page_pool,
-					page_list_ptr,
-					frame_size,
-					0 /* msg_offset */);
+	video_msg.page_pool = page_pool;
+	video_msg.page_list = *page_list_ptr;
+	video_msg.msg_len = frame_size;
+	video_msg.msg_offset = 0;
+
+	video_stream->fireVideoMessage (&video_msg);
 
 	if (!use_same_pages)
 	    page_pool->msgUnref (tmp_page_list.first);

@@ -36,7 +36,7 @@ extern "C" {
 
 typedef struct MomentMessage MomentMessage;
 
-void moment_message_get_data (MomentMessage *message,
+void moment_message_get_data (MomentMessage *msg,
 			      size_t         offset,
 			      unsigned char *buf,
 			      size_t         len);
@@ -46,17 +46,17 @@ void moment_message_get_data (MomentMessage *message,
 
 typedef struct MomentStreamHandler MomentStreamHandler;
 
-typedef void (*MomentRtmpCommandMessageCallback) (MomentMessage *msg,
-						  // TODO AMF decoder
-						  void          *user_data);
+typedef void (*MomentRtmpDataMessageCallback) (MomentMessage *msg,
+					       // TODO AMF decoder
+					       void          *user_data);
 
 typedef void (*MomentStreamClosedCallback) (void *user_data);
 
 void moment_stream_handler_init (MomentStreamHandler *stream_handler);
 
-void moment_stream_handler_set_rtmp_command_message (MomentStreamHandler              *stream_handler,
-						     MomentRtmpCommandMessageCallback  cb,
-						     void                             *user_data);
+void moment_stream_handler_set_rtmp_command_message (MomentStreamHandler           *stream_handler,
+						     MomentRtmpDataMessageCallback  cb,
+						     void                          *user_data);
 
 void moment_stream_handler_set_closed (MomentStreamHandler        *stream_handler,
 				       MomentStreamClosedCallback  cb,
@@ -122,6 +122,10 @@ typedef MomentStream* (*MomentStartStreamingCallback) (char const *stream_name_b
 						       void       *client_user_data,
 						       void       *user_data);
 
+typedef void (*MomentRtmpCommandMessageCallback) (MomentMessage *msg,
+						  void          *client_user_data,
+						  void          *user_data);
+
 typedef struct MomentClientHandler MomentClientHandler;
 
 typedef void* MomentClientHandlerKey;
@@ -146,15 +150,22 @@ void moment_client_handler_set_start_streaming (MomentClientHandler          *cl
 						MomentStartStreamingCallback  cb,
 						void                         *user_data);
 
+void moment_client_handler_set_rtmp_command_message (MomentClientHandler              *client_handler,
+						     MomentRtmpCommandMessageCallback  cb,
+						     void                             *user_data);
+
 MomentClientHandlerKey moment_add_client_handler (MomentClientHandler *client_handler,
 						  char const          *prefix_bux,
 						  size_t               prefix_len);
 
 void moment_remove_client_handler (MomentClientHandlerKey client_handler_key);
 
-void moment_client_send_command_message (MomentClientSession *client_session,
-					 unsigned char const *msg_buf,
-					 size_t               msg_len);
+void moment_client_send_rtmp_command_message (MomentClientSession *client_session,
+					      unsigned char const *msg_buf,
+					      size_t               msg_len);
+
+void moment_client_send_rtmp_command_message_passthrough (MomentClientSession *client_session,
+							  MomentMessage       *msg);
 
 
 // _____________________________ Config file access ____________________________
