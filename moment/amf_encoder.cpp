@@ -24,6 +24,85 @@ using namespace M;
 
 namespace Moment {
 
+void
+AmfEncoder::addNumber (double const number)
+{
+    reserveAtom ();
+    atoms [num_encoded].type = AmfAtom::Number;
+    atoms [num_encoded].number = number;
+    ++num_encoded;
+}
+
+void
+AmfEncoder::addBoolean (bool const boolean)
+{
+    reserveAtom ();
+    atoms [num_encoded].type = AmfAtom::Boolean;
+    atoms [num_encoded].boolean = boolean;
+    ++num_encoded;
+}
+
+void
+AmfEncoder::addString (ConstMemory const &mem)
+{
+    reserveAtom ();
+    atoms [num_encoded].type = AmfAtom::String;
+    atoms [num_encoded].string.data = mem.mem();
+    atoms [num_encoded].string.len = mem.len();
+    ++num_encoded;
+}
+
+void
+AmfEncoder::addNullObject ()
+{
+    reserveAtom ();
+    atoms [num_encoded].type = AmfAtom::NullObject;
+    ++num_encoded;
+}
+
+void
+AmfEncoder::beginObject ()
+{
+    reserveAtom ();
+    atoms [num_encoded].type = AmfAtom::BeginObject;
+    ++num_encoded;
+}
+
+void
+AmfEncoder::endObject ()
+{
+    reserveAtom ();
+    atoms [num_encoded].type = AmfAtom::EndObject;
+    ++num_encoded;
+}
+
+void
+AmfEncoder::beginEcmaArray (Uint32 const num_entries)
+{
+    reserveAtom ();
+    atoms [num_encoded].type = AmfAtom::EcmaArray;
+    atoms [num_encoded].integer = num_entries;
+    ++num_encoded;
+}
+
+void
+AmfEncoder::addFieldName (ConstMemory const &field_name)
+{
+    reserveAtom ();
+    atoms [num_encoded].type = AmfAtom::FieldName;
+    atoms [num_encoded].string.data = field_name.mem();
+    atoms [num_encoded].string.len = field_name.len();
+    ++num_encoded;
+}
+
+void
+AmfEncoder::addNull ()
+{
+    reserveAtom ();
+    atoms [num_encoded].type = AmfAtom::Null;
+    ++num_encoded;
+}
+
 Result
 AmfEncoder::encode (Memory          const &mem,
 		    AmfEncoding     const  encoding,

@@ -55,6 +55,7 @@ extern "C" {
 
 // _________________________________ Messages __________________________________
 
+// Duplicated in api_amf.cpp
 struct MomentMessage {
     PagePool::PageListHead *page_list;
     Size msg_offset;
@@ -278,7 +279,7 @@ struct MomentClientHandler {
     void *rtmp_command_cb_data;
 };
 
-MomentClientHandler* moment_client_handler_new ()
+MomentClientHandler* moment_client_handler_new (void)
 {
     MomentClientHandler * const client_handler = new MomentClientHandler;
     assert (client_handler);
@@ -571,7 +572,7 @@ void moment_client_send_rtmp_command_message_passthrough (MomentClientSession * 
     CodeRef conn_ref;
     RtmpConnection * const conn = api_client_session->int_client_session->getRtmpConnection (&conn_ref);
     if (conn) {
-	conn->sendCommandMessage_AMF0_Pages (RtmpConnection::DefaultMessageStreamId,
+	conn->sendCommandMessage_AMF0_Pages (RtmpConnection::CommandMessageStreamId,
 					     api_msg->page_list,
 					     api_msg->msg_offset,
 					     api_msg->msg_len,

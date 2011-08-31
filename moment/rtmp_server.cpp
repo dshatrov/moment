@@ -727,7 +727,7 @@ RtmpServer::encodeMetaData (MetaData                  * const mt_nonnull metadat
     encoder.addString ("onMetaData");
 // Unnecessary    encoder.addNumber (1.0);
 
-    encoder.addEcmaArray (0 /* num_entries */);
+    encoder.beginEcmaArray (0 /* num_entries */);
     AmfAtom * const toplevel_array_atom = encoder.getLastAtom ();
     Uint32 num_entries = 0;
 

@@ -24,6 +24,7 @@
 // Stable C API for external modules.
 
 
+#include <stdlib.h>
 #include <stdarg.h>
 
 
@@ -130,7 +131,7 @@ typedef struct MomentClientHandler MomentClientHandler;
 
 typedef void* MomentClientHandlerKey;
 
-MomentClientHandler* moment_client_handler_new ();
+MomentClientHandler* moment_client_handler_new (void);
 
 void moment_client_handler_delete (MomentClientHandler *client_handler);
 

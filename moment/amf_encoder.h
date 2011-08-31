@@ -21,6 +21,9 @@
 #define __LIBMOMENT__AMF_ENCODER__H__
 
 
+#include <libmary/types.h>
+#include <cstdlib>
+
 #include <libmary/libmary.h>
 
 
@@ -151,10 +154,25 @@ public:
 class AmfEncoder
 {
 private:
-    AmfAtom * const atoms;
-    Count const num_atoms;
+    AmfAtom *atoms;
+    Count num_atoms;
 
     Count num_encoded;
+
+    bool own_atoms;
+
+    void reserveAtom ()
+    {
+	if (!own_atoms) {
+	    assert (num_encoded < num_atoms);
+	} else {
+	    assert (num_encoded <= num_atoms);
+	    if (num_encoded == num_atoms) {
+		atoms = (AmfAtom*) realloc (atoms, sizeof (AmfAtom) * num_atoms * 2);
+		assert (atoms);
+	    }
+	}
+    }
 
 public:
     AmfAtom* getLastAtom ()
@@ -162,75 +180,28 @@ public:
 	return &atoms [num_encoded - 1];
     }
 
-    void addNumber (double const number)
+    void addNumber (double number);
+
+    void addBoolean (bool boolean);
+
+    void addString (ConstMemory const &mem);
+
+    void addNullObject ();
+
+    void beginObject ();
+
+    void endObject ();
+
+    void beginEcmaArray (Uint32 const num_entries);
+
+    void endEcmaArray ()
     {
-	assert (num_encoded < num_atoms);
-	atoms [num_encoded].type = AmfAtom::Number;
-	atoms [num_encoded].number = number;
-	++num_encoded;
+	endObject ();
     }
 
-    void addBoolean (bool const boolean)
-    {
-	assert (num_encoded < num_atoms);
-	atoms [num_encoded].type = AmfAtom::Boolean;
-	atoms [num_encoded].boolean = boolean;
-	++num_encoded;
-    }
+    void addFieldName (ConstMemory const &field_name);
 
-    void addString (ConstMemory const &mem)
-    {
-	assert (num_encoded < num_atoms);
-	atoms [num_encoded].type = AmfAtom::String;
-	atoms [num_encoded].string.data = mem.mem();
-	atoms [num_encoded].string.len = mem.len();
-	++num_encoded;
-    }
-
-    void addNullObject ()
-    {
-	assert (num_encoded < num_atoms);
-	atoms [num_encoded].type = AmfAtom::NullObject;
-	++num_encoded;
-    }
-
-    void beginObject ()
-    {
-	assert (num_encoded < num_atoms);
-	atoms [num_encoded].type = AmfAtom::BeginObject;
-	++num_encoded;
-    }
-
-    void endObject ()
-    {
-	assert (num_encoded < num_atoms);
-	atoms [num_encoded].type = AmfAtom::EndObject;
-	++num_encoded;
-    }
-
-    void addFieldName (ConstMemory const &field_name)
-    {
-	assert (num_encoded < num_atoms);
-	atoms [num_encoded].type = AmfAtom::FieldName;
-	atoms [num_encoded].string.data = field_name.mem();
-	atoms [num_encoded].string.len = field_name.len();
-	++num_encoded;
-    }
-
-    void addEcmaArray (Uint32 const num_entries)
-    {
-	assert (num_encoded < num_atoms);
-	atoms [num_encoded].type = AmfAtom::EcmaArray;
-	atoms [num_encoded].integer = num_entries;
-	++num_encoded;
-    }
-
-    void addNull ()
-    {
-	assert (num_encoded < num_atoms);
-	atoms [num_encoded].type = AmfAtom::Null;
-	++num_encoded;
-    }
+    void addNull ();
 
     static Result encode (Memory const  &mem,
 			  AmfEncoding    encoding,
@@ -254,20 +225,49 @@ public:
 	return encode (mem, encoding, ret_len, atoms, num_encoded);
     }
 
+    void reset ()
+    {
+	num_encoded = 0;
+    }
+
     AmfEncoder (AmfAtom * const atoms,
 		Count const num_atoms)
 	: atoms (atoms),
 	  num_atoms (num_atoms),
 	  num_encoded (0)
     {
+	if (atoms) {
+	    own_atoms = false;
+	} else {
+	    this->atoms = (AmfAtom*) malloc (sizeof (AmfAtom) * 64);
+	    assert (this->atoms);
+	    this->num_atoms = 64;
+	    own_atoms = true;
+	}
     }
 
     template <Size N>
     AmfEncoder (AmfAtom (&atoms) [N])
 	: atoms (atoms),
 	  num_atoms (N),
-	  num_encoded (0)
+	  num_encoded (0),
+	  own_atoms (false)
     {
+    }
+
+    AmfEncoder ()
+	: num_encoded (0)
+    {
+	atoms = (AmfAtom*) malloc (sizeof (AmfAtom) * 64);
+	assert (atoms);
+	num_atoms = 64;
+	own_atoms = true;
+    }
+
+    ~AmfEncoder ()
+    {
+	if (own_atoms)
+	    free (atoms);
     }
 };
 

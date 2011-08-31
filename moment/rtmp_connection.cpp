@@ -36,7 +36,7 @@ LogGroup libMary_logGroup_send      ("rtmp_send",       LogLevel::N);
 LogGroup libMary_logGroup_time      ("rtmp_time",       LogLevel::I);
 LogGroup libMary_logGroup_close     ("rtmp_conn_close", LogLevel::N);
 LogGroup libMary_logGroup_proto_in  ("rtmp_proto_in",   LogLevel::I);
-LogGroup libMary_logGroup_proto_out ("rtmp_proto_out",  LogLevel::N);
+LogGroup libMary_logGroup_proto_out ("rtmp_proto_out",  LogLevel::I);
 }
 
 Sender::Frontend const RtmpConnection::sender_frontend = {

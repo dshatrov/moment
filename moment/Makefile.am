@@ -62,6 +62,7 @@ libmoment_1_0_la_SOURCES =	\
 	moment_server.cpp	\
 				\
 	api.cpp			\
+	api_amf.cpp		\
 				\
 	hmac/sha2.c		\
 	hmac/hmac_sha2.c

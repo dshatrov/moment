@@ -33,9 +33,9 @@ using namespace M;
 class AmfDecoder
 {
 private:
-    AmfEncoding const encoding;
-    Array * const array;
-    Size const msg_len;
+    AmfEncoding encoding;
+    Array *array;
+    Size msg_len;
 
     Size cur_offset;
 
@@ -63,9 +63,25 @@ public:
 	return cur_offset;
     }
 
-    AmfDecoder (AmfEncoding const encoding,
-		Array * const array,
-		Size const msg_len)
+    void setOffset (Size const offs)
+    {
+	cur_offset = offs;
+    }
+
+    void reset (AmfEncoding   const encoding,
+		Array       * const array,
+		Size          const msg_len)
+    {
+	this->encoding = encoding;
+	this->array = array;
+	this->msg_len = msg_len;
+
+	cur_offset = 0;
+    }
+
+    AmfDecoder (AmfEncoding   const encoding,
+		Array       * const array,
+		Size          const msg_len)
 	: encoding (encoding),
 	  array (array),
 	  msg_len (msg_len),
