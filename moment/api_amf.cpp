@@ -20,7 +20,7 @@
 #include <libmary/libmary.h>
 #include <moment/libmoment.h>
 
-#include <moment/api_amf.h>
+#include <moment/api.h>
 
 
 using namespace M;

@@ -38,7 +38,6 @@ moment_target_headers =		\
 	moment_server.h		\
 				\
 	api.h			\
-	api_amf.h		\
 				\
 	module_init.h
 
