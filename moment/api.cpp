@@ -406,7 +406,8 @@ void client_rtmpCommandMessage (RtmpConnection       * const mt_nonnull conn,
     ext_msg.msg_offset    = int_msg->msg_offset;
     ext_msg.prechunk_size = int_msg->prechunk_size;
 
-    // TODO Initialize msg.pl_array
+    PagePool::PageListArray pl_array (int_msg->page_list.first, int_msg->msg_len);
+    ext_msg.pl_array = &pl_array;
 
     if (api_client_session->api_client_handler_wrapper->ext_client_handler.rtmp_command_cb) {
 	api_client_session->api_client_handler_wrapper->ext_client_handler.rtmp_command_cb (
@@ -563,7 +564,7 @@ void moment_client_send_rtmp_command_message (MomentClientSession * const api_cl
     CodeRef conn_ref;
     RtmpConnection * const conn = api_client_session->int_client_session->getRtmpConnection (&conn_ref);
     if (conn)
-	conn->sendCommandMessage_AMF0 (RtmpConnection::DefaultMessageStreamId, ConstMemory (msg_buf, msg_len));
+	conn->sendCommandMessage_AMF0 (RtmpConnection::CommandMessageStreamId, ConstMemory (msg_buf, msg_len));
 }
 
 void moment_client_send_rtmp_command_message_passthrough (MomentClientSession * const api_client_session,
