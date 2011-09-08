@@ -50,13 +50,18 @@ RtmptService::clientConnected (RtmpConnection * const mt_nonnull rtmp_conn,
 }
 
 void
-RtmptService::connectionClosed (void * const _pollable_key,
+RtmptService::connectionClosed (void * const _conn_data,
 				void * const _self)
 {
     RtmptService * const self = static_cast <RtmptService*> (_self);
-    PollGroup::PollableKey const pollable_key = static_cast <PollGroup::PollableKey> (_pollable_key);
+    ConnectionData * const conn_data = static_cast <ConnectionData*> (_conn_data);
 
-    self->poll_group->removePollable (pollable_key);
+    conn_data->mutex.lock ();
+
+    if (conn_data->pollable_key)
+	self->poll_group->removePollable (conn_data->pollable_key);
+
+    conn_data->mutex.unlock ();
 }
 
 bool
@@ -80,14 +85,24 @@ RtmptService::acceptOneConnection ()
 	assert (res == TcpServer::AcceptResult::Accepted);
     }
 
-    PollGroup::PollableKey pollable_key = poll_group->addPollable (tcp_conn->getPollable(), NULL /* ret_reg */);
+    Ref<ConnectionData> const conn_data = grab (new ConnectionData);
+
+    rtmpt_server.addConnection (tcp_conn,
+				tcp_conn  /* dep_code_referenced */,
+				conn_data /* conn_cb_data */,
+				conn_data /* ref_data */);
+
+    conn_data->mutex.lock ();
+    PollGroup::PollableKey const pollable_key = poll_group->addPollable (tcp_conn->getPollable(), NULL /* ret_reg */);
     if (!pollable_key) {
+	conn_data->mutex.unlock ();
+	// TODO FIXME Remove the connection from rtmpt_server.
+
 	delete tcp_conn;
 	logE_ (_func, "PollGroup::addPollable() failed: ", exc->toString ());
 	return true;
     }
-
-    rtmpt_server.addConnection (tcp_conn, tcp_conn /* dep_code_referenced */, pollable_key /* conn_cb_data */);
+    conn_data->mutex.unlock ();
 
     return true;
 }
