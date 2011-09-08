@@ -34,6 +34,12 @@ class RtmptService : public RtmpVideoService,
 		     public DependentCodeReferenced
 {
 private:
+    class ConnectionData : public Object
+    {
+    public:
+	mt_mutex (mutex) PollGroup::PollableKey pollable_key;
+    };
+
     mt_const PollGroup *poll_group;
 
     TcpServer tcp_server;
