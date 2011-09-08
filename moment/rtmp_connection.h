@@ -519,7 +519,7 @@ public:
     void setSender (Sender * const sender)
     {
 	this->sender = sender;
-	sender->setFrontend (Cb<Sender::Frontend> (&sender_frontend, this, getCoderefContainer()));
+	sender->setFrontend (CbDesc<Sender::Frontend> (&sender_frontend, this, getCoderefContainer()));
     }
 
     void startClient ();

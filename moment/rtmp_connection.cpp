@@ -1086,7 +1086,8 @@ RtmpConnection::processMessage (ChunkStream * const chunk_stream)
 {
     logD (msg, _func_);
 
-    logD (proto_in, _func, "ts 0x", fmt_hex, chunk_stream->in_msg_timestamp, ", "
+    logD (proto_in, _func, "ts 0x", fmt_hex, chunk_stream->in_msg_timestamp,
+	  " (", fmt_def, chunk_stream->in_msg_timestamp, "), "
 	  "tid ", fmt_def, chunk_stream->in_msg_type_id,
 	  ", msid ", chunk_stream->in_msg_stream_id, ", csid ", chunk_stream->chunk_stream_id,
 	  ", mlen ", chunk_stream->in_msg_len);
