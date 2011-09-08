@@ -16,6 +16,7 @@ import flash.events.NetStatusEvent;
 import flash.events.MouseEvent;
 import flash.utils.setInterval;
 import flash.utils.clearInterval;
+import flash.geom.Rectangle;
 
 //[SWF(width='640', height='480')]
 [SWF(backgroundColor=0)]
@@ -32,7 +33,7 @@ public class MySubscriber extends Sprite
     private var buttons_visible : Boolean;
 
     // Shows/hides the playlist.
-    private var playlist_button   : LoadedElement;
+    private var playlist_button : LoadedElement;
 
     // Toggles fullscreen mode.
     private var fullscreen_button : LoadedElement;
@@ -270,7 +271,9 @@ public class MySubscriber extends Sprite
 	    }
 
 	    var stream : NetStream = new NetStream (conn);
-	    stream.bufferTime = 5;
+	    stream.bufferTime = 0.1;
+//	    stream.bufferTime = 0.0;
+//	    stream.bufferTime = 5.0;
 	    stream.client = new MyStreamClient();
 
 	    video.attachNetStream (stream);
@@ -325,10 +328,12 @@ public class MySubscriber extends Sprite
 		reconnect_interval = 2000;
 	}
 
+	/* TEST (uncomment)
 	if (reconnect_timer) {
 	    clearInterval (reconnect_timer);
 	}
 	reconnect_timer = setInterval (reconnectTick, reconnect ? reconnect_interval : 3000);
+	*/
 
 	channel_uri = uri;
 	stream_name = stream_name_;
@@ -338,13 +343,46 @@ public class MySubscriber extends Sprite
 	    conn.close ();
 	}
 
+	/*
+	// TEST ______________________________
+
+	    conn = new NetConnection ();
+	    conn.connect (null);
+
+	    var stream : NetStream = new NetStream (conn);
+//	    stream.bufferTime = 0.1;
+//	    stream.bufferTime = 0.0;
+//	    stream.bufferTime = 5.0;
+	    stream.bufferTime = 3.0;
+	    stream.client = new MyStreamClient();
+
+	    video.attachNetStream (stream);
+
+	    stream.addEventListener (NetStatusEvent.NET_STATUS, onStreamNetStatus);
+
+	    video.addEventListener (NetStatusEvent.NET_STATUS,
+		function (event : NetStatusEvent) : void {
+		    trace ("--- VIDEO STATUS");
+		    trace (event.info.code);
+		}
+	    );
+
+	    frame_no = 0;
+	    video.addEventListener (Event.ENTER_FRAME, onEnterFrame);
+
+	    stream.play (uri);
+
+	return;
+	// ___________________________________
+	*/
+
 	conn = new NetConnection();
 	conn.objectEncoding = ObjectEncoding.AMF0;
-	conn.connect (uri);
-
-	trace ("--- connecting...");
 
 	conn.addEventListener (NetStatusEvent.NET_STATUS, onConnNetStatus);
+
+	trace ("--- connecting...");
+	conn.connect (uri);
     }
 
     private function toggleFullscreen (event : MouseEvent) : void
@@ -355,6 +393,12 @@ public class MySubscriber extends Sprite
           playlist_button.setVisible (true);
         } else {
           playlist_button.setVisible (false);
+// This toglles hardware scaling, but it's done in some weird way.
+// It looks like flash clip has to be resized to the original size of the video
+// before going to full-screen mode.
+//	  stage.fullScreenSourceRect = new Rectangle (0, 0, stage_width, stage_height);
+//	  stage.fullScreenSourceRect = new Rectangle (0, 0, video.videoWidth, video.videoHeight);
+//	  stage.fullScreenSourceRect = new Rectangle (0, 0, stage.fullScreenWidth, stage.fullScreenHeight);
           stage.displayState = "fullScreen";
         }
     }
@@ -433,7 +477,7 @@ public class MySubscriber extends Sprite
 	return loaded_element;
     }
 
-    public function MySubscriber()
+    public function MySubscriber ()
     {
 	buttons_visible = true;
 	horizontal_mode = false;
@@ -452,9 +496,10 @@ public class MySubscriber extends Sprite
 	splash = createLoadedElement ("splash.png", true /* visible */);
 
 	video = new Video();
-	video.width = 320;
+	video.width  = 320;
 	video.height = 240;
 	video.smoothing = true;
+//	video.deblocking = 5;
         video.visible = false;
 
 	addChild (video);
@@ -484,10 +529,9 @@ public class MySubscriber extends Sprite
 	msg_error      = createLoadedElement ("error.png",      false /* visible */);
 
 	doResize ();
-
         stage.addEventListener ("resize",
             function (event : Event) : void {
-              doResize ();
+		doResize ();
             }
         );
 
