@@ -535,7 +535,8 @@ mt_rev (11.06.18)
 mt_async void
 RtmptServer::addConnection (Connection              * const mt_nonnull conn,
 			    DependentCodeReferenced * const mt_nonnull dep_code_referenced,
-			    void                    * const conn_cb_data)
+			    void                    * const conn_cb_data,
+			    VirtReferenced          * const ref_data)
 {
     RtmptConnection * const rtmpt_conn = new RtmptConnection;
     // This is a hack. What could be done with it? (conn init callback?)
@@ -544,7 +545,8 @@ RtmptServer::addConnection (Connection              * const mt_nonnull conn,
     rtmpt_conn->weak_rtmpt_server = this;
     rtmpt_conn->unsafe_rtmpt_server = this;
     rtmpt_conn->conn = conn;
-    rtmpt_conn->conn_cb_data = conn_cb_data,
+    rtmpt_conn->conn_cb_data = conn_cb_data;
+    rtmpt_conn->ref_data = ref_data;
     rtmpt_conn->conn_sender.setConnection (conn);
     rtmpt_conn->conn_receiver.setConnection (conn);
     rtmpt_conn->conn_receiver.setFrontend (rtmpt_conn->http_server.getReceiverFrontend ());

@@ -132,6 +132,8 @@ private:
 
 	Connection *conn;
 	void *conn_cb_data;
+	VirtRef ref_data;
+
 	ImmediateConnectionSender conn_sender;
 	ConnectionReceiver conn_receiver;
 	HttpServer http_server;
@@ -222,9 +224,10 @@ public:
 
     // Takes ownership of the connection.
     // TODO Грубая несогласованность по Coderef containers.
-    mt_async void addConnection (Connection * mt_nonnull conn,
+    mt_async void addConnection (Connection              * mt_nonnull conn,
 				 DependentCodeReferenced * mt_nonnull dep_code_referenced,
-				 void *conn_cb_data);
+				 void                    *conn_cb_data,
+				 VirtReferenced          *ref_data);
 
     mt_const void setFrontend (Cb<Frontend> const frontend)
     {
