@@ -45,12 +45,14 @@ private:
 	mt_const RtmpService *unsafe_rtmp_service;
 
 	TcpConnection tcp_conn;
-	DeferredConnectionSender conn_sender;
+	// TEST
+//	DeferredConnectionSender conn_sender;
+	ImmediateConnectionSender conn_sender;
 	ConnectionReceiver conn_receiver;
 	RtmpConnection rtmp_conn;
 	DeferredProcessor::Registration deferred_reg;
 
-	mt_const PollGroup::PollableKey pollable_key;
+	mt_mutex (RtmpService::mutex) PollGroup::PollableKey pollable_key;
 
 	ClientSession (Timers   * const timers,
 		       PagePool * const page_pool)
@@ -76,7 +78,7 @@ private:
 
     StateMutex mutex;
 
-    void destroySession (ClientSession *session);
+    mt_mutex (mutex) void destroySession (ClientSession *session);
 
     bool acceptOneConnection ();
 

@@ -41,10 +41,7 @@ RtmpService::ClientSession::~ClientSession ()
 //    logD_ (_func_);
 }
 
-// Either 'mutex' must be locked when calling this method, or we must be sure
-// that object's state is valid for the current thread
-// (see acceptOneConnection()).
-void
+mt_mutex (mutex) void
 RtmpService::destroySession (ClientSession * const session)
 {
     logD (rtmp_service, _func, "session: 0x", fmt_hex, (UintPtr) session);
@@ -94,37 +91,40 @@ RtmpService::acceptOneConnection ()
     }
 
     session->conn_sender.setConnection (&session->tcp_conn);
-    session->conn_sender.setDeferredRegistration (&session->deferred_reg);
+    // TEST (uncomment)
+//    session->conn_sender.setDeferredRegistration (&session->deferred_reg);
 
     session->rtmp_conn.setBackend (Cb<RtmpConnection::Backend> (&rtmp_conn_backend, session, session));
     session->rtmp_conn.setSender (&session->conn_sender);
 
     session->conn_receiver.setFrontend (session->rtmp_conn.getReceiverFrontend());
 
-    session->pollable_key = poll_group->addPollable (session->tcp_conn.getPollable(),
-						     &session->deferred_reg);
-    if (!session->pollable_key) {
-	logE (rtmp_service, _func, "PollGroup::addPollable() failed: ", exc->toString());
-	return true;
-    }
-
-    mutex.lock ();
-    session_list.append (session);
-    mutex.unlock ();
-    session->ref ();
-  // The session is fully initialized and should be destroyed with
-  // destroySession() when necessary.
-
     {
 	Result res;
 	if (!frontend.call_ret (&res, frontend->clientConnected, /*(*/ /* session, */ &session->rtmp_conn /*)*/)
 	    || !res)
 	{
-	    mutex.lock ();
-	    destroySession (session);
-	    mutex.unlock ();
+	    return true;
 	}
     }
+
+    mutex.lock ();
+    session->pollable_key = poll_group->addPollable (session->tcp_conn.getPollable(),
+						     &session->deferred_reg);
+    if (!session->pollable_key) {
+	mutex.unlock ();
+
+	// TODO FIXME Call clientDisconnected()
+
+	logE (rtmp_service, _func, "PollGroup::addPollable() failed: ", exc->toString());
+	return true;
+    }
+
+    session_list.append (session);
+    mutex.unlock ();
+    session->ref ();
+  // The session is fully initialized and should be destroyed with
+  // destroySession() when necessary.
 
     logD (rtmp_service, _func, "done");
 
