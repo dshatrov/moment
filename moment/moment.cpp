@@ -167,8 +167,8 @@ int main (int argc, char **argv)
     {
 	Uint64 min_pages = default__page_pool__min_pages;
 	{
-	    ConstMemory opt_name ("page_pool/min_pages");
-	    ConstMemory min_pages_mem = config.getString (opt_name);
+	    ConstMemory const opt_name ("page_pool/min_pages");
+	    ConstMemory const min_pages_mem = config.getString (opt_name);
 	    if (min_pages_mem.len()) {
 		if (!strToUint64_safe (min_pages_mem, &min_pages)) {
 		    logE_ (_func, "Bad option value \"", min_pages_mem, "\" "
@@ -183,10 +183,25 @@ int main (int argc, char **argv)
     }
 
     {
+	Uint64 num_threads = 0;
+	{
+	    ConstMemory const opt_name = "moment/num_threads";
+	    if (!config.getUint64_default (opt_name, &num_threads, num_threads)) {
+		logE_ (_func, "Bad value for config option ", opt_name);
+		return EXIT_FAILURE;
+	    }
+
+	    logD_ (_func, opt_name, ": ", num_threads);
+	}
+
+	server_app.setNumThreads (num_threads);
+    }
+
+    {
 	Uint64 http_keepalive_timeout = default__http__keepalive_timeout;
 	{
-	    ConstMemory opt_name ("http/keepalive_timeout");
-	    ConstMemory http_keepalive_timeout_mem = config.getString (opt_name);
+	    ConstMemory const opt_name ("http/keepalive_timeout");
+	    ConstMemory const http_keepalive_timeout_mem = config.getString (opt_name);
 	    if (http_keepalive_timeout_mem.len()) {
 		if (!strToUint64_safe (http_keepalive_timeout_mem, &http_keepalive_timeout)) {
 		    logE_ (_func, "Bad option value \"", http_keepalive_timeout_mem, "\" "
