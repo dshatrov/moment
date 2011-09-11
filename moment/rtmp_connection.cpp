@@ -50,6 +50,7 @@ Receiver::Frontend const RtmpConnection::receiver_frontend = {
     processError
 };
 
+mt_one_of(( mt_const, mt_sync_domain (receiver) ))
 RtmpConnection::ChunkStream*
 RtmpConnection::getChunkStream (Uint32 const chunk_stream_id,
 				bool const create)
@@ -67,7 +68,10 @@ RtmpConnection::getChunkStream (Uint32 const chunk_stream_id,
 	chunk_stream->in_msg_offset = 0;
 	chunk_stream->in_header_valid = false;
 	chunk_stream->out_header_valid = false;
+
+	in_destr_mutex.lock ();
 	chunk_stream_tree.add (chunk_stream);
+	in_destr_mutex.unlock ();
 
 	return chunk_stream;
     }
@@ -75,7 +79,16 @@ RtmpConnection::getChunkStream (Uint32 const chunk_stream_id,
     return chunk_stream_node->value;
 }
 
-Uint32
+mt_mutex (in_destr_mutex) void
+RtmpConnection::releaseChunkStream (ChunkStream * const mt_nonnull chunk_stream)
+{
+    if (!chunk_stream->page_list.isEmpty ()) {
+	page_pool->msgUnref (chunk_stream->page_list.first);
+	chunk_stream->page_list.reset ();
+    }
+}
+
+mt_mutex (send_mutex) Uint32
 RtmpConnection::mangleOutTimestamp (Uint32 const timestamp)
 {
 //    logD_ (_func, "timestamp: 0x", fmt_hex, timestamp);
@@ -102,16 +115,7 @@ RtmpConnection::mangleOutTimestamp (Uint32 const timestamp)
     return 0;
 }
 
-#if 0
-// Deprecated
-static inline Uint32 debugMangleTimestamp (Uint32 const timestamp)
-{
-    return timestamp;
-//    return timestamp + 0x00ffafff; // Extended timesatmps debugging.
-}
-#endif
-
-Size
+mt_mutex (send_mutex) Size
 RtmpConnection::fillMessageHeader (MessageDesc const * const mt_nonnull mdesc,
 				   ChunkStream       * const mt_nonnull chunk_stream,
 				   Byte              * const mt_nonnull header_buf,
@@ -159,16 +163,6 @@ RtmpConnection::fillMessageHeader (MessageDesc const * const mt_nonnull mdesc,
 
 	// TEST
 //	force_type0 = true;
-
-#if 0
-// Uniform prechunking.
-	if (chunk_stream->out_msg_timestamp >= 0x00ffffff) {
-	    // Forcing type 0 header to be sure that all type 3 headers of
-	    // this message's chunks should have extended timestamp field.
-	    // This is essential for prechunking.
-	    force_type0 = true;
-	}
-#endif
 
 	if (!timestampGreater (chunk_stream->out_msg_timestamp, timestamp)) {
 	    logW_ (_func, "!timestampGreater: ", chunk_stream->out_msg_timestamp, ", ", timestamp);
@@ -426,26 +420,8 @@ RtmpConnection::fillPrechunkedPages (PrechunkContext        * const  prechunk_ct
 	    // TODO Large chunk stream ids.
 	    assert (chunk_stream_id > 1 && chunk_stream_id < 64);
 
-#if 0
-// Uniform prechunking.
-	    if (msg_timestamp < 0x00ffffff) {
-//		logD_ (_func, "type 3 regular");
-#endif
-		Byte const header_buf = (Byte) 0xc0 | (Byte) chunk_stream_id;
-		page_pool->getFillPages (page_list, ConstMemory (&header_buf, 1));
-#if 0
-// Uniform prechunking.
-	    } else {
-//		logD_ (_func, "type 3 extended");
-		Byte header [5];
-		header [0] = (Byte) 0xc0 | (Byte) chunk_stream_id;
-		header [1] = (msg_timestamp >> 24) & 0xff;
-		header [2] = (msg_timestamp >> 16) & 0xff;
-		header [3] = (msg_timestamp >>  8) & 0xff;
-		header [4] = (msg_timestamp >>  0) & 0xff;
-		page_pool->getFillPages (page_list, ConstMemory (header, 5));
-	    }
-#endif
+	    Byte const header_buf = (Byte) 0xc0 | (Byte) chunk_stream_id;
+	    page_pool->getFillPages (page_list, ConstMemory (&header_buf, 1));
 	}
 
 	Size tofill;
@@ -470,7 +446,8 @@ void
 RtmpConnection::sendMessage (MessageDesc const * const mt_nonnull mdesc,
 			     ChunkStream       * const mt_nonnull chunk_stream,
 			     ConstMemory const &mem,
-			     Uint32             prechunk_size)
+			     Uint32             prechunk_size,
+			     bool                const unlocked)
 {
     logD (send, _func, "prechunk_size: ", prechunk_size, ", PrechunkSize: ", (unsigned) PrechunkSize);
 
@@ -495,8 +472,7 @@ RtmpConnection::sendMessage (MessageDesc const * const mt_nonnull mdesc,
 #endif
     }
 
-    // TODO put_pages or 'bool take_ownership'.
-    sendMessagePages (mdesc, chunk_stream, &page_list, 0 /* msg_offset */, prechunk_size, true /* take_ownership */);
+    sendMessagePages (mdesc, chunk_stream, &page_list, 0 /* msg_offset */, prechunk_size, true /* take_ownership */, unlocked);
 }
 
 // TODO first_page is enough, page_list not needed
@@ -506,16 +482,13 @@ RtmpConnection::sendMessagePages (MessageDesc const      * const mt_nonnull mdes
 				  PagePool::PageListHead * const mt_nonnull page_list,
 				  Size                     const msg_offset,
 				  Uint32                         prechunk_size,
-				  bool                     const take_ownership)
+				  bool                     const take_ownership,
+				  bool                     const unlocked)
 {
     logD (send, _func, "prechunk_size: ", prechunk_size);
 
-    if (is_closed) {
-	logD (close, _func, "0x", fmt_hex, (UintPtr) this, " is closed");
-	// TODO unref pages if (bool take_ownership).
-	// ^^^^ ???
-	return;
-    }
+    if (!unlocked)
+	send_mutex.lock ();
 
     Uint32 const timestamp = mangleOutTimestamp (mdesc->timestamp);
 
@@ -581,12 +554,14 @@ RtmpConnection::sendMessagePages (MessageDesc const      * const mt_nonnull mdes
     }
 
     if (prechunk_size != out_chunk_size) {
-	sendSetChunkSize (prechunk_size);
+	sendSetChunkSize_unlocked (prechunk_size);
 	out_chunk_size = prechunk_size;
     }
 
-    sender->sendMessage (msg_pages);
-    sender->flush ();
+    sender->sendMessage (msg_pages, true /* do_flush */);
+
+    if (!unlocked)
+	send_mutex.unlock ();
 }
 
 void
@@ -595,11 +570,6 @@ RtmpConnection::sendRawPages (PagePool::Page * const first_page,
 {
     logD (send, _func_);
 
-    if (is_closed) {
-	logD (close, _func, "0x", fmt_hex, (UintPtr) this, " is closed");
-	return;
-    }
-
     Sender::MessageEntry_Pages * const msg_pages =
 	    Sender::MessageEntry_Pages::createNew (0 /* max_header_len */);
     msg_pages->header_len = 0;
@@ -607,12 +577,11 @@ RtmpConnection::sendRawPages (PagePool::Page * const first_page,
     msg_pages->first_page = first_page;
     msg_pages->msg_offset = msg_offset;
 
-    sender->sendMessage (msg_pages);
-    sender->flush ();
+    sender->sendMessage (msg_pages, true /* do_flush */);
 }
 
-void
-RtmpConnection::resetPacket ()
+mt_sync_domain (receiver) void
+RtmpConnection::resetChunkRecvState ()
 {
     logD (chunk, _func_);
 
@@ -622,15 +591,18 @@ RtmpConnection::resetPacket ()
     chunk_offset = 0;
 }
 
-void
-RtmpConnection::resetMessage (ChunkStream * const mt_nonnull chunk_stream)
+mt_sync_domain (receiver) void
+RtmpConnection::resetMessageRecvState (ChunkStream * const mt_nonnull chunk_stream)
 {
     logD (send, _func_);
 
     if (!chunk_stream->page_list.isEmpty ()) {
 	page_pool->msgUnref (chunk_stream->page_list.first);
+
+	in_destr_mutex.lock ();
+	chunk_stream->page_list.reset ();
+	in_destr_mutex.unlock ();
     }
-    chunk_stream->page_list.reset ();
 
     chunk_stream->in_msg_offset = 0;
     chunk_stream->in_prechunk_ctx.reset ();
@@ -638,6 +610,19 @@ RtmpConnection::resetMessage (ChunkStream * const mt_nonnull chunk_stream)
 
 void
 RtmpConnection::sendSetChunkSize (Uint32 const chunk_size)
+{
+    doSendSetChunkSize (chunk_size, false /* unlocked */);
+}
+
+void
+RtmpConnection::sendSetChunkSize_unlocked (Uint32 const chunk_size)
+{
+    doSendSetChunkSize (chunk_size, true /* unlocked */);
+}
+
+void
+RtmpConnection::doSendSetChunkSize (Uint32 const chunk_size,
+				    bool   const unlocked)
 {
     logD (proto_out, _func, chunk_size);
 
@@ -665,7 +650,11 @@ RtmpConnection::sendSetChunkSize (Uint32 const chunk_size)
     // sendMessagePages() from calling sendSetChunkSize() recursively.
     // This is a safe thing to do, since "set chunk size" message always fits
     // into a single chunk.
-    sendMessage (&mdesc, control_chunk_stream, ConstMemory::forObject (msg), out_chunk_size /* prechunk_size */);
+    sendMessage (&mdesc,
+		 control_chunk_stream,
+		 ConstMemory::forObject (msg),
+		 out_chunk_size /* prechunk_size */,
+		 unlocked);
 }
 
 void
@@ -1031,7 +1020,6 @@ void
 RtmpConnection::close ()
 {
     logD (close, _func, "0x", fmt_hex, (UintPtr) this);
-    is_closed = true;
     frontend.call (frontend->closed, /*(*/ (Exception*) NULL /*)*/);
     backend.call (backend->close);
 }
@@ -1040,22 +1028,25 @@ void
 RtmpConnection::close_noBackendCb ()
 {
     logD (close, _func, "0x", fmt_hex, (UintPtr) this);
-    is_closed = true;
     frontend.call (frontend->closed, /*(*/ (Exception*) NULL /*)*/);
 }
 
-void
+mt_sync_domain (receiver) void
 RtmpConnection::beginPings ()
 {
     if (ping_send_timer)
 	return;
 
+    // It'd be better to initialize 'ping_reply_received' to 1 in the constructor.
+    ping_reply_received.set (1);
+
+    in_destr_mutex.lock ();
     ping_send_timer = timers->addTimer (pingTimerTick,
 					this,
 					getCoderefContainer(),
 					5 * 60 /* TODO Config parameter for timeout */,
 					true /* periodical */);
-    ping_reply_received = true;
+    in_destr_mutex.unlock ();
 }
 
 void
@@ -1063,12 +1054,11 @@ RtmpConnection::pingTimerTick (void * const _self)
 {
     RtmpConnection * const self = static_cast <RtmpConnection*> (_self);
 
-  // TODO Synchronization for ping_reply_received.
+    if (!self->ping_reply_received.compareAndExchange (1 /* old_value */, 0 /* new_value */)) {
+      // 'self->ping_reply_received' if 'false'.
 
-    if (!self->ping_reply_received) {
 	logE_ (_func, "no ping reply, rtmp_conn 0x", fmt_hex, (UintPtr) self);
 	logD (close, _func, "0x", fmt_hex, (UintPtr) self, " closing");
-	self->is_closed = true;
 	{
 	    InternalException internal_exc (InternalException::ProtocolError);
 	    self->frontend.call (self->frontend->closed, /*(*/ &internal_exc /*)*/);
@@ -1077,11 +1067,10 @@ RtmpConnection::pingTimerTick (void * const _self)
 	return;
     }
 
-    self->ping_reply_received = false;
     self->sendUserControl_PingRequest ();
 }
 
-Result
+mt_sync_domain (receiver) Result
 RtmpConnection::processMessage (ChunkStream * const chunk_stream)
 {
     logD (msg, _func_);
@@ -1152,7 +1141,7 @@ RtmpConnection::processMessage (ChunkStream * const chunk_stream)
 		return Result::Success;
 	    }
 
-	    resetMessage (chunk_stream);
+	    resetMessageRecvState (chunk_stream);
 	} break; 
 	case RtmpMessageType::Ack: {
 	    logD (proto_in, _func, "Ack");
@@ -1210,6 +1199,8 @@ RtmpConnection::processMessage (ChunkStream * const chunk_stream)
 
 	    // Unused
 	    // Byte const limit_type = msg_buf [4];
+
+	    // Note: SetPeerBandwidth message does nothing. This doesn't feel right.
 
 	    if (local_wack_size != wack_size)
 		sendWindowAckSize (local_wack_size);
@@ -1346,9 +1337,9 @@ RtmpConnection::processMessage (ChunkStream * const chunk_stream)
     return Result::Success;
 }
 
-Result
+mt_sync_domain (receiver) Result
 RtmpConnection::callCommandMessage (ChunkStream * const chunk_stream,
-				    AmfEncoding const amf_encoding)
+				    AmfEncoding   const amf_encoding)
 {
     if (logLevelOn (proto_in, LogLevel::Debug)) {
 	if (chunk_stream->page_list.first) {
@@ -1378,7 +1369,7 @@ RtmpConnection::callCommandMessage (ChunkStream * const chunk_stream,
     return Result::Success;
 }
 
-Result
+mt_sync_domain (receiver) Result
 RtmpConnection::processUserControlMessage (ChunkStream * const chunk_stream)
 {
     Byte const *msg_buf = chunk_stream->page_list.first->getData();
@@ -1425,7 +1416,7 @@ RtmpConnection::processUserControlMessage (ChunkStream * const chunk_stream)
 	case UserControlMessageType::PingResponse: {
 	    logD (proto_in, _func, "PingResponse");
 
-	    ping_reply_received = true;
+	    ping_reply_received.set (1);
 	} break;
 	default:
 	    logW_ (_func, "unknown message type: ", uc_type);
@@ -1440,24 +1431,9 @@ RtmpConnection::senderStateChanged (Sender::SendState   const send_state,
 {
     RtmpConnection * const self = static_cast <RtmpConnection*> (_self);
 
-//    logD_ (_func_);
-
   // Note that we're not allowed to call Sender's methods while in this callback.
 
     self->frontend.call (self->frontend->sendStateChanged, /* ( */ send_state /* ) */);
-
-#if 0
-    switch (send_state) {
-	case Sender::ConnectionReady:
-	    break;
-	case Sender::ConnectionOverloaded:
-	    break;
-	case Sender::QueueSoftLimit:
-	    break;
-	case Sender::QueueHardLimit:
-	    break;
-    }
-#endif
 }
 
 void
@@ -1467,13 +1443,11 @@ RtmpConnection::senderClosed (Exception * const exc_,
     logD (close, _func, "0x", fmt_hex, (UintPtr) _self);
 
     RtmpConnection * const self = static_cast <RtmpConnection*> (_self);
-    // TODO synchonization for is_closed
-    self->is_closed = true;
     self->frontend.call (self->frontend->closed, exc_);
     self->backend.call (self->backend->close);
 }
 
-Receiver::ProcessInputResult
+mt_sync_domain (receiver) Receiver::ProcessInputResult
 RtmpConnection::processInput (Memory const &mem,
 			      Size * const mt_nonnull ret_accepted,
 			      void * const _self)
@@ -1523,15 +1497,10 @@ getDigestOffset (Byte const * const msg,
     return server_digest_offs;
 }
 
-Receiver::ProcessInputResult
+mt_sync_domain (receiver) Receiver::ProcessInputResult
 RtmpConnection::doProcessInput (ConstMemory const &mem,
 				Size * const mt_nonnull ret_accepted)
 {
-    if (is_closed) {
-	logD (close, _func, "0x", fmt_hex, (UintPtr) this, " is closed");
-	return Receiver::ProcessInputResult::Error;
-    }
-
     logD (msg, _func, "mem.len(): ", mem.len());
     if (logLevelOn (msg, LogLevel::Debug))
 	hexdump (mem);
@@ -1569,11 +1538,9 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 		unreachable ();
 	    case ReceiveState::ClientWaitS0: {
 		if (len < 1) {
-		    recv_needed_len = 1;
 		    ret_res = Receiver::ProcessInputResult::Again;
 		    goto _return;
 		}
-		recv_needed_len = 0;
 
 		Byte const server_version = data [0];
 		if (server_version < 3) {
@@ -1590,11 +1557,9 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 	    } break;
 	    case ReceiveState::ClientWaitS1: {
 		if (len < 1536) {
-		    recv_needed_len = 1536;
 		    ret_res = Receiver::ProcessInputResult::Again;
 		    goto _return;
 		}
-		recv_needed_len = 0;
 
 		{
 		    PagePool::PageListHead page_list;
@@ -1623,11 +1588,9 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 	    } break;
 	    case ReceiveState::ClientWaitS2: {
 		if (len < 1536) {
-		    recv_needed_len = 1536;
 		    ret_res = Receiver::ProcessInputResult::Again;
 		    goto _return;
 		}
-		recv_needed_len = 0;
 
 		{
 		    data += 1536;
@@ -1655,12 +1618,9 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 		logD (msg, _func, "ServerWaitC0");
 
 		if (len < 1) {
-		    recv_needed_len = 1;
 		    ret_res = Receiver::ProcessInputResult::Again;
 		    goto _return;
 		}
-		// TODO Get rid of recv_needed len if it is not very beneficial.
-		recv_needed_len = 0;
 
 		Byte const client_version = data [0];
 		if (client_version < 3) {
@@ -1688,8 +1648,7 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 		    msg_pages->first_page = NULL;
 		    msg_pages->msg_offset = 0;
 
-		    sender->sendMessage (msg_pages);
-		    sender->flush ();
+		    sender->sendMessage (msg_pages, true /* do_flush */);
 		}
 
 #if 0
@@ -1727,11 +1686,9 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 		logD (msg, _func, "ServerWaitC1");
 
 		if (len < 1536) {
-		    recv_needed_len = 1536;
 		    ret_res = Receiver::ProcessInputResult::Again;
 		    goto _return;
 		}
-		recv_needed_len = 0;
 
 		{
 		    PagePool::PageListHead page_list;
@@ -1840,11 +1797,9 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 		logD (msg, _func, "ServerWaitC2");
 
 		if (len < 1536) {
-		    recv_needed_len = 1536;
 		    ret_res = Receiver::ProcessInputResult::Again;
 		    goto _return;
 		}
-		recv_needed_len = 0;
 
 		{
 		    data += 1536;
@@ -1872,12 +1827,10 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 		logD (msg, _func, "BasicHeader");
 
 		if (len < 1) {
-		    recv_needed_len = 1;
 		    ret_res = Receiver::ProcessInputResult::Again;
 		    logD (chunk, _func, "len < 1, returning Again");
 		    goto _return;
 		}
-		recv_needed_len = 0;
 
 		bool next_state = false;
 		switch (cs_id__fmt) {
@@ -1965,11 +1918,9 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 		logD (msg, _func, "ChunkHeader_Type0");
 
 		if (len < 11) {
-		    recv_needed_len = 11;
 		    ret_res = Receiver::ProcessInputResult::Again;
 		    goto _return;
 		}
-		recv_needed_len = 0;
 
 		Uint32 const timestamp = (data [2] <<  0) |
 					 (data [1] <<  8) |
@@ -2016,11 +1967,9 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 		logD (msg, _func, "ChunkHeader_Type1");
 
 		if (len < 7) {
-		    recv_needed_len = 7;
 		    ret_res = Receiver::ProcessInputResult::Again;
 		    goto _return;
 		}
-		recv_needed_len = 0;
 
 		if (!recv_chunk_stream->in_header_valid) {
 		    logE_ (_func, "in_header is not valid, type 1, cs id ", recv_chunk_stream->chunk_stream_id);
@@ -2063,11 +2012,9 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 		logD (msg, _func, "ChunkHeader_Type2");
 
 		if (len < 3) {
-		    recv_needed_len = 3;
 		    ret_res = Receiver::ProcessInputResult::Again;
 		    goto _return;
 		}
-		recv_needed_len = 0;
 
 		if (!recv_chunk_stream->in_header_valid) {
 		    logE_ (_func, "in_header is not valid, type 2, cs id ", recv_chunk_stream->chunk_stream_id);
@@ -2104,11 +2051,9 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 		logD (msg, _func, "ChunkHeader_Type3");
 
 		if (len < 1) {
-		    recv_needed_len = 1;
 		    ret_res = Receiver::ProcessInputResult::Again;
 		    goto _return;
 		}
-		recv_needed_len = 0;
 
 		if (!recv_chunk_stream->in_header_valid) {
 		    logE_ (_func, "in_header is not valid, type 3, cs id ", recv_chunk_stream->chunk_stream_id);
@@ -2117,10 +2062,6 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 		}
 
 		bool has_extended_timestamp = false;
-#if 0
-// Commented for testing. It seems like inbound and outbound protocols are
-// different here.
-#endif
 		if (recv_chunk_stream->in_msg_timestamp_delta >= 0x00ffffff)
 		    has_extended_timestamp = true;
 
@@ -2143,11 +2084,9 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 		logD (msg, _func, "ExtendedTimestamp");
 
 		if (len < 4) {
-		    recv_needed_len = 4;
 		    ret_res = Receiver::ProcessInputResult::Again;
 		    goto _return;
 		}
-		recv_needed_len = 0;
 
 		if (recv_chunk_stream->in_msg_offset == 0 &&
 		    !ignore_extended_timestamp)
@@ -2189,16 +2128,6 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 
 		    logD (msg, _func, "last chunk");
 
-#if 0
-// Deprecated
-		    if (len < recv_chunk_stream->in_msg_len - recv_chunk_stream->in_msg_offset) {
-			// TODO There's no reason to wait: process partial chunks.
-			// TODO recv_needed_len
-			ret_res = Receiver::ProcessInputResult::Again;
-			goto _return;
-		    }
-#endif
-
 		    Size tofill = msg_left;
 		    assert (chunk_offset <= tofill);
 		    tofill -= chunk_offset;
@@ -2212,6 +2141,8 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 			Uint32 const out_chunk_stream_id =
 				(recv_chunk_stream->in_msg_type_id == RtmpMessageType::AudioMessage ?
 					 DefaultAudioChunkStreamId : DefaultVideoChunkStreamId);
+
+			in_destr_mutex.lock ();
 			fillPrechunkedPages (&recv_chunk_stream->in_prechunk_ctx,
 					     ConstMemory (data, tofill),
 					     page_pool,
@@ -2219,9 +2150,12 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 					     out_chunk_stream_id,
 					     recv_chunk_stream->in_msg_timestamp,
 					     recv_chunk_stream->in_msg_offset == 0 && chunk_offset == 0 /* first_chunk */);
+			in_destr_mutex.unlock ();
 		    } else {
+			in_destr_mutex.lock ();
 			page_pool->getFillPages (&recv_chunk_stream->page_list,
 						 ConstMemory (data, tofill));
+			in_destr_mutex.unlock ();
 		    }
 
 		    {
@@ -2238,8 +2172,8 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 
 		    Result const res = processMessage (recv_chunk_stream);
 
-		    resetMessage (recv_chunk_stream);
-		    resetPacket ();
+		    resetMessageRecvState (recv_chunk_stream);
+		    resetChunkRecvState ();
 
 		    if (!res) {
 			logE_ (_func, "processMessage() failed");
@@ -2250,17 +2184,6 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 		  // Intermediate chunk.
 
 		    logD (msg, _func, "intermediate chunk");
-
-#if 0
-// Deprecated
-		    if (len < in_chunk_size) {
-			// TODO There's no reason to wait: process partial chunks.
-			recv_needed_len = in_chunk_size;
-			ret_res = Receiver::ProcessInputResult::Again;
-			goto _return;
-		    }
-		    recv_needed_len = 0;
-#endif
 
 		    assert (chunk_offset < in_chunk_size);
 		    Size tofill = in_chunk_size - chunk_offset;
@@ -2274,6 +2197,8 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 			Uint32 const out_chunk_stream_id =
 				(recv_chunk_stream->in_msg_type_id == RtmpMessageType::AudioMessage ?
 					 DefaultAudioChunkStreamId : DefaultVideoChunkStreamId);
+
+			in_destr_mutex.lock ();
 			fillPrechunkedPages (&recv_chunk_stream->in_prechunk_ctx,
 					     ConstMemory (data, tofill),
 					     page_pool,
@@ -2281,9 +2206,12 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 					     out_chunk_stream_id,
 					     recv_chunk_stream->in_msg_timestamp,
 					     recv_chunk_stream->in_msg_offset == 0 && chunk_offset == 0 /* first_chunk */);
+			in_destr_mutex.unlock ();
 		    } else {
+			in_destr_mutex.lock ();
 			page_pool->getFillPages (&recv_chunk_stream->page_list,
 						 ConstMemory (data, tofill));
+			in_destr_mutex.unlock ();
 		    }
 
 		    {
@@ -2299,7 +2227,7 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 		    }
 
 		    recv_chunk_stream->in_msg_offset += in_chunk_size;
-		    resetPacket ();
+		    resetChunkRecvState ();
 		}
 	    } break;
 	    default:
@@ -2323,19 +2251,18 @@ _return:
     return ret_res;
 }
 
-void
+mt_sync_domain (receiver) void
 RtmpConnection::processEof (void * const _self)
 {
     logD (close, _func, "0x", fmt_hex, (UintPtr) _self);
 
     RtmpConnection * const self = static_cast <RtmpConnection*> (_self);
 
-    self->is_closed = true;
     self->frontend.call (self->frontend->closed, /*(*/ (Exception*) NULL /* exc */);
     self->backend.call (self->backend->close);
 }
 
-void
+mt_sync_domain (receiver) void
 RtmpConnection::processError (Exception * const exc_,
 			      void      * const _self)
 {
@@ -2343,12 +2270,11 @@ RtmpConnection::processError (Exception * const exc_,
 
     RtmpConnection * const self = static_cast <RtmpConnection*> (_self);
 
-    self->is_closed = true;
     self->frontend.call (self->frontend->closed, /*(*/ exc_ /*)*/);
     self->backend.call (self->backend->close);
 }
 
-void
+mt_const void
 RtmpConnection::startClient ()
 {
     logD_ (_func_);
@@ -2380,7 +2306,7 @@ RtmpConnection::startClient ()
     sendRawPages (page_list.first, 0 /* msg_offset */);
 }
 
-void
+mt_const void
 RtmpConnection::startServer ()
 {
     conn_state = ReceiveState::ServerWaitC0;
@@ -2536,10 +2462,7 @@ RtmpConnection::RtmpConnection (Object     * const coderef_container,
 
       prechunking_enabled (true),
 
-      is_closed (false),
-
       ping_send_timer (NULL),
-      ping_reply_received (false),
 
       in_chunk_size  (DefaultChunkSize),
       out_chunk_size (DefaultChunkSize),
@@ -2555,7 +2478,6 @@ RtmpConnection::RtmpConnection (Object     * const coderef_container,
 
       remote_wack_size (1 << 20 /* 1 Mb */),
 
-      recv_needed_len (0),
       total_received (0),
       last_ack (0),
 
@@ -2563,13 +2485,13 @@ RtmpConnection::RtmpConnection (Object     * const coderef_container,
 
       local_wack_size (1 << 20 /* 1 Mb */)
 {
-    resetPacket ();
+    resetChunkRecvState ();
 
     control_chunk_stream = getChunkStream (2, true /* create */);
     data_chunk_stream    = getChunkStream (3, true /* create */);
 }
 
-void
+mt_const void
 RtmpConnection::init (Timers     * mt_nonnull const timers,
 		      PagePool   * mt_nonnull const page_pool)
 {
@@ -2587,10 +2509,7 @@ RtmpConnection::RtmpConnection (Object * const coderef_container)
 
       prechunking_enabled (true),
 
-      is_closed (false),
-
       ping_send_timer (NULL),
-      ping_reply_received (false),
 
       in_chunk_size  (DefaultChunkSize),
       out_chunk_size (DefaultChunkSize),
@@ -2606,7 +2525,6 @@ RtmpConnection::RtmpConnection (Object * const coderef_container)
 
       remote_wack_size (1 << 20 /* 1 Mb */),
 
-      recv_needed_len (0),
       total_received (0),
       last_ack (0),
 
@@ -2614,7 +2532,7 @@ RtmpConnection::RtmpConnection (Object * const coderef_container)
 
       local_wack_size (1 << 20 /* 1 Mb */)
 {
-    resetPacket ();
+    resetChunkRecvState ();
 
     control_chunk_stream = getChunkStream (2, true /* create */);
     data_chunk_stream    = getChunkStream (DefaultDataChunkStreamId, true /* create */);
@@ -2622,11 +2540,20 @@ RtmpConnection::RtmpConnection (Object * const coderef_container)
 
 RtmpConnection::~RtmpConnection ()
 {
+    in_destr_mutex.lock ();
+
     if (ping_send_timer)
 	timers->deleteTimer (ping_send_timer);
 
-    // TODO Release chunk streams
-    // TODO Release incomplete messages in chunk streams.
+    {
+	ChunkStreamTree::Iterator iter (chunk_stream_tree);
+	while (!iter.done ()) {
+	    Ref<ChunkStream> const &chunk_stream = iter.next ().value;
+	    releaseChunkStream (chunk_stream);
+	}
+    }
+
+    in_destr_mutex.unlock ();
 }
 
 }

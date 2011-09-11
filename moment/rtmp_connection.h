@@ -80,16 +80,6 @@ public:
 	void (*close) (void *cb_data);
     };
 
-#if 0
-    struct Backend
-    {
-//	void (*peekInput) (Memory * mt_nonnull mem,
-//			   void *cb_data);
-
-//	void (*get_client_addr) ();
-    };
-#endif
-
 private:
     typedef IntrusiveList<RtmpConnection, RtmpConnection_OutputQueue_name> OutputQueue;
 
@@ -100,7 +90,6 @@ private:
 	//  4 bytes - extended timestamp;
 	//  3 bytes - fix chunk basic header;
 	//  7 bytes - fix chunk message header (type 1).
-	// TODO More descriptive name
 	MaxHeaderLen = 28
     };
 
@@ -242,7 +231,7 @@ public:
 	Uint32 chunk_stream_id;
 
 	// Incoming message accumulator.
-	PagePool::PageListHead page_list;
+	mt_mutex (RtmpConnection::in_destr_mutex) PagePool::PageListHead page_list;
 
 	PrechunkContext in_prechunk_ctx;
 
@@ -255,12 +244,15 @@ public:
 	Uint32 in_msg_stream_id;
 	bool   in_header_valid;
 
-	Uint32 out_msg_timestamp;
-	Uint32 out_msg_timestamp_delta;
-	Uint32 out_msg_len;
-	Uint32 out_msg_type_id;
-	Uint32 out_msg_stream_id;
-	bool   out_header_valid;
+	mt_mutex (RtmpConnection::send_mutex)
+	mt_begin
+	  Uint32 out_msg_timestamp;
+	  Uint32 out_msg_timestamp_delta;
+	  Uint32 out_msg_len;
+	  Uint32 out_msg_type_id;
+	  Uint32 out_msg_stream_id;
+	  bool   out_header_valid;
+	mt_end
 
     public:
 	Uint32 getChunkStreamId () const
@@ -281,16 +273,14 @@ private:
     Cb<Frontend> frontend;
     Cb<Backend> backend;
 
-    bool is_closed;
-
-    Timers::TimerKey ping_send_timer;
-    bool ping_reply_received;
+    mt_mutex (in_destr_mutex) Timers::TimerKey ping_send_timer;
+    AtomicInt ping_reply_received;
 
     Size in_chunk_size;
-    Size out_chunk_size;
+    mt_mutex (send_mutex) Size out_chunk_size;
 
-    Size out_got_first_timestamp;
-    Uint32 out_first_timestamp;
+    mt_mutex (send_mutex) Size out_got_first_timestamp;
+    mt_mutex (send_mutex) Uint32 out_first_timestamp;
 
     bool extended_timestamp_is_delta;
     bool ignore_extended_timestamp;
@@ -305,13 +295,12 @@ private:
 		     DirectComparator<Uint32> >
 	    ChunkStreamTree;
 
-    ChunkStreamTree chunk_stream_tree;
+    mt_mutex (in_destr_mutex) ChunkStreamTree chunk_stream_tree;
 
   // Receiving state
 
     Uint32 remote_wack_size;
 
-    Size recv_needed_len; // TODO Get rid of
     Size total_received;
     Size last_ack;
 
@@ -325,9 +314,23 @@ private:
 
     ReceiveState conn_state;
 
+    // Protects part of receiving state which may be accessed from
+    // ~RtmpConnection() destructor.
+    // A simple release fence would be enough to synchronize with the destructor.
+    // Using a mutex is an overkill. We can switch to using a fence after
+    // an implementation of C++0x atomics comes out.
+    //
+    // It'd be optimal to use a fence just once for each invocation of doProcessInput()
+    // and only if there was a change to the part of the state which the destructor
+    // needs.
+    Mutex in_destr_mutex;
+
   // Sending state
 
-    Uint32 local_wack_size;
+    mt_const Uint32 local_wack_size;
+
+    // Protects sending state.
+    Mutex send_mutex;
 
     static bool timestampGreater (Uint32 const left,
 				  Uint32 const right)
@@ -341,32 +344,33 @@ private:
 	return delta < 0x80000000 ? 1 : 0;
     }
 
-    Receiver::ProcessInputResult doProcessInput (ConstMemory const &mem,
-						 Size * mt_nonnull ret_accepted);
+    mt_sync_domain (receiver) Receiver::ProcessInputResult doProcessInput (ConstMemory const &mem,
+									   Size * mt_nonnull ret_accepted);
 
 public:
     class MessageDesc;
 
 private:
-    Uint32 mangleOutTimestamp (Uint32 timestamp);
+    mt_mutex (send_mutex) Uint32 mangleOutTimestamp (Uint32 timestamp);
 
-    Size fillMessageHeader (MessageDesc const * mt_nonnull mdesc,
-			    ChunkStream       * mt_nonnull chunk_stream,
-			    Byte              * mt_nonnull header_buf,
-			    Uint32             timestamp,
-			    Uint32             prechunk_size);
+    mt_mutex (send_mutex) Size fillMessageHeader (MessageDesc const * mt_nonnull mdesc,
+						  ChunkStream       * mt_nonnull chunk_stream,
+						  Byte              * mt_nonnull header_buf,
+						  Uint32             timestamp,
+						  Uint32             prechunk_size);
 
-    // TODO rename to resetChunk()
-    void resetPacket ();
+    mt_sync_domain (receiver) void resetChunkRecvState ();
+    mt_sync_domain (receiver) void resetMessageRecvState (ChunkStream * mt_nonnull chunk_stream);
 
-    void resetMessage (ChunkStream * mt_nonnull chunk_stream);
+    mt_mutex (in_destr_mutex) void releaseChunkStream (ChunkStream * mt_nonnull chunk_stream);
 
 public:
     mt_const ChunkStream *control_chunk_stream;
     mt_const ChunkStream *data_chunk_stream;
 
-    ChunkStream* getChunkStream (Uint32 chunk_stream_id,
-				 bool create);
+    mt_one_of(( mt_const, mt_sync_domain (receiver) ))
+	ChunkStream* getChunkStream (Uint32 chunk_stream_id,
+				     bool create);
 
     static void fillPrechunkedPages (PrechunkContext        *prechunk_ctx,
 				     ConstMemory const      &mem,
@@ -396,7 +400,8 @@ public:
     void sendMessage (MessageDesc  const * mt_nonnull mdesc,
 		      ChunkStream        * mt_nonnull chunk_stream,
 		      ConstMemory  const &mem,
-		      Uint32              prechunk_size);
+		      Uint32              prechunk_size,
+		      bool                unlocked = false);
 
     // TODO 'page_pool' parameter is needed.
     // @prechunk_size - If 0, then message data is not prechunked.
@@ -405,7 +410,8 @@ public:
 			   PagePool::PageListHead * mt_nonnull page_list,
 			   Size                    msg_offset,
 			   Uint32                  prechunk_size,
-			   bool                    take_ownership = false);
+			   bool                    take_ownership = false,
+			   bool                    unlocked = false);
 
     void sendRawPages (PagePool::Page *first_page,
 		       Size msg_offset);
@@ -414,6 +420,13 @@ public:
 
     void sendSetChunkSize (Uint32 chunk_size);
 
+private:
+    void sendSetChunkSize_unlocked (Uint32 chunk_size);
+
+    void doSendSetChunkSize (Uint32 chunk_size,
+			     bool   unlocked);
+
+public:
     void sendAck (Uint32 seq);
 
     void sendWindowAckSize (Uint32 wack_size);
@@ -461,43 +474,46 @@ public:
 private:
   // Ping timer
 
-    void beginPings ();
+    mt_sync_domain (receiver) void beginPings ();
 
     static void pingTimerTick (void *_self);
 
   // ___
 
-    Result processMessage (ChunkStream *chunk_stream);
+    mt_sync_domain (receiver) Result processMessage (ChunkStream *chunk_stream);
 
-    Result callCommandMessage (ChunkStream *chunk_stream,
-			       AmfEncoding amf_encoding);
+    mt_sync_domain (receiver) Result callCommandMessage (ChunkStream *chunk_stream,
+							 AmfEncoding amf_encoding);
 
-    Result processUserControlMessage (ChunkStream *chunk_stream);
+    mt_sync_domain (receiver) Result processUserControlMessage (ChunkStream *chunk_stream);
 
-  mt_iface (Sender::Frontend)
+    mt_iface (Sender::Frontend)
+    mt_begin
+      static Sender::Frontend const sender_frontend;
 
-    static Sender::Frontend const sender_frontend;
+      static void senderStateChanged (Sender::SendState  send_state,
+				      void              *_self);
 
-    static void senderStateChanged (Sender::SendState  send_state,
-				    void              *_self);
+      static void senderClosed (Exception *exc_,
+				void      *_self);
+    mt_end
 
-    static void senderClosed (Exception *exc_,
-			      void      *_self);
+    mt_iface (Receiver::Frontend)
+    mt_begin
+      static Receiver::Frontend const receiver_frontend;
 
-  mt_iface (Receiver::Frontend)
+      mt_sync_domain (receiver)
+      mt_begin
+	static Receiver::ProcessInputResult processInput (Memory const &mem,
+							  Size * mt_nonnull ret_accepted,
+							  void *_self);
 
-    static Receiver::Frontend const receiver_frontend;
+	static void processEof (void *_self);
 
-    static Receiver::ProcessInputResult processInput (Memory const &mem,
-						      Size * mt_nonnull ret_accepted,
-						      void *_self);
-
-    static void processEof (void *_self);
-
-    static void processError (Exception *exc_,
-			      void      *_self);
-
-  mt_iface_end()
+	static void processError (Exception *exc_,
+				  void      *_self);
+      mt_end
+    mt_end
 
 public:
     // TODO setReceiver
@@ -506,31 +522,33 @@ public:
 	return Cb<Receiver::Frontend> (&receiver_frontend, this, getCoderefContainer());
     }
 
-    void setFrontend (Cb<Frontend> const &frontend)
+    mt_const void setFrontend (Cb<Frontend> const &frontend)
     {
 	this->frontend = frontend;
     }
 
-    void setBackend (Cb<Backend> const &backend)
+    mt_const void setBackend (Cb<Backend> const &backend)
     {
 	this->backend = backend;
     }
 
-    void setSender (Sender * const sender)
+    mt_const void setSender (Sender * const sender)
     {
 	this->sender = sender;
 	sender->setFrontend (CbDesc<Sender::Frontend> (&sender_frontend, this, getCoderefContainer()));
     }
 
-    void startClient ();
+    mt_const void startClient ();
 
-    void startServer ();
+    mt_const void startServer ();
 
+    // Should be called from frontend->commandMessage() callback only.
     Uint32 getLocalWackSize () const
     {
 	return local_wack_size;
     }
 
+    // Should be called from frontend->commandMessage() callback only.
     Uint32 getRemoteWackSize () const
     {
 	return remote_wack_size;
@@ -557,8 +575,8 @@ public:
 		    Timers   * mt_nonnull timers,
 		    PagePool * mt_nonnull page_pool);
 
-    void init (Timers   * mt_nonnull timers,
-	       PagePool * mt_nonnull page_pool);
+    mt_const void init (Timers   * mt_nonnull timers,
+			PagePool * mt_nonnull page_pool);
 
     RtmpConnection (Object *coderef_container);
 
