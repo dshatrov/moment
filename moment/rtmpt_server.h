@@ -63,10 +63,13 @@ private:
 
 	Mutex sender_mutex;
 
+	mt_mutex (mutex) void doFlush ();
+
     public:
       mt_iface (Sender)
       // {
-	mt_async void sendMessage (Sender::MessageEntry * mt_nonnull msg_entry);
+	mt_async void sendMessage (Sender::MessageEntry * mt_nonnull msg_entry,
+				   bool do_flush = false);
 
 	mt_async void flush ();
 

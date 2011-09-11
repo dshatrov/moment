@@ -76,7 +76,8 @@ HttpServer::Frontend const RtmptServer::http_frontend = {
 
 mt_rev (11.06.18)
 mt_async void
-RtmptServer::RtmptSender::sendMessage (Sender::MessageEntry * const mt_nonnull msg_entry)
+RtmptServer::RtmptSender::sendMessage (Sender::MessageEntry * const mt_nonnull msg_entry,
+				       bool const do_flush)
 {
     logD (rtmpt, _func, "<", fmt_hex, (UintPtr) this, "> ", fmt_def, "msg_entry: 0x", fmt_hex, (UintPtr) msg_entry);
 
@@ -113,7 +114,20 @@ RtmptServer::RtmptSender::sendMessage (Sender::MessageEntry * const mt_nonnull m
 	    unreachable ();
     }
 
+    if (do_flush)
+	doFlush ();
+
     sender_mutex.unlock ();
+}
+
+mt_mutex (mutex) void
+RtmptServer::RtmptSender::doFlush ()
+{
+    pending_msg_list.stealAppend (nonflushed_msg_list.getFirst(), nonflushed_msg_list.getLast());
+    pending_data_len += nonflushed_data_len;
+
+    nonflushed_msg_list.clear();
+    nonflushed_data_len = 0;
 }
 
 mt_rev (11.06.18)
@@ -123,13 +137,7 @@ RtmptServer::RtmptSender::flush ()
     logD (rtmpt, _func, "<", fmt_hex, (UintPtr) this, "> ", fmt_def, "nonflushed_data_len: ", nonflushed_data_len);
 
     sender_mutex.lock ();
-
-    pending_msg_list.stealAppend (nonflushed_msg_list.getFirst(), nonflushed_msg_list.getLast());
-    pending_data_len += nonflushed_data_len;
-
-    nonflushed_msg_list.clear();
-    nonflushed_data_len = 0;
-
+    doFlush ();
     sender_mutex.unlock ();
 }
 
@@ -295,12 +303,12 @@ RtmptServer::doOpen (RtmptConnection * const rtmpt_conn)
     RTMPT_SERVER__HEADERS_DATE
     rtmpt_conn->conn_sender.send (
 	    page_pool,
+	    true /* do_flush */,
 	    RTMPT_SERVER__FCS_OK_HEADERS
 	    "Content-Length: ", toString (Memory(), session->session_id) + 1 /* for \n */, "\r\n"
 	    "\r\n",
 	    session->session_id,
 	    "\n");
-    rtmpt_conn->conn_sender.flush ();
 
     if (frontend && frontend->clientConnected)
 	frontend.call (frontend->clientConnected, /*(*/ &session->rtmp_conn /*)*/);
@@ -316,9 +324,9 @@ RtmptServer::doSend (RtmptConnection * const rtmpt_conn,
 	RTMPT_SERVER__HEADERS_DATE
 	rtmpt_conn->conn_sender.send (
 		page_pool,
+		true /* do_flush */,
 		RTMPT_SERVER__404_HEADERS
 		"\r\n");
-	rtmpt_conn->conn_sender.flush ();
 	return;
     }
 
@@ -339,9 +347,9 @@ RtmptServer::doIdle (RtmptConnection * const rtmpt_conn,
 	RTMPT_SERVER__HEADERS_DATE
 	rtmpt_conn->conn_sender.send (
 		page_pool,
+		true /* do_flush */,
 		RTMPT_SERVER__404_HEADERS
 		"\r\n");
-	rtmpt_conn->conn_sender.flush ();
 	return;
     }
 
@@ -359,9 +367,9 @@ RtmptServer::doClose (RtmptConnection * const rtmpt_conn,
 	RTMPT_SERVER__HEADERS_DATE
 	rtmpt_conn->conn_sender.send (
 		page_pool,
+		true /* do_flush */,
 		RTMPT_SERVER__404_HEADERS
 		"\r\n");
-	rtmpt_conn->conn_sender.flush ();
 	return;
     }
 
@@ -373,11 +381,11 @@ RtmptServer::doClose (RtmptConnection * const rtmpt_conn,
     RTMPT_SERVER__HEADERS_DATE
     rtmpt_conn->conn_sender.send (
 	    page_pool,
+	    true /* do_flush */,
 	    RTMPT_SERVER__OK_HEADERS
 	    "Content-Type: text/plain\r\n"
 	    "Content-Length: 0\r\n"
 	    "\r\n");
-    rtmpt_conn->conn_sender.flush ();
 }
 
 mt_rev (11.06.18)
@@ -424,9 +432,9 @@ RtmptServer::httpRequest (HttpRequest * const req,
 	RTMPT_SERVER__HEADERS_DATE
 	rtmpt_conn->conn_sender.send (
 		self->page_pool,
+		true /* do_flush */,
 		RTMPT_SERVER__400_HEADERS
 		"\r\n");
-	rtmpt_conn->conn_sender.flush ();
     }
 
     self->mutex.unlock ();
