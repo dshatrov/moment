@@ -52,9 +52,7 @@ RtmpService::destroySession (ClientSession * const session)
     }
     session->valid = false;
 
-    poll_group->removePollable (session->pollable_key);
-
-    session->deferred_reg.release ();
+    session->thread_ctx->getPollGroup()->removePollable (session->pollable_key);
 
     // TODO close TCP connection explicitly.
 
@@ -68,7 +66,10 @@ RtmpService::acceptOneConnection ()
 {
     logD (rtmp_service, _func_);
 
-    Ref<ClientSession> session = grab (new ClientSession (timers, page_pool));
+    ServerThreadContext * const thread_ctx = server_ctx->selectThreadContext();
+
+    Ref<ClientSession> const session = grab (new ClientSession (thread_ctx->getTimers(), page_pool));
+    session->thread_ctx = thread_ctx;
 
 // TEST
 //    session->traceReferences ();
@@ -90,9 +91,18 @@ RtmpService::acceptOneConnection ()
 	assert (res == TcpServer::AcceptResult::Accepted);
     }
 
+    session->pollable_key = thread_ctx->getPollGroup()->addPollable (session->tcp_conn.getPollable(),
+								     NULL /* deferred_reg */,
+								     false /* activate */);
+    if (!session->pollable_key) {
+	logE (rtmp_service, _func, "PollGroup::addPollable() failed: ", exc->toString());
+	return true;
+    }
+
     session->conn_sender.setConnection (&session->tcp_conn);
-    // TEST (uncomment)
-//    session->conn_sender.setDeferredRegistration (&session->deferred_reg);
+#ifndef MOMENT__RTMP_SERVICE__USE_IMMEDIATE_SENDER
+    session->conn_sender.setQueue (thread_ctx->getDeferredConnectionSenderQueue());
+#endif
 
     session->rtmp_conn.setBackend (Cb<RtmpConnection::Backend> (&rtmp_conn_backend, session, session));
     session->rtmp_conn.setSender (&session->conn_sender);
@@ -109,14 +119,12 @@ RtmpService::acceptOneConnection ()
     }
 
     mutex.lock ();
-    session->pollable_key = poll_group->addPollable (session->tcp_conn.getPollable(),
-						     &session->deferred_reg);
-    if (!session->pollable_key) {
+    if (!thread_ctx->getPollGroup()->activatePollable (session->pollable_key)) {
 	mutex.unlock ();
 
 	// TODO FIXME Call clientDisconnected()
 
-	logE (rtmp_service, _func, "PollGroup::addPollable() failed: ", exc->toString());
+	logE (rtmp_service, _func, "PollGroup::activatePollable() failed: ", exc->toString());
 	return true;
     }
 
@@ -190,7 +198,7 @@ RtmpService::start ()
     if (!tcp_server.listen ())
 	return Result::Failure;
 
-    if (!poll_group->addPollable (tcp_server.getPollable(), NULL /* ret_reg */))
+    if (!server_ctx->getMainPollGroup()->addPollable (tcp_server.getPollable(), NULL /* ret_reg */))
 	return Result::Failure;
 
     return Result::Success;

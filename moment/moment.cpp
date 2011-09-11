@@ -211,7 +211,7 @@ int main (int argc, char **argv)
 	    }
 	}
 
-	if (!http_service.init (server_app.getPollGroup(), server_app.getTimers(), &page_pool, http_keepalive_timeout)) {
+	if (!http_service.init (server_app.getMainPollGroup(), server_app.getTimers(), &page_pool, http_keepalive_timeout)) {
 	    logE_ (_func, "http_service.init() failed: ", exc->toString());
 	    return EXIT_FAILURE;
 	}

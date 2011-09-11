@@ -25,6 +25,9 @@
 #include <moment/rtmp_video_service.h>
 
 
+//#define MOMENT__RTMP_SERVICE__USE_IMMEDIATE_SENDER
+
+
 namespace Moment {
 
 using namespace M;
@@ -41,13 +44,17 @@ private:
     public:
 	bool valid;
 
+	mt_const ServerThreadContext *thread_ctx;
+
 	mt_const WeakCodeRef weak_rtmp_service;
 	mt_const RtmpService *unsafe_rtmp_service;
 
 	TcpConnection tcp_conn;
-	// TEST
-//	DeferredConnectionSender conn_sender;
+#ifndef MOMENT__RTMP_SERVICE__USE_IMMEDIATE_SENDER
+	DeferredConnectionSender conn_sender;
+#else
 	ImmediateConnectionSender conn_sender;
+#endif
 	ConnectionReceiver conn_receiver;
 	RtmpConnection rtmp_conn;
 	DeferredProcessor::Registration deferred_reg;
@@ -56,7 +63,8 @@ private:
 
 	ClientSession (Timers   * const timers,
 		       PagePool * const page_pool)
-	    : tcp_conn      (this /* coderef_container */),
+	    : thread_ctx    (NULL),
+	      tcp_conn      (this /* coderef_container */),
 	      conn_sender   (this /* coderef_container */),
 	      conn_receiver (this /* coderef_container */, &tcp_conn),
 	      rtmp_conn     (this /* coderef_container */, timers, page_pool)
@@ -68,9 +76,8 @@ private:
 
     typedef IntrusiveList<ClientSession, SessionList_name> SessionList;
 
-    mt_const Timers    *timers;
-    mt_const PollGroup *poll_group;
-    mt_const PagePool  *page_pool;
+    mt_const ServerContext *server_ctx;
+    mt_const PagePool *page_pool;
 
     TcpServer tcp_server;
 
@@ -105,14 +112,9 @@ public:
 
     mt_throws Result start ();
 
-    void setTimers (Timers * const timers)
+    void setServerContext (ServerContext * const server_ctx)
     {
-	this->timers = timers;
-    }
-
-    void setPollGroup (PollGroup * const poll_group)
-    {
-	this->poll_group = poll_group;
+	this->server_ctx = server_ctx;
     }
 
     void setPagePool (PagePool * const page_pool)
@@ -122,8 +124,7 @@ public:
 
     RtmpService (Object * const coderef_container)
 	: DependentCodeReferenced (coderef_container),
-	  timers (NULL),
-	  poll_group (NULL),
+	  server_ctx (NULL),
 	  page_pool (NULL),
 	  tcp_server (coderef_container)
     {

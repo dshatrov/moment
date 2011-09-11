@@ -106,8 +106,7 @@ public:
 	this->frontend = frontend;
     }
 
-    // Must be called only once for initialization.
-    void setRtmpConnection (RtmpConnection * const rtmp_conn)
+    mt_const void setRtmpConnection (RtmpConnection * const rtmp_conn)
     {
 	this->rtmp_conn = rtmp_conn;
 	audio_chunk_stream = rtmp_conn->getChunkStream (RtmpConnection::DefaultAudioChunkStreamId, true /* create */);
