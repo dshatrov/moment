@@ -109,10 +109,10 @@ Result httpRequest (HttpRequest  * const mt_nonnull req,
 	    ConstMemory const reply_body = "500 Internal Server Error";
 	    conn_sender->send (
 		    page_pool,
+		    true /* do_flush */,
 		    MOMENT_FILE__500_HEADERS (reply_body.len()),
 		    "\r\n",
 		    reply_body);
-	    conn_sender->flush ();
 
 	    return Result::Success;
 	}
@@ -138,10 +138,10 @@ Result httpRequest (HttpRequest  * const mt_nonnull req,
 	ConstMemory const reply_body = "400 Bad Request";
 	conn_sender->send (
 		page_pool,
+		true /* do_flush */,
 		MOMENT_FILE__400_HEADERS (reply_body.len()),
 		"\r\n",
 		reply_body);
-	conn_sender->flush ();
 
 	return Result::Success;
 #endif
@@ -184,10 +184,10 @@ Result httpRequest (HttpRequest  * const mt_nonnull req,
 	ConstMemory const reply_body = "404 Not Found";
 	conn_sender->send (
 		page_pool,
+		true /* do_flush */,
 		MOMENT_FILE__404_HEADERS (reply_body.len()),
 		"\r\n",
 		reply_body);
-	conn_sender->flush ();
 
 	return Result::Success;
     }
@@ -200,10 +200,10 @@ Result httpRequest (HttpRequest  * const mt_nonnull req,
 	ConstMemory const reply_body = "500 Internal Server Error";
 	conn_sender->send (
 		page_pool,
+		true /* do_flush */,
 		MOMENT_FILE__500_HEADERS (reply_body.len()),
 		"\r\n",
 		reply_body);
-	conn_sender->flush ();
 
 	return Result::Success;
     }
@@ -211,6 +211,7 @@ Result httpRequest (HttpRequest  * const mt_nonnull req,
     MOMENT_FILE__HEADERS_DATE;
     conn_sender->send (
 	    page_pool,
+	    true /* do_flush */,
 	    MOMENT_FILE__OK_HEADERS (mime_type, stat.size),
 	    "\r\n");
 
@@ -245,8 +246,7 @@ Result httpRequest (HttpRequest  * const mt_nonnull req,
 	    break;
     }
 
-    conn_sender->sendPages (page_pool, &page_list);
-    conn_sender->flush ();
+    conn_sender->sendPages (page_pool, &page_list, true /* do_flush */);
 
     assert (total_sent <= stat.size);
     if (total_sent != stat.size) {
