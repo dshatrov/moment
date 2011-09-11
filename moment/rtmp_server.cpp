@@ -322,12 +322,15 @@ RtmpServer::doPublish (Uint32       const msg_stream_id,
 {
     logD (rtmp_server, _func_);
 
+// TEST (uncomment)
+#if 0
     // XXX Ugly
     if (playing.get()) {
 	logW_ (_func, "already playing");
 	return Result::Success;
     }
     playing.set (1);
+#endif
 
     double transaction_id;
     if (!decoder->decodeNumber (&transaction_id)) {
