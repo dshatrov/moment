@@ -48,6 +48,7 @@ public:
     Ref<String> channel;
     Ref<String> out_file;
 
+    Uint32 num_threads;
     Uint32 report_interval;
 
     Options ()
@@ -57,6 +58,7 @@ public:
 	  nonfatal_errors (false),
 	  app_name (grab (new String ("oflaDemo"))),
 	  channel (grab (new String ("red5StreamDemo"))),
+	  num_threads (0),
 	  report_interval (0)
     {
     }
@@ -370,9 +372,10 @@ RtmpClient::RtmpClient (Object * const coderef_container,
 }
 
 Result
-start_clients (PagePool  * const page_pool,
-	       ServerApp * const server_app,
-	       IpAddress * const server_addr)
+startClients (PagePool  * const page_pool,
+	      ServerApp * const server_app,
+	      IpAddress * const server_addr,
+	      bool        const use_main_thread)
 {
     Byte id_char = 'a';
     // TODO "Slow start" option.
@@ -382,7 +385,13 @@ start_clients (PagePool  * const page_pool,
 	// Note that RtmpClient objects are never freed.
 	RtmpClient * const client = new RtmpClient (NULL /* coderef_container */, id_char);
 
-	client->init (server_app->getServerContext()->selectThreadContext(), page_pool);
+	ServerThreadContext *thread_ctx;
+	if (use_main_thread)
+	    thread_ctx = server_app->getMainThreadContext();
+	else
+	    thread_ctx = server_app->getServerContext()->selectThreadContext();
+
+	client->init (thread_ctx, page_pool);
 	if (!client->start (*server_addr)) {
 	    logE_ (_func, "client->start() failed");
 	    return Result::Failure;
@@ -406,8 +415,7 @@ public:
     IpAddress server_addr;
 };
 
-// TEST
-void client_thread_func (void * const _client_thread_data)
+void clientThreadFunc (void * const _client_thread_data)
 {
     ClientThreadData * const client_thread_data = static_cast <ClientThreadData*> (_client_thread_data);
 
@@ -419,7 +427,7 @@ void client_thread_func (void * const _client_thread_data)
     sSleep (3);
     logD_ (_func, "Starting clients...");
 
-    if (!start_clients (page_pool, server_app, &client_thread_data->server_addr))
+    if (!startClients (page_pool, server_app, &client_thread_data->server_addr, false /* use_main_thread */))
 	logE_ (_func, "start_clients() failed");
 
     logD_ (_func, "done");
@@ -435,10 +443,8 @@ Result doTest (void)
 	return Result::Failure;
     }
 
-    // TEST
-    // TODO Command line option for the number of threads;
-    //      Check overall MT safety of rtmptool.
-    server_app.setNumThreads (3);
+    // TODO Check overall MT safety of rtmptool.
+    server_app.setNumThreads (options.num_threads);
 
     IpAddress server_addr = options.server_addr;
     if (!options.got_server_addr) {
@@ -448,45 +454,24 @@ Result doTest (void)
 	}
     }
 
-#if 0
-    {
-	Byte id_char = 'a';
-	// TODO "Slow start" option.
-	for (Uint32 i = 0; i < options.num_clients; ++i) {
-	    logD_ (_func, "Starting client, id_char: ", ConstMemory::forObject (id_char));
-
-	    // Note that RtmpClient objects are never freed.
-	    RtmpClient * const client = new RtmpClient (NULL /* coderef_container */, id_char);
-
-	    client->init (server_app->getServerContext()->selectThreadContext(), &page_pool);
-	    if (!client->start (server_addr)) {
-		logE_ (_func, "client->start() failed");
-		return Result::Failure;
-	    }
-
-	    if (id_char == 'z')
-		id_char = 'a';
-	    else
-		++id_char;
-	}
-    }
-#endif
-
     Ref<Thread> client_thread;
-    {
+    if (options.num_threads == 0) {
+	startClients (&page_pool, &server_app, &server_addr, true /* use_main_thread */);
+    } else {
 	Ref<ClientThreadData> const client_thread_data = grab (new ClientThreadData);
 	client_thread_data->page_pool = &page_pool;
 	client_thread_data->server_app = &server_app;
 	client_thread_data->server_addr = server_addr;
 	client_thread = grab (new Thread (
-		CbDesc<Thread::ThreadFunc> (client_thread_func,
+		CbDesc<Thread::ThreadFunc> (clientThreadFunc,
 					    client_thread_data /* cb_data */,
 					    NULL /* coderef_container */,
 					    client_thread_data /* ref_data */)));
-    }
-    if (!client_thread->spawn (true /* joinable */)) {
-	logE_ (_func, "client_thread->spawn() failed");
-	return Result::Failure;
+
+	if (!client_thread->spawn (true /* joinable */)) {
+	    logE_ (_func, "client_thread->spawn() failed");
+	    return Result::Failure;
+	}
     }
 
     logI_ (_func, "Starting...");
@@ -495,8 +480,10 @@ Result doTest (void)
     }
     logI_ (_func, "...Finished");
 
-    if (!client_thread->join ())
-	logE_ (_func, "client_thread.join() failed: ", exc->toString());
+    if (client_thread) {
+	if (!client_thread->join ())
+	    logE_ (_func, "client_thread.join() failed: ", exc->toString());
+    }
 
     return Result::Success;
 }
@@ -510,6 +497,7 @@ printUsage ()
 		 "  -s --server-addr <address>     Server address, IP:PORT (default: localhost:1935)\n"
 		 "  -a --app <string>              Application name (default: oflaDemo)\n"
 		 "  -c --channel <string>          Name of the channel to subscribe to (default: red5StreamDemo)\n"
+		 "  -r --num-threads <number>      Number of threads to spawn (default: 0, use a single thread)\n"
 		 "  -r --report-interval <number>  Interval between video frame reports (default: 0, no reports)\n"
 		 "  --nonfatal-errors              Do not exit on the first error.\n"
 		 "  -h --help                      Show this help message.\n"
@@ -592,6 +580,20 @@ bool cmdline_out_file (char const * /* short_name */,
     return true;
 }
 
+bool cmdline_num_threads (char const * /* short_name */,
+			  char const * /* long_name */,
+			  char const *value,
+			  void       * /* opt_data */,
+			  void       * /* cb_data */)
+{
+    if (!strToUint32_safe (value, &options.num_threads)) {
+ 	logE_ (_func, "Invalid value \"", value, "\" "
+	       "for --num-threads (number expected): ", exc->toString());
+	exit (EXIT_FAILURE);
+   }
+    return true;
+}
+
 bool cmdline_report_interval (char const * /* short_name */,
 			      char const * /* long_name */,
 			      char const *value,
@@ -624,7 +626,7 @@ int main (int argc, char **argv)
     libMaryInit ();
 
     {
-	unsigned const num_opts = 8;
+	unsigned const num_opts = 9;
 	MyCpp::CmdlineOption opts [num_opts];
 
 	opts [0].short_name = "h";
@@ -674,6 +676,12 @@ int main (int argc, char **argv)
 	opts [7].with_value = false;
 	opts [7].opt_data   = NULL;
 	opts [7].opt_callback = cmdline_nonfatal_errors;
+
+	opts [8].short_name = "t";
+	opts [8].long_name  = "num-threads";
+	opts [8].with_value = true;
+	opts [8].opt_data   = NULL;
+	opts [8].opt_callback = cmdline_num_threads;
 
 	MyCpp::ArrayIterator<MyCpp::CmdlineOption> opts_iter (opts, num_opts);
 	MyCpp::parseCmdline (&argc, &argv, opts_iter, NULL /* callback */, NULL /* callback_data */);
