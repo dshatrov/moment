@@ -77,6 +77,8 @@ private:
 
     mt_const Byte id_char;
 
+    mt_const ServerThreadContext *thread_ctx;
+
     RtmpConnection rtmp_conn;
     TcpConnection tcp_conn;
     DeferredConnectionSender conn_sender;
@@ -114,11 +116,10 @@ private:
 			void      *_self);
 
 public:
-    Result start (PollGroup       *poll_group,
-		  IpAddress const &addr);
+    Result start (IpAddress const &addr);
 
-    void init (Timers   *timers,
-	       PagePool *page_pool);
+    mt_const void init (ServerThreadContext *thread_ctx,
+			PagePool            *page_pool);
 
     RtmpClient (Object *coderef_container,
 		Byte    id_char);
@@ -323,23 +324,26 @@ RtmpClient::closed (Exception * const exc_,
 }
 
 Result
-RtmpClient::start (PollGroup * const  poll_group,
-		   IpAddress   const &addr)
+RtmpClient::start (IpAddress const &addr)
 {
     if (!tcp_conn.connect (addr)) {
 	logE_ (_func, "tcp_conn.connect() failed: ", exc->toString());
 	return Result::Failure;
     }
 
-    poll_group->addPollable (tcp_conn.getPollable(), NULL /* ret_reg */);
+    thread_ctx->getPollGroup()->addPollable (tcp_conn.getPollable(), NULL /* ret_reg */);
     return Result::Success;
 }
 
 void
-RtmpClient::init (Timers   * const timers,
-		  PagePool * const page_pool)
+RtmpClient::init (ServerThreadContext * const thread_ctx,
+		  PagePool            * const page_pool)
 {
-    rtmp_conn.init (timers, page_pool);
+    this->thread_ctx = thread_ctx;
+
+    conn_sender.setQueue (thread_ctx->getDeferredConnectionSenderQueue());
+
+    rtmp_conn.init (thread_ctx->getTimers(), page_pool);
 }
 
 RtmpClient::RtmpClient (Object * const coderef_container,
@@ -365,6 +369,62 @@ RtmpClient::RtmpClient (Object * const coderef_container,
     tcp_conn.setFrontend (Cb<TcpConnection::Frontend> (&tcp_conn_frontend, &rtmp_conn, rtmp_conn.getCoderefContainer()));
 }
 
+Result
+start_clients (PagePool  * const page_pool,
+	       ServerApp * const server_app,
+	       IpAddress * const server_addr)
+{
+    Byte id_char = 'a';
+    // TODO "Slow start" option.
+    for (Uint32 i = 0; i < options.num_clients; ++i) {
+	logD_ (_func, "Starting client, id_char: ", ConstMemory::forObject (id_char));
+
+	// Note that RtmpClient objects are never freed.
+	RtmpClient * const client = new RtmpClient (NULL /* coderef_container */, id_char);
+
+	client->init (server_app->getServerContext()->selectThreadContext(), page_pool);
+	if (!client->start (*server_addr)) {
+	    logE_ (_func, "client->start() failed");
+	    return Result::Failure;
+	}
+
+	if (id_char == 'z')
+	    id_char = 'a';
+	else
+	    ++id_char;
+    }
+
+    return Result::Success;
+}
+
+class ClientThreadData : public Referenced
+{
+public:
+    PagePool *page_pool;
+    ServerApp *server_app;
+
+    IpAddress server_addr;
+};
+
+// TEST
+void client_thread_func (void * const _client_thread_data)
+{
+    ClientThreadData * const client_thread_data = static_cast <ClientThreadData*> (_client_thread_data);
+
+    PagePool * const page_pool = client_thread_data->page_pool;
+    ServerApp * const server_app = client_thread_data->server_app;
+
+    // TODO Wait for ServerApp threads to spawn, reliably.
+    logD_ (_func, "Sleeping...");
+    sSleep (3);
+    logD_ (_func, "Starting clients...");
+
+    if (!start_clients (page_pool, server_app, &client_thread_data->server_addr))
+	logE_ (_func, "start_clients() failed");
+
+    logD_ (_func, "done");
+}
+
 Result doTest (void)
 {
     PagePool page_pool (4096 /* page_size */, 4096 /* min_pages */);
@@ -375,14 +435,20 @@ Result doTest (void)
 	return Result::Failure;
     }
 
-    IpAddress addr = options.server_addr;
+    // TEST
+    // TODO Command line option for the number of threads;
+    //      Check overall MT safety of rtmptool.
+    server_app.setNumThreads (3);
+
+    IpAddress server_addr = options.server_addr;
     if (!options.got_server_addr) {
-	if (!setIpAddress ("localhost:1935", &addr)) {
+	if (!setIpAddress ("localhost:1935", &server_addr)) {
 	    logE_ (_func, "setIpAddress() failed");
 	    return Result::Failure;
 	}
     }
 
+#if 0
     {
 	Byte id_char = 'a';
 	// TODO "Slow start" option.
@@ -392,8 +458,8 @@ Result doTest (void)
 	    // Note that RtmpClient objects are never freed.
 	    RtmpClient * const client = new RtmpClient (NULL /* coderef_container */, id_char);
 
-	    client->init (server_app.getTimers(), &page_pool);
-	    if (!client->start (server_app.getPollGroup(), addr)) {
+	    client->init (server_app->getServerContext()->selectThreadContext(), &page_pool);
+	    if (!client->start (server_addr)) {
 		logE_ (_func, "client->start() failed");
 		return Result::Failure;
 	    }
@@ -404,10 +470,33 @@ Result doTest (void)
 		++id_char;
 	}
     }
+#endif
+
+    Ref<Thread> client_thread;
+    {
+	Ref<ClientThreadData> const client_thread_data = grab (new ClientThreadData);
+	client_thread_data->page_pool = &page_pool;
+	client_thread_data->server_app = &server_app;
+	client_thread_data->server_addr = server_addr;
+	client_thread = grab (new Thread (
+		CbDesc<Thread::ThreadFunc> (client_thread_func,
+					    client_thread_data /* cb_data */,
+					    NULL /* coderef_container */,
+					    client_thread_data /* ref_data */)));
+    }
+    if (!client_thread->spawn (true /* joinable */)) {
+	logE_ (_func, "client_thread->spawn() failed");
+	return Result::Failure;
+    }
 
     logI_ (_func, "Starting...");
-    server_app.run ();
+    if (!server_app.run ()) {
+	logE_ (_func, "server_app.run() failed: ", exc->toString());
+    }
     logI_ (_func, "...Finished");
+
+    if (!client_thread->join ())
+	logE_ (_func, "client_thread.join() failed: ", exc->toString());
 
     return Result::Success;
 }
