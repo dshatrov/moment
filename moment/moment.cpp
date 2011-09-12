@@ -53,6 +53,9 @@ HttpService http_service (NULL /* coderef_container */);
 
 MomentServer moment_server;
 
+mt_mutex (mutex) Timers::TimerKey exit_timer_key = NULL;
+Mutex mutex;
+
 static void
 printUsage ()
 {
@@ -106,6 +109,10 @@ cmdline_exit_after (char const * /* short_nmae */,
 static void exitTimerTick (void * const /* cb_data */)
 {
     logD_ (_func, "Exit timer expired (", options.exit_after, " seconds)");
+    mutex.lock ();
+    server_app.getTimers()->deleteTimer (exit_timer_key);
+    mutex.unlock ();
+
 //    exit (0);
     server_app.stop ();
 }
@@ -257,11 +264,13 @@ int main (int argc, char **argv)
 
     logD_ (_func, "options.exit_after: ", options.exit_after);
     if (options.exit_after != (Uint64) -1) {
-	server_app.getTimers()->addTimer (exitTimerTick,
-					  NULL /* cb_data */,
-					  NULL /* coderef_container */,
-					  options.exit_after,
-					  false /* periodical */);
+	mutex.lock ();
+	exit_timer_key = server_app.getTimers()->addTimer (exitTimerTick,
+							   NULL /* cb_data */,
+							   NULL /* coderef_container */,
+							   options.exit_after,
+							   false /* periodical */);
+	mutex.unlock ();
     }
 
     if (!server_app.run ()) {

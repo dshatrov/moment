@@ -1034,13 +1034,15 @@ RtmpConnection::close_noBackendCb ()
 mt_sync_domain (receiver) void
 RtmpConnection::beginPings ()
 {
-    if (ping_send_timer)
-	return;
-
     // It'd be better to initialize 'ping_reply_received' to 1 in the constructor.
     ping_reply_received.set (1);
 
     in_destr_mutex.lock ();
+    if (ping_send_timer) {
+	in_destr_mutex.unlock ();
+	return;
+    }
+
     ping_send_timer = timers->addTimer (pingTimerTick,
 					this,
 					getCoderefContainer(),
