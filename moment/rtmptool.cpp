@@ -454,9 +454,12 @@ Result doTest (void)
 	}
     }
 
+#ifdef LIBMARY_MT_SAFE
     Ref<Thread> client_thread;
     if (options.num_threads == 0) {
+#endif
 	startClients (&page_pool, &server_app, &server_addr, true /* use_main_thread */);
+#ifdef LIBMARY_MT_SAFE
     } else {
 	Ref<ClientThreadData> const client_thread_data = grab (new ClientThreadData);
 	client_thread_data->page_pool = &page_pool;
@@ -473,6 +476,7 @@ Result doTest (void)
 	    return Result::Failure;
 	}
     }
+#endif
 
     logI_ (_func, "Starting...");
     if (!server_app.run ()) {
@@ -480,10 +484,12 @@ Result doTest (void)
     }
     logI_ (_func, "...Finished");
 
+#ifdef LIBMARY_MT_SAFE
     if (client_thread) {
 	if (!client_thread->join ())
 	    logE_ (_func, "client_thread.join() failed: ", exc->toString());
     }
+#endif
 
     return Result::Success;
 }
