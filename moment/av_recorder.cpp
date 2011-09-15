@@ -143,6 +143,7 @@ AvRecorder::start (ConstMemory const filename)
     }
 
     recording = grab (new Recording);
+    muxer->setSender (&recording->sender);
 
     recording->file_key = storage->openFile (filename, &recording->conn);
     if (!recording->file_key) {
