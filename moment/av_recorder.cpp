@@ -166,6 +166,11 @@ AvRecorder::start (ConstMemory const filename)
 
     paused = false;
 
+    if (!muxer->beginMuxing ()) {
+	logE_ (_func, "muxer->beginMuxing() failed: ", exc->toString());
+	// TODO Fail?
+    }
+
     mutex.unlock ();
 }
 

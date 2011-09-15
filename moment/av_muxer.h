@@ -36,6 +36,8 @@ protected:
     Sender *sender;
 
 public:
+    virtual mt_throws Result beginMuxing () = 0;
+
     virtual mt_throws Result muxAudioMessage (VideoStream::AudioMessage * mt_nonnull msg) = 0;
 
     virtual mt_throws Result muxVideoMessage (VideoStream::VideoMessage * mt_nonnull msg) = 0;

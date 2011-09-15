@@ -74,6 +74,8 @@ private:
 
     mt_const ServerThreadContext *thread_ctx;
     mt_const Storage *storage;
+
+    // Muxer operations should be synchronized with 'mutex'.
     mt_const AvMuxer *muxer;
 
     mt_mutex (mutex) Ref<Recording> recording;
