@@ -83,6 +83,7 @@ public:
 private:
     typedef IntrusiveList<RtmpConnection, RtmpConnection_OutputQueue_name> OutputQueue;
 
+public: // Temporally public
     enum {
 	//  3 bytes - chunk basic header;
 	// 11 bytes - chunk message header (type 0);
@@ -92,6 +93,7 @@ private:
 	//  7 bytes - fix chunk message header (type 1).
 	MaxHeaderLen = 28
     };
+private:
 
     class ReceiveState
     {
