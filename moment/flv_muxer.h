@@ -30,9 +30,18 @@ namespace Moment {
 
 using namespace M;
 
-class FlvMuxer : public AvMuxer
+mt_unsafe class FlvMuxer : public AvMuxer
 {
+private:
+    PagePool *page_pool;
+
+    bool got_first_timestamp;
+
+    void doMuxMessage (VideoStream::Message * mt_nonnull msg,
+		       Byte msg_type);
 public:
+    mt_throws Result beginMuxing ();
+
     mt_throws Result muxAudioMessage (VideoStream::AudioMessage * mt_nonnull msg);
 
     mt_throws Result muxVideoMessage (VideoStream::VideoMessage * mt_nonnull msg);
@@ -40,6 +49,11 @@ public:
     mt_throws Result endMuxing ();
 
     void reset ();
+
+    void setPagePool (PagePool * const page_pool)
+    {
+	this->page_pool = page_pool;
+    }
 
     FlvMuxer ();
 };
