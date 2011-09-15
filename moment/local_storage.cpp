@@ -26,20 +26,59 @@ Storage::FileKey
 LocalStorage::openFile (ConstMemory    const filename,
 			Connection  ** const ret_conn)
 {
-  // TODO
     exc_throw<InternalException> (InternalException::NotImplemented);
-    return NULL;
+
+    Ref<FileEntry> file_entry = grab (new FileEntry);
+
+    if (!file_entry->file.open (filename,
+				File::OpenFlags::Create | File::OpenFlags::Truncate,
+				File::AccessMode::WriteOnly))
+    {
+	logE_ (_func, "file.open() failed: ", exc->toString());
+	return NULL;
+    }
+
+    file_entry->conn.setFile (&file_entry->file);
+
+    mutex.lock ();
+    file_list.append (file_entry);
+    mutex.unlock ();
+
+    if (ret_conn)
+	*ret_conn = &file_entry->conn;
+
+    FileEntry * const tmp_file_entry = file_entry;
+    file_entry.setNoUnref ((FileEntry*) NULL);
+    return tmp_file_entry;
 }
 
 void
 LocalStorage::releaseFile (FileKey const file_key)
 {
-  // TODO
+    FileEntry * const file_entry = static_cast <FileEntry*> (file_key);
+
+    if (!file_entry->file.close ())
+	logE_ (_func, "file.close() failed: ", exc->toString());
+
+    mutex.lock ();
+    file_list.remove (file_entry);
+    mutex.unlock ();
+
+    file_entry->unref ();
 }
 
 LocalStorage::~LocalStorage ()
 {
-  // TODO
+    mutex.lock ();
+
+    FileEntryList::iter iter (file_list);
+    while (!file_list.iter_done (iter)) {
+	FileEntry * const file_entry = file_list.iter_next (iter);
+	file_entry->file.close ();
+	file_entry->unref ();
+    }
+
+    mutex.unlock ();
 }
 
 }

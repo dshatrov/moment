@@ -33,14 +33,19 @@ using namespace M;
 class LocalStorage : public Storage
 {
 private:
-    class FileEntry : public Referenced
+    class FileEntry : public IntrusiveListElement<>,
+		      public Referenced
     {
     public:
 	NativeFile file;
 	FileConnection conn;
     };
 
-    List< Ref<FileEntry> > file_list;
+    typedef IntrusiveList<FileEntry> FileEntryList;
+
+    mt_mutex (mutex) FileEntryList file_list;
+
+    StateMutex mutex;
 
 public:
     FileKey openFile (ConstMemory   filename,
