@@ -51,6 +51,10 @@ PagePool page_pool (4096 /* page_size */, default__page_pool__min_pages);
 ServerApp server_app (NULL /* coderef_container */);
 HttpService http_service (NULL /* coderef_container */);
 
+FixedThreadPool recorder_thread_pool (NULL /* coderef_container */);
+
+LocalStorage storage;
+
 MomentServer moment_server;
 
 mt_mutex (mutex) Timers::TimerKey exit_timer_key = NULL;
@@ -121,6 +125,8 @@ static void exitTimerTick (void * const /* cb_data */)
 
 int main (int argc, char **argv)
 {
+    int ret_res = 0;
+
     MyCpp::myCppInit ();
     libMaryInit ();
 
@@ -205,6 +211,21 @@ int main (int argc, char **argv)
     }
 
     {
+	Uint64 num_file_threads = 0;
+	{
+	    ConstMemory const opt_name = "moment/num_file_threads";
+	    if (!config.getUint64_default (opt_name, &num_file_threads, num_file_threads)) {
+		logE_ (_func, "Bad value for config option ", opt_name);
+		return EXIT_FAILURE;
+	    }
+
+	    logD_ (_func, opt_name, ": ", num_file_threads);
+	}
+
+	recorder_thread_pool.setNumThreads (num_file_threads);
+    }
+
+    {
 	Uint64 http_keepalive_timeout = default__http__keepalive_timeout;
 	{
 	    ConstMemory const opt_name ("http/keepalive_timeout");
@@ -256,10 +277,17 @@ int main (int argc, char **argv)
 	} while (0);
     }
 
-    logD_ (_func, "CREATING MOMENT SERVER");
-    if (!moment_server.init (&server_app, &page_pool, &http_service, &config)) {
-	logE_ (_func, "moment_server.init() failed: ", exc->toString());
+    recorder_thread_pool.setMainThreadContext (server_app.getMainThreadContext());
+    if (!recorder_thread_pool.spawn ()) {
+	logE_ (_func, "recorder_thread_pool.spawn() failed");
 	return EXIT_FAILURE;
+    }
+
+    logD_ (_func, "CREATING MOMENT SERVER");
+    if (!moment_server.init (&server_app, &page_pool, &http_service, &config, &recorder_thread_pool, &storage)) {
+	logE_ (_func, "moment_server.init() failed: ", exc->toString());
+	ret_res = EXIT_FAILURE;
+	goto _stop_recorder;
     }
 
     logD_ (_func, "options.exit_after: ", options.exit_after);
@@ -275,11 +303,15 @@ int main (int argc, char **argv)
 
     if (!server_app.run ()) {
 	logE_ (_func, "server_app.run() failed: ", exc->toString());
-	return EXIT_FAILURE;
+	ret_res = EXIT_FAILURE;
+	goto _stop_recorder;
     }
 
     logD_ (_func, "DONE");
 
-    return 0;
+_stop_recorder:
+    recorder_thread_pool.stop ();
+
+    return ret_res;
 }
 

@@ -36,6 +36,13 @@
 
 #include <moment/video_stream.h>
 
+#include <moment/av_recorder.h>
+#include <moment/av_muxer.h>
+#include <moment/flv_muxer.h>
+
+#include <moment/storage.h>
+#include <moment/local_storage.h>
+
 #include <moment/moment_server.h>
 
 

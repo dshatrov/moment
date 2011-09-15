@@ -35,6 +35,13 @@ moment_target_headers =		\
 				\
 	video_stream.h		\
 				\
+	av_recorder.h		\
+	av_muxer.h		\
+	flv_muxer.h		\
+				\
+	storage.h		\
+	local_storage.h		\
+				\
 	moment_server.h		\
 				\
 	api.h			\
@@ -57,6 +64,11 @@ libmoment_1_0_la_SOURCES =	\
 	rtmpt_service.cpp	\
 				\
 	video_stream.cpp	\
+				\
+	av_recorder.cpp		\
+	flv_muxer.cpp		\
+				\
+	local_storage.cpp	\
 				\
 	moment_server.cpp	\
 				\

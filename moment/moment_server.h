@@ -27,6 +27,7 @@
 
 #include <moment/rtmp_connection.h>
 #include <moment/video_stream.h>
+#include <moment/storage.h>
 
 
 namespace Moment {
@@ -209,6 +210,8 @@ private:
     mt_const PagePool *page_pool;
     mt_const HttpService *http_service;
     mt_const MConfig::Config *config;
+    mt_const ServerThreadPool *recorder_thread_pool;
+    mt_const Storage *storage;
 
     mt_mutex (mutex) ClientSessionList client_session_list;
 
@@ -261,6 +264,10 @@ public:
     HttpService* getHttpService ();
 
     MConfig::Config* getConfig ();
+
+    ServerThreadPool* getRecorderThreadPool ();
+
+    Storage* getStorage ();
 
     static MomentServer* getInstance ();
 
@@ -330,10 +337,12 @@ public:
 
   // Initialization
 
-    Result init (ServerApp       * mt_nonnull server_app,
-		 PagePool        * mt_nonnull page_pool,
-		 HttpService     * mt_nonnull http_service,
-		 MConfig::Config * mt_nonnull config);
+    Result init (ServerApp        * mt_nonnull server_app,
+		 PagePool         * mt_nonnull page_pool,
+		 HttpService      * mt_nonnull http_service,
+		 MConfig::Config  * mt_nonnull config,
+		 ServerThreadPool * mt_nonnull recorder_thread_pool,
+		 Storage          * mt_nonnull storage);
 
     MomentServer ();
 
