@@ -43,6 +43,7 @@ FlvMuxer::muxAudioMessage (VideoStream::AudioMessage * const mt_nonnull msg)
     msg_pages->first_page = msg->page_list.first;
     msg_pages->msg_offset = 0;
 
+    msg->page_pool->msgRef (msg->page_list.first);
     sender->sendMessage (msg_pages, true /* do_flush */);
 
     return Result::Success;
@@ -63,6 +64,7 @@ FlvMuxer::muxVideoMessage (VideoStream::VideoMessage * const mt_nonnull msg)
     msg_pages->first_page = msg->page_list.first;
     msg_pages->msg_offset = 0;
 
+    msg->page_pool->msgRef (msg->page_list.first);
     sender->sendMessage (msg_pages, true /* do_flush */);
 
     return Result::Success;
