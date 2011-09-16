@@ -60,13 +60,19 @@ private:
 	AvRecorder *unsafe_av_recorder;
 
 	Connection *conn;
-	Storage::FileKey file_key;
+	mt_mutex (mutex) Storage::FileKey file_key;
 
 	DeferredConnectionSender sender;
 
 	Recording ()
 	    : sender (this /* coderef_container */)
 	{
+//	    logD_ (_func, "0x", fmt_hex, (UintPtr) this);
+	}
+
+	~Recording ()
+	{
+//	    logD_ (_func, "0x", fmt_hex, (UintPtr) this);
 	}
     };
 
@@ -92,10 +98,10 @@ private:
       static Sender::Frontend sender_frontend;
 
       static void senderSendStateChanged (Sender::SendState  send_state,
-					  void              *_self);
+					  void              *_recording);
 
       static void senderClosed (Exception *exc_,
-				void      *_self);
+				void      *_recording);
     mt_end
 
     mt_iface (VideoStream::EventHandler)

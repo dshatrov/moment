@@ -39,10 +39,12 @@ AvRecorder::doStop ()
     cur_stream_ticket = NULL;
 
     if (recording) {
+	// Note that muxer->endMuxing() implies recording->sender.closeAfterFlush().
 	if (!muxer->endMuxing ())
 	    logE (recorder, _func, "muxer->endMuxing() failed: ", exc->toString());
 
-	storage->releaseFile (recording->file_key);
+      // The file can't be released at this point, because it is used by
+      // deferred sender. The file is released later in senderClosed().
 
 	recording = NULL;
     }
@@ -50,16 +52,32 @@ AvRecorder::doStop ()
 
 void
 AvRecorder::senderSendStateChanged (Sender::SendState   const send_state,
-				    void              * const _self)
+				    void              * const _recording)
 {
   // TODO
 }
 
 void
 AvRecorder::senderClosed (Exception * const exc_,
-			  void      * const _self)
+			  void      * const _recording)
 {
-  // TODO
+    Recording * const recording = static_cast <Recording*> (_recording);
+
+    if (exc_)
+	logE (recorder, _func, "exception: ", exc_->toString());
+
+    CodeRef const self_ref = recording->weak_av_recorder;
+    if (!self_ref) {
+	return;
+    }
+    AvRecorder * const self = recording->unsafe_av_recorder;
+
+    recording->mutex.lock ();
+    if (recording->file_key) {
+	self->storage->releaseFile (recording->file_key);
+	recording->file_key = NULL;
+    }
+    recording->mutex.unlock ();
 }
 
 VideoStream::EventHandler AvRecorder::stream_handler = {
