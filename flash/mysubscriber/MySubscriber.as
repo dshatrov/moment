@@ -328,12 +328,12 @@ public class MySubscriber extends Sprite
 		reconnect_interval = 2000;
 	}
 
-	/* TEST (uncomment)
+	/* TEST (uncomment) */
 	if (reconnect_timer) {
 	    clearInterval (reconnect_timer);
 	}
 	reconnect_timer = setInterval (reconnectTick, reconnect ? reconnect_interval : 3000);
-	*/
+	/**/
 
 	channel_uri = uri;
 	stream_name = stream_name_;
