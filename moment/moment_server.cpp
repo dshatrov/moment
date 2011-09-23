@@ -289,6 +289,12 @@ MomentServer::getHttpService ()
     return http_service;
 }
 
+HttpService*
+MomentServer::getAdminHttpService ()
+{
+    return admin_http_service;
+}
+
 MConfig::Config* 
 MomentServer::getConfig ()
 {
@@ -585,6 +591,7 @@ Result
 MomentServer::init (ServerApp        * const mt_nonnull server_app,
 		    PagePool         * const mt_nonnull page_pool,
 		    HttpService      * const mt_nonnull http_service,
+		    HttpService      * const mt_nonnull admin_http_service,
 		    MConfig::Config  * const mt_nonnull config,
 		    ServerThreadPool * const mt_nonnull recorder_thread_pool,
 		    Storage          * const mt_nonnull storage)
@@ -592,6 +599,7 @@ MomentServer::init (ServerApp        * const mt_nonnull server_app,
     this->server_app = server_app;
     this->page_pool = page_pool;
     this->http_service = http_service;
+    this->admin_http_service = admin_http_service;
     this->config = config;
     this->recorder_thread_pool = recorder_thread_pool;
     this->storage = storage;
@@ -606,7 +614,9 @@ MomentServer::MomentServer ()
     : server_app (NULL),
       page_pool (NULL),
       http_service (NULL),
-      config (NULL)
+      config (NULL),
+      recorder_thread_pool (NULL),
+      storage (NULL)
 {
     instance = this;
 }

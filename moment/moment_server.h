@@ -209,6 +209,7 @@ private:
     mt_const ServerApp *server_app;
     mt_const PagePool *page_pool;
     mt_const HttpService *http_service;
+    mt_const HttpService *admin_http_service;
     mt_const MConfig::Config *config;
     mt_const ServerThreadPool *recorder_thread_pool;
     mt_const Storage *storage;
@@ -262,6 +263,8 @@ public:
     PagePool* getPagePool ();
 
     HttpService* getHttpService ();
+
+    HttpService* getAdminHttpService ();
 
     MConfig::Config* getConfig ();
 
@@ -340,6 +343,7 @@ public:
     Result init (ServerApp        * mt_nonnull server_app,
 		 PagePool         * mt_nonnull page_pool,
 		 HttpService      * mt_nonnull http_service,
+		 HttpService      * mt_nonnull admin_http_service,
 		 MConfig::Config  * mt_nonnull config,
 		 ServerThreadPool * mt_nonnull recorder_thread_pool,
 		 Storage          * mt_nonnull storage);

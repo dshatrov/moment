@@ -51,6 +51,9 @@ PagePool page_pool (4096 /* page_size */, default__page_pool__min_pages);
 ServerApp server_app (NULL /* coderef_container */);
 HttpService http_service (NULL /* coderef_container */);
 
+HttpService separate_admin_http_service (NULL /* coderef_container */);
+HttpService *admin_http_service_ptr = &separate_admin_http_service;
+
 FixedThreadPool recorder_thread_pool (NULL /* coderef_container */);
 
 LocalStorage storage;
@@ -225,20 +228,21 @@ int main (int argc, char **argv)
 	recorder_thread_pool.setNumThreads (num_file_threads);
     }
 
+    Uint64 http_keepalive_timeout = default__http__keepalive_timeout;
     {
-	Uint64 http_keepalive_timeout = default__http__keepalive_timeout;
-	{
-	    ConstMemory const opt_name ("http/keepalive_timeout");
-	    ConstMemory const http_keepalive_timeout_mem = config.getString (opt_name);
-	    if (http_keepalive_timeout_mem.len()) {
-		if (!strToUint64_safe (http_keepalive_timeout_mem, &http_keepalive_timeout)) {
-		    logE_ (_func, "Bad option value \"", http_keepalive_timeout_mem, "\" "
-			   "for ", opt_name, " (number expected): ", exc->toString());
-		    logE_ (_func, "Using default value of ", http_keepalive_timeout, " for ", opt_name);
-		}
+	ConstMemory const opt_name ("http/keepalive_timeout");
+	ConstMemory const http_keepalive_timeout_mem = config.getString (opt_name);
+	if (http_keepalive_timeout_mem.len()) {
+	    if (!strToUint64_safe (http_keepalive_timeout_mem, &http_keepalive_timeout)) {
+		logE_ (_func, "Bad option value \"", http_keepalive_timeout_mem, "\" "
+		       "for ", opt_name, " (number expected): ", exc->toString());
+		logE_ (_func, "Using default value of ", http_keepalive_timeout, " for ", opt_name);
 	    }
 	}
+    }
 
+    ConstMemory http_bind;
+    {
 	if (!http_service.init (server_app.getMainPollGroup(), server_app.getTimers(), &page_pool, http_keepalive_timeout)) {
 	    logE_ (_func, "http_service.init() failed: ", exc->toString());
 	    return EXIT_FAILURE;
@@ -246,33 +250,81 @@ int main (int argc, char **argv)
 
 	do {
 	    ConstMemory const opt_name = "http/http_bind";
-	    ConstMemory const http_bind = config.getString_default (opt_name, ":8080");
+	    http_bind = config.getString_default (opt_name, ":8080");
 	    logD_ (_func, opt_name, ": ", http_bind);
-	    if (!http_bind.isNull ()) {
-		IpAddress addr;
-		if (!setIpAddress_default (http_bind,
-					   ConstMemory() /* default_host */,
-					   8080          /* default_port */,
-					   true          /* allow_any_host */,
-					   &addr))
-		{
-		    logE_ (_func, "setIpAddress_default() failed (http)");
-		    return EXIT_FAILURE;
-		}
-
-		if (!http_service.bind (addr)) {
-		    logE_ (_func, "http_service.bind() failed: ", exc->toString());
-		    break;
-		}
-
-		if (!http_service.start ()) {
-		    logE_ (_func, "http_service.start() failed: ", exc->toString());
-		    return EXIT_FAILURE;
-		}
-	    } else {
+	    if (http_bind.isNull()) {
 		logI_ (_func, "HTTP service is not bound to any port "
 		       "and won't accept any connections. "
 		       "Set \"", opt_name, "\" option to bind the service.");
+		break;
+	    }
+
+	    IpAddress addr;
+	    if (!setIpAddress_default (http_bind,
+				       ConstMemory() /* default_host */,
+				       8080          /* default_port */,
+				       true          /* allow_any_host */,
+				       &addr))
+	    {
+		logE_ (_func, "setIpAddress_default() failed (http)");
+		return EXIT_FAILURE;
+	    }
+
+	    if (!http_service.bind (addr)) {
+		logE_ (_func, "http_service.bind() failed (http): ", exc->toString());
+		break;
+	    }
+
+	    if (!http_service.start ()) {
+		logE_ (_func, "http_service.start() failed (http): ", exc->toString());
+		return EXIT_FAILURE;
+	    }
+	} while (0);
+    }
+
+    {
+	do {
+	    ConstMemory const opt_name = "http/admin_bind";
+	    ConstMemory const admin_bind = config.getString_default (opt_name, ":8082");
+	    logD_ (_func, opt_name, ": ", admin_bind);
+	    if (admin_bind.isNull()) {
+		logI_ (_func, "HTTP-Admin service is not bound to any port "
+		       "and won't accept any connections. "
+		       "Set \"", opt_name, "\" option to bind the service.");
+		break;
+	    }
+
+	    if (equal (admin_bind, http_bind)) {
+		admin_http_service_ptr = &http_service;
+		break;
+	    }
+
+	    if (!separate_admin_http_service.init (
+			server_app.getMainPollGroup(), server_app.getTimers(), &page_pool, http_keepalive_timeout))
+	    {
+		logE_ (_func, "admin_http_service.init() failed: ", exc->toString());
+		return EXIT_FAILURE;
+	    }
+
+	    IpAddress addr;
+	    if (!setIpAddress_default (admin_bind,
+				       ConstMemory() /* default_host */,
+				       8082          /* default_port */,
+				       true          /* allow_any_host */,
+				       &addr))
+	    {
+		logE_ (_func, "setIpAddress_default() failed (admin)");
+		return EXIT_FAILURE;
+	    }
+
+	    if (!separate_admin_http_service.bind (addr)) {
+		logE_ (_func, "http_service.bind() failed (admin): ", exc->toString());
+		break;
+	    }
+
+	    if (!separate_admin_http_service.start ()) {
+		logE_ (_func, "http_service.start() failed (admin): ", exc->toString());
+		return EXIT_FAILURE;
 	    }
 	} while (0);
     }
@@ -284,7 +336,14 @@ int main (int argc, char **argv)
     }
 
     logD_ (_func, "CREATING MOMENT SERVER");
-    if (!moment_server.init (&server_app, &page_pool, &http_service, &config, &recorder_thread_pool, &storage)) {
+    if (!moment_server.init (&server_app,
+			     &page_pool,
+			     &http_service,
+			     admin_http_service_ptr,
+			     &config,
+			     &recorder_thread_pool,
+			     &storage))
+    {
 	logE_ (_func, "moment_server.init() failed: ", exc->toString());
 	ret_res = EXIT_FAILURE;
 	goto _stop_recorder;
