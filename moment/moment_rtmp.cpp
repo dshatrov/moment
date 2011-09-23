@@ -273,9 +273,12 @@ void streamVideoMessage (VideoStream::VideoMessage * const mt_nonnull msg,
     client_session->rtmp_server.sendVideoMessage (msg);
 }
 
-void streamClosed (void * const /* _session */)
+void streamClosed (void * const _session)
 {
     logD_ (_func_);
+    ClientSession * const client_session = static_cast <ClientSession*> (_session);
+// Unnecessary    destroyClientSession (client_session);
+    client_session->rtmp_conn->closeAfterFlush ();
 }
 
 VideoStream::EventHandler /* TODO Allow consts in Informer_ */ /* const */ video_event_handler = {
@@ -486,6 +489,7 @@ void sendStateChanged (Sender::SendState   const send_state,
 	case Sender::QueueHardLimit:
 	    logD (framedrop, _func, "QueueHardLimit");
 	    destroyClientSession (client_session);
+	    // FIXME Close client connection
 	    break;
 	default:
 	    unreachable();
