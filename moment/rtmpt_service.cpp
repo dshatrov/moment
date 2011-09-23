@@ -94,6 +94,7 @@ RtmptService::acceptOneConnection ()
 
     conn_data->mutex.lock ();
     PollGroup::PollableKey const pollable_key = poll_group->addPollable (tcp_conn->getPollable(), NULL /* ret_reg */);
+    conn_data->pollable_key = pollable_key;
     if (!pollable_key) {
 	conn_data->mutex.unlock ();
 	// TODO FIXME Remove the connection from rtmpt_server.
