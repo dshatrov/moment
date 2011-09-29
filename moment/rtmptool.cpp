@@ -503,7 +503,7 @@ printUsage ()
 		 "  -s --server-addr <address>     Server address, IP:PORT (default: localhost:1935)\n"
 		 "  -a --app <string>              Application name (default: oflaDemo)\n"
 		 "  -c --channel <string>          Name of the channel to subscribe to (default: red5StreamDemo)\n"
-		 "  -r --num-threads <number>      Number of threads to spawn (default: 0, use a single thread)\n"
+		 "  -t --num-threads <number>      Number of threads to spawn (default: 0, use a single thread)\n"
 		 "  -r --report-interval <number>  Interval between video frame reports (default: 0, no reports)\n"
 		 "  --nonfatal-errors              Do not exit on the first error.\n"
 		 "  -h --help                      Show this help message.\n"
@@ -596,7 +596,7 @@ bool cmdline_num_threads (char const * /* short_name */,
  	logE_ (_func, "Invalid value \"", value, "\" "
 	       "for --num-threads (number expected): ", exc->toString());
 	exit (EXIT_FAILURE);
-   }
+    }
     return true;
 }
 
