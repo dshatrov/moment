@@ -28,7 +28,7 @@ namespace {
 LogGroup libMary_logGroup_recorder ("av_recorder", LogLevel::I);
 }
 
-Sender::Frontend AvRecorder::sender_frontend {
+Sender::Frontend AvRecorder::sender_frontend = {
     senderSendStateChanged,
     senderClosed
 };
@@ -54,7 +54,9 @@ void
 AvRecorder::senderSendStateChanged (Sender::SendState   const send_state,
 				    void              * const _recording)
 {
-  // TODO
+  // TODO Start dropping frames when destination is overloaded.
+  //      This doesn't matter for local files, because local write operations
+  //      always block till completion.
 }
 
 void
@@ -155,6 +157,7 @@ AvRecorder::start (ConstMemory const filename)
     mutex.lock ();
 
     if (recording) {
+      // TODO Stop current recording and start a new one.
 	logW (recorder, _func, "Already recording");
 	mutex.unlock ();
 	return;
