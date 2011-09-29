@@ -111,14 +111,11 @@ private:
 	RtmptSender rtmpt_sender;
 	RtmpConnection rtmp_conn;
 
-	RtmptSession (RtmptServer * const rtmpt_server,
-		      Timers      * const timers,
-		      PagePool    * const page_pool)
-	    : weak_rtmpt_server (rtmpt_server),
-	      unsafe_rtmpt_server (rtmpt_server),
-	      rtmp_conn (this /* coderef_containter */, timers, page_pool)
-	{
-	}
+	RtmptSession (RtmptServer *rtmpt_server,
+		      Timers      *timers,
+		      PagePool    *page_pool);
+
+	~RtmptSession ();
     };
 
     typedef RtmptSession::SessionMap_ SessionMap;

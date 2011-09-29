@@ -61,7 +61,7 @@ using namespace M;
 namespace Moment {
 
 namespace {
-LogGroup libMary_logGroup_rtmpt ("rtmpt", LogLevel::N);
+LogGroup libMary_logGroup_rtmpt ("rtmpt", LogLevel::I);
 }
 
 RtmpConnection::Backend const RtmptServer::rtmp_conn_backend = {
@@ -212,6 +212,22 @@ RtmptServer::RtmptSender::~RtmptSender ()
     sender_mutex.unlock ();
 }
 
+
+RtmptServer::RtmptSession::RtmptSession (RtmptServer * const rtmpt_server,
+					 Timers      * const timers,
+					 PagePool    * const page_pool)
+    : weak_rtmpt_server (rtmpt_server),
+      unsafe_rtmpt_server (rtmpt_server),
+      rtmp_conn (this /* coderef_containter */, timers, page_pool)
+{
+//    logD_ (_func, "0x", fmt_hex, (UintPtr) this);
+}
+
+RtmptServer::RtmptSession::~RtmptSession ()
+{
+//    logD_ (_func, "0x", fmt_hex, (UintPtr) this);
+}
+
 mt_rev (11.06.18)
 mt_mutex (mutex) void
 RtmptServer::destroyRtmptSession (RtmptSession * const mt_nonnull session)
@@ -265,6 +281,7 @@ RtmptServer::sendDataInReply (RtmptConnection * const mt_nonnull rtmpt_conn,
     RTMPT_SERVER__HEADERS_DATE
     rtmpt_conn->conn_sender.send (
 	    page_pool,
+	    false /* do_flush */,
 	    RTMPT_SERVER__FCS_OK_HEADERS
 	    "Content-Length: ", 1 /* idle interval */ + session->rtmpt_sender.pending_data_len, "\r\n"
 	    "\r\n",
@@ -319,6 +336,9 @@ mt_mutex (mutex) void
 RtmptServer::doSend (RtmptConnection * const rtmpt_conn,
 		     Uint32            const session_id)
 {
+//    logD_ (_func, "rtmpt_conn 0x", fmt_hex, (UintPtr) rtmpt_conn, ", "
+//	   "session_id: ", fmt_def, session_id);
+
     SessionMap::Entry session_entry = session_map.lookup (session_id);
     if (session_entry.isNull()) {
 	RTMPT_SERVER__HEADERS_DATE
@@ -457,8 +477,8 @@ RtmptServer::httpMessageBody (HttpRequest * const mt_nonnull /* req */,
     }
     RtmptServer * const self = rtmpt_conn->unsafe_rtmpt_server;
 
-    logW (rtmpt, _func);
-    if (logLevelOn (rtmpt, LogLevel::W))
+    logD (rtmpt, _func);
+    if (logLevelOn (rtmpt, LogLevel::D))
 	hexdump (logs, mem);
 
     self->mutex.lock ();
@@ -466,6 +486,7 @@ RtmptServer::httpMessageBody (HttpRequest * const mt_nonnull /* req */,
     if (!rtmpt_conn->cur_req_session) {
 	self->mutex.unlock ();
 	*ret_accepted = mem.len();
+//	logD_ (_func, "!cur_req_session");
 	return;
     }
 
@@ -505,6 +526,8 @@ RtmptServer::httpMessageBody (HttpRequest * const mt_nonnull /* req */,
     self->mutex.unlock ();
 
     *ret_accepted = accepted;
+
+//    logD_ (_func, "done");
 }
 
 mt_rev (11.06.18)
@@ -565,7 +588,7 @@ RtmptServer::addConnection (Connection              * const mt_nonnull conn,
     conn_list.append (rtmpt_conn);
     mutex.unlock ();
 
-    logD_ (_func, "new rtmpt_conn refcount: ", rtmpt_conn->getRefCount());
+//    logD_ (_func, "new rtmpt_conn refcount: ", rtmpt_conn->getRefCount());
 }
 
 mt_rev (11.06.18)
