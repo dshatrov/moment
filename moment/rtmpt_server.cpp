@@ -292,10 +292,14 @@ RtmptServer::sendDataInReply (RtmptConnection * const mt_nonnull rtmpt_conn,
     session->rtmpt_sender.sendPendingData (&rtmpt_conn->conn_sender);
     rtmpt_conn->conn_sender.flush ();
 
+    bool destroy_session = false;
     if (session->rtmpt_sender.close_after_flush)
-	destroyRtmptSession (session);
+	destroy_session = true;
 
     session->rtmpt_sender.sender_mutex.unlock ();
+
+    if (destroy_session)
+	destroyRtmptSession (session);
 }
 
 mt_rev (11.06.18)
