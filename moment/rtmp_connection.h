@@ -166,6 +166,7 @@ public:
 	operator Value () const { return value; }
 	RtmpMessageType (Value const value) : value (value) {}
 	RtmpMessageType () {}
+	Size toString_ (Memory const &mem, Format const &fmt);
     private:
 	Value value;
     };
@@ -283,6 +284,8 @@ private:
 
     mt_mutex (send_mutex) Size out_got_first_timestamp;
     mt_mutex (send_mutex) Uint32 out_first_timestamp;
+
+    mt_mutex (send_mutex) Time out_last_flush_time;
 
     bool extended_timestamp_is_delta;
     bool ignore_extended_timestamp;

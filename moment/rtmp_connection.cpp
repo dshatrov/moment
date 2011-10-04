@@ -37,6 +37,7 @@ LogGroup libMary_logGroup_time      ("rtmp_time",       LogLevel::I);
 LogGroup libMary_logGroup_close     ("rtmp_conn_close", LogLevel::N);
 LogGroup libMary_logGroup_proto_in  ("rtmp_proto_in",   LogLevel::I);
 LogGroup libMary_logGroup_proto_out ("rtmp_proto_out",  LogLevel::I);
+LogGroup libMary_logGroup_flush     ("rtmp_flush",      LogLevel::I);
 }
 
 Sender::Frontend const RtmpConnection::sender_frontend = {
@@ -49,6 +50,47 @@ Receiver::Frontend const RtmpConnection::receiver_frontend = {
     processEof,
     processError
 };
+
+Size
+RtmpConnection::RtmpMessageType::toString_ (Memory const &mem,
+					    Format const & /* fmt */)
+{
+    switch (value) {
+	case SetChunkSize:
+	    return toString (mem, "SetChunkSize");
+	case Abort:
+	    return toString (mem, "Abort");
+	case Ack:
+	    return toString (mem, "Ack");
+	case UserControl:
+	    return toString (mem, "UserControl");
+	case WindowAckSize:
+	    return toString (mem, "WindowAckSize");
+	case SetPeerBandwidth:
+	    return toString (mem, "SetPeerBandwidth");
+	case AudioMessage:
+	    return toString (mem, "AudioMessage");
+	case VideoMessage:
+	    return toString (mem, "VideoMessage");
+	case Data_AMF3:
+	    return toString (mem, "Data_AMF3");
+	case Data_AMF0:
+	    return toString (mem, "Data_AMF0");
+	case SharedObject_AMF3:
+	    return toString (mem, "SharedObject_AMF3");
+	case SharedObject_AMF0:
+	    return toString (mem, "SharedObject_AMF0");
+	case Command_AMF3:
+	    return toString (mem, "Command_AMF3");
+	case Command_AMF0:
+	    return toString (mem, "Command_AMF0");
+	case Aggregate:
+	    return toString (mem, "Aggregate");
+    }
+
+    unreachable ();
+    return 0;
+}
 
 mt_one_of(( mt_const, mt_sync_domain (receiver) ))
 RtmpConnection::ChunkStream*
@@ -326,7 +368,8 @@ RtmpConnection::fillMessageHeader (MessageDesc const * const mt_nonnull mdesc,
 
 	    header_buf [offs + 6] = RtmpMessageType::Data_AMF0;
 
-	    chunk_stream->out_msg_type_id = RtmpMessageType::AudioMessage;
+// Wrong? Why change out_msg_type_id?
+//	    chunk_stream->out_msg_type_id = RtmpMessageType::AudioMessage;
 	    chunk_stream->out_msg_timestamp_delta = 0;
 	}
 
@@ -558,7 +601,35 @@ RtmpConnection::sendMessagePages (MessageDesc const      * const mt_nonnull mdes
 	out_chunk_size = prechunk_size;
     }
 
-    sender->sendMessage (msg_pages, true /* do_flush */);
+    bool do_flush = true;
+    {
+	Time const cur_time = getTimeMilliseconds();
+	if (mdesc->msg_type_id == RtmpMessageType::AudioMessage ||
+	    mdesc->msg_type_id == RtmpMessageType::VideoMessage)
+	{
+//	    logD (flush, _func, "A/V message");
+
+	    // TODO Config parameter for max_send_delay.
+	    Time const max_send_delay = 0; // milliseconds
+
+//	    logD (flush, _func, "cur_time: ", cur_time, ", out_last_flush_time: ", out_last_flush_time);
+	    if (cur_time >= out_last_flush_time
+		&& cur_time - out_last_flush_time < max_send_delay)
+	    {
+		logD (flush, _func, "cs 0x", fmt_hex, (UintPtr) chunk_stream, ": Delaying flush, ts 0x", fmt_hex, timestamp);
+		do_flush = false;
+	    }
+	} else {
+	    logD (flush, _func, "Not an A/V message: ", mdesc->msg_type_id);
+	}
+
+	if (do_flush) {
+	    logD (flush, _func, "cs 0x", fmt_hex, (UintPtr) chunk_stream, ": Flushing, ts 0x", fmt_hex, timestamp);
+	    out_last_flush_time = cur_time;
+	}
+    }
+
+    sender->sendMessage (msg_pages, do_flush);
 
     if (!unlocked)
 	send_mutex.unlock ();
@@ -2472,6 +2543,8 @@ RtmpConnection::RtmpConnection (Object     * const coderef_container,
       out_got_first_timestamp (false),
       out_first_timestamp (0),
 
+      out_last_flush_time (0),
+
       extended_timestamp_is_delta (false),
       ignore_extended_timestamp (false),
 
@@ -2518,6 +2591,8 @@ RtmpConnection::RtmpConnection (Object * const coderef_container)
 
       out_got_first_timestamp (false),
       out_first_timestamp (0),
+
+      out_last_flush_time (0),
 
       extended_timestamp_is_delta (false),
       ignore_extended_timestamp (false),
