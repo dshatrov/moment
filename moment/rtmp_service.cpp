@@ -129,8 +129,8 @@ RtmpService::acceptOneConnection ()
     }
 
     session_list.append (session);
-    mutex.unlock ();
     session->ref ();
+    mutex.unlock ();
   // The session is fully initialized and should be destroyed with
   // destroySession() when necessary.
 
