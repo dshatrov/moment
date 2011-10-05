@@ -17,6 +17,10 @@
 */
 
 
+#include <libmary/types.h>
+#include <unistd.h>
+#include <errno.h>
+
 #include <moment/libmoment.h>
 
 #include <mycpp/mycpp.h>
@@ -30,11 +34,13 @@ namespace {
 
 struct Options {
     bool help;
+    bool daemonize;
     Ref<String> config_filename;
     Uint64 exit_after;
 
     Options ()
 	: help (false),
+	  daemonize (false),
 	  exit_after ((Uint64) -1)
     {
     }
@@ -69,6 +75,7 @@ printUsage ()
     outs->print ("Usage: moment [options]\n"
 		  "Options:\n"
 		  "  -c --config <config_file>  Configuration file to use (default: /opt/moment/moment.conf)\n"
+		  "  -d --daemonize             Daemonize (run in the background as a daemon).\n"
 		  "  --exit-after <number>      Exit after specified timeout in seconds.\n"
 		  "  -h --help                  Show this help message.\n");
     outs->flush ();
@@ -82,6 +89,17 @@ cmdline_help (char const * /* short_name */,
 	      void       * /* cb_data */)
 {
     options.help = true;
+    return true;
+}
+
+static bool
+cmdline_daemonize (char const * /* short_name */,
+		   char const * /* long_name */,
+		   char const * /* value */,
+		   void       * /* opt_data */,
+		   void       * /* cb_data */)
+{
+    options.daemonize = true;
     return true;
 }
 
@@ -134,7 +152,7 @@ int main (int argc, char **argv)
     libMaryInit ();
 
     {
-	unsigned const num_opts = 3;
+	unsigned const num_opts = 4;
 	MyCpp::CmdlineOption opts [num_opts];
 
 	opts [0].short_name = "h";
@@ -143,17 +161,23 @@ int main (int argc, char **argv)
 	opts [0].opt_data   = NULL;
 	opts [0].opt_callback = cmdline_help;
 
-	opts [1].short_name = "c";
-	opts [1].long_name  = "config";
-	opts [1].with_value = true;
+	opts [1].short_name = "d";
+	opts [1].long_name  = "daemonize";
+	opts [1].with_value = false;
 	opts [1].opt_data   = NULL;
-	opts [1].opt_callback = cmdline_config;
+	opts [1].opt_callback = cmdline_daemonize;
 
-	opts [2].short_name = NULL;
-	opts [2].long_name = "exit-after";
+	opts [2].short_name = "c";
+	opts [2].long_name  = "config";
 	opts [2].with_value = true;
-	opts [2].opt_data = NULL;
-	opts [2].opt_callback = cmdline_exit_after;
+	opts [2].opt_data   = NULL;
+	opts [2].opt_callback = cmdline_config;
+
+	opts [3].short_name = NULL;
+	opts [3].long_name = "exit-after";
+	opts [3].with_value = true;
+	opts [3].opt_data = NULL;
+	opts [3].opt_callback = cmdline_exit_after;
 
 	MyCpp::ArrayIterator<MyCpp::CmdlineOption> opts_iter (opts, num_opts);
 	MyCpp::parseCmdline (&argc, &argv, opts_iter, NULL /* callback */, NULL /* callbackData */);
@@ -162,6 +186,18 @@ int main (int argc, char **argv)
     if (options.help) {
 	printUsage ();
 	return 0;
+    }
+
+  // TODO Open log file
+
+    if (options.daemonize) {
+	logD_ (_func, "Daemonizing. Server log is at /var/log/moment.log");
+	int const res = daemon (1 /* nochdir */, 0 /* noclose */);
+	if (res == -1)
+	    logD_ (_func, "daemon() failed: ", errnoString (errno));
+	else
+	if (res != 0)
+	    logD_ (_func, "Unexpected return value from daemon(): ", res);
     }
 
     {
