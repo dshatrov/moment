@@ -36,6 +36,7 @@ struct Options {
     bool help;
     bool daemonize;
     Ref<String> config_filename;
+    Ref<String> log_filename;
     Uint64 exit_after;
 
     Options ()
@@ -75,6 +76,7 @@ printUsage ()
     outs->print ("Usage: moment [options]\n"
 		  "Options:\n"
 		  "  -c --config <config_file>  Configuration file to use (default: /opt/moment/moment.conf)\n"
+		  "  -l --log <log_file>        Log file to use (default: /var/log/moment.log)\n"
 		  "  -d --daemonize             Daemonize (run in the background as a daemon).\n"
 		  "  --exit-after <number>      Exit after specified timeout in seconds.\n"
 		  "  -h --help                  Show this help message.\n");
@@ -111,6 +113,17 @@ cmdline_config (char const * /* short_name */,
 		void       * /* cb_data */)
 {
     options.config_filename = grab (new String (value));
+    return true;
+}
+
+static bool
+cmdline_log (char const * /* short_name */,
+	     char const * /* long_name */,
+	     char const *value,
+	     void       * /* opt_data */,
+	     void       * /* cb_data */)
+{
+    options.log_filename = grab (new String (value));
     return true;
 }
 
@@ -152,7 +165,7 @@ int main (int argc, char **argv)
     libMaryInit ();
 
     {
-	unsigned const num_opts = 4;
+	unsigned const num_opts = 5;
 	MyCpp::CmdlineOption opts [num_opts];
 
 	opts [0].short_name = "h";
@@ -173,11 +186,17 @@ int main (int argc, char **argv)
 	opts [2].opt_data   = NULL;
 	opts [2].opt_callback = cmdline_config;
 
-	opts [3].short_name = NULL;
-	opts [3].long_name = "exit-after";
+	opts [3].short_name = "l";
+	opts [3].long_name  = "log";
 	opts [3].with_value = true;
-	opts [3].opt_data = NULL;
-	opts [3].opt_callback = cmdline_exit_after;
+	opts [3].opt_data   = NULL;
+	opts [3].opt_callback = cmdline_log;
+
+	opts [4].short_name = NULL;
+	opts [4].long_name = "exit-after";
+	opts [4].with_value = true;
+	opts [4].opt_data = NULL;
+	opts [4].opt_callback = cmdline_exit_after;
 
 	MyCpp::ArrayIterator<MyCpp::CmdlineOption> opts_iter (opts, num_opts);
 	MyCpp::parseCmdline (&argc, &argv, opts_iter, NULL /* callback */, NULL /* callbackData */);
@@ -209,6 +228,29 @@ int main (int argc, char **argv)
 	    return Result::Failure;
 	}
     }
+
+    {
+	ConstMemory const log_filename = options.log_filename ?
+						 options.log_filename->mem() :
+						 ConstMemory ("/var/log/moment.log");
+	// We never deallocate 'log_file' after log file is opened successfully.
+	NativeFile * const log_file = new NativeFile ();
+	assert (log_file);
+	if (!log_file->open (log_filename,
+			     File::OpenFlags::Create | File::OpenFlags::Append,
+			     File::AccessMode::WriteOnly))
+	{
+	    logE_ (_func, "Could not open log file \"", log_filename, "\": ", exc->toString());
+	    delete log_file;
+	} else {
+	    logI_ (_func, "Log file is at ", log_filename);
+	    // We never deallocate 'logs'
+	    delete logs;
+	    logs = new BufferedOutputStream (log_file, 4096);
+	    assert (logs);
+	}
+    }
+
     config.dump (logs);
 
     if (!server_app.init ()) {
