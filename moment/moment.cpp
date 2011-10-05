@@ -37,11 +37,13 @@ struct Options {
     bool daemonize;
     Ref<String> config_filename;
     Ref<String> log_filename;
+    LogLevel loglevel;
     Uint64 exit_after;
 
     Options ()
 	: help (false),
 	  daemonize (false),
+	  loglevel (LogLevel::Info),
 	  exit_after ((Uint64) -1)
     {
     }
@@ -77,6 +79,7 @@ printUsage ()
 		  "Options:\n"
 		  "  -c --config <config_file>  Configuration file to use (default: /opt/moment/moment.conf)\n"
 		  "  -l --log <log_file>        Log file to use (default: /var/log/moment.log)\n"
+		  "  --loglevel <loglevel>      Loglevel, one of A/D/I/W/E/H/F/N (default: I, \"Info\")\n"
 		  "  -d --daemonize             Daemonize (run in the background as a daemon).\n"
 		  "  --exit-after <number>      Exit after specified timeout in seconds.\n"
 		  "  -h --help                  Show this help message.\n");
@@ -128,6 +131,22 @@ cmdline_log (char const * /* short_name */,
 }
 
 static bool
+cmdline_loglevel (char const * /* short_name */,
+		  char const * /* long_name */,
+		  char const *value,
+		  void       * /* opt_data */,
+		  void       * /* cb_data */)
+{
+    ConstMemory const value_mem = ConstMemory (value, value ? strlen (value) : 0);
+    if (!LogLevel::fromString (value_mem, &options.loglevel)) {
+	logE_ (_func, "Invalid loglevel name \"", value_mem, "\", using \"Info\"");
+	options.loglevel = LogLevel::Info;
+    }
+
+    return true;
+}
+
+static bool
 cmdline_exit_after (char const * /* short_nmae */,
 		    char const * /* long_name */,
 		    char const *value,
@@ -165,7 +184,7 @@ int main (int argc, char **argv)
     libMaryInit ();
 
     {
-	unsigned const num_opts = 5;
+	unsigned const num_opts = 6;
 	MyCpp::CmdlineOption opts [num_opts];
 
 	opts [0].short_name = "h";
@@ -192,11 +211,17 @@ int main (int argc, char **argv)
 	opts [3].opt_data   = NULL;
 	opts [3].opt_callback = cmdline_log;
 
-	opts [4].short_name = NULL;
-	opts [4].long_name = "exit-after";
+	opts [4].short_name = "NULL";
+	opts [4].long_name = "loglevel";
 	opts [4].with_value = true;
 	opts [4].opt_data = NULL;
-	opts [4].opt_callback = cmdline_exit_after;
+	opts [4].opt_callback = cmdline_loglevel;
+
+	opts [5].short_name = NULL;
+	opts [5].long_name = "exit-after";
+	opts [5].with_value = true;
+	opts [5].opt_data = NULL;
+	opts [5].opt_callback = cmdline_exit_after;
 
 	MyCpp::ArrayIterator<MyCpp::CmdlineOption> opts_iter (opts, num_opts);
 	MyCpp::parseCmdline (&argc, &argv, opts_iter, NULL /* callback */, NULL /* callbackData */);
@@ -207,16 +232,17 @@ int main (int argc, char **argv)
 	return 0;
     }
 
-  // TODO Open log file
+// Unnecessary   getDefaultLogGroup()->setLogLevel (options.loglevel);
+    setGlobalLogLevel (options.loglevel);
 
     if (options.daemonize) {
-	logD_ (_func, "Daemonizing. Server log is at /var/log/moment.log");
+	logI_ (_func, "Daemonizing. Server log is at /var/log/moment.log");
 	int const res = daemon (1 /* nochdir */, 0 /* noclose */);
 	if (res == -1)
-	    logD_ (_func, "daemon() failed: ", errnoString (errno));
+	    logE_ (_func, "daemon() failed: ", errnoString (errno));
 	else
 	if (res != 0)
-	    logD_ (_func, "Unexpected return value from daemon(): ", res);
+	    logE_ (_func, "Unexpected return value from daemon(): ", res);
     }
 
     {
