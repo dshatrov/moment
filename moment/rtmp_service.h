@@ -57,7 +57,6 @@ private:
 #endif
 	ConnectionReceiver conn_receiver;
 	RtmpConnection rtmp_conn;
-	DeferredProcessor::Registration deferred_reg;
 
 	mt_mutex (RtmpService::mutex) PollGroup::PollableKey pollable_key;
 
