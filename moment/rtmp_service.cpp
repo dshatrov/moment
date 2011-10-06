@@ -68,8 +68,9 @@ RtmpService::acceptOneConnection ()
 
     ServerThreadContext * const thread_ctx = server_ctx->selectThreadContext();
 
-    Ref<ClientSession> const session = grab (new ClientSession (thread_ctx->getTimers(), page_pool));
+    Ref<ClientSession> const session = grab (new ClientSession);
     session->thread_ctx = thread_ctx;
+    session->rtmp_conn.init (thread_ctx->getTimers(), page_pool, send_delay);
 
 // TEST
 //    session->traceReferences ();

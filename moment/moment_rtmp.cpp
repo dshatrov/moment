@@ -33,7 +33,7 @@ namespace {
 
 namespace {
 LogGroup libMary_logGroup_mod_rtmp ("mod_rtmp", LogLevel::E);
-LogGroup libMary_logGroup_framedrop ("mod_rtmp_framedrop", LogLevel::N);
+LogGroup libMary_logGroup_framedrop ("mod_rtmp_framedrop", LogLevel::D);
 }
 
 RtmpService rtmp_service (NULL);
@@ -561,6 +561,19 @@ void momentRtmpInit ()
 	    logI_ (_func, "Unrestricted RTMP access module is not enabled. "
 		   "Set \"", opt_name, "\" option to \"y\" to enable.");
 	    return;
+	}
+    }
+
+    {
+	ConstMemory const opt_name = "mod_rtmp/send_delay";
+	Uint64 send_delay_val = 0;
+	MConfig::GetResult const res = config->getUint64_default (
+		opt_name, &send_delay_val, send_delay_val);
+	if (!res) {
+	    logE_ (_func, "bad value for ", opt_name);
+	} else {
+	    logI_ (_func, "RTMP send delay: ", send_delay_val, " milliseconds");
+	    rtmp_service.setSendDelay (send_delay_val);
 	}
     }
 

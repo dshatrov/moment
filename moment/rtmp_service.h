@@ -60,13 +60,12 @@ private:
 
 	mt_mutex (RtmpService::mutex) PollGroup::PollableKey pollable_key;
 
-	ClientSession (Timers   * const timers,
-		       PagePool * const page_pool)
+	ClientSession ()
 	    : thread_ctx    (NULL),
 	      tcp_conn      (this /* coderef_container */),
 	      conn_sender   (this /* coderef_container */),
 	      conn_receiver (this /* coderef_container */, &tcp_conn),
-	      rtmp_conn     (this /* coderef_container */, timers, page_pool)
+	      rtmp_conn     (this /* coderef_container */)
 	{
 	}
 
@@ -77,6 +76,7 @@ private:
 
     mt_const ServerContext *server_ctx;
     mt_const PagePool *page_pool;
+    mt_const Time send_delay;
 
     TcpServer tcp_server;
 
@@ -121,10 +121,16 @@ public:
 	this->page_pool = page_pool;
     }
 
+    void setSendDelay (Time const send_delay)
+    {
+	this->send_delay = send_delay;
+    }
+
     RtmpService (Object * const coderef_container)
 	: DependentCodeReferenced (coderef_container),
 	  server_ctx (NULL),
 	  page_pool (NULL),
+	  send_delay (0),
 	  tcp_server (coderef_container)
     {
     }
