@@ -32,7 +32,7 @@ namespace {
 LogGroup libMary_logGroup_chunk     ("rtmp_chunk",      LogLevel::N);
 LogGroup libMary_logGroup_msg       ("rtmp_msg",        LogLevel::N);
 LogGroup libMary_logGroup_codec     ("rtmp_codec",      LogLevel::N);
-LogGroup libMary_logGroup_send      ("rtmp_send",       LogLevel::N);
+LogGroup libMary_logGroup_send      ("rtmp_send",       LogLevel::I);
 LogGroup libMary_logGroup_time      ("rtmp_time",       LogLevel::I);
 LogGroup libMary_logGroup_close     ("rtmp_conn_close", LogLevel::N);
 LogGroup libMary_logGroup_proto_in  ("rtmp_proto_in",   LogLevel::I);
@@ -609,12 +609,9 @@ RtmpConnection::sendMessagePages (MessageDesc const      * const mt_nonnull mdes
 	{
 //	    logD (flush, _func, "A/V message");
 
-	    // TODO Config parameter for max_send_delay.
-	    Time const max_send_delay = 0; // milliseconds
-
 //	    logD (flush, _func, "cur_time: ", cur_time, ", out_last_flush_time: ", out_last_flush_time);
 	    if (cur_time >= out_last_flush_time
-		&& cur_time - out_last_flush_time < max_send_delay)
+		&& cur_time - out_last_flush_time < send_delay)
 	    {
 		logD (flush, _func, "cs 0x", fmt_hex, (UintPtr) chunk_stream, ": Delaying flush, ts 0x", fmt_hex, timestamp);
 		do_flush = false;
@@ -2534,6 +2531,7 @@ RtmpConnection::RtmpConnection (Object     * const coderef_container,
       sender (NULL),
 
       prechunking_enabled (true),
+      send_delay (0),
 
       ping_send_timer (NULL),
 
@@ -2567,11 +2565,13 @@ RtmpConnection::RtmpConnection (Object     * const coderef_container,
 }
 
 mt_const void
-RtmpConnection::init (Timers     * mt_nonnull const timers,
-		      PagePool   * mt_nonnull const page_pool)
+RtmpConnection::init (Timers     * const mt_nonnull timers,
+		      PagePool   * const mt_nonnull page_pool,
+		      Time         const send_delay)
 {
     this->timers = timers;
     this->page_pool = page_pool;
+    this->send_delay = send_delay;
 }
 
 RtmpConnection::RtmpConnection (Object * const coderef_container)
@@ -2583,6 +2583,7 @@ RtmpConnection::RtmpConnection (Object * const coderef_container)
       sender (NULL),
 
       prechunking_enabled (true),
+      send_delay (0),
 
       ping_send_timer (NULL),
 

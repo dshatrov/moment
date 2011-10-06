@@ -265,21 +265,22 @@ public:
     };
 
 private:
-    Timers *timers;
-    PagePool *page_pool;
+    mt_const Timers *timers;
+    mt_const PagePool *page_pool;
 
-    Sender *sender;
+    mt_const Sender *sender;
 
     // Prechunking is always enabled currently.
-    bool prechunking_enabled;
+    mt_const bool prechunking_enabled;
+    mt_const Time send_delay;
 
-    Cb<Frontend> frontend;
-    Cb<Backend> backend;
+    mt_const Cb<Frontend> frontend;
+    mt_const Cb<Backend> backend;
 
     mt_mutex (in_destr_mutex) Timers::TimerKey ping_send_timer;
     AtomicInt ping_reply_received;
 
-    Size in_chunk_size;
+    mt_sync_domain (receiver) Size in_chunk_size;
     mt_mutex (send_mutex) Size out_chunk_size;
 
     mt_mutex (send_mutex) Size out_got_first_timestamp;
@@ -287,10 +288,11 @@ private:
 
     mt_mutex (send_mutex) Time out_last_flush_time;
 
-    bool extended_timestamp_is_delta;
-    bool ignore_extended_timestamp;
+    mt_sync_domain (receiver) bool extended_timestamp_is_delta;
+    mt_sync_domain (receiver) bool ignore_extended_timestamp;
 
-    bool processing_input;
+    mt_sync_domain (receiver) bool processing_input;
+    // TODO Unused (never set to 'true'). Support input blocking.
     bool block_input;
 
     typedef AvlTree< Ref<ChunkStream>,
@@ -304,20 +306,25 @@ private:
 
   // Receiving state
 
-    Uint32 remote_wack_size;
+    mt_sync_domain (receiver)
+    mt_begin
 
-    Size total_received;
-    Size last_ack;
+      Uint32 remote_wack_size;
 
-    Uint16 cs_id;
-    CsIdFormat cs_id__fmt;
-    Size chunk_offset;
+      Size total_received;
+      Size last_ack;
 
-    ChunkStream *recv_chunk_stream;
+      Uint16 cs_id;
+      CsIdFormat cs_id__fmt;
+      Size chunk_offset;
 
-    Byte fmt;
+      ChunkStream *recv_chunk_stream;
 
-    ReceiveState conn_state;
+      Byte fmt;
+
+      ReceiveState conn_state;
+
+    mt_end
 
     // Protects part of receiving state which may be accessed from
     // ~RtmpConnection() destructor.
@@ -581,7 +588,8 @@ public:
 		    PagePool * mt_nonnull page_pool);
 
     mt_const void init (Timers   * mt_nonnull timers,
-			PagePool * mt_nonnull page_pool);
+			PagePool * mt_nonnull page_pool,
+			Time      send_delay_millisec = 0);
 
     RtmpConnection (Object *coderef_container);
 
