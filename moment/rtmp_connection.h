@@ -597,11 +597,14 @@ public:
 
   // Utility functions
 
-    static Size normalizePrechunkedData (PagePool::PageListHead * mt_nonnull page_list,
-					 Size                    msg_offs,
-					 Size                    prechunk_size,
-					 PagePool               * mt_nonnull page_pool,
-					 PagePool::PageListHead * mt_nonnull ret_page_list);
+    static Size normalizePrechunkedData (PagePool                *msg_page_pool,
+					 PagePool::PageListHead  * mt_nonnull page_list,
+					 Size                     msg_offs,
+					 Size                     prechunk_size,
+					 PagePool                * mt_nonnull page_pool,
+					 PagePool               ** mt_nonnull ret_page_pool,
+					 PagePool::PageListHead  * mt_nonnull ret_page_list,
+					 Size                    * mt_nonnull ret_msg_offs);
 };
 
 }

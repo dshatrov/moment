@@ -130,15 +130,20 @@ FlvMuxer::doMuxMessage (VideoStream::Message * const mt_nonnull msg,
 
 	    msg->page_pool->msgRef (msg->page_list.first);
 	} else {
-	    PagePool::PageListHead page_list;
-	    RtmpConnection::normalizePrechunkedData (&msg->page_list,
+	    PagePool *norm_page_pool;
+	    PagePool::PageListHead norm_page_list;
+	    Size norm_msg_offs;
+	    RtmpConnection::normalizePrechunkedData (msg->page_pool,
+						     &msg->page_list,
 						     msg->msg_offset,
 						     msg->prechunk_size,
 						     page_pool,
-						     &page_list);
-	    msg_pages->page_pool = page_pool;
-	    msg_pages->first_page = page_list.first;
-	    msg_pages->msg_offset = 0;
+						     &norm_page_pool,
+						     &norm_page_list,
+						     &norm_msg_offs);
+	    msg_pages->page_pool = norm_page_pool;
+	    msg_pages->first_page = norm_page_list.first;
+	    msg_pages->msg_offset = norm_msg_offs;
 	}
 
 	sender->sendMessage (msg_pages, false /* do_flush */);

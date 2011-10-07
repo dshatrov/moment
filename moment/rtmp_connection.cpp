@@ -2635,13 +2635,38 @@ RtmpConnection::~RtmpConnection ()
 }
 
 Size
-RtmpConnection::normalizePrechunkedData (PagePool::PageListHead * const mt_nonnull page_list,
-					 Size                     const msg_offs,
-					 Size                     const prechunk_size,
-					 PagePool               * const mt_nonnull page_pool,
-					 PagePool::PageListHead * const mt_nonnull ret_page_list)
+RtmpConnection::normalizePrechunkedData (PagePool                * const msg_page_pool,
+					 PagePool::PageListHead  * const mt_nonnull page_list,
+					 Size                      const msg_offs,
+					 Size                      const prechunk_size,
+					 PagePool                * const mt_nonnull page_pool,
+					 PagePool               ** const mt_nonnull ret_page_pool,
+					 PagePool::PageListHead  * const mt_nonnull ret_page_list,
+					 Size                    * const mt_nonnull ret_msg_offs)
 {
-    assert (prechunk_size != 0);
+    {
+	Size total_len = 0;
+	if (prechunk_size > 0) {
+	    Size cur_page_offs = msg_offs;
+	    PagePool::Page *page = page_list->first;
+	    while (page) {
+		total_len += page->data_len - cur_page_offs;
+		cur_page_offs = 0;
+		page = page->getNextMsgPage();
+	    }
+	}
+
+	if (total_len <= prechunk_size) {
+	    *ret_page_pool = msg_page_pool;
+	    *ret_page_list = *page_list;
+	    *ret_msg_offs = msg_offs;
+	    msg_page_pool->msgRef (page_list->first);
+	    return total_len;
+	}
+    }
+
+    *ret_page_pool = page_pool;
+    *ret_msg_offs = 0;
 
     Size normalized_len = 0;
 
