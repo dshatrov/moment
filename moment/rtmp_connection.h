@@ -594,6 +594,14 @@ public:
     RtmpConnection (Object *coderef_container);
 
     ~RtmpConnection ();
+
+  // Utility functions
+
+    static Size normalizePrechunkedData (PagePool::PageListHead * mt_nonnull page_list,
+					 Size                    msg_offs,
+					 Size                    prechunk_size,
+					 PagePool               * mt_nonnull page_pool,
+					 PagePool::PageListHead * mt_nonnull ret_page_list);
 };
 
 }

@@ -2634,5 +2634,65 @@ RtmpConnection::~RtmpConnection ()
     in_destr_mutex.unlock ();
 }
 
+Size
+RtmpConnection::normalizePrechunkedData (PagePool::PageListHead * const mt_nonnull page_list,
+					 Size                     const msg_offs,
+					 Size                     const prechunk_size,
+					 PagePool               * const mt_nonnull page_pool,
+					 PagePool::PageListHead * const mt_nonnull ret_page_list)
+{
+    assert (prechunk_size != 0);
+
+    Size normalized_len = 0;
+
+    Size chunk_offs = 0;
+    Size page_offs = msg_offs;
+
+    PagePool::Page *page = page_list->first;
+    if (page) {
+	assert (msg_offs <= page->data_len);
+	if (msg_offs == page->data_len)
+	    page = page->getNextMsgPage();
+    }
+
+    while (page) {
+	if (chunk_offs == prechunk_size) {
+	    chunk_offs = 0;
+	    assert (page->data_len - page_offs > 0);
+	    ++page_offs;
+	}
+
+	Size const data_remain = page->data_len - page_offs;
+
+	Size tocopy;
+	if (chunk_offs + data_remain >= prechunk_size) {
+	  // Full chunk.
+	    tocopy = prechunk_size - chunk_offs;
+	    chunk_offs = prechunk_size;
+	} else {
+	  // Incomplete chunk.
+	    tocopy = prechunk_size - chunk_offs;
+	    if (tocopy > data_remain)
+		tocopy = data_remain;
+
+	    chunk_offs += tocopy;
+	}
+
+	if (tocopy > 0) {
+	    page_pool->getFillPages (ret_page_list,
+				     ConstMemory (page->getData() + page_offs, tocopy));
+	    page_offs += tocopy;
+	    normalized_len += tocopy;
+	}
+
+	if (page_offs == page->data_len) {
+	    page = page->getNextMsgPage();
+	    page_offs = 0;
+	}
+    }
+
+    return normalized_len;
+}
+
 }
 

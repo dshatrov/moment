@@ -82,6 +82,8 @@ void
 FlvMuxer::doMuxMessage (VideoStream::Message * const mt_nonnull msg,
 			Byte const msg_type)
 {
+    logD_ (_func, "ts 0x", fmt_hex, msg->timestamp);
+
     if (msg->msg_len >= (1 << 24)) {
 	logE (flvmux, _func, "Message is too long (", msg->msg_len, " bytes), dropping it");
 	return;
@@ -121,11 +123,24 @@ FlvMuxer::doMuxMessage (VideoStream::Message * const mt_nonnull msg,
 	memcpy (msg_pages->getHeaderData(), tag_header, sizeof (tag_header));
 	msg_pages->header_len = sizeof (tag_header);
 
-	msg_pages->page_pool = msg->page_pool;
-	msg_pages->first_page = msg->page_list.first;
-	msg_pages->msg_offset = msg->msg_offset;
+	if (msg->prechunk_size == 0) {
+	    msg_pages->page_pool = msg->page_pool;
+	    msg_pages->first_page = msg->page_list.first;
+	    msg_pages->msg_offset = msg->msg_offset;
 
-	msg->page_pool->msgRef (msg->page_list.first);
+	    msg->page_pool->msgRef (msg->page_list.first);
+	} else {
+	    PagePool::PageListHead page_list;
+	    RtmpConnection::normalizePrechunkedData (&msg->page_list,
+						     msg->msg_offset,
+						     msg->prechunk_size,
+						     page_pool,
+						     &page_list);
+	    msg_pages->page_pool = page_pool;
+	    msg_pages->first_page = page_list.first;
+	    msg_pages->msg_offset = 0;
+	}
+
 	sender->sendMessage (msg_pages, false /* do_flush */);
     }
 
@@ -182,8 +197,6 @@ FlvMuxer::endMuxing ()
 void
 FlvMuxer::reset ()
 {
-  // TODO
-
     got_first_timestamp = false;
 }
 
