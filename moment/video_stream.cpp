@@ -39,6 +39,8 @@ VideoStream::AudioFrameType::toString_ (Memory const &mem,
 	    return toString (mem, "RawData");
 	case AacSequenceHeader:
 	    return toString (mem, "AacSequenceHeader");
+	case SpeexHeader:
+	    return toString (mem, "SpeexHeader");
     }
 
     unreachable ();
@@ -328,6 +330,21 @@ VideoStream::FrameSaver::processAudioFrame (AudioMessage * const mt_nonnull msg)
 
 	    msg->page_pool->msgRef (msg->page_list.first);
 	} break;
+	case AudioFrameType::SpeexHeader: {
+	    logD_ (_func, "SPEEX HEADER");
+
+	    if (saved_speex_headers.getNumElements() >= 2) {
+		logD_ (_func, "Wrapping saved speex headers");
+		releaseSavedSpeexHeaders ();
+	    }
+
+	    SavedAudioFrame * const frame = new SavedAudioFrame;
+	    assert (frame);
+	    frame->msg = *msg;
+	    msg->page_pool->msgRef (msg->page_list.first);
+
+	    saved_speex_headers.append (frame);
+	} break;
 	default:
 	  // No-op
 	    ;
@@ -435,6 +452,40 @@ VideoStream::FrameSaver::getSavedAvcSeqHdr (SavedFrame * const mt_nonnull ret_fr
     return true;
 }
 
+Size
+VideoStream::FrameSaver::getNumSavedSpeexHeaders ()
+{
+    return saved_speex_headers.getNumElements();
+}
+
+void
+VideoStream::FrameSaver::getSavedSpeexHeaders (SavedAudioFrame *ret_frames,
+					       Size             ret_frame_size)
+{
+    Size i = 0;
+    List<SavedAudioFrame*>::iter iter (saved_speex_headers);
+    while (!saved_speex_headers.iter_done (iter)) {
+	if (i >= ret_frame_size)
+	    break;
+
+	SavedAudioFrame * const frame = saved_speex_headers.iter_next (iter)->data;
+	ret_frames [i] = *frame;
+
+	++i;
+    }
+}
+
+void
+VideoStream::FrameSaver::releaseSavedSpeexHeaders ()
+{
+    List<SavedAudioFrame*>::iter iter (saved_speex_headers);
+    while (!saved_speex_headers.iter_done (iter)) {
+	SavedAudioFrame * const frame = saved_speex_headers.iter_next (iter)->data;
+	frame->msg.page_pool->msgUnref (frame->msg.page_list.first);
+	delete frame;
+    }
+}
+
 VideoStream::FrameSaver::FrameSaver ()
     : got_saved_keyframe (false),
       got_saved_metadata (false),
@@ -456,6 +507,8 @@ VideoStream::FrameSaver::~FrameSaver ()
 
     if (got_saved_avc_seq_hdr)
 	saved_avc_seq_hdr.msg.page_pool->msgUnref (saved_avc_seq_hdr.msg.page_list.first);
+
+    releaseSavedSpeexHeaders ();
 }
 
 namespace {

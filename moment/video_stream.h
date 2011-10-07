@@ -41,7 +41,8 @@ public:
 	enum Value {
 	    Unknown = 0,
 	    RawData,
-	    AacSequenceHeader
+	    AacSequenceHeader,
+	    SpeexHeader
 	};
 	operator Value () const { return value; }
 	AudioFrameType (Value const value) : value (value) {}
@@ -49,6 +50,12 @@ public:
 	Size toString_ (Memory const &mem, Format const &fmt);
     private:
 	Value value;
+
+    public:
+	bool isAudioData () const
+	{
+	    return value == RawData;
+	}
     };
 
     class VideoFrameType
@@ -77,6 +84,14 @@ public:
 
     public:
 	static VideoFrameType fromFlvFrameType (Byte flv_frame_type);
+
+	bool isVideoData () const
+	{
+	    return value == KeyFrame             ||
+		   value == InterFrame           ||
+		   value == DisposableInterFrame ||
+		   value == GeneratedKeyFrame;
+	}
 
 	Byte toFlvFrameType () const;
     };
@@ -244,6 +259,10 @@ public:
 	bool got_saved_avc_seq_hdr;
 	SavedFrame saved_avc_seq_hdr;
 
+	List<SavedAudioFrame*> saved_speex_headers;
+
+	void releaseSavedSpeexHeaders ();
+
     public:
 	void processAudioFrame (AudioMessage * mt_nonnull msg);
 
@@ -256,6 +275,11 @@ public:
 	bool getSavedAacSeqHdr (SavedAudioFrame * mt_nonnull ret_frame);
 
 	bool getSavedAvcSeqHdr (SavedFrame * mt_nonnull ret_frame);
+
+	Size getNumSavedSpeexHeaders ();
+
+	void getSavedSpeexHeaders (SavedAudioFrame *ret_frames,
+				   Size             ret_frame_size);
 
 	FrameSaver ();
 

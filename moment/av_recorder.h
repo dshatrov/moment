@@ -76,7 +76,9 @@ private:
 	}
     };
 
-    Ref<StreamTicket> cur_stream_ticket;
+    mt_mutex (mutex) Ref<VideoStream> video_stream;
+
+    mt_mutex (mutex) Ref<StreamTicket> cur_stream_ticket;
 
     mt_const ServerThreadContext *thread_ctx;
     mt_const Storage *storage;
@@ -87,9 +89,15 @@ private:
     mt_mutex (mutex) Ref<Recording> recording;
     mt_mutex (mutex) bool paused;
 
+    mt_mutex (mutex) bool got_first_frame;
+    mt_mutex (mutex) Time first_frame_time;
+    mt_mutex (mutex) Time cur_frame_time;
+
     Mutex mutex;
 
     mt_const Cb<Frontend> frontend;
+
+    mt_mutex (mutex) void muxInitialMessages ();
 
     mt_mutex (mutex) void doStop ();
 

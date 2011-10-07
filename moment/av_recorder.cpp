@@ -34,6 +34,81 @@ Sender::Frontend AvRecorder::sender_frontend = {
 };
 
 mt_mutex (mutex) void
+AvRecorder::muxInitialMessages ()
+{
+    logD_ (_func_);
+
+    if (!video_stream)
+	return;
+
+    VideoStream::SavedFrame saved_frame;
+    VideoStream::SavedAudioFrame saved_audio_frame;
+
+    video_stream->lock ();
+
+    VideoStream::FrameSaver * const frame_saver = video_stream->getFrameSaver ();
+    if (!frame_saver)
+	goto _return;
+
+    if (frame_saver->getSavedMetaData (&saved_frame)) {
+	logD_ (_func, "metadata");
+	saved_frame.msg.timestamp = 0;
+	if (!muxer->muxVideoMessage (&saved_frame.msg)) {
+	    logE (recorder, _func, "muxer->muxVideoMessage() failed (metadata): ", exc->toString());
+	    doStop ();
+	    goto _return;
+	}
+    }
+
+    if (frame_saver->getSavedAacSeqHdr (&saved_audio_frame)) {
+	logD_ (_func, "AAC seq hdr");
+	saved_audio_frame.msg.timestamp = 0;
+	if (!muxer->muxAudioMessage (&saved_audio_frame.msg)) {
+	    logE (recorder, _func, "muxer->muxAudioMessage() failed (aac seq hdr): ", exc->toString());
+	    doStop ();
+	    goto _return;
+	}
+    }
+
+    if (frame_saver->getSavedAvcSeqHdr (&saved_frame)) {
+	logD_ (_func, "AVC seq hdr");
+	saved_frame.msg.timestamp = 0;
+	if (!muxer->muxVideoMessage (&saved_frame.msg)) {
+	    logE (recorder, _func, "muxer->muxVideoMessage() failed (avc seq hdr): ", exc->toString());
+	    doStop ();
+	    goto _return;
+	}
+    }
+
+    if (frame_saver->getNumSavedSpeexHeaders () > 0) {
+	logD_ (_func, "Speex headers");
+	VideoStream::SavedAudioFrame saved_speex_frames [2];
+	frame_saver->getSavedSpeexHeaders (saved_speex_frames, 2);
+	for (Count i = 0; i < frame_saver->getNumSavedSpeexHeaders(); ++i) {
+	    saved_speex_frames [i].msg.timestamp = 0;
+	    if (!muxer->muxAudioMessage (&saved_speex_frames [i].msg)) {
+		logE (recorder, _func, "muxer->muxAudioMessage() failed (speex hdr #", i + 1, ": ", exc->toString());
+		doStop ();
+		goto _return;
+	    }
+	}
+    }
+
+    if (frame_saver->getSavedKeyframe (&saved_frame)) {
+	logD_ (_func, "keyframe");
+	saved_frame.msg.timestamp = 0;
+	if (!muxer->muxVideoMessage (&saved_frame.msg)) {
+	    logE (recorder, _func, "muxer->muxVideoMessage() failed (keyframe): ", exc->toString());
+	    doStop ();
+	    goto _return;
+	}
+    }
+
+_return:
+    video_stream->unlock ();
+}
+
+mt_mutex (mutex) void
 AvRecorder::doStop ()
 {
     cur_stream_ticket = NULL;
@@ -102,11 +177,26 @@ AvRecorder::streamAudioMessage (VideoStream::AudioMessage * const mt_nonnull msg
 	return;
     }
 
-    if (self->recording) {
-	if (!self->muxer->muxAudioMessage (msg)) {
-	    logE (recorder, _func, "muxer->muxAudioMessage() failed: ", exc->toString());
-	    self->doStop ();
-	}
+    if (!self->recording) {
+	self->mutex.unlock ();
+	return;
+    }
+
+    if (!self->got_first_frame & msg->frame_type.isAudioData()) {
+	logD_ (_func, "first frame (audio)");
+	self->got_first_frame = true;
+	// Note that integer overflows are possible here and that's fine.
+	self->first_frame_time = msg->timestamp /* - self->cur_frame_time */;
+    }
+    self->cur_frame_time = msg->timestamp - self->first_frame_time;
+    logD_ (_func, "cur_frame_time: ", self->cur_frame_time, ", got_first_frame: ", self->got_first_frame);
+
+    VideoStream::AudioMessage alt_msg = *msg;
+    alt_msg.timestamp = self->cur_frame_time;
+
+    if (!self->muxer->muxAudioMessage (&alt_msg)) {
+	logE (recorder, _func, "muxer->muxAudioMessage() failed: ", exc->toString());
+	self->doStop ();
     }
 
     self->mutex.unlock ();
@@ -125,11 +215,26 @@ AvRecorder::streamVideoMessage (VideoStream::VideoMessage * const mt_nonnull msg
 	return;
     }
 
-    if (self->recording) {
-	if (!self->muxer->muxVideoMessage (msg)) {
-	    logE (recorder, _func, "muxer->muxVideoMessage() failed: ", exc->toString());
-	    self->doStop ();
-	}
+    if (!self->recording) {
+	self->mutex.unlock ();
+	return;
+    }
+
+    if (!self->got_first_frame && msg->frame_type.isVideoData()) {
+	logD_ (_func, "first frame (video)");
+	self->got_first_frame = true;
+	// Note that integer overflows are possible here and that's fine.
+	self->first_frame_time = msg->timestamp /* - self->cur_frame_time */;
+    }
+    self->cur_frame_time = msg->timestamp - self->first_frame_time;
+    logD_ (_func, "cur_frame_time: ", self->cur_frame_time, ", got_first_frame: ", self->got_first_frame);
+
+    VideoStream::VideoMessage alt_msg = *msg;
+    alt_msg.timestamp = self->cur_frame_time;
+
+    if (!self->muxer->muxVideoMessage (&alt_msg)) {
+	logE (recorder, _func, "muxer->muxVideoMessage() failed: ", exc->toString());
+	self->doStop ();
     }
 
     self->mutex.unlock ();
@@ -163,6 +268,10 @@ AvRecorder::start (ConstMemory const filename)
 	return;
     }
 
+    got_first_frame = false;
+    first_frame_time = 0;
+    cur_frame_time = 0;
+
     recording = grab (new Recording);
     muxer->setSender (&recording->sender);
 
@@ -191,6 +300,8 @@ AvRecorder::start (ConstMemory const filename)
 	logE_ (_func, "muxer->beginMuxing() failed: ", exc->toString());
 	// TODO Fail?
     }
+
+    muxInitialMessages ();
 
     mutex.unlock ();
 }
@@ -225,7 +336,13 @@ AvRecorder::setVideoStream (VideoStream * const stream)
 {
     mutex.lock ();
 
+    this->video_stream = stream;
+
     cur_stream_ticket = grab (new StreamTicket (this));
+
+  // TODO Unsubsribe from the previous stream's events.
+
+    got_first_frame = false;
 
     stream->getEventInformer()->subscribe (
 	    CbDesc<VideoStream::EventHandler> (
@@ -252,7 +369,10 @@ AvRecorder::AvRecorder (Object * const coderef_container)
     : DependentCodeReferenced (coderef_container),
       thread_ctx (NULL),
       storage (NULL),
-      paused (false)
+      paused (false),
+      got_first_frame (false),
+      first_frame_time (0),
+      cur_frame_time (0)
 {
 }
 
