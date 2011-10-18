@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE mync SYSTEM "entities.dtd">
+
+<moment>
+<moment_docpage/>
+<content>
+  <pagename>
+    <eng>Documentation - Installation</eng>
+    <rus>Документация - Установка</rus>
+  </pagename>
+  <title>
+    <eng>Installation</eng>
+    <rus>Установка</rus>
+  </title>
+
+  <moment_toc>
+    <dl>
+      <dt><a href="doc_install.ru.html#linux">Установка в Linux-системах</a></dt>
+      <dt><a href="doc_install.ru.html#freebsd">Установка на FreeBSD</a></dt>
+      <dt><a href="doc_install.ru.html#run">Запуск видеосервера</a></dt>
+    </dl>
+  </moment_toc>
+
+  <a name="linux">
+    <moment_section>
+      <eng>Installation on Linux</eng>
+      <rus>Установка в Linux-системах</rus>
+    </moment_section>
+  </a>
+
+  <p>
+    <eng>Download <a href="http://downloads.sourceforge.net/moment/moment-bin-1.0.1.tar.gz">Moment VS installation package</a>.</eng>
+    <rus>Скачайте <a href="http://downloads.sourceforge.net/moment/moment-bin-1.0.1.tar.gz">установочный архив</a>
+    видеосервера &laquo;Moment&raquo;.</rus>
+  </p>
+
+  <p>
+    <eng>Unpack the archive into /opt directory with the following command:</eng>
+    <rus>Распакуйте полученный архив в директорию /opt, выполнив команду:</rus>
+  </p>
+<pre>tar -C /opt -xzf moment-1.0.1.tar.gz</pre>
+
+  <p>
+    <eng>/opt/moment directory will be created as the result. This directory contains
+    server's files.</eng>
+    <rus>В результате будет создана директория /opt/moment c файлами сервера.</rus>
+  </p>
+
+  <a name="freebsd">
+    <moment_section>
+      <eng>Installation on FreeBSD</eng>
+      <rus>Установка на FreeBSD</rus>
+    </moment_section>
+  </a>
+
+  <p>
+    Для установки сервера &laquo;Момент&raquo; на FreeBSD необходимо собрать его из исходных кодов
+    в соответствии с <a href="developers.ru.html">инструкцией по сборке</a>.
+  </p>
+
+  <a name="run">
+    <moment_section>
+      <eng>Running the server</eng>
+      <rus>Запуск видеосервера</rus>
+    </moment_section>
+  </a>
+
+  <p>
+    Перед запуском выполните настройку видеосервера.<br/>Процесс настройки описан в <a href="doc_config.ru.html">разделе о настройке</a>.
+    Также можно выполнить ускоренную настройку сервера, как это описано
+    в <a href="quickstart.ru.html">кратком руководстве по установке</a>.
+  </p>
+
+  <p>
+    <eng>
+      Run the videoserver with the following command:
+    </eng>
+    <rus>
+      Запустите видеосервер следующей командой:
+    </rus>
+  </p>
+<pre>/opt/moment/bin/moment</pre>
+
+  <p>
+    <eng>
+      You can make the server start automatically on system startup
+      using mechanisms specific to your Linux distribution.
+    </eng>
+    <rus>
+      Если необходимо, настройте автоматический запуск сервера способом, предусмотренным в используемой вами операционной системе.
+    </rus>
+  </p>
+
+  <p>
+    Проверить работоспособность сервера после запуска можно, зайдя на его страницу в браузере: <a href="http://localhost:8080">http://localhost:8080</a><br/>
+    Если установка прошла успешно, то по этому адресу откроется страница приветствия.
+  </p>
+
+</content>
+</moment>
+

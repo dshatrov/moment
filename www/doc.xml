@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE mync SYSTEM "entities.dtd">
+
+<moment>
+<content>
+  <pagename>
+    <eng>Documentation</eng>
+    <rus>Документация</rus>
+  </pagename>
+  <title>
+    <eng>Documentation</eng>
+    <rus>Документация</rus>
+  </title>
+
+  <div class="toc">
+  <dl>
+    <dt><a href="doc_desc.ru.html">Описание сервера</a></dt>
+    <dd>
+      <dl>
+	<dt><a href="doc_desc.ru.html#func">Функциональные возможности</a></dt>
+	<dt><a href="doc_desc.ru.html#spec">Отличительные особенности</a></dt>
+	<dt><a href="doc_desc.ru.html#req">Системные требования</a></dt>
+      </dl>
+    </dd>
+    <dt><a href="doc_install.ru.html">Установка</a></dt>
+    <dd>
+      <dl>
+	<dt><a href="doc_install.ru.html#linux">Установка в Linux-системах</a></dt>
+	<dt><a href="doc_install.ru.html#freebsd">Установка на FreeBSD</a></dt>
+	<dt><a href="doc_install.ru.html#run">Запуск видеосервера</a></dt>
+      </dl>
+    </dd>
+    <dt><a href="doc_config.ru.html">Настройка</a></dt>
+    <dd>
+      <dl>
+	<dt><a href="doc_config.ru.html#config">Основной конфигурационный файл</a></dt>
+	<dt><a href="doc_config.ru.html#transcoding">Захват и перекодирование видео</a></dt>
+	<dt><a href="doc_config.ru.html#ipcam">Захват видео с IP-камер</a></dt>
+	<dt><a href="doc_config.ru.html#cam">Захват видео с локальных камер</a></dt>
+	<dt><a href="doc_config.ru.html#inputs">Получение видео из других источников</a></dt>
+	<dt><a href="doc_config.ru.html#playlists">Списки воспроизведения (плейлисты)</a></dt>
+	<dt><a href="doc_config.ru.html#recording">Запись видео</a></dt>
+      </dl>
+    </dd>
+    <dt><a href="doc_builtin.ru.html">Встроенные приложения</a></dt>
+    <dd>
+      <dl>
+	<dt><a href="doc_builtin.ru.html#player">Видеоплеер</a></dt>
+        <dt><a href="doc_builtin.ru.html#phone">Видеозвонки</a></dt>
+      </dl>
+    </dd>
+    <dt><a href="doc_plugins.ru.html">Подключаемые модули (плагины)</a></dt>
+    <dd>
+      <dl>
+	<dt><a href="doc_plugins.ru.html#api">API видеосервера</a></dt>
+	<dt><a href="doc_plugins.ru.html#building">Компиляция и установка модулей</a></dt>
+	<dt><a href="doc_plugins.ru.html#example">Пример внешнего модуля</a></dt>
+      </dl>
+    </dd>
+    <dd>
+    </dd>
+    <dt class="toc_single"><a href="doc_cluster.ru.html">Кластеризация</a></dt>
+    <dt class="toc_single"><a href="doc_stress.ru.html">Нагрузочное тестирование</a></dt>
+    <dt><a href="doc_examples.ru.html">Примеры использования</a></dt>
+    <dd>
+      <dl>
+        <dt><a href="doc_examples.ru.html#videochat">Видеочат</a></dt>
+	<dt><a href="doc_examples.ru.html#tv">Вещание онлайн ТВ</a></dt>
+	<dt><a href="doc_examples.ru.html#surv">Видеонаблюдение</a></dt>
+      </dl>
+    </dd>
+  </dl>
+  </div>
+
+<!--
+  <p>
+    <eng>
+      <p>
+      Moment Video Server allows you to organize live video streaming on the Internet or in your local network.
+      All the user has to do to watch the video is to open server's web page in a browser.
+      </p>
+
+      <div style="text-align: center; padding-top: 1em; padding-bottom: 1em">
+	<a href="img/myplayer_big.png"><img src="img/myplayer.png"/></a>
+      </div>
+
+      <p>
+      Moment VS can stream video from various sources: files on disk, IP cameras, web cameras, from other streaming servers.
+      Moment VS is easy to install and easy to use. It is a robust high-performance solution.
+      For a more complete list of server features see the technical description.
+      </p>
+
+      <p>
+      To start streaming with Moment VS, follow the <a href="quickstart.html">quick start guide</a>.
+      </p>
+
+      <p>
+      Moment VS works under Linux and FreeBSD. A port to Windows is under development.
+      </p>
+    </eng>
+    <rus>
+      <p>
+      С помощью видеосервера &laquo;Moment&raquo; вы можете с минимальными усилиями организовать
+      вещание потокового видео в Интернете или локальной сети. Для просмотра видео
+      пользователю достаточно открыть страницу видеосервера в интернет-браузере.
+      </p>
+
+      <div style="text-align: center; padding-top: 1em; padding-bottom: 1em">
+	<a href="img/myplayer_big.png"><img src="img/myplayer.png"/></a>
+      </div>
+
+      <p>
+      &laquo;Moment&raquo; может транслировать видео из самых разных источников - из видеофайлов
+      на диске, с IP-камер, с веб-камеры, с других серверов потокового вещания
+      (например, для ретрансляции телеканалов).
+      &laquo;Moment&raquo; прост в установке и использовании, отличается высокой производительностью и надёжностью.
+      Подробная информация о возможностях,
+      предоставляемых видеосервером, изложена в <a href="wiki/index.php?title=Moment:Features:Ru">техническом описании</a>.
+      </p>
+
+      <p>
+      Чтобы начать вещание с помощью сервера &laquo;Moment&raquo;, следуйте
+      <a href="quickstart.ru.html">краткой инструкции</a> по установке.
+      </p>
+
+      <p>
+      &laquo;Moment&raquo; работает под управлением ОС Linux и FreeBSD. Версия для Windows находится в разработке.
+      </p>
+    </rus>
+  </p>
+-->
+</content>
+</moment>
+

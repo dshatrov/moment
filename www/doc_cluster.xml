@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE mync SYSTEM "entities.dtd">
+
+<moment>
+<moment_docpage/>
+<content>
+  <pagename>
+    <eng>Documentation - Clustering</eng>
+    <rus>Документация - Кластеризация</rus>
+  </pagename>
+  <title>
+    <eng>Clustering</eng>
+    <rus>Кластеризация</rus>
+  </title>
+
+  <p>
+  Кластеризация сегодня.
+  </p>
+
+</content>
+</moment>
+

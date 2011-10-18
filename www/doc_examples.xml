@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE mync SYSTEM "entities.dtd">
+
+<moment>
+<moment_docpage/>
+<content>
+  <pagename>
+    <eng>Documentation - Usage examples</eng>
+    <rus>Документация - Примеры использования</rus>
+  </pagename>
+  <title>
+    <eng>Usage examples</eng>
+    <rus>Примеры использования</rus>
+  </title>
+
+  <moment_toc>
+    <dl>
+      <dt><a href="doc_examples.ru.html#videochat">Видеочат</a></dt>
+      <dt><a href="doc_examples.ru.html#tv">Вещание онлайн ТВ</a></dt>
+      <dt><a href="doc_examples.ru.html#surv">Видеонаблюдение</a></dt>
+    </dl>
+  </moment_toc>
+
+  <a name="videochat">
+    <moment_section>
+      <eng>Video chat</eng>
+      <rus>Видеочат</rus>
+    </moment_section>
+  </a>
+
+  <p>
+  Видеочат!
+  </p>
+
+  <a name="tv">
+    <moment_section>
+      <eng>Online TV</eng>
+      <rus>Вещание онлайн ТВ</rus>
+    </moment_section>
+  </a>
+
+  <p>
+  Онлайн-ТВ.
+  </p>
+
+  <a name="surv">
+    <moment_section>
+      <eng>Video surveillance</eng>
+      <rus>Видеонаблюдение</rus>
+    </moment_section>
+  </a>
+
+  <p>
+  Видеонаблюдение.
+  </p>
+
+</content>
+</moment>
+

@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE mync SYSTEM "entities.dtd">
+
+<moment>
+<moment_docpage/>
+<content>
+  <pagename>
+    <eng>Documentation - Built-in applications</eng>
+    <rus>Документация - Встроенные приложения</rus>
+  </pagename>
+  <title>
+    <eng>Built-in applications</eng>
+    <rus>Встроенные приложения</rus>
+  </title>
+
+  <moment_toc>
+    <dl>
+      <dt>
+	<a href="doc_builtin.ru.html#player">
+	  <eng>Video player</eng>
+	  <rus>Видеоплеер</rus>
+	</a>
+      </dt>
+      <dt>
+	<a href="doc_builtin.ru.html#phone">
+	  <eng>Video phone</eng>
+	  <rus>Видеозвонки</rus>
+	</a>
+      </dt>
+    </dl>
+  </moment_toc>
+
+  <a name="player">
+    <moment_section>
+      <eng>Video player</eng>
+      <rus>Видеоплеер</rus>
+    </moment_section>
+  </a>
+
+  <p>
+  Всё о видеоплеере.
+  </p>
+
+  <a name="phone">
+    <moment_section>
+      <eng>Video phone</eng>
+      <rus>Видеозвонки</rus>
+    </moment_section>
+  </a>
+
+  <p>
+  Всё о видезвонках.
+  </p>
+
+</content>
+</moment>
+

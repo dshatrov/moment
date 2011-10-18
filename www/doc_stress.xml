@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE mync SYSTEM "entities.dtd">
+
+<moment>
+<moment_docpage/>
+<content>
+  <pagename>
+    <eng>Documentation - Stress Testing</eng>
+    <rus>Документация - Нагрузочное тестирование</rus>
+  </pagename>
+  <title>
+    <eng>Stress Testing</eng>
+    <rus>Нагрузочное тестирование</rus>
+  </title>
+
+  <p>
+    В комплект видеосервера &laquo;Момент&raquo; входит утилита нагрузочного тестирования
+    <i>rtmptool,</i> с помощью которой можно имитировать одновременное подключение
+    нескольких тысяч RTMP-клиентов. Параметры командной строки <i>rtmptool</i>:
+  </p>
+
+  <moment_params>
+    <p><b>-n --num-clients</b> &lt;number&gt;      &mdash; Simulate N simultaneous clients (default: 1)</p>
+    <p><b>-s --server-addr</b> &lt;address&gt;     &mdash; Server address, IP:PORT (default: localhost:1935)</p>
+    <p><b>-a --app</b> &lt;string&gt;              &mdash; Application name (default: oflaDemo)</p>
+    <p><b>-c --channel</b> &lt;string&gt;          &mdash; Name of the channel to subscribe to (default: red5StreamDemo)</p>
+    <p><b>-t --num-threads</b> &lt;number&gt;      &mdash; Number of threads to spawn (default: 0, use a single thread)</p>
+    <p><b>-r --report-interval</b> &lt;number&gt;  &mdash; Interval between video frame reports (default: 0, no reports)</p>
+    <p><b>--nonfatal-errors</b>                    &mdash; Do not exit on the first error.</p>
+    <p><b>-h --help</b>                            &mdash; Show this help message.</p>
+  </moment_params>
+
+  <p>
+    Также для тестирования можно использовать встроенный модуль <i>mod_test,</i> предназначенный
+    для генерации псевдо-видеопотока &mdash; кадров заданного размера и частоты, наполненных
+    случайными данными. С помощью модуля <i>mod_test</i> и утилиты <i>rtmptool</i> можно оперативно
+    оценить влияние характеристик видеопотока на производительность сервера при большом числе
+    одновременно подключенных клиентов.
+  </p>
+  <p>Параметры модуля <i>mod_test</i>:</p>
+  <moment_params>
+    <p><b>mod_test/enable</b> &mdash; включить модуль mod_test (yes/no). По умолчанию: "no" (mod_test выключен).</p>
+    <p><b>mod_test/stream_name</b> &mdash; название видеопотока, генерируемого модулем <i>mod_test</i>.
+    По умолчанию: "test".</p>
+    <p><b>mod_test/frame_duration</b> &mdash; продолжительность одного кадра в миллисекундах.
+    По умолчанию: 40 мс (25 кадров/сек).</p>
+    <p><b>mod_test/frame_size</b> &mdash; размер кадра в байтах. По умолчанию: 2500 байт.</p>
+    <p><b>mod_test/start_timestamp</b> &mdash; временной штамп первого сгенерированного пакета. По умолчанию: 0.</p>
+    <p><b>mod_test/keyframe_interval</b> &mdash; расстояние между ключевыми кадрами псевдо-видеопотока (в кадрах).
+    По умолчанию: 10 кадров.</p>
+    <p><b>mod_test/burst_width</b> &mdash; количество видеокадров, генерируемых за одну итерацию.
+    Не влияет на частоту кадров. По умолчанию: 1.</p>
+    <p><b>mod_test/prechunk_size</b> &mdash; размер RTMP-чанка в байтах. Видеосообщения разбиваются на чанки
+    однократно перед рассылкой клиентам. Если в качестве значения задать 0, то разбиение на чанки
+    (длиной по умолчанию) будет производиться отдельно для каждого клиента. По умолчанию: 65536 байт.</p>
+    <p><b>mod_test/same_pages</b> &mdash; если включено, то все видеокадры представляются
+    одним и тем же набором страниц, который не меняется во время работы.
+    Если выключено, то каждый кадр генерируется отдельно и размещается в новом наборе страниц.
+    По умолчанию: "on" (включено).</p>
+  </moment_params>
+
+</content>
+</moment>
+

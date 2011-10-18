@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE mync SYSTEM "entities.dtd">
+
+<moment>
+<moment_docpage/>
+<content>
+  <pagename>
+    <eng>Documentation - Plugins</eng>
+    <rus>Документация - Подключаемые модули</rus>
+  </pagename>
+  <title>
+    <eng>Plugins</eng>
+    <rus>Подключаемые модули</rus>
+  </title>
+
+  <moment_toc>
+    <dl>
+      <dt>
+        <a href="doc_plugins.ru.html#api">
+	  <eng>Moment API</eng>
+	  <rus>API видеосервера</rus>
+	</a>
+      </dt>
+      <dt>
+        <a href="doc_plugins.ru.html#building">
+	  <eng>Building and installing plugins</eng>
+	  <rus>Компиляция и установка модулей</rus>
+	</a>
+      </dt>
+      <dt>
+        <a href="doc_plugins.ru.html#example">
+	  <eng>Plugin example</eng>
+	  <rus>Пример внешнего модуля</rus>
+	</a>
+      </dt>
+    </dl>
+  </moment_toc>
+
+  <a name="api">
+    <moment_section>
+      <eng>Moment API</eng>
+      <rus>API видеосервера</rus>
+    </moment_section>
+  </a>
+
+  <p>
+  API
+  </p>
+
+  <a name="building">
+    <moment_section>
+      <eng>Building and installing plugins</eng>
+      <rus>Компиляция и установка модулей</rus>
+    </moment_section>
+  </a>
+
+  <p>
+  BUILDING
+  </p>
+
+  <a name="example">
+    <moment_section>
+      <eng>Plugin example</eng>
+      <rus>Пример внешнего модуля</rus>
+    </moment_section>
+  </a>
+
+  <p>
+  EXAMPLE
+  </p>
+
+</content>
+</moment>
+
