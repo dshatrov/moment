@@ -215,6 +215,9 @@ Result httpRequest (HttpRequest  * const mt_nonnull req,
 	    MOMENT_FILE__OK_HEADERS (mime_type, stat.size),
 	    "\r\n");
 
+    if (equal (req->getMethod(), "HEAD"))
+	return Result::Success;
+
     PagePool::PageListHead page_list;
 
     // TODO This doesn't work well with large files (eats too much memory).
