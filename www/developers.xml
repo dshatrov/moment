@@ -3,6 +3,7 @@
 <!DOCTYPE mync SYSTEM "entities.dtd">
 
 <moment>
+<download_sidebar/>
 <content>
   <pagename>
     <eng>Developers</eng>

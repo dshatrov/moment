@@ -3,6 +3,7 @@
 <!DOCTYPE mync SYSTEM "entities.dtd">
 
 <moment>
+<download_sidebar/>
 <content>
   <pagename>
     <eng>Quick Start</eng>
@@ -16,12 +17,14 @@
     <eng>
       To install and run Moment VS, follow this quick start guide.
       For more detailed information, refer to
-      <a href="wiki/index.php?title=Moment:Config">more detailed instructions</a> in the wiki.
+<!--      <a href="wiki/index.php?title=Moment:Config">more detailed instructions</a> in the wiki. -->
+      <a href="doc.html">the documentation</a>.
     </eng>
     <rus>
       Чтобы установить и запустить видеосервер &laquo;Moment&raquo;, следуйте этой
       краткой инструкции. Для более детальной настройки сервера воспользуйтесь
-      <a href="wiki/index.php?title=Moment:Config:Ru">подробным руководством</a>.
+<!--      <a href="wiki/index.php?title=Moment:Config:Ru">подробным руководством</a>.-->
+      <a href="doc.ru.html">подробным руководством</a>.
     </rus>
   </p>
 
@@ -117,6 +120,12 @@
       Установка завершена! Теперь можно смотреть видео со страницы сервера:
     </rus>
     <a href="http://localhost:8080/moment/">http://localhost:8080/moment/</a>
+  </p>
+
+  <br/>
+  <p>
+    Подробную информацию о настройке видеосервера можно найти в
+    <a href="doc.ru.html">руководстве пользователя</a>.
   </p>
 </content>
 </moment>

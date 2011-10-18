@@ -65,6 +65,7 @@
       padding-left: 3px;
       padding-right: 3px;
       background-color: #f3f3fb;
+      padding: 0.6ex;
     }
 
     .main_div {
@@ -184,7 +185,14 @@
       margin-right: auto;
       padding-bottom: 140px;
       margin-left: 80px;
-      width: 600px;
+      <xsl:choose>
+	<xsl:when test="download_sidebar">
+	  width: 600px;
+        </xsl:when>
+	<xsl:otherwise>
+	  width: 680px;
+	</xsl:otherwise>
+      </xsl:choose>
       min-height: 180px;
 /*      border: 1px solid red; */
     }
@@ -219,6 +227,57 @@
     .footer a {
       color: #616187;
     }
+
+    .title {
+      <xsl:if test="count (moment_docpage) = 0">
+	margin-left: 15px;
+      </xsl:if>
+      padding-bottom: 5px;
+      font-size: xx-large;
+    }
+
+    .toc {
+      margin-top: 1.25em;
+      <xsl:if test="count (moment_docpage) = 0">
+	margin-left: 15px;
+      </xsl:if>
+      <xsl:if test="moment_docpage">
+        margin-bottom: 2em;
+      </xsl:if>
+    }
+
+    .toc dl {
+      margin-top: 0px;
+      margin-bottom: 0px;
+    }
+
+/*
+    .toc dt {
+      margin-bottom: 0px;
+    }
+*/
+
+    .toc dd {
+      margin-top: 0.25ex;
+      margin-left: 2em;
+      margin-bottom: 1.5ex;
+    }
+
+    .toc_single {
+      margin-top: 0px;
+      margin-bottom: 1.5ex;
+    }
+
+    .moment_list li {
+      margin-top: 1em;
+      margin-bottom: 1em;
+    }
+
+    .moment_table td {
+      padding: 1ex;
+      padding-left: 1.25em;
+      padding-right: 1.5ex;
+    }
   </style>
 </head>
 
@@ -242,8 +301,13 @@
     <eng><a href="index.en.html"><div class="menuitem" style="padding-left: 30px">Home</div></a></eng>
     <rus><a href="index.ru.html"><div class="menuitem" style="padding-left: 30px">Главная</div></a></rus>
 
+    <!--
     <eng><a href="quickstart.html"><div class="menuitem">Quick Start</div></a></eng>
     <rus><a href="quickstart.ru.html"><div class="menuitem">Установка</div></a></rus>
+    -->
+
+    <eng><a href="doc.html"><div class="menuitem">Documentation</div></a></eng>
+    <rus><a href="doc.ru.html"><div class="menuitem">Документация</div></a></rus>
 
     <eng><a href="licensing.html"><div class="menuitem">Licensing</div></a></eng>
     <rus><a href="licensing.ru.html"><div class="menuitem">Лицензия</div></a></rus>
@@ -298,7 +362,6 @@
     </div>
   </div>
 
-
   <div class="content_div">
 <!--    <table border="0" cellpadding="0" cellspacing="0" style="margin-left: 80px">
       <tr>
@@ -314,27 +377,46 @@
                 </xsl:otherwise>
               </xsl:choose>
             </xsl:attribute>
+	    <!--
+	    <xsl:if test="moment_docpage">
+	      <xsl:attribute name="style">
+	        margin-left: 15px
+	      </xsl:attribute>
+	    </xsl:if>
+	    -->
+	    <!--
+	    <xsl:if test="moment_docpage">
+	      Документация > <xsl:apply-templates select="content/title" mode="title"/>
+	    </xsl:if>
+	    -->
             <xsl:apply-templates select="content/*"/>
           </xsl:element>
 <!--        </td>
       </tr>
     </table> -->
+    <xsl:if test="moment_docpage">
+      <br/><br/>
+      <eng><a href="doc.html">Back to Contents</a></eng>
+      <rus><a href="doc.ru.html">К содержанию</a></rus>
+    </xsl:if>
   </div>
 
-  <div class="download_outer">
-    <div class="download">
-      <a href="http://downloads.sourceforge.net/moment/moment-bin-1.0.1.tar.gz">
-      <eng><img src="img/download.png" alt="Download Moment Video Server 1.0 for Linux" style="margin-bottom: 16px; width: 183px; height: 62px"/></eng>
-      <rus><img src="img/download.ru.png" alt="Загрузить Moment Video Server 1.0 для Linux" style="margin-bottom: 16px; width: 183px; height: 62px"/></rus>
-      </a>
-      <br/>
-      <div style="white-space: nowrap; line-height: 1.33">
-        <eng>Follow <a href="quickstart.html">these quick instructions</a><br/>to get Moment VS up and running.</eng>
-<!--    <rus>Следуйте <a href="quickstart.ru.html">этим простым инструкциям</a>,<br/> чтобы запустить &laquo;Moment&raquo;.</rus> -->
-        <rus><a href="quickstart.ru.html">Простые инструкции</a> помогут<br/>запустить &laquo;Moment&raquo;.</rus>
+  <xsl:if test="download_sidebar">
+    <div class="download_outer">
+      <div class="download">
+	<a href="http://downloads.sourceforge.net/moment/moment-bin-1.0.1.tar.gz">
+	<eng><img src="img/download.png" alt="Download Moment Video Server 1.0 for Linux" style="margin-bottom: 16px; width: 183px; height: 62px"/></eng>
+	<rus><img src="img/download.ru.png" alt="Загрузить Moment Video Server 1.0 для Linux" style="margin-bottom: 16px; width: 183px; height: 62px"/></rus>
+	</a>
+	<br/>
+	<div style="white-space: nowrap; line-height: 1.33">
+	  <eng>Follow <a href="quickstart.html">these quick instructions</a><br/>to get Moment VS up and running.</eng>
+  <!--    <rus>Следуйте <a href="quickstart.ru.html">этим простым инструкциям</a>,<br/> чтобы запустить &laquo;Moment&raquo;.</rus> -->
+	  <rus><a href="quickstart.ru.html">Простые инструкции</a> помогут<br/>запустить &laquo;Moment&raquo;.</rus>
+	</div>
       </div>
     </div>
-  </div>
+  </xsl:if>
 
   <div class="footer">
     <eng>Copyright (c) 2011 <a href="mailto:shatrov@gmail.com">Dmitry Shatrov</a></eng>
@@ -347,8 +429,39 @@
 </html>
 </xsl:template>
 
+<xsl:template match="moment_toc">
+  <div class="toc">
+    <xsl:if test="moment_docpage">
+      ABRACADABRA
+    </xsl:if>
+    <xsl:apply-templates slect="@*|node()"/>
+  </div>
+</xsl:template>
+
+<xsl:template match="moment_section">
+  <div style="margin-top: 2em;">
+    <h2>
+      <xsl:apply-templates slect="@*|node()"/>
+    </h2>
+  </div>
+</xsl:template>
+
+<xsl:template match="moment_subsection">
+<!--  <div style="margin-top: 1em;"> -->
+  <h3>
+    <xsl:apply-templates select="@*|node()"/>
+  </h3>
+<!--  </div> -->
+</xsl:template>
+
+<xsl:template match="moment_params">
+  <div style="margin-left: 2em">
+    <xsl:apply-templates select="@*|node()"/>
+  </div>
+</xsl:template>
+
 <xsl:template match="title">
-  <div class="title" style="margin-left: 15px; padding-bottom: 5px; font-size: xx-large">
+  <div class="title">
     <xsl:apply-templates select="@*|node()"/>
   </div>
 </xsl:template>
