@@ -49,8 +49,8 @@ struct Options {
     }
 };
 
-const Count default__page_pool__min_pages    = 512;
-const Time  default__http__keepalive_timeout =  60;
+const Count default__page_pool__min_pages     = 512;
+const Time  default__http__keepalive_timeout  =  60;
 
 Options options;
 MConfig::Config config;
@@ -345,9 +345,28 @@ int main (int argc, char **argv)
 	}
     }
 
+    bool no_keepalive_conns = false;
+    {
+	ConstMemory const opt_name ("http/no_keepalive_conns");
+	MConfig::Config::BooleanValue const enable = config.getBoolean (opt_name);
+	if (enable == MConfig::Config::Boolean_Invalid) {
+	    logE_ (_func, "Invalid value for ", opt_name, ": ", config.getString (opt_name));
+	    return EXIT_FAILURE;
+	}
+
+	if (enable == MConfig::Config::Boolean_True)
+	    no_keepalive_conns = true;
+    }
+    logD_ (_func, "no_keepalive_conns: ", no_keepalive_conns);
+
     ConstMemory http_bind;
     {
-	if (!http_service.init (server_app.getMainPollGroup(), server_app.getTimers(), &page_pool, http_keepalive_timeout)) {
+	if (!http_service.init (server_app.getMainPollGroup(),
+				server_app.getTimers(),
+				&page_pool,
+				http_keepalive_timeout,
+				no_keepalive_conns))
+	{
 	    logE_ (_func, "http_service.init() failed: ", exc->toString());
 	    return EXIT_FAILURE;
 	}
@@ -403,8 +422,11 @@ int main (int argc, char **argv)
 		break;
 	    }
 
-	    if (!separate_admin_http_service.init (
-			server_app.getMainPollGroup(), server_app.getTimers(), &page_pool, http_keepalive_timeout))
+	    if (!separate_admin_http_service.init (server_app.getMainPollGroup(),
+						   server_app.getTimers(),
+						   &page_pool,
+						   http_keepalive_timeout,
+						   no_keepalive_conns))
 	    {
 		logE_ (_func, "admin_http_service.init() failed: ", exc->toString());
 		return EXIT_FAILURE;
