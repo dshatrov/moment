@@ -29,12 +29,12 @@ using namespace M;
 namespace Moment {
 
 namespace {
-LogGroup libMary_logGroup_chunk     ("rtmp_chunk",      LogLevel::N);
-LogGroup libMary_logGroup_msg       ("rtmp_msg",        LogLevel::N);
-LogGroup libMary_logGroup_codec     ("rtmp_codec",      LogLevel::N);
+LogGroup libMary_logGroup_chunk     ("rtmp_chunk",      LogLevel::I);
+LogGroup libMary_logGroup_msg       ("rtmp_msg",        LogLevel::I);
+LogGroup libMary_logGroup_codec     ("rtmp_codec",      LogLevel::I);
 LogGroup libMary_logGroup_send      ("rtmp_send",       LogLevel::I);
 LogGroup libMary_logGroup_time      ("rtmp_time",       LogLevel::I);
-LogGroup libMary_logGroup_close     ("rtmp_conn_close", LogLevel::N);
+LogGroup libMary_logGroup_close     ("rtmp_conn_close", LogLevel::I);
 LogGroup libMary_logGroup_proto_in  ("rtmp_proto_in",   LogLevel::I);
 LogGroup libMary_logGroup_proto_out ("rtmp_proto_out",  LogLevel::I);
 LogGroup libMary_logGroup_flush     ("rtmp_flush",      LogLevel::I);
@@ -1081,6 +1081,7 @@ void
 RtmpConnection::closeAfterFlush ()
 {
     logD (close, _func, "0x", fmt_hex, (UintPtr) this);
+    sender->flush ();
     sender->closeAfterFlush ();
 }
 
