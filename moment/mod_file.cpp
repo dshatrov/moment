@@ -113,6 +113,8 @@ Result httpRequest (HttpRequest  * const mt_nonnull req,
 		    MOMENT_FILE__500_HEADERS (reply_body.len()),
 		    "\r\n",
 		    reply_body);
+	    if (!req->getKeepalive())
+		conn_sender->closeAfterFlush();
 
 	    return Result::Success;
 	}
@@ -142,6 +144,8 @@ Result httpRequest (HttpRequest  * const mt_nonnull req,
 		MOMENT_FILE__400_HEADERS (reply_body.len()),
 		"\r\n",
 		reply_body);
+	if (!req->getKeepalive())
+	    conn_sender->closeAfterFlush();
 
 	return Result::Success;
 #endif
@@ -188,6 +192,8 @@ Result httpRequest (HttpRequest  * const mt_nonnull req,
 		MOMENT_FILE__404_HEADERS (reply_body.len()),
 		"\r\n",
 		reply_body);
+	if (!req->getKeepalive())
+	    conn_sender->closeAfterFlush();
 
 	return Result::Success;
     }
@@ -204,6 +210,8 @@ Result httpRequest (HttpRequest  * const mt_nonnull req,
 		MOMENT_FILE__500_HEADERS (reply_body.len()),
 		"\r\n",
 		reply_body);
+	if (!req->getKeepalive())
+	    conn_sender->closeAfterFlush();
 
 	return Result::Success;
     }
@@ -215,8 +223,11 @@ Result httpRequest (HttpRequest  * const mt_nonnull req,
 	    MOMENT_FILE__OK_HEADERS (mime_type, stat.size),
 	    "\r\n");
 
-    if (equal (req->getMethod(), "HEAD"))
+    if (equal (req->getMethod(), "HEAD")) {
+	if (!req->getKeepalive())
+	    conn_sender->closeAfterFlush();
 	return Result::Success;
+    }
 
     PagePool::PageListHead page_list;
 
@@ -257,6 +268,9 @@ Result httpRequest (HttpRequest  * const mt_nonnull req,
 	conn_sender->closeAfterFlush ();
 	return Result::Success;
     }
+
+    if (!req->getKeepalive())
+	conn_sender->closeAfterFlush();
 
 //    logD_ (_func, "done");
     return Result::Success;
