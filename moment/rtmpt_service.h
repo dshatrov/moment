@@ -64,7 +64,8 @@ private:
   mt_iface_end()
 
 public:
-    mt_throws Result init ();
+    mt_throws Result init (Time session_keepalive_timeout,
+			   bool no_keepalive_conns);
 
     mt_throws Result bind (IpAddress const &addr);
 

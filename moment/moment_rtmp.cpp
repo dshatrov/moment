@@ -577,6 +577,30 @@ void momentRtmpInit ()
 	}
     }
 
+    Time rtmpt_session_timeout = 30;
+    {
+	ConstMemory const opt_name = "mod_rtmp/rtmpt_session_timeout";
+	MConfig::GetResult const res = config->getUint64_default (
+		opt_name, &rtmpt_session_timeout, rtmpt_session_timeout);
+	if (!res)
+	    logE_ (_func, "bad value for ", opt_name);
+    }
+    logI_ (_func, "rtmpt_session_timeout: ", rtmpt_session_timeout);
+
+    bool rtmpt_no_keepalive_conns = false;
+    {
+	ConstMemory const opt_name = "mod_rtmp/rtmpt_no_keepalive_conns";
+	MConfig::Config::BooleanValue const enable = config->getBoolean (opt_name);
+	if (enable == MConfig::Config::Boolean_Invalid) {
+	    logE_ (_func, "Invalid value for ", opt_name, ": ", config->getString (opt_name));
+	    return;
+	}
+
+	if (enable == MConfig::Config::Boolean_True)
+	    rtmpt_no_keepalive_conns = true;
+    }
+    logD_ (_func, "rtmpt_no_keepalive_conns: ", rtmpt_no_keepalive_conns);
+
     {
 	rtmp_service.setFrontend (Cb<RtmpVideoService::Frontend> (
 		&rtmp_video_service_frontend, NULL, NULL));
@@ -632,7 +656,7 @@ void momentRtmpInit ()
 	rtmpt_service.setPollGroup (server_app->getMainPollGroup());
 	rtmpt_service.setPagePool (moment->getPagePool());
 
-	if (!rtmpt_service.init()) {
+	if (!rtmpt_service.init (rtmpt_session_timeout, rtmpt_no_keepalive_conns)) {
 	    logE_ (_func, "rtmpt_service.init() failed: ", exc->toString());
 	    return;
 	}

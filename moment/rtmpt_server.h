@@ -91,6 +91,8 @@ private:
     class RtmptSession : public Object
     {
     public:
+	bool valid;
+
 	mt_const Uint32 session_id;
 
 	typedef Map< Ref<RtmptSession>,
@@ -105,11 +107,11 @@ private:
 	mt_const WeakCodeRef const weak_rtmpt_server;
 	mt_const RtmptServer * const unsafe_rtmpt_server;
 
-	// Unused Timers::TimerKey session_keepalive_timer;
-	// Unused Mutex session_mutex;
-
 	RtmptSender rtmpt_sender;
 	RtmpConnection rtmp_conn;
+
+	mt_mutex (RtmptServer::mutex) Time last_msg_time;
+	mt_mutex (RtmptServer::mutex) Timers::TimerKey session_keepalive_timer;
 
 	RtmptSession (RtmptServer *rtmpt_server,
 		      Timers      *timers,
@@ -130,7 +132,7 @@ private:
 	WeakCodeRef weak_rtmpt_server;
 	RtmptServer *unsafe_rtmpt_server;
 
-	Connection *conn;
+	mt_const Connection *conn;
 	void *conn_cb_data;
 	VirtRef ref_data;
 
@@ -162,6 +164,9 @@ private:
     mt_const Timers *timers;
     mt_const PagePool *page_pool;
 
+    mt_const Time session_keepalive_timeout;
+    mt_const bool no_keepalive_conns;
+
   mt_mutex (mutex)
   // {
     typedef IntrusiveList<RtmptConnection, ConnectionList_name> ConnectionList;
@@ -172,11 +177,24 @@ private:
     Uint32 session_id_counter;
   // }
 
-    Mutex mutex;
+    StateMutex mutex;
+
+    static void sessionKeepaliveTimerTick (void *_session);
 
     mt_mutex (mutex) void destroyRtmptSession (RtmptSession * mt_nonnull session);
 
     mt_mutex (mutex) void destroyRtmptConnection (RtmptConnection * mt_nonnull rtmpt_conn);
+
+  mt_iface (Sender::Frontend)
+    static Sender::Frontend const sender_frontend;
+
+// TODO
+//    void senderStateChanged (Sender::SendState  send_state,
+//			     void              *_rtmpt_conn);
+
+    static void senderClosed (Exception *exc_,
+			      void      *_rtmpt_conn);
+  mt_iface_end()
 
   mt_iface (RtmpConnection::Backend)
   // {
@@ -244,13 +262,14 @@ public:
 	this->page_pool = page_pool;
     }
 
-    RtmptServer (Object * const coderef_container)
-	: DependentCodeReferenced (coderef_container),
-	  timers (NULL),
-	  page_pool (NULL),
-	  session_id_counter (1)
+    mt_const void init (Time const session_keepalive_timeout,
+			bool const no_keepalive_conns)
     {
+	this->session_keepalive_timeout = session_keepalive_timeout;
+	this->no_keepalive_conns = no_keepalive_conns;
     }
+
+    RtmptServer (Object *coderef_container);
 
     ~RtmptServer ();
 };

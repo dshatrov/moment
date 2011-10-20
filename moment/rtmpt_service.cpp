@@ -67,6 +67,8 @@ RtmptService::connectionClosed (void * const _conn_data,
 bool
 RtmptService::acceptOneConnection ()
 {
+    logD_ (_func_);
+
     TcpConnection * const tcp_conn = new TcpConnection (NULL /* coderef_container */);
     assert (tcp_conn);
     {
@@ -83,6 +85,7 @@ RtmptService::acceptOneConnection ()
 	}
 
 	assert (res == TcpServer::AcceptResult::Accepted);
+	logD_ (_func, "Connection accepted");
     }
 
     Ref<ConnectionData> const conn_data = grab (new ConnectionData);
@@ -113,6 +116,8 @@ RtmptService::accepted (void * const _self)
 {
     RtmptService * const self = static_cast <RtmptService*> (_self);
 
+    logD_ (_func_);
+
     for (;;) {
 	if (!self->acceptOneConnection ())
 	    break;
@@ -120,8 +125,11 @@ RtmptService::accepted (void * const _self)
 }
 
 mt_throws Result
-RtmptService::init ()
+RtmptService::init (Time const session_keepalive_timeout,
+		    bool const no_keepalive_conns)
 {
+    rtmpt_server.init (session_keepalive_timeout, no_keepalive_conns);
+
     if (!tcp_server.open ())
 	return Result::Failure;
 

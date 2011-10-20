@@ -29,29 +29,29 @@
 	Byte date_buf [timeToString_BufSize]; \
 	Size const date_len = timeToString (Memory::forObject (date_buf), getUnixtime());
 
-#define RTMPT_SERVER__COMMON_HEADERS \
+#define RTMPT_SERVER__COMMON_HEADERS(keepalive) \
 	"Server: Moment/1.0\r\n" \
 	"Date: ", ConstMemory (date_buf, date_len), "\r\n" \
-	"Connection: Keep-Alive\r\n" \
+	"Connection: ", (keepalive) ? "Keep-Alive" : "Close", "\r\n" \
 	"Cache-Control: no-cache\r\n"
 
-#define RTMPT_SERVER__OK_HEADERS \
-	"HTTP/1.1 200 OK\r\n" \
-	RTMPT_SERVER__COMMON_HEADERS
+#define RTMPT_SERVER__OK_HEADERS(keepalive) \
+	"HTTP/1.", ((keepalive) ? "1" : "1"), " 200 OK\r\n" \
+	RTMPT_SERVER__COMMON_HEADERS(keepalive)
 
-#define RTMPT_SERVER__FCS_OK_HEADERS \
-	RTMPT_SERVER__OK_HEADERS \
+#define RTMPT_SERVER__FCS_OK_HEADERS(keepalive) \
+	RTMPT_SERVER__OK_HEADERS(keepalive) \
 	"Content-Type: application/x-fcs\r\n" \
 
-#define RTMPT_SERVER__404_HEADERS \
-	"HTTP/1.1 404 Not found\r\n" \
-	RTMPT_SERVER__COMMON_HEADERS \
+#define RTMPT_SERVER__404_HEADERS(keepalive) \
+	"HTTP/1.", (keepalive) ? "1" : "1", " 404 Not found\r\n" \
+	RTMPT_SERVER__COMMON_HEADERS(keepalive) \
 	"Content-Type: text/plain\r\n" \
 	"Content-Length: 0\r\n"
 
-#define RTMPT_SERVER__400_HEADERS \
-	"HTTP/1.1 400 Bad Request\r\n" \
-	RTMPT_SERVER__COMMON_HEADERS \
+#define RTMPT_SERVER__400_HEADERS(keepalive) \
+	"HTTP/1.", (keepalive) ? "1" : "1", " 400 Bad Request\r\n" \
+	RTMPT_SERVER__COMMON_HEADERS(keepalive) \
 	"Content-Type: text/plain\r\n" \
 	"Content-Length: 0\r\n"
 
@@ -61,8 +61,13 @@ using namespace M;
 namespace Moment {
 
 namespace {
-LogGroup libMary_logGroup_rtmpt ("rtmpt", LogLevel::I);
+LogGroup libMary_logGroup_rtmpt ("rtmpt", LogLevel::N);
 }
+
+Sender::Frontend const RtmptServer::sender_frontend = {
+    NULL, // sendStateChanged
+    senderClosed
+};
 
 RtmpConnection::Backend const RtmptServer::rtmp_conn_backend = {
     rtmpClosed
@@ -216,22 +221,67 @@ RtmptServer::RtmptSender::~RtmptSender ()
 RtmptServer::RtmptSession::RtmptSession (RtmptServer * const rtmpt_server,
 					 Timers      * const timers,
 					 PagePool    * const page_pool)
-    : weak_rtmpt_server (rtmpt_server),
+    : valid (true),
+      session_id (0),
+      weak_rtmpt_server (rtmpt_server),
       unsafe_rtmpt_server (rtmpt_server),
-      rtmp_conn (this /* coderef_containter */, timers, page_pool)
+      rtmp_conn (this /* coderef_containter */, timers, page_pool),
+      last_msg_time (0)
 {
 //    logD_ (_func, "0x", fmt_hex, (UintPtr) this);
 }
 
 RtmptServer::RtmptSession::~RtmptSession ()
 {
-//    logD_ (_func, "0x", fmt_hex, (UintPtr) this);
+    logD_ (_func, "0x", fmt_hex, (UintPtr) this);
+}
+
+void
+RtmptServer::sessionKeepaliveTimerTick (void * const _session)
+{
+    logD_ (_func_);
+
+    RtmptSession * const session = static_cast <RtmptSession*> (_session);
+
+    CodeRef rtmpt_server_ref;
+    if (session->weak_rtmpt_server.isValid()) {
+	rtmpt_server_ref = session->weak_rtmpt_server;
+	if (!rtmpt_server_ref)
+	    return;
+    }
+    RtmptServer * const self = session->unsafe_rtmpt_server;
+
+    self->mutex.lock ();
+    if (!session->valid) {
+	self->mutex.unlock ();
+	return;
+    }
+
+    Time const cur_time = getTime();
+    if (cur_time >= session->last_msg_time &&
+	cur_time - session->last_msg_time >= self->session_keepalive_timeout)
+    {
+	logE_ (_func, "RTMPT session timeout");
+	self->destroyRtmptSession (session);
+    }
+
+    self->mutex.unlock ();
 }
 
 mt_rev (11.06.18)
 mt_mutex (mutex) void
 RtmptServer::destroyRtmptSession (RtmptSession * const mt_nonnull session)
 {
+    logD_ (_func, "session 0x", fmt_hex, (UintPtr) session);
+
+    session->valid = false;
+
+    if (session->session_keepalive_timer) {
+	logD_ (_func, "deleting session_keepalive_timer");
+	timers->deleteTimer (session->session_keepalive_timer);
+	session->session_keepalive_timer = NULL;
+    }
+
     session->rtmp_conn.close_noBackendCb ();
     // Last unref.
     session_map.remove (session->session_map_entry);
@@ -245,6 +295,28 @@ RtmptServer::destroyRtmptConnection (RtmptConnection * const mt_nonnull rtmpt_co
 
     conn_list.remove (rtmpt_conn);
     rtmpt_conn->unref ();
+}
+
+void
+RtmptServer::senderClosed (Exception * const /* exc_ */,
+			   void      * const _rtmpt_conn)
+{
+    RtmptConnection * const rtmpt_conn = static_cast <RtmptConnection*> (_rtmpt_conn);
+
+    CodeRef rtmpt_server_ref;
+    if (rtmpt_conn->weak_rtmpt_server.isValid()) {
+	rtmpt_server_ref = rtmpt_conn->weak_rtmpt_server;
+	if (!rtmpt_server_ref)
+	    return;
+    }
+    RtmptServer * const self = rtmpt_conn->unsafe_rtmpt_server;
+
+    self->frontend.call (self->frontend->closed, /*(*/ rtmpt_conn->conn_cb_data /*)*/);
+    rtmpt_conn->conn->close ();
+
+    self->mutex.lock ();
+    self->destroyRtmptConnection (rtmpt_conn);
+    self->mutex.unlock ();
 }
 
 mt_rev (11.06.18)
@@ -261,9 +333,21 @@ RtmptServer::rtmpClosed (void * const _session)
     }
     RtmptServer * const self = session->unsafe_rtmpt_server;
 
-    // TODO delete session keepalive timer
-
     self->mutex.lock ();
+    if (!session->valid) {
+	self->mutex.unlock ();
+	return;
+    }
+    session->valid = false;
+
+    logD_ (_func, "session 0x", fmt_hex, (UintPtr) session);
+
+    if (session->session_keepalive_timer) {
+	logD_ (_func, "deleting session_keepalive_timer");
+	self->timers->deleteTimer (session->session_keepalive_timer);
+	session->session_keepalive_timer = NULL;
+    }
+
     // Last unref.
     self->session_map.remove (session->session_map_entry);
     self->mutex.unlock ();
@@ -282,7 +366,7 @@ RtmptServer::sendDataInReply (RtmptConnection * const mt_nonnull rtmpt_conn,
     rtmpt_conn->conn_sender.send (
 	    page_pool,
 	    false /* do_flush */,
-	    RTMPT_SERVER__FCS_OK_HEADERS
+	    RTMPT_SERVER__FCS_OK_HEADERS(!no_keepalive_conns)
 	    "Content-Length: ", 1 /* idle interval */ + session->rtmpt_sender.pending_data_len, "\r\n"
 	    "\r\n",
 	    // TODO Variable idle intervals.
@@ -319,13 +403,22 @@ RtmptServer::doOpen (RtmptConnection * const rtmpt_conn)
 
     session->session_map_entry = session_map.add (session);
 
-    // TODO Setup session keepalive timer
+    {
+	Time const timeout = session_keepalive_timeout >= 10 ? 10 : session_keepalive_timeout;
+	logD_ (_func, "session_keepalive_timer period: ", timeout);
+	// Checking for session timeout at least each 10 seconds.
+	session->session_keepalive_timer = timers->addTimer (sessionKeepaliveTimerTick,
+							     session,
+							     session /* coderef_container */,
+							     timeout,
+							     true /* periodical */);
+    }
 
     RTMPT_SERVER__HEADERS_DATE
     rtmpt_conn->conn_sender.send (
 	    page_pool,
 	    true /* do_flush */,
-	    RTMPT_SERVER__FCS_OK_HEADERS
+	    RTMPT_SERVER__FCS_OK_HEADERS(!no_keepalive_conns)
 	    "Content-Length: ", toString (Memory(), session->session_id) + 1 /* for \n */, "\r\n"
 	    "\r\n",
 	    session->session_id,
@@ -345,16 +438,18 @@ RtmptServer::doSend (RtmptConnection * const rtmpt_conn,
 
     SessionMap::Entry session_entry = session_map.lookup (session_id);
     if (session_entry.isNull()) {
+	logD_ (_func, "Session not found: ", session_id);
 	RTMPT_SERVER__HEADERS_DATE
 	rtmpt_conn->conn_sender.send (
 		page_pool,
 		true /* do_flush */,
-		RTMPT_SERVER__404_HEADERS
+		RTMPT_SERVER__404_HEADERS(!no_keepalive_conns)
 		"\r\n");
 	return;
     }
 
     Ref<RtmptSession> const &session = session_entry.getData();
+    session->last_msg_time = getTime();
     // Message body will be directed into the specified session
     // in httpMessageBody().
     rtmpt_conn->cur_req_session = session;
@@ -368,16 +463,18 @@ RtmptServer::doIdle (RtmptConnection * const rtmpt_conn,
 {
     SessionMap::Entry session_entry = session_map.lookup (session_id);
     if (session_entry.isNull()) {
+	logD_ (_func, "Session not found: ", session_id);
 	RTMPT_SERVER__HEADERS_DATE
 	rtmpt_conn->conn_sender.send (
 		page_pool,
 		true /* do_flush */,
-		RTMPT_SERVER__404_HEADERS
+		RTMPT_SERVER__404_HEADERS(!no_keepalive_conns)
 		"\r\n");
 	return;
     }
 
     Ref<RtmptSession> const &session = session_entry.getData();
+    session->last_msg_time = getTime();
     sendDataInReply (rtmpt_conn, session);
 }
 
@@ -388,11 +485,12 @@ RtmptServer::doClose (RtmptConnection * const rtmpt_conn,
 {
     SessionMap::Entry session_entry = session_map.lookup (session_id);
     if (session_entry.isNull()) {
+	logD_ (_func, "Session not found: ", session_id);
 	RTMPT_SERVER__HEADERS_DATE
 	rtmpt_conn->conn_sender.send (
 		page_pool,
 		true /* do_flush */,
-		RTMPT_SERVER__404_HEADERS
+		RTMPT_SERVER__404_HEADERS(!no_keepalive_conns)
 		"\r\n");
 	return;
     }
@@ -406,7 +504,7 @@ RtmptServer::doClose (RtmptConnection * const rtmpt_conn,
     rtmpt_conn->conn_sender.send (
 	    page_pool,
 	    true /* do_flush */,
-	    RTMPT_SERVER__OK_HEADERS
+	    RTMPT_SERVER__OK_HEADERS(!no_keepalive_conns)
 	    "Content-Type: text/plain\r\n"
 	    "Content-Length: 0\r\n"
 	    "\r\n");
@@ -457,11 +555,14 @@ RtmptServer::httpRequest (HttpRequest * const req,
 	rtmpt_conn->conn_sender.send (
 		self->page_pool,
 		true /* do_flush */,
-		RTMPT_SERVER__400_HEADERS
+		RTMPT_SERVER__400_HEADERS(!self->no_keepalive_conns)
 		"\r\n");
     }
 
     self->mutex.unlock ();
+
+    if (self->no_keepalive_conns)
+	rtmpt_conn->conn_sender.closeAfterFlush ();
 }
 
 mt_rev (11.06.18)
@@ -582,6 +683,7 @@ RtmptServer::addConnection (Connection              * const mt_nonnull conn,
     rtmpt_conn->conn = conn;
     rtmpt_conn->conn_cb_data = conn_cb_data;
     rtmpt_conn->ref_data = ref_data;
+    rtmpt_conn->conn_sender.setFrontend (CbDesc<Sender::Frontend> (&sender_frontend, rtmpt_conn, rtmpt_conn));
     rtmpt_conn->conn_sender.setConnection (conn);
     rtmpt_conn->conn_receiver.setConnection (conn);
     rtmpt_conn->conn_receiver.setFrontend (rtmpt_conn->http_server.getReceiverFrontend ());
@@ -593,6 +695,16 @@ RtmptServer::addConnection (Connection              * const mt_nonnull conn,
     mutex.unlock ();
 
 //    logD_ (_func, "new rtmpt_conn refcount: ", rtmpt_conn->getRefCount());
+}
+
+RtmptServer::RtmptServer (Object * const coderef_container)
+    : DependentCodeReferenced (coderef_container),
+      timers (NULL),
+      page_pool (NULL),
+      session_keepalive_timeout (30),
+      no_keepalive_conns (false),
+      session_id_counter (1)
+{
 }
 
 mt_rev (11.06.18)
