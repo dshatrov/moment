@@ -97,6 +97,21 @@
     Если установка прошла успешно, то по этому адресу откроется страница приветствия.
   </p>
 
+  <moment_subsection>
+    Параметры командной строки
+  </moment_subsection>
+
+  <p>Параметры, которые можно указать видеосерверу при запуске:</p>
+
+  <moment_params>
+    <p><b>-c --config</b> &lt;config_file&gt;  &mdash; Configuration file to use (default: /opt/moment/moment.conf)</p>
+    <p><b>-l --log</b> &lt;log_file&gt;        &mdash; Log file to use (default: /var/log/moment.log)</p>
+    <p><b>--loglevel</b> &lt;loglevel&gt;      &mdash; Loglevel, one of A/D/I/W/E/H/F/N (default: I, "Info")</p>
+    <p><b>-d --daemonize</b>                   &mdash; Daemonize (run in the background as a daemon).</p>
+    <p><b>--exit-after</b> &lt;number&gt;      &mdash; Exit after specified timeout in seconds.</p>
+    <p><b>-h --help</b>                        &mdash; Show this help message.</p>
+  </moment_params>
+
 </content>
 </moment>
 

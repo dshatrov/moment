@@ -91,7 +91,7 @@
       <li>
 	Встроенная <b>возможность получать видео из
 	широкого спектра источников</b>, в том числе с IP-камер и камер, подключенных локально, с серверов потокового
-	вещания по протоколам HTTP, MMS, RTSP, из файлов asf, avi, 3gp/mp4/mov, flv, mpeg-ps/ts, mkv/webm,
+	вещания по протоколам HTTP, MMS, RTSP, из потоков MJPEG, из файлов asf, avi, 3gp/mp4/mov, flv, mpeg-ps/ts, mkv/webm,
 	mxf, ogg.
       </li>
     </ul>
@@ -111,9 +111,42 @@
 
   <p>
     В таблице приведены результаты измерения производительности видеосервера при отдаче
-    видеопотока 500 Кбит/сек на системе с процессором Intel Pentium Dual-Core 2.4 ГГц.
+    видеопотока 500 Кбит/сек на 64-битной системе с процессором Intel Core i7 2600.
     В тесте задействовано только одно процессорное ядро. Под требуемым объёмом оперативной памяти понимается
     объём памяти, занятой процессом видеосервера.
+  </p>
+
+  <table class="moment_table" style="text-align: right" cellpadding="0" cellspacing="0">
+    <tr>
+      <td style="background-color: #f7f7f7; border-bottom: 1px solid #c0c0c0">
+        Кол-во клиентов
+      </td>
+      <td style="background-color: #eaeaea; border-bottom: 1px solid #c0c0c0">
+        Загруженность процессорного ядра
+      </td>
+      <td style="background-color: #f7f7f7; border-bottom: 1px solid #c0c0c0">
+       Объём оперативной памяти
+      </td>
+    </tr>
+    <tr>
+      <td style="background-color: #fafafa; border-bottom: 1px solid #e0e0e0">1000</td>
+      <td style="background-color: #f1f1f1; border-bottom: 1px solid #e0e0e0">8%</td>
+      <td style="background-color: #fafafa; border-bottom: 1px solid #e0e0e0">130 Мб</td>
+    </tr>
+    <tr>
+      <td style="background-color: #fafafa; border-bottom: 1px solid #e0e0e0">5000</td>
+      <td style="background-color: #f1f1f1; border-bottom: 1px solid #e0e0e0">41%</td>
+      <td style="background-color: #fafafa; border-bottom: 1px solid #e0e0e0">210 Мб</td>
+    </tr>
+    <tr>
+      <td style="background-color: #fafafa">10000</td>
+      <td style="background-color: #f1f1f1">95%</td>
+      <td style="background-color: #fafafa">360 Мб</td>
+    </tr>
+  </table>
+
+  <p>
+    Результаты аналогичного теста, проведённого на 32-битной системе бюджетного класса с процессором Intel Pentium Dual-Core 2.4 ГГц:
   </p>
 
   <table class="moment_table" style="text-align: right" cellpadding="0" cellspacing="0">

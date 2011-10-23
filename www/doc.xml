@@ -35,6 +35,7 @@
     <dd>
       <dl>
 	<dt><a href="doc_config.ru.html#config">Основной конфигурационный файл</a></dt>
+	<dt><a href="doc_config.ru.html#flashsrc">Получение видео от Flash-клиентов</a></dt>
 	<dt><a href="doc_config.ru.html#transcoding">Захват и перекодирование видео</a></dt>
 	<dt><a href="doc_config.ru.html#ipcam">Захват видео с IP-камер</a></dt>
 	<dt><a href="doc_config.ru.html#cam">Захват видео с локальных камер</a></dt>
@@ -60,7 +61,7 @@
     </dd>
     <dd>
     </dd>
-    <dt class="toc_single"><a href="doc_cluster.ru.html">Кластеризация</a></dt>
+<!--    <dt class="toc_single"><a href="doc_cluster.ru.html">Кластеризация</a></dt> -->
     <dt class="toc_single"><a href="doc_stress.ru.html">Нагрузочное тестирование</a></dt>
     <dt><a href="doc_examples.ru.html">Примеры использования</a></dt>
     <dd>

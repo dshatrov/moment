@@ -421,7 +421,7 @@ http {
 <pre>
   chain = "souphttpsrc location=http://192.168.0.1/mjpg/video.mjpg ! \
            multipartdemux ! jpegdec ! ffmpegcolorspace !             \
-           x264enc speed-preset=ultrafast profile=low bitrate=500 !  \
+           x264enc speed-preset=ultrafast bitrate=500 !  \
            fakesink name=video"
 </pre>
 
@@ -588,6 +588,44 @@ mod_gst {
 }
 </pre>
 
+  <p>
+    &laquo;Момент&raquo; поволяет обновлять плейлист и изменять позицию воспроизведения видеопотока
+    во время работы через административные HTTP-запросы (методы POST или GET).
+    Запрос для обновления плейлиста имеет следующий вид:
+  </p>
+    
+  <moment_params>
+    <p>
+      http://хост:порт/moment_admin/<b>update_playlist</b> или <b>update_playlist_now</b>/<b>название_канала</b>
+    </p>
+  </moment_params>
+
+  <p>
+    Запрос update_playlist_now выполняет переключение на новый плейлист немедленно, прерывая воспроизведение
+    текущего элемента. Запрос update_playlist даёт текущему элементу доиграть до конца. Пример URI
+    для обновления плейлиста для канала "channel":
+  </p>
+
+<pre>
+http://localhost:8082/moment_admin/update_playlist_now/channel
+</pre>
+ 
+  <p>
+    Запрос для установки позиции воспроизведения:
+  </p>
+
+  <moment_params>
+    <p>
+      http://хост:порт/moment_admin/set_position/<b>название_канала</b>/<b>номер либо id элемента</b>/<b>время</b>
+    </p>
+  </moment_params>
+
+  <p>Пример URI для перемотки на позицию 1 час 45 мин первого элемента плейлиста для канала "video":</p>
+
+<pre>
+http://localhost:8082/moment_admin/set_position/video/1/1:45:40
+</pre>
+ 
   <a name="recording">
     <moment_section>
       <eng>Recording video</eng>
@@ -652,7 +690,6 @@ mod_gst {
   }
 }
 </pre>
-
 
 </content>
 </moment>
