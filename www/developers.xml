@@ -16,7 +16,7 @@
 
   <p>
     <eng>Source code of Moment VS is hosted <a href="http://github.com/erdizz">at GitHub</a>. The server is written in C++.</eng>
-    <rus>Исходный код видеосервера &laquo;Moment&raquo; размещён <a href="http://github.com/erdizz">на GitHub</a>. Сервер написан на C++.</rus>
+    <rus>Исходный код видеосервера &laquo;Момент&raquo; размещён <a href="http://github.com/erdizz">на GitHub</a>. Сервер написан на C++.</rus>
   </p>
 
   <p>
@@ -99,6 +99,15 @@
     </eng>
     <rus>
       Код приложения &laquo;MyPlayer&raquo; находится в модуле moment, в поддиректориях flash/mysubscriber и web/myplayer.
+    </rus>
+  </p>
+
+  <p>
+    <eng>
+      Source code of VideoChat web app is located at "mychat" git module.
+    </eng>
+    <rus>
+      Код приложения &laquo;Видеозвонки&raquo; находится в модуле mychat.
     </rus>
   </p>
 </content>

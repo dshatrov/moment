@@ -412,7 +412,7 @@
 	<div style="white-space: nowrap; line-height: 1.33">
 	  <eng>Follow <a href="quickstart.html">these quick instructions</a><br/>to get Moment VS up and running.</eng>
   <!--    <rus>Следуйте <a href="quickstart.ru.html">этим простым инструкциям</a>,<br/> чтобы запустить &laquo;Moment&raquo;.</rus> -->
-	  <rus><a href="quickstart.ru.html">Простые инструкции</a> помогут<br/>запустить &laquo;Moment&raquo;.</rus>
+	  <rus><a href="quickstart.ru.html">Простые инструкции</a> помогут<br/>запустить видеосервер.</rus>
 	</div>
       </div>
     </div>

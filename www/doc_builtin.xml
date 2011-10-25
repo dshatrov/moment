@@ -18,13 +18,13 @@
     <dl>
       <dt>
 	<a href="doc_builtin.ru.html#player">
-	  <eng>Video player</eng>
+	  <eng>Video Player</eng>
 	  <rus>Видеоплеер</rus>
 	</a>
       </dt>
       <dt>
 	<a href="doc_builtin.ru.html#phone">
-	  <eng>Video phone</eng>
+	  <eng>Video Phone</eng>
 	  <rus>Видеозвонки</rus>
 	</a>
       </dt>
@@ -33,60 +33,73 @@
 
   <a name="player">
     <moment_section>
-      <eng>Video player</eng>
+      <eng>Video Player</eng>
       <rus>Видеоплеер</rus>
     </moment_section>
   </a>
 
-  <div style="text-align: center; padding-top: 1em; padding-bottom: 1em">
+<!--  <div style="text-align: left; /* padding-top: 1em; padding-bottom: 1em */"> -->
     <a href="img/myplayer_big.png"><img src="img/myplayer.png"/></a>
-    <img style="margin-left: 2em" src="http://momentvideo.org/wiki/images/thumb/7/7c/Myplayer.png/180px-Myplayer.png"/>
-  </div>
+<!--    <img style="margin-left: 2em" src="http://momentvideo.org/wiki/images/thumb/7/7c/Myplayer.png/180px-Myplayer.png"/> -->
+<!--  </div> -->
 
   <p>
-    Приложение &laquo;Видеоплеер&raquo; позволяет пользователям смотреть видео
-    с сервера &laquo;Момент&raquo; через веб-браузер.
+    <eng>Video Player app allows users to watch video from Moment Video Server in a web browser.</eng>
+    <rus>Приложение &laquo;Видеоплеер&raquo; позволяет пользователям смотреть видео
+    с сервера &laquo;Момент&raquo; через веб-браузер.</rus>
   </p>
   
   <p>
-    &laquo;Видеоплеер&raquo; представляет
+    <eng>Video Player consists of a video display field and a list of available channels to the right of the video.
+    Users can watch video in fullscreen mode, scale it to full horizontal screen size and show/hide the list of
+    channels using control buttons at the bottom right corner of the video field.</eng>
+    <rus>&laquo;Видеоплеер&raquo; представляет
     собой поле с видеоизображением и список список каналов, расположенный справа от видео.
     Пользователь может развернуть видео на весь экран, масштабировать видео по горизонтальным границам экрана
-    и скрыть/показать список воспроизведения с помощью кнопок управления в правом нижнем углу поля с видео.
+    и скрыть/показать список воспроизведения с помощью кнопок управления в правом нижнем углу поля с видео.</rus>
   </p>
 
   <p>
-    Для изменения списка каналов нужно отредактировать файл /opt/moment/myplayer/playlist.json (файл в формате JSON).
-    Пример списка каналов:
+    <eng>To change the list of available channels, one should edit /opt/moment/myplayer/playlist.json file (JSON file format).
+    Channel list example:</eng>
+    <rus>Для изменения списка каналов нужно отредактировать файл /opt/moment/myplayer/playlist.json (файл в формате JSON).
+    Пример списка каналов:</rus>
   </p>
 
 <pre>
 [
-  [ "Test Channel",  "rtmp://192.168.0.10:1935", "testChannel" ],
-  [ "Дикая природа", "rtmpt://10.0.0.2:8080",    "wild" ],
+  [ "Test Channel", "rtmp://192.168.0.10:1935", "testChannel" ],
+  [ "<eng>Wild Nature</eng><rus>Дикая природа</rus>"<eng>  </eng> "rtmpt://10.0.0.2:8080",    "wild" ],
 ]
 </pre>
 
   <a name="phone">
     <moment_section>
-      <eng>Video phone</eng>
+      <eng>Video Phone</eng>
       <rus>Видеозвонки</rus>
     </moment_section>
   </a>
 
+  <a href="img/mychat_big.png"><img src="img/mychat.png"/></a>
+
   <p>
-    Приложение &laquo;Видеозвонки&raquo; позволяет двум пользователям общаться между сообой с передачей видео, звука и
-    текстовых сообщений.
+    <eng>Video Phone app lets two users talk to each other with video, audio and text messages.</eng>
+    <rus>Приложение &laquo;Видеозвонки&raquo; позволяет двум пользователям общаться между сообой с передачей видео, звука и
+    текстовых сообщений.</rus>
   </p>
   
   <p>
-    Перед началом разговора пользователь вводит код разговора. Между пользователями, которые ввели
-    одинаковый код, устанавливается соединение.
+    <eng>Before conversation starts, user enters conversation code. Users who have entered the same
+    conversation codes get connected.</eng>
+    <rus>Перед началом разговора пользователь вводит код разговора. Между пользователями, которые ввели
+    одинаковый код, устанавливается соединение.</rus>
   </p>
 
   <p>
-    Для правильной работы приложения необходимо указать адрес видеосервера в файле /opt/moment/mychat/server.json<br/>
-    Пример содержимого файла server.json:
+    <eng>For the Video Phone app to work properly, one must set video server's address in /opt/moment/mychat/server.json
+    file. Example of server.json contents:</eng>
+    <rus>Для правильной работы приложения необходимо указать адрес видеосервера в файле /opt/moment/mychat/server.json<br/>
+    Пример содержимого файла server.json:</rus>
   </p>
 
 <pre>"rtmpt://127.0.0.1:8081/mychat"</pre>

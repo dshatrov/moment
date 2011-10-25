@@ -16,9 +16,18 @@
 
   <moment_toc>
     <dl>
-      <dt><a href="doc_install.ru.html#linux">Установка в Linux-системах</a></dt>
-      <dt><a href="doc_install.ru.html#freebsd">Установка на FreeBSD</a></dt>
-      <dt><a href="doc_install.ru.html#run">Запуск видеосервера</a></dt>
+      <dt>
+	<eng><a href="doc_install.html#linux">Installation on Linux</a></eng>
+	<rus><a href="doc_install.ru.html#linux">Установка в Linux</a></rus>
+      </dt>
+      <dt>
+	<eng><a href="doc_install.html#freebsd">Installation on FreeBSD</a></eng>
+	<rus><a href="doc_install.ru.html#freebsd">Установка на FreeBSD</a></rus>
+      </dt>
+      <dt>
+	<eng><a href="doc_install.html#run">Running the server</a></eng>
+	<rus><a href="doc_install.ru.html#run">Запуск видеосервера</a></rus>
+      </dt>
     </dl>
   </moment_toc>
 
@@ -55,8 +64,10 @@
   </a>
 
   <p>
-    Для установки сервера &laquo;Момент&raquo; на FreeBSD необходимо собрать его из исходных кодов
-    в соответствии с <a href="developers.ru.html">инструкцией по сборке</a>.
+    <eng>Installation on FreeBSD requires compiling the server from sources according to
+    <a href="developers.html">buidling instructions</a>.</eng>
+    <rus>Для установки сервера &laquo;Момент&raquo; на FreeBSD необходимо собрать его из исходных кодов
+    в соответствии с <a href="developers.ru.html">инструкцией по сборке</a>.</rus>
   </p>
 
   <a name="run">
@@ -67,9 +78,11 @@
   </a>
 
   <p>
-    Перед запуском выполните настройку видеосервера.<br/>Процесс настройки описан в <a href="doc_config.ru.html">разделе о настройке</a>.
+    <eng>Configure the server before launching it. Refer to <a href="doc_config.html">"Configuration" section</a> for details.
+    You can also make a quick initial setup by following <a href="quickstart.html">quickstart guideline</a>.</eng>
+    <rus>Перед запуском выполните настройку видеосервера.<br/>Процесс настройки описан в <a href="doc_config.ru.html">разделе о настройке</a>.
     Также можно выполнить ускоренную настройку сервера, как это описано
-    в <a href="quickstart.ru.html">кратком руководстве по установке</a>.
+    в <a href="quickstart.ru.html">кратком руководстве по установке</a>.</rus>
   </p>
 
   <p>
@@ -93,23 +106,54 @@
   </p>
 
   <p>
-    Проверить работоспособность сервера после запуска можно, зайдя на его страницу в браузере: <a href="http://localhost:8080">http://localhost:8080</a><br/>
-    Если установка прошла успешно, то по этому адресу откроется страница приветствия.
+    <eng>To verify that the server works, open its home page in a browser:</eng>
+    <rus>Проверить работоспособность сервера после запуска можно, зайдя на его страницу в браузере:</rus>
+    <a href="http://localhost:8080">http://localhost:8080</a><br/>
+    <eng>If installation passed fine, you should see a greetings page.</eng>
+    <rus>Если установка прошла успешно, то по этому адресу откроется страница приветствия.</rus>
   </p>
 
   <moment_subsection>
-    Параметры командной строки
+    <eng>Command line options</eng>
+    <rus>Параметры командной строки</rus>
   </moment_subsection>
 
-  <p>Параметры, которые можно указать видеосерверу при запуске:</p>
+  <p>
+    <eng>Server command line options:</eng>
+    <rus>Параметры, которые можно указать видеосерверу при запуске:</rus>
+  </p>
 
   <moment_params>
-    <p><b>-c --config</b> &lt;config_file&gt;  &mdash; Configuration file to use (default: /opt/moment/moment.conf)</p>
-    <p><b>-l --log</b> &lt;log_file&gt;        &mdash; Log file to use (default: /var/log/moment.log)</p>
-    <p><b>--loglevel</b> &lt;loglevel&gt;      &mdash; Loglevel, one of A/D/I/W/E/H/F/N (default: I, "Info")</p>
-    <p><b>-d --daemonize</b>                   &mdash; Daemonize (run in the background as a daemon).</p>
-    <p><b>--exit-after</b> &lt;number&gt;      &mdash; Exit after specified timeout in seconds.</p>
-    <p><b>-h --help</b>                        &mdash; Show this help message.</p>
+    <p>
+      <b>-c --config</b> &lt;<eng>filename</eng><rus>имя_файла</rus>&gt; &mdash;
+      <eng>Configuration file to use. Default: /opt/moment/moment.conf</eng>
+      <rus>Путь к основному конфигурационному файлу. По умолчанию: /opt/moment/moment.conf</rus>
+    </p>
+    <p>
+      <b>-l --log</b> &lt;<eng>filename</eng><rus>имя_файла</rus>&gt; &mdash;
+      <eng>Log file to use. Default: /var/log/moment.log</eng>
+      <rus>Путь к файлу журанала (лог-файлу). По умолчанию: /var/log/moment.log</rus>
+    </p>
+    <p>
+      <b>--loglevel</b> &lt;<eng>loglevel</eng><rus>логлевел</rus>&gt; &mdash;
+      <eng>Loglevel, one of A/D/I/W/E/H/F/N. Default: I, "Info".</eng>
+      <rus>Уровень журналирования: A/D/I/W/E/H/F/N. По умолчанию: I, "Info"</rus>
+    </p>
+    <p>
+      <b>-d --daemonize</b> &mdash;
+      <eng>Daemonize (run in the background as a daemon).</eng>
+      <rus>Запуск в фоновом режиме.</rus>
+    </p>
+    <p>
+      <b>--exit-after</b> &lt;<eng>number</eng><rus>число</rus>&gt; &mdash;
+      <eng>Exit after specified timeout in seconds.</eng>
+      <rus>Завершить работу по прошествии указанного времени в секундах.</rus>
+    </p>
+    <p>
+      <b>-h --help</b> &mdash;
+      <eng>Show help message.</eng>
+      <rus>Показать справку.</rus>
+    </p>
   </moment_params>
 
 </content>
