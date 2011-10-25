@@ -566,6 +566,15 @@ RtmpServer::sendInitialMessages_unlocked (VideoStream::FrameSaver * const mt_non
 	sendVideoMessage (&saved_frame.msg);
     }
 
+    if (frame_saver->getNumSavedSpeexHeaders () > 0) {
+	VideoStream::SavedAudioFrame saved_speex_frames [2];
+	frame_saver->getSavedSpeexHeaders (saved_speex_frames, 2);
+	for (Count i = 0; i < frame_saver->getNumSavedSpeexHeaders(); ++i) {
+	    saved_speex_frames [i].msg.timestamp = 0;
+	    sendAudioMessage (&saved_speex_frames [i].msg);
+	}
+    }
+
     if (frame_saver->getSavedKeyframe (&saved_frame)) {
 	saved_frame.msg.timestamp = 0;
 	sendVideoMessage (&saved_frame.msg);
