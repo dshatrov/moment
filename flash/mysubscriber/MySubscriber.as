@@ -253,8 +253,8 @@ public class MySubscriber extends Sprite
     {
 	trace ("--- reconnectTick");
 
-	if (reconnect_interval < 60000)
-	    reconnect_interval *= 2;
+//	if (reconnect_interval < 60000)
+//	    reconnect_interval *= 2;
 
 	doReconnect ();
     }
@@ -271,6 +271,7 @@ public class MySubscriber extends Sprite
 	    }
 
 	    var stream : NetStream = new NetStream (conn);
+//	    stream.bufferTime = 0.0;
 	    stream.bufferTime = 0.1;
 //	    stream.bufferTime = 0.0;
 //	    stream.bufferTime = 5.0;
@@ -325,14 +326,14 @@ public class MySubscriber extends Sprite
 	    reconnect_interval = 0;
 	} else {
 	    if (!reconnect_interval)
-		reconnect_interval = 2000;
+		reconnect_interval = 5000;
 	}
 
 	/* TEST (uncomment) */
 	if (reconnect_timer) {
 	    clearInterval (reconnect_timer);
 	}
-	reconnect_timer = setInterval (reconnectTick, reconnect ? reconnect_interval : 3000);
+	reconnect_timer = setInterval (reconnectTick, reconnect ? reconnect_interval : 5000);
 	/**/
 
 	channel_uri = uri;
