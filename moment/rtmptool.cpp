@@ -31,7 +31,7 @@ using namespace Moment;
 
 namespace {
 
-LogGroup libMary_logGroup_time ("rtmptool_time", LogLevel::I);
+LogGroup libMary_logGroup_time ("rtmptool_time", LogLevel::N);
 
 class Options
 {
@@ -56,8 +56,8 @@ public:
 	  num_clients (1),
 	  got_server_addr (false),
 	  nonfatal_errors (false),
-	  app_name (grab (new String ("oflaDemo"))),
-	  channel (grab (new String ("red5StreamDemo"))),
+	  app_name (grab (new String ("app"))),
+	  channel (grab (new String ("video"))),
 	  num_threads (0),
 	  report_interval (0)
     {
@@ -499,12 +499,12 @@ printUsage ()
 {
     outs->print ("Usage: rtmptool [options]\n"
 		 "Options:\n"
-		 "  -n --num-clients <number>      Simulate N simultaneous clients (default: 1)\n"
-		 "  -s --server-addr <address>     Server address, IP:PORT (default: localhost:1935)\n"
-		 "  -a --app <string>              Application name (default: oflaDemo)\n"
-		 "  -c --channel <string>          Name of the channel to subscribe to (default: red5StreamDemo)\n"
-		 "  -t --num-threads <number>      Number of threads to spawn (default: 0, use a single thread)\n"
-		 "  -r --report-interval <number>  Interval between video frame reports (default: 0, no reports)\n"
+		 "  -n --num-clients <number>      Simulate N simultaneous clients. Default: 1\n"
+		 "  -s --server-addr <address>     Server address, IP:PORT. Default: localhost:1935\n"
+		 "  -a --app <string>              Application name. Default: app\n"
+		 "  -c --channel <string>          Name of the channel to subscribe to. Default: video\n"
+		 "  -t --num-threads <number>      Number of threads to spawn. Default: 0, use a single thread.\n"
+		 "  -r --report-interval <number>  Interval between video frame reports. Default: 0, no reports.\n"
 		 "  --nonfatal-errors              Do not exit on the first error.\n"
 		 "  -h --help                      Show this help message.\n"
 //		 "  -o --out-file - Output file name.\n"
