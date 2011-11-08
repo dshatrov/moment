@@ -17,12 +17,19 @@
 */
 
 
+#define MOMENT_FILE__CTEMPLATE
+
+
 #include <libmary/types.h>
 #include <cstring>
 
 #include <mycpp/list.h>
 #include <libmary/module_init.h>
 #include <moment/libmoment.h>
+
+#ifdef MOMENT_FILE__CTEMPLATE
+#include <ctemplate/template.h>
+#endif
 
 
 // TODO These header macros are the same as in rtmpt_server.cpp
@@ -74,9 +81,21 @@ public:
     Ref<String> prefix;
 };
 
+Ref<String> this_http_server_addr;
+Ref<String> this_rtmp_server_addr;
+Ref<String> this_rtmpt_server_addr;
+
 MyCpp::List< Ref<PathEntry> > path_list;
 
 PagePool *page_pool = NULL;
+
+static Result momentFile_sendTemplate (ConstMemory  filename,
+				       Sender      * mt_nonnull sender,
+				       ConstMemory  mimet_type);
+
+static Result momentFile_sendMemory (ConstMemory  mem,
+				     Sender      * mt_nonnull sender,
+				     ConstMemory  mime_type);
 
 Result httpRequest (HttpRequest  * const mt_nonnull req,
 		    Sender       * const mt_nonnull conn_sender,
@@ -86,7 +105,7 @@ Result httpRequest (HttpRequest  * const mt_nonnull req,
 {
     PathEntry * const path_entry = static_cast <PathEntry*> (_path_entry);
 
-//    logD_ (_func, "HTTP request: ", req->getRequestLine());
+    logD_ (_func, "HTTP request: ", req->getRequestLine());
 
   // TODO On Linux, we could do a better job with sendfile() or splice().
 
@@ -152,13 +171,23 @@ Result httpRequest (HttpRequest  * const mt_nonnull req,
     }
 
     ConstMemory mime_type = "text/plain";
+    bool try_template = false;
+    Size ext_length = 0;
     {
 	void const * const dot_ptr = memrchr (file_path.mem(), '.', file_path.len());
 	if (dot_ptr) {
 	    ConstMemory const ext = file_path.region ((Byte const *) (dot_ptr) + 1 - file_path.mem());
-	    if (equal (ext, "html"))
+	    if (equal (ext, "html")) {
 		mime_type = "text/html";
-	    else
+		try_template = true;
+		ext_length = 5;
+	    } else
+	    if (equal (ext, "json")) {
+		// application/json doesn't work on client side somewhy.
+		// mime_type = "application/json";
+		try_template = true;
+		ext_length = 0;
+	    } else
 	    if (equal (ext, "css"))
 		mime_type = "text/css";
 	    else
@@ -175,6 +204,7 @@ Result httpRequest (HttpRequest  * const mt_nonnull req,
 		mime_type = "image/jpeg";
 	}
     }
+    logD_ (_func, "try_template: ", try_template);
 
     Ref<String> const filename = makeString (path_entry->path->mem(), !path_entry->path->isNull() ? "/" : "", file_path);
 //    logD_ (_func, "Opening ", filename);
@@ -182,6 +212,22 @@ Result httpRequest (HttpRequest  * const mt_nonnull req,
 			    0 /* open_flags */,
 			    File::AccessMode::ReadOnly);
     if (exc) {
+#ifdef MOMENT_FILE__CTEMPLATE
+	if (try_template) {
+	    if (momentFile_sendTemplate (
+			makeString (filename->mem().region (0, filename->mem().len() - ext_length),
+				    ".tpl")->mem(),
+			conn_sender,
+			mime_type))
+	    {
+		if (!req->getKeepalive())
+		    conn_sender->closeAfterFlush();
+
+		return Result::Success;
+	    }
+	}
+#endif
+
 	logE_ (_func, "Could not open \"", filename, "\": ", exc->toString());
 
 	MOMENT_FILE__HEADERS_DATE;
@@ -219,7 +265,7 @@ Result httpRequest (HttpRequest  * const mt_nonnull req,
     MOMENT_FILE__HEADERS_DATE;
     conn_sender->send (
 	    page_pool,
-	    true /* do_flush */,
+	    true /* do_flush */, // TODO No need to flush here?
 	    MOMENT_FILE__OK_HEADERS (mime_type, stat.size),
 	    "\r\n");
 
@@ -275,6 +321,61 @@ Result httpRequest (HttpRequest  * const mt_nonnull req,
 //    logD_ (_func, "done");
     return Result::Success;
 }
+
+#if 0
+Result httpRequest (HttpRequest  * const mt_nonnull req,
+		    Sender       * const mt_nonnull conn_sender,
+		    Memory const & /* msg_body */,
+		    void        ** const mt_nonnull /* ret_msg_data */,
+		    void         * const _path_entry)
+#endif
+
+#ifdef MOMENT_FILE__CTEMPLATE
+static Result momentFile_sendTemplate (ConstMemory   const filename,
+				       Sender      * const mt_nonnull sender,
+				       ConstMemory   const mime_type)
+{
+    // TODO There should be a better way.
+    ctemplate::mutable_default_template_cache()->ReloadAllIfChanged (ctemplate::TemplateCache::LAZY_RELOAD);
+
+    ctemplate::TemplateDictionary dict ("tmpl");
+    dict.SetValue ("ThisHttpServerAddr", this_http_server_addr->cstr());
+    dict.SetValue ("ThisRtmpServerAddr", this_rtmp_server_addr->cstr());
+    dict.SetValue ("ThisRtmptServerAddr", this_rtmpt_server_addr->cstr());
+    std::string str;
+    if (!ctemplate::ExpandTemplate (grab (new String (filename))->cstr(),
+				    ctemplate::DO_NOT_STRIP,
+				    &dict,
+				    &str))
+    {
+	logD_ ("could not expand template \"", filename, "\": ", str.c_str());
+	return Result::Failure;
+    }
+
+    logD_ ("template \"", filename, "\" expanded: ", str.c_str());
+//    logD_ ("template \"", filename, "\" expanded");
+
+    return momentFile_sendMemory (ConstMemory ((Byte const *) str.data(), str.length()), sender, mime_type);
+}
+
+static Result momentFile_sendMemory (ConstMemory   const mem,
+				     Sender      * const mt_nonnull sender,
+				     ConstMemory   const mime_type)
+{
+    MOMENT_FILE__HEADERS_DATE;
+    sender->send (page_pool,
+		  false /* do_flush */,
+		  MOMENT_FILE__OK_HEADERS (mime_type, mem.len()),
+		  "\r\n");
+
+    PagePool::PageListHead page_list;
+    page_pool->getFillPages (&page_list, mem);
+    // TODO pages of zero length => (behavior - ?)
+    sender->sendPages (page_pool, &page_list, true /* do_flush */);
+
+    return Result::Success;
+}
+#endif
 
 HttpService::HttpHandler http_handler = {
     httpRequest,
@@ -367,6 +468,45 @@ void momentFileInit ()
 	}
     }
 
+    {
+	ConstMemory const opt_name = "moment/this_http_server_addr";
+	ConstMemory const opt_val = config->getString (opt_name);
+	logD_ (_func, opt_name, ": ", opt_val);
+	if (!opt_val.isNull()) {
+	    this_http_server_addr = grab (new String (opt_val));
+	} else {
+	    this_http_server_addr = grab (new String ("127.0.0.1:8080"));
+	    logI_ (_func, opt_name, " config parameter is not set. "
+		   "Defaulting to ", this_http_server_addr);
+	}
+    }
+
+    {
+	ConstMemory const opt_name = "moment/this_rtmp_server_addr";
+	ConstMemory const opt_val = config->getString (opt_name);
+	logD_ (_func, opt_name, ": ", opt_val);
+	if (!opt_val.isNull()) {
+	    this_rtmp_server_addr = grab (new String (opt_val));
+	} else {
+	    this_rtmp_server_addr = grab (new String ("127.0.0.1:1935"));
+	    logI_ (_func, opt_name, " config parameter is not set. "
+		   "Defaulting to ", this_rtmp_server_addr);
+	}
+    }
+
+    {
+	ConstMemory const opt_name = "moment/this_rtmpt_server_addr";
+	ConstMemory const opt_val = config->getString (opt_name);
+	logD_ (_func, opt_name, ": ", opt_val);
+	if (!opt_val.isNull()) {
+	    this_rtmpt_server_addr = grab (new String (opt_val));
+	} else {
+	    this_rtmpt_server_addr = grab (new String ("127.0.0.1:8081"));
+	    logI_ (_func, opt_name, " config parameter is not set. "
+		   "Defaulting to ", this_rtmpt_server_addr);
+	}
+    }
+
     bool got_path = false;
     do {
 	MConfig::Section * const modfile_section = config->getSection ("mod_file");
@@ -389,6 +529,7 @@ void momentFileInit ()
     if (!got_path) {
       // Default setup.
 	momentFile_addPath ("/opt/moment/myplayer", "moment", http_service);
+	momentFile_addPath ("/opt/moment/mychat", "mychat", http_service);
     }
 }
 

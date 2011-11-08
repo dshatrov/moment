@@ -1,6 +1,7 @@
 AC_INIT([Moment], [0.1])
 
-PKG_CHECK_MODULES(THIS, [libmary-1.0 >= 0.1, mconfig-1.0 >= 0.1])
+PKG_CHECK_MODULES(THIS, [libmary-1.0 >= 0.1, mconfig-1.0 >= 0.1, libctemplate >= 1.0])
+#PKG_CHECK_MODULES(THIS, [libmary-1.0 >= 0.1, mconfig-1.0 >= 0.1])
 AC_SUBST(THIS_CFLAGS)
 AC_SUBST(THIS_LIBS)
 
