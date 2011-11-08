@@ -144,14 +144,16 @@ void destroyClientSession (ClientSession * const client_session)
     // TODO class MomentRtmpModule
     MomentServer * const moment = MomentServer::getInstance();
 
+    if (srv_session)
+	moment->clientDisconnected (srv_session);
+
+    // Closing video stream *after* firing clientDisconnected() to avoid
+    // premature closing of client connections in streamClosed().
     if (video_stream)
 	video_stream->close ();
 
     if (video_stream_key)
 	moment->removeVideoStream (video_stream_key);
-
-    if (srv_session)
-	moment->clientDisconnected (srv_session);
 
     client_session->unref ();
 }
@@ -566,7 +568,7 @@ void momentRtmpInit ()
 
     {
 	ConstMemory const opt_name = "mod_rtmp/send_delay";
-	Uint64 send_delay_val = 0;
+	Uint64 send_delay_val = 50;
 	MConfig::GetResult const res = config->getUint64_default (
 		opt_name, &send_delay_val, send_delay_val);
 	if (!res) {
