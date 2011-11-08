@@ -703,7 +703,7 @@ void moment_vlog (MomentLogLevel   const log_level,
 	delete p;
     }
 
-    log_ ((LogLevel::Value) log_level, ConstMemory (p, n));
+    log_ (LogLevel ((LogLevel::Value) log_level), ConstMemory (p, n));
 }
 
 void moment_log_d (char const *fmt, ...)
