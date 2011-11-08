@@ -287,7 +287,7 @@ int main (int argc, char **argv)
     {
 	Uint64 min_pages = default__page_pool__min_pages;
 	{
-	    ConstMemory const opt_name ("page_pool/min_pages");
+	    ConstMemory const opt_name ("moment/min_pages");
 	    ConstMemory const min_pages_mem = config.getString (opt_name);
 	    if (min_pages_mem.len()) {
 		if (!strToUint64_safe (min_pages_mem, &min_pages)) {
