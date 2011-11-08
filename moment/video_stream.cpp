@@ -22,9 +22,8 @@
 
 using namespace M;
 
-namespace {
-LogGroup libMary_logGroup_frame_saver ("frame_saver", LogLevel::N);
-}
+static LogGroup libMary_logGroup_frames ("VideoStream.frames", LogLevel::I);
+static LogGroup libMary_logGroup_frame_saver ("frame_saver", LogLevel::I);
 
 namespace Moment {
 
@@ -320,7 +319,7 @@ VideoStream::FrameSaver::processAudioFrame (AudioMessage * const mt_nonnull msg)
 	case AudioFrameType::AacSequenceHeader: {
 	    logD (frame_saver, _func, msg->frame_type);
 
-	    logD_ (_func, "AAC SEQUENCE HEADER");
+	    logD (frames, _func, "AAC SEQUENCE HEADER");
 
 	    if (got_saved_aac_seq_hdr)
 		saved_aac_seq_hdr.msg.page_pool->msgUnref (saved_aac_seq_hdr.msg.page_list.first);
@@ -331,10 +330,10 @@ VideoStream::FrameSaver::processAudioFrame (AudioMessage * const mt_nonnull msg)
 	    msg->page_pool->msgRef (msg->page_list.first);
 	} break;
 	case AudioFrameType::SpeexHeader: {
-	    logD_ (_func, "SPEEX HEADER");
+	    logD (frames, _func, "SPEEX HEADER");
 
 	    if (saved_speex_headers.getNumElements() >= 2) {
-		logD_ (_func, "Wrapping saved speex headers");
+		logD (frames, _func, "Wrapping saved speex headers");
 		releaseSavedSpeexHeaders ();
 	    }
 
