@@ -82,7 +82,7 @@ void
 FlvMuxer::doMuxMessage (VideoStream::Message * const mt_nonnull msg,
 			Byte const msg_type)
 {
-    logD_ (_func, "ts 0x", fmt_hex, msg->timestamp);
+//    logD_ (_func, "ts 0x", fmt_hex, msg->timestamp);
 
     if (msg->msg_len >= (1 << 24)) {
 	logE (flvmux, _func, "Message is too long (", msg->msg_len, " bytes), dropping it");
