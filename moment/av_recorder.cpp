@@ -26,6 +26,7 @@ namespace Moment {
 
 namespace {
 LogGroup libMary_logGroup_recorder ("av_recorder", LogLevel::I);
+LogGroup libMary_logGroup_recorder_frames ("av_recorder_frames", LogLevel::I);
 }
 
 Sender::Frontend AvRecorder::sender_frontend = {
@@ -36,7 +37,7 @@ Sender::Frontend AvRecorder::sender_frontend = {
 mt_mutex (mutex) void
 AvRecorder::muxInitialMessages ()
 {
-    logD_ (_func_);
+    logD (recorder_frames, _func_);
 
     if (!video_stream)
 	return;
@@ -51,7 +52,7 @@ AvRecorder::muxInitialMessages ()
 	goto _return;
 
     if (frame_saver->getSavedMetaData (&saved_frame)) {
-	logD_ (_func, "metadata");
+	logD (recorder_frames, _func, "metadata");
 	saved_frame.msg.timestamp = 0;
 	if (!muxer->muxVideoMessage (&saved_frame.msg)) {
 	    logE (recorder, _func, "muxer->muxVideoMessage() failed (metadata): ", exc->toString());
@@ -61,7 +62,7 @@ AvRecorder::muxInitialMessages ()
     }
 
     if (frame_saver->getSavedAacSeqHdr (&saved_audio_frame)) {
-	logD_ (_func, "AAC seq hdr");
+	logD (recorder_frames, _func, "AAC seq hdr");
 	saved_audio_frame.msg.timestamp = 0;
 	if (!muxer->muxAudioMessage (&saved_audio_frame.msg)) {
 	    logE (recorder, _func, "muxer->muxAudioMessage() failed (aac seq hdr): ", exc->toString());
@@ -71,7 +72,7 @@ AvRecorder::muxInitialMessages ()
     }
 
     if (frame_saver->getSavedAvcSeqHdr (&saved_frame)) {
-	logD_ (_func, "AVC seq hdr");
+	logD (recorder_frames, _func, "AVC seq hdr");
 	saved_frame.msg.timestamp = 0;
 	if (!muxer->muxVideoMessage (&saved_frame.msg)) {
 	    logE (recorder, _func, "muxer->muxVideoMessage() failed (avc seq hdr): ", exc->toString());
@@ -81,7 +82,7 @@ AvRecorder::muxInitialMessages ()
     }
 
     if (frame_saver->getNumSavedSpeexHeaders () > 0) {
-	logD_ (_func, "Speex headers");
+	logD (recorder_frames, _func, "Speex headers");
 	VideoStream::SavedAudioFrame saved_speex_frames [2];
 	frame_saver->getSavedSpeexHeaders (saved_speex_frames, 2);
 	for (Count i = 0; i < frame_saver->getNumSavedSpeexHeaders(); ++i) {
@@ -95,7 +96,7 @@ AvRecorder::muxInitialMessages ()
     }
 
     if (frame_saver->getSavedKeyframe (&saved_frame)) {
-	logD_ (_func, "keyframe");
+	logD (recorder_frames, _func, "keyframe");
 	saved_frame.msg.timestamp = 0;
 	if (!muxer->muxVideoMessage (&saved_frame.msg)) {
 	    logE (recorder, _func, "muxer->muxVideoMessage() failed (keyframe): ", exc->toString());
@@ -183,13 +184,13 @@ AvRecorder::streamAudioMessage (VideoStream::AudioMessage * const mt_nonnull msg
     }
 
     if (!self->got_first_frame & msg->frame_type.isAudioData()) {
-	logD_ (_func, "first frame (audio)");
+	logD (recorder_frames, _func, "first frame (audio)");
 	self->got_first_frame = true;
 	// Note that integer overflows are possible here and that's fine.
 	self->first_frame_time = msg->timestamp /* - self->cur_frame_time */;
     }
     self->cur_frame_time = msg->timestamp - self->first_frame_time;
-    logD_ (_func, "cur_frame_time: ", self->cur_frame_time, ", got_first_frame: ", self->got_first_frame);
+    logD (recorder_frames, _func, "cur_frame_time: ", self->cur_frame_time, ", got_first_frame: ", self->got_first_frame);
 
     VideoStream::AudioMessage alt_msg = *msg;
     alt_msg.timestamp = self->cur_frame_time;
@@ -221,13 +222,13 @@ AvRecorder::streamVideoMessage (VideoStream::VideoMessage * const mt_nonnull msg
     }
 
     if (!self->got_first_frame && msg->frame_type.isVideoData()) {
-	logD_ (_func, "first frame (video)");
+	logD (recorder_frames, _func, "first frame (video)");
 	self->got_first_frame = true;
 	// Note that integer overflows are possible here and that's fine.
 	self->first_frame_time = msg->timestamp /* - self->cur_frame_time */;
     }
     self->cur_frame_time = msg->timestamp - self->first_frame_time;
-    logD_ (_func, "cur_frame_time: ", self->cur_frame_time, ", got_first_frame: ", self->got_first_frame);
+    logD (recorder_frames, _func, "cur_frame_time: ", self->cur_frame_time, ", got_first_frame: ", self->got_first_frame);
 
     VideoStream::VideoMessage alt_msg = *msg;
     alt_msg.timestamp = self->cur_frame_time;
