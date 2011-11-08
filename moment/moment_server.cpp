@@ -419,7 +419,7 @@ MomentServer::startStreaming (ClientSession * const mt_nonnull client_session,
 			      ConstMemory const stream_name)
 {
     if (client_session->backend
-	&& client_session->backend->startWatching)
+	&& client_session->backend->startStreaming)
     {
 	logD_ (_func, "calling backend->startStreaming()");
 	Ref<VideoStream> video_stream;
@@ -434,6 +434,9 @@ MomentServer::startStreaming (ClientSession * const mt_nonnull client_session,
     }
 
     logD_ (_func, "default path");
+
+    if (!publish_all_streams)
+	return NULL;
 
     Ref<VideoStream> const video_stream = grab (new VideoStream);
     VideoStreamKey const video_stream_key = addVideoStream (video_stream, stream_name);
@@ -604,6 +607,22 @@ MomentServer::init (ServerApp        * const mt_nonnull server_app,
     this->recorder_thread_pool = recorder_thread_pool;
     this->storage = storage;
 
+    {
+	ConstMemory const opt_name = "moment/publish_all";
+	MConfig::Config::BooleanValue const value = config->getBoolean (opt_name);
+	if (value == MConfig::Config::Boolean_Invalid) {
+	    logE_ (_func, "Invalid value for ", opt_name, ": ", config->getString (opt_name),
+		   ", assuming \"", publish_all_streams, "\"");
+	} else {
+	    if (value == MConfig::Config::Boolean_False)
+		publish_all_streams = false;
+	    else
+		publish_all_streams = true;
+
+	    logD_ (_func, opt_name, ": ", publish_all_streams);
+	}
+    }
+
     if (!loadModules ())
 	logE_ (_func, "Could not load modules");
 
@@ -616,7 +635,8 @@ MomentServer::MomentServer ()
       http_service (NULL),
       config (NULL),
       recorder_thread_pool (NULL),
-      storage (NULL)
+      storage (NULL),
+      publish_all_streams (true)
 {
     instance = this;
 }

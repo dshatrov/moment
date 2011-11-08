@@ -214,6 +214,8 @@ private:
     mt_const ServerThreadPool *recorder_thread_pool;
     mt_const Storage *storage;
 
+    mt_const bool publish_all_streams;
+
     mt_mutex (mutex) ClientSessionList client_session_list;
 
     static MomentServer *instance;
@@ -337,6 +339,11 @@ private:
 
 public:
     void removeVideoStream (VideoStreamKey video_stream_key);
+
+    void toAccessLog (ConstMemory addr,
+		      ConstMemory request_line,
+		      unsigned    status_code,
+		      Size        data_length);
 
   // Initialization
 
