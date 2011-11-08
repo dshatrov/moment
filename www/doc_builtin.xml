@@ -39,14 +39,16 @@
   </a>
 
 <!--  <div style="text-align: left; /* padding-top: 1em; padding-bottom: 1em */"> -->
-    <a href="img/myplayer_big.png"><img src="img/myplayer.png"/></a>
+    <a href="img/myplayer_big.png"><img src="img/myplayer_med.png"/></a>
 <!--    <img style="margin-left: 2em" src="http://momentvideo.org/wiki/images/thumb/7/7c/Myplayer.png/180px-Myplayer.png"/> -->
 <!--  </div> -->
 
   <p>
-    <eng>Video Player app allows users to watch video from Moment Video Server in a web browser.</eng>
+    <eng>Video Player app allows users to watch video from Moment Video Server in a web browser.
+    It is available by default with <tt>/moment</tt> URI suffix.</eng>
     <rus>Приложение &laquo;Видеоплеер&raquo; позволяет пользователям смотреть видео
-    с сервера &laquo;Момент&raquo; через веб-браузер.</rus>
+    с сервера &laquo;Момент&raquo; через веб-браузер.
+    По умолчанию &laquo;Видеоплеер&raquo; доступен по URI с суффиксом <tt>/moment</tt></rus>
   </p>
   
   <p>
@@ -83,26 +85,36 @@
   <a href="img/mychat_big.png"><img src="img/mychat.png"/></a>
 
   <p>
-    <eng>Video Phone app lets two users talk to each other with video, audio and text messages.</eng>
+    <eng>Video Phone app lets two users talk to each other with live video, audio and text messages.
+    It is available by default with <tt>/mychat</tt> URI suffix.</eng>
     <rus>Приложение &laquo;Видеозвонки&raquo; позволяет двум пользователям общаться между сообой с передачей видео, звука и
-    текстовых сообщений.</rus>
+    текстовых сообщений. По умолчанию &laquo;Видеозвонки&raquo; доступны по URI с суффиксом <tt>/mychat</tt> .</rus>
   </p>
   
   <p>
     <eng>Before conversation starts, user enters conversation code. Users who have entered the same
     conversation codes get connected.</eng>
-    <rus>Перед началом разговора пользователь вводит код разговора. Между пользователями, которые ввели
+    <rus>Перед началом общения пользователь вводит код разговора. Между пользователями, которые ввели
     одинаковый код, устанавливается соединение.</rus>
   </p>
 
   <p>
-    <eng>For the Video Phone app to work properly, one must set video server's address in /opt/moment/mychat/server.json
-    file. Example of server.json contents:</eng>
-    <rus>Для правильной работы приложения необходимо указать адрес видеосервера в файле /opt/moment/mychat/server.json<br/>
-    Пример содержимого файла server.json:</rus>
+    <eng>For the Video Phone app to work properly, video server's address must be specified in
+    /opt/moment/mychat/index.html file. To do that, change the value of server_uri variable at the beginning of the file
+    (highlighted in bold):</eng>
+    <rus>Для правильной работы приложения необходимо указать адрес видеосервера в начале файла /opt/moment/mychat/index.html,
+    изменив значение переменной server_uri на URI вашего сервера (выделено жирным шрифтом):</rus>
   </p>
 
-<pre>"rtmpt://127.0.0.1:8081/mychat"</pre>
+<pre>
+<![CDATA[<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" ...>
+<html style="height: 100%" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <script type="text/javascript">]]>
+    var <b>server_uri = "rtmp://127.0.0.1:1935/mychat"</b>;
+<![CDATA[  </script>]]>
+</pre>
 
 </content>
 </moment>

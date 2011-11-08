@@ -64,7 +64,7 @@
     </rus>
   </p>
 <pre>mod_gst {
-    streams {
+    sources {
         "news"   = "http://10.0.0.1:8080"
         "nature" = "mms://10.0.0.2"
     }

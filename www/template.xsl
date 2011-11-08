@@ -285,7 +285,9 @@
 <div class="main_div">
 
   <div>
-    <img src="img/logo2.png" alt="Moment Video Server" class="logo_image"/>
+    <a href="http://momentvideo.org">
+      <img src="img/logo2.png" alt="Moment Video Server" class="logo_image"/>
+    </a>
   </div>
 
   <div style="position: absolute; z-index: 10; top: 0; right: 0">
@@ -298,8 +300,20 @@
   <div class="menu" style="text-align: center; position: relative; z-index: 30">
     <img src="img/menubar.png" class="menubar_image"/>
 
-    <eng><a href="index.en.html"><div class="menuitem" style="padding-left: 30px">Home</div></a></eng>
-    <rus><a href="index.ru.html"><div class="menuitem" style="padding-left: 30px">Главная</div></a></rus>
+    <xsl:choose>
+      <xsl:when test="not ($moment_welcome)">
+	<eng><a href="index.en.html"><div class="menuitem" style="padding-left: 30px">Home</div></a></eng>
+	<rus><a href="index.ru.html"><div class="menuitem" style="padding-left: 30px">Главная</div></a></rus>
+      </xsl:when>
+      <xsl:otherwise>
+	<eng><a href="welcome.html"><div class="menuitem" style="padding-left: 30px">Home</div></a></eng>
+	<rus><a href="welcome.ru.html"><div class="menuitem" style="padding-left: 30px">Главная</div></a></rus>
+	<!--
+	<eng><a href="./"><div class="menuitem" style="padding-left: 30px">Home</div></a></eng>
+	<rus><a href="./"><div class="menuitem" style="padding-left: 30px">Главная</div></a></rus>
+	-->
+      </xsl:otherwise>
+    </xsl:choose>
 
     <!--
     <eng><a href="quickstart.html"><div class="menuitem">Quick Start</div></a></eng>
@@ -309,12 +323,17 @@
     <eng><a href="doc.html"><div class="menuitem">Documentation</div></a></eng>
     <rus><a href="doc.ru.html"><div class="menuitem">Документация</div></a></rus>
 
+  <xsl:if test="not ($moment_welcome)">
     <eng><a href="licensing.html"><div class="menuitem">Licensing</div></a></eng>
     <rus><a href="licensing.ru.html"><div class="menuitem">Лицензия</div></a></rus>
 
     <eng><a href="developers.html"><div class="menuitem">Developers</div></a></eng>
     <rus><a href="developers.ru.html"><div class="menuitem">Разработчикам</div></a></rus>
+  </xsl:if>
 
+  <xsl:choose>
+    <xsl:when test="not ($moment_welcome)">
+<!-- English wiki is empty at the moment
     <eng>
       <a href="http://momentvideo.org/wiki/">
         <div class="menuarrow">
@@ -323,6 +342,7 @@
 	</div>
       </a>
     </eng>
+-->
     <rus>
       <a href="http://momentvideo.org/wiki/index.php?title=Moment:Main:Ru">
         <div class="menuarrow">
@@ -331,6 +351,16 @@
 	</div>
       </a>
     </rus>
+    </xsl:when>
+    <xsl:otherwise>
+      <a href="http://momentvideo.org">
+	<div class="menuarrow" style="margin-left: 7em">
+	  <img src="img/arrow.png" style="vertical-align: middle; margin-right: 7px; width: 16px; height: 22px"/>
+	  momentvideo.org
+	</div>
+      </a>
+    </xsl:otherwise>
+  </xsl:choose>
 
     <div class="langbar">
 <!--      <div class="langbar_image_div"> -->
@@ -419,8 +449,16 @@
   </xsl:if>
 
   <div class="footer">
-    <eng>Copyright (c) 2011 <a href="mailto:shatrov@gmail.com">Dmitry Shatrov</a></eng>
-    <rus>(c) 2011 <a href="mailto:shatrov@gmail.com">Дмитрий Шатров</a></rus>
+    <xsl:choose>
+      <xsl:when test="not ($moment_welcome)">
+	<eng>Copyright (c) 2011 <a href="mailto:shatrov@gmail.com">Dmitry Shatrov</a></eng>
+	<rus>(c) 2011 <a href="mailto:shatrov@gmail.com">Дмитрий Шатров</a></rus>
+      </xsl:when>
+      <xsl:otherwise>
+        <eng>Moment Video Server, version 1.2.0</eng>
+	<rus>Видеосервер &laquo;Момент&raquo;, версия 1.2.0</rus>
+      </xsl:otherwise>
+    </xsl:choose>
   </div>
 
 </div>

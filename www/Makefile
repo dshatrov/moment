@@ -1,4 +1,4 @@
-.PHONY: all clean
+.PHONY: all clean fix
 
 all:	index.html              \
         quickstart.html         \
@@ -27,10 +27,10 @@ fix: index.html index.ru.html
 	mv index.html index.en.html
 
 %.html: %.xml template.xsl postprocess.xsl entities.dtd
-	xsltproc --nonet -o "$*.tmp.xml" --stringparam name "$*" --stringparam suffix "" template.xsl "$<"
+	xsltproc --nonet -o "$*.tmp.xml" --stringparam name "$*" --stringparam suffix "" --stringparam moment_welcome "" template.xsl "$<"
 	xsltproc --nonet -o "$*.html" --stringparam lang eng postprocess.xsl "$*.tmp.xml"
 	rm -f "$*.tmp.xml"
-	xsltproc --nonet -o "$*.tmp.xml" --stringparam name "$*" --stringparam suffix ".ru" template.xsl "$<"
+	xsltproc --nonet -o "$*.tmp.xml" --stringparam name "$*" --stringparam suffix ".ru" --stringparam moment_welcome "" template.xsl "$<"
 	xsltproc --nonet -o "$*.ru.html" --stringparam lang rus postprocess.xsl "$*.tmp.xml"
 	rm -f "$*.tmp.xml"
 

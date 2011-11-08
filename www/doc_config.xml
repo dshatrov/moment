@@ -53,11 +53,11 @@
 
   <p>
     <eng>This section describes syntax of configuration files for Moment VS and
-    lists available configuration parameters. Examples of complete setups of the server
-    for typical tasks can be found in <a href="doc_examples.html">"Usage examples" section</a>.</eng>
+    lists available configuration parameters.<!-- Examples of complete setups of the server
+    for typical tasks can be found in <a href="doc_examples.html">"Usage examples" section</a>.--></eng>
     <rus>В этом разделе описывается синтаксис конфигурационных файлов видеосервера и приводится
-    список доступных параметров конфигурации. Примеры полной найстройки сервера для типовых
-    задач можно найти в разделе <a href="doc_examples.ru.html">&laquo;Примеры использования&raquo;</a>.</rus>
+    список доступных параметров конфигурации.<!-- Примеры полной найстройки сервера для типовых
+    задач можно найти в разделе <a href="doc_examples.ru.html">&laquo;Примеры использования&raquo;</a>.--></rus>
   </p>
 
   <a name="config">
@@ -228,6 +228,14 @@ http {
       соединения по протоколу RTMPT. По умолчанию: ":8081"</rus>
     </p>
     <p>
+      <b>mod_rtmp/rtmpt_session_timeout</b> &mdash;
+      <eng>RTMPT client session inactivity timeout, in seconds.
+      Client session is closed after the timeout expires.
+      Default: 30 seconds.</eng>
+      <rus>таймаут неактивности клиентской сессии RTMPT, в секундах. По истечении таймаута сессия закрывается.
+      По умолчанию: 30 сек.</rus>
+    </p>
+    <p>
       <b>mod_rtmp/send_delay</b> &mdash;
       <eng>Sending delay for audio messages in milliseconds. Delayed sending (buffering on the server)
       increases server's performance substantially. E.g., when many clients are connected to the server,
@@ -358,12 +366,12 @@ http {
     <eng>By default, if a client starts streaming video to the server
     with a certain channel name, then this channel becomes immediately available
     to other clients for viewing. Automatic channel availability can be disabled by
-    setting <b>mod_rtmp/publish_all</b> parameter to "no". In this case, video
+    setting <b>moment/publish_all</b> parameter to "no". In this case, video
     received from Flash clients is available only though plugins which allow that explicitly.</eng>
     <rus>По умолчанию, если клиент подключается и начинает
     передавать на сервер видео с определённым названием канала, то этот канал становится
     доступным другим клиентам для просмотра. Автоматическое предоставление доступа к видео
-    можно отключить, присвоив параметру <b>mod_rtmp/publish_all</b> значение "no".
+    можно отключить, присвоив параметру <b>moment/publish_all</b> значение "no".
     В этом случае передача видео, получаемое от Flash-клиентов, будет доступна только
     через те плагины видеосервера, которые это разрешают явно.</rus>
   </p>
@@ -396,6 +404,22 @@ http {
       <b>mod_gst/enable</b> &mdash;
       <eng>enable <i>mod_gst</i> module. Default: "yes".</eng>
       <rus>включить модуль <i>mod_gst</i>. По умолчанию: "yes" (<i>mod_gst</i> включен).</rus>
+    </p>
+    <p>
+      <b>mod_gst/no_video_timeout</b> &mdash;
+      <eng>video source availability timeout, in seconds. If there was no audio or video messages
+      from the source for this period of time, then Moment VS attempts to reconnect to the source.
+      Default: 60 seconds.</eng>
+      <rus>таймаут доступности источника видео, в секундах. Если по истечении таймаута от источника
+      не получено ни одного видео- или аудиосообщения, то производится повторное подключение
+      к этому источнику. По умолчанию: 60 сек.</rus>
+    </p>
+    <p>
+      <b>mod_gst/send_metadata</b> &mdash;
+      <eng>generate metadata (onMetaData message) for flv stream format.
+      Default: "no" (onMetaData is not generated).</eng>
+      <rus>генерировать метаданные (сообщение onMetaData) для формата flv.
+      По умолчанию: "no" (onMetaData не генерируется).</rus>
     </p>
     <p>
       <b>mod_gst/gst_debug</b> &mdash;
@@ -754,7 +778,7 @@ http {
 </p>
 <pre>
   {
-    screencast =                                                          \
+    chain =                                                               \
         "ximagesrc use-damage=false do-timestamp=true show-pointer=true ! \
          video/x-raw-rgb,framerate=15/1 !                                 \
          ffmpegcolorspace !                                               \
@@ -940,7 +964,7 @@ http://localhost:8082/moment_admin/update_playlist_now/my_video
   </p>
 
 <pre>
-http://localhost:8082/moment_admin/set_position/video/1/1:45:40
+http://localhost:8082/moment_admin/set_position/video/1/1:45:00
 </pre>
  
   <a name="recording">

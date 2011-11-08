@@ -133,12 +133,10 @@
     </dd>
     <dd>
     </dd>
-<!--
     <dt class="toc_single">
       <eng><a href="doc_cluster.html">Clustering</a></eng>
       <rus><a href="doc_cluster.ru.html">Кластеризация</a></rus>
     </dt>
--->
     <dt class="toc_single">
       <eng><a href="doc_stress.html">Stress testing</a></eng>
       <rus><a href="doc_stress.ru.html">Нагрузочное тестирование</a></rus>
