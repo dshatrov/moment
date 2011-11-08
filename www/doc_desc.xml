@@ -40,7 +40,7 @@
 
   <p>
     <eng>Primary capabilities of Moment Video Server include:</eng>
-    <rus>Основные возможности, предоставляемые видеосервером &laquo;Moment&raquo;:</rus>
+    <rus>Основные возможности, предоставляемые видеосервером &laquo;Момент&raquo;:</rus>
   </p>
 
   <ul class="moment_list">
@@ -97,7 +97,7 @@
 
   <p>
     <eng>Special features of Moment Video Server:</eng>
-    <rus>Основные особенности видеосервера &laquo;Moment&raquo;:</rus>
+    <rus>Основные особенности видеосервера &laquo;Момент&raquo;:</rus>
     <ul class="moment_list">
       <li>
         <eng><b>High performance</b> when streaming video to numerous clients simultaneously.
@@ -132,7 +132,7 @@
   <p>
     <eng>Moment VS is a high performance video server capable of serving more than 3000 simultaneously connected clients
     using a single core of a medium-class CPU.</eng>
-    <rus>&laquo;Moment&raquo; &mdash; высокопроизводительный видеосервер, способный обслуживать
+    <rus>&laquo;Момент&raquo; &mdash; высокопроизводительный видеосервер, способный обслуживать
     более 3000 одновременно подключенных клиентов с одного ядра процессора среднего класса.</rus>
   </p>
 
