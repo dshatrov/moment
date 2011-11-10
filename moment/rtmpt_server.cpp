@@ -61,7 +61,7 @@ using namespace M;
 namespace Moment {
 
 namespace {
-LogGroup libMary_logGroup_rtmpt ("rtmpt", LogLevel::N);
+LogGroup libMary_logGroup_rtmpt ("rtmpt", LogLevel::I);
 }
 
 Sender::Frontend const RtmptServer::sender_frontend = {
@@ -84,7 +84,7 @@ mt_async void
 RtmptServer::RtmptSender::sendMessage (Sender::MessageEntry * const mt_nonnull msg_entry,
 				       bool const do_flush)
 {
-    logD (rtmpt, _func, "<", fmt_hex, (UintPtr) this, "> ", fmt_def, "msg_entry: 0x", fmt_hex, (UintPtr) msg_entry);
+//    logD (rtmpt, _func, "<", fmt_hex, (UintPtr) this, "> ", fmt_def, "msg_entry: 0x", fmt_hex, (UintPtr) msg_entry);
 
     sender_mutex.lock ();
 
@@ -96,24 +96,7 @@ RtmptServer::RtmptSender::sendMessage (Sender::MessageEntry * const mt_nonnull m
 	case Sender::MessageEntry::Pages: {
 	    Sender::MessageEntry_Pages * const msg_pages =
 		    static_cast <Sender::MessageEntry_Pages*> (msg_entry);
-
-	    Size pages_data_len = 0;
-	    {
-		PagePool::Page *cur_page = msg_pages->first_page;
-		if (cur_page) {
-		    assert (msg_pages->msg_offset <= cur_page->data_len);
-		    pages_data_len += cur_page->data_len - msg_pages->msg_offset;
-		    cur_page = cur_page->getNextMsgPage ();
-		    while (cur_page) {
-			pages_data_len += cur_page->data_len;
-			cur_page = cur_page->getNextMsgPage ();
-		    }
-		}
-	    }
-
-	    logD (rtmpt, _func, "new data len: ", msg_pages->header_len + pages_data_len);
-
-	    nonflushed_data_len += msg_pages->header_len + pages_data_len;
+	    nonflushed_data_len += msg_pages->getTotalMsgLen();
 	} break;
 	default:
 	    unreachable ();
@@ -184,7 +167,7 @@ RtmptServer::RtmptSender::sendPendingData (Sender * const mt_nonnull sender)
     MessageList::iter iter (pending_msg_list);
     while (!pending_msg_list.iter_done (iter)) {
 	MessageEntry * const msg_entry = pending_msg_list.iter_next (iter);
-	logD (rtmpt, _func, "msg_entry: 0x", fmt_hex, (UintPtr) msg_entry);
+//	logD (rtmpt, _func, "msg_entry: 0x", fmt_hex, (UintPtr) msg_entry);
 	sender->sendMessage (msg_entry);
     }
 
@@ -226,7 +209,8 @@ RtmptServer::RtmptSession::RtmptSession (RtmptServer * const rtmpt_server,
       weak_rtmpt_server (rtmpt_server),
       unsafe_rtmpt_server (rtmpt_server),
       rtmp_conn (this /* coderef_containter */, timers, page_pool),
-      last_msg_time (0)
+      last_msg_time (0),
+      session_keepalive_timer (NULL)
 {
 //    logD_ (_func, "0x", fmt_hex, (UintPtr) this);
 }
@@ -274,6 +258,10 @@ RtmptServer::destroyRtmptSession (RtmptSession * const mt_nonnull session)
 {
     logD_ (_func, "session 0x", fmt_hex, (UintPtr) session);
 
+    if (!session->valid) {
+	logD (rtmpt, _func, "session is invalid already");
+	return;
+    }
     session->valid = false;
 
     if (session->session_keepalive_timer) {
@@ -291,6 +279,11 @@ mt_rev (11.06.18)
 mt_mutex (mutex) void
 RtmptServer::destroyRtmptConnection (RtmptConnection * const mt_nonnull rtmpt_conn)
 {
+    if (!rtmpt_conn->valid) {
+	return;
+    }
+    rtmpt_conn->valid = false;
+
     // TODO Destroy conn_keepalive_timer
 
     conn_list.remove (rtmpt_conn);
@@ -315,6 +308,7 @@ RtmptServer::senderClosed (Exception * const /* exc_ */,
     rtmpt_conn->conn->close ();
 
     self->mutex.lock ();
+    logD (rtmpt, _func, "calling destroyRtmptConnection");
     self->destroyRtmptConnection (rtmpt_conn);
     self->mutex.unlock ();
 }
@@ -382,8 +376,12 @@ RtmptServer::sendDataInReply (RtmptConnection * const mt_nonnull rtmpt_conn,
 
     session->rtmpt_sender.sender_mutex.unlock ();
 
-    if (destroy_session)
+    // If close after flush has been requested for session->rtmpt_sender, then
+    // virtual RTMP connection should be closed, hence we're destroying the session.
+    if (destroy_session) {
+	logD (rtmpt, _func, "calling destroyRtmptSession()");
 	destroyRtmptSession (session);
+    }
 }
 
 mt_rev (11.06.18)
@@ -498,6 +496,7 @@ RtmptServer::doClose (RtmptConnection * const rtmpt_conn,
     // TODO FIXME Avoid closing a session while we're receiving message body
     //            from another request for the same session (cur_req_session).
     Ref<RtmptSession> const &session = session_entry.getData();
+    logD (rtmpt, _func, "calling destroyRtmptSession()");
     destroyRtmptSession (session);
 
     RTMPT_SERVER__HEADERS_DATE
@@ -532,6 +531,7 @@ RtmptServer::httpRequest (HttpRequest * const req,
     rtmpt_conn->cur_req_session = NULL;
 
     ConstMemory const command = req->getPath (0);
+    logD (rtmpt, _func, "request: ", req->getRequestLine());
     logD (rtmpt, _func, "command: ", command);
     // TODO Arrange in the order of frequency (send, then idle, then open)
     if (!compare (command, "open")) {
@@ -660,11 +660,9 @@ RtmptServer::httpClosed (Exception * const exc,
     self->frontend.call (self->frontend->closed, /*(*/ rtmpt_conn->conn_cb_data /*)*/);
 
     self->mutex.lock ();
-    self->conn_list.remove (rtmpt_conn);
 //    logD_ (_func, "--- rtmpt_conn refcount: ", rtmpt_conn->getRefCount());
+    self->destroyRtmptConnection (rtmpt_conn);
     self->mutex.unlock ();
-
-    rtmpt_conn->unref ();
 }
 
 mt_rev (11.06.18)

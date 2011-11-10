@@ -96,10 +96,10 @@ private:
 	mt_const Uint32 session_id;
 
 	typedef Map< Ref<RtmptSession>,
-			 MemberExtractor< RtmptSession,
-					  Uint32,
-					  &RtmptSession::session_id >,
-			 DirectComparator<Uint32> >
+		     MemberExtractor< RtmptSession,
+				      Uint32,
+				      &RtmptSession::session_id >,
+		     DirectComparator<Uint32> >
 		SessionMap_;
 
 	mt_const SessionMap_::Entry session_map_entry;
@@ -129,6 +129,8 @@ private:
 				public IntrusiveListElement<ConnectionList_name>
     {
     public:
+	bool valid;
+
 	WeakCodeRef weak_rtmpt_server;
 	RtmptServer *unsafe_rtmpt_server;
 
@@ -142,10 +144,13 @@ private:
 
 	Timers::TimerKey conn_keepalive_timer;
 
-	RtmptSession *cur_req_session;
+	// TEST (uncomment)
+//	RtmptSession *cur_req_session;
+	Ref<RtmptSession> cur_req_session;
 
 	RtmptConnection ()
-	    : conn_sender   (this /* coderef_container */),
+	    : valid (true),
+	      conn_sender   (this /* coderef_container */),
 	      conn_receiver (this /* coderef_container */),
 	      http_server   (this /* coderef_container */),
 	      cur_req_session (NULL)
