@@ -24,7 +24,9 @@
 
 #define MOMENT_RTMP__WAIT_FOR_KEYFRAME
 #define MOMENT_RTMP__AUDIO_WAITS_VIDEO
-#define MOMENT_RTMP__FLOW_CONTROL
+
+// Flow control is disabled until done right.
+//#define MOMENT_RTMP__FLOW_CONTROL
 
 
 namespace Moment {
