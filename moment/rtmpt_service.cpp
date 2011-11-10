@@ -58,8 +58,10 @@ RtmptService::connectionClosed (void * const _conn_data,
 
     conn_data->mutex.lock ();
 
-    if (conn_data->pollable_key)
+    if (conn_data->pollable_key) {
 	self->poll_group->removePollable (conn_data->pollable_key);
+	conn_data->pollable_key = NULL;
+    }
 
     conn_data->mutex.unlock ();
 }
@@ -89,6 +91,7 @@ RtmptService::acceptOneConnection ()
     }
 
     Ref<ConnectionData> const conn_data = grab (new ConnectionData);
+    conn_data->pollable_key = NULL;
 
     rtmpt_server.addConnection (tcp_conn,
 				tcp_conn  /* dep_code_referenced */,
