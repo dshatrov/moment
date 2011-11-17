@@ -166,17 +166,53 @@
       position: absolute; top: 181px; left: <xsl:value-of select="$main_width - 165"/>px;
     }
 
-    .download {
+    .download_container {
       margin-top: 20px;
       margin-left: 10px;
-      padding: 13px;
-      padding-top: 18px;
-      padding-bottom: 20px;
-      background-color: /* #f0f0f0 */ /* #e9e9f7 */ /* #e8e8ff */ /* #eeeefb */ #f3f3fb;
-      -moz-border-radius: 15px;
-      border-radius: 15px;
+    }
+
+    .download_header {
+      padding-top: 5px;
+      padding-bottom: 5px;
+
+      border-top-left-radius: 15px;
+      -moz-border-radius-toplfet: 15px;
+      border-top-right-radius: 15px;
+      -moz-border-radius-topright: 15px;
+
+      background-color: /*#448844*/ #559955;
+      color: white;
+
       text-align: center;
-      font-size: small;
+      line-height: 1.5;
+    }
+
+    .download {
+      background-color: /* #f3f3fb */ #eeffee;
+      color: #003300;
+
+      border-bottom-left-radius: 15px;
+      -moz-border-radius-bottomleft: 15px;
+      border-bottom-right-radius: 15px;
+      -moz-border-radius-bottomright: 15px;
+
+      /*
+      border-left:   1px solid #aaddaa;
+      border-right:  1px solid #aaddaa;
+      border-bottom: 1px solid #aaddaa;
+      */
+
+      text-align: center;
+      /* font-size: small; */
+      line-height: 1.5;
+      padding: 13px;
+      padding-bottom: 18px;
+      /* padding-top: 18px;
+      padding-bottom: 20px; */
+    }
+
+    .download a {
+       color: #005500;
     }
 
     .content_div {
@@ -432,6 +468,7 @@
   </div>
 
   <xsl:if test="download_sidebar">
+  <!--
     <div class="download_outer">
       <div class="download">
 	<a href="http://downloads.sourceforge.net/moment/moment-bin-1.0.1.tar.gz">
@@ -441,9 +478,58 @@
 	<br/>
 	<div style="white-space: nowrap; line-height: 1.33">
 	  <eng>Follow <a href="quickstart.html">these quick instructions</a><br/>to get Moment VS up and running.</eng>
+	  <rus><a href="quickstart.ru.html">Простые инструкции</a> помогут<br/>запустить видеосервер.</rus>
+	</div>
+      </div>
+    </div>
+ -->
+
+    <div class="download_outer">
+      <div class="download_container">
+      <div class="download_header">
+<!--        <div style="padding-bottom: 0.5ex"> -->
+	   <big><big>
+	     <eng>Download</eng>
+	     <rus>Загрузить</rus>
+	   </big></big>
+<!--	 </div> -->
+      </div>
+      <div class="download">
+	 <div style="padding-bottom: 1.25ex">
+	   Moment Video Server 1.2
+	 </div>
+	 <div style="padding-bottom: 1.75ex">
+	   <div style="padding-bottom: 1.0ex">
+	     <a href="http://downloads.sourceforge.net/moment/moment-bin-1.2.0_32bit.tar.gz"><big>Linux 32-bit</big></a>
+	   </div>
+
+	   <a href="http://downloads.sourceforge.net/moment/moment-bin-1.2.0_64bit.tar.gz"><big>Linux 64-bit</big></a><br/>
+	 </div>
+    <!--
+	<table>
+	  <tr>
+	    <td>
+	      <big><big>Download</big></big><br/>Moment Video Server 1.2
+	    </td>
+	  </tr>
+	  <tr>
+	    <td>
+	      Linux 32 bit
+	    </td>
+	  </tr>
+	  <tr>
+	    <td>
+	      Linux 64 bit
+	    </td>
+	  </tr>
+	</table>
+    -->
+	<div style="white-space: nowrap; line-height: 1.33; font-size: small; color: black">
+	  <eng>Follow <a href="quickstart.html">these quick instructions</a><br/>to get Moment VS up and running.</eng>
   <!--    <rus>Следуйте <a href="quickstart.ru.html">этим простым инструкциям</a>,<br/> чтобы запустить &laquo;Moment&raquo;.</rus> -->
 	  <rus><a href="quickstart.ru.html">Простые инструкции</a> помогут<br/>запустить видеосервер.</rus>
 	</div>
+      </div>
       </div>
     </div>
   </xsl:if>
