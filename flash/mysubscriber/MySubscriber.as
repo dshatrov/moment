@@ -67,6 +67,7 @@ public class MySubscriber extends Sprite
 
     private var hide_buttons_timer : uint;
 
+    private var buffering_complete : Boolean;
     private var frame_no : uint;
 
     private function doResize () : void
@@ -220,8 +221,10 @@ public class MySubscriber extends Sprite
 	trace (event.info.code);
 
 	if (event.info.code == "NetStream.Buffer.Full") {
+	    buffering_complete = true;
+
 	    reconnect_interval = 0;
-	    video.removeEventListener (Event.ENTER_FRAME, onEnterFrame);
+//	    video.removeEventListener (Event.ENTER_FRAME, onEnterFrame);
 
 	    repositionVideo ();
 	    showVideo ();
@@ -233,9 +236,21 @@ public class MySubscriber extends Sprite
     {
 	trace ("--- onEnterFrame");
 
+	if (buffering_complete) {
+	    repositionVideo ();
+
+	    if (frame_no == 100)
+		video.removeEventListener (Event.ENTER_FRAME, onEnterFrame);
+
+	    ++frame_no;
+	    return;
+	}
+
 	// This doesn't filter all spurious EnterFrame events.
-	if (frame_no == 1)
+	if (frame_no == 1) {
 	    showBuffering ();
+//	    hideMessages ();
+	}
 
 	++frame_no;
 
@@ -272,8 +287,10 @@ public class MySubscriber extends Sprite
 
 	    var stream : NetStream = new NetStream (conn);
 //	    stream.bufferTime = 0.0;
-	    stream.bufferTime = 0.1;
+//	    stream.bufferTime = 0.1;
 //	    stream.bufferTime = 0.0;
+	    stream.bufferTime = 1.0;
+//	    stream.bufferTime = 2.0;
 //	    stream.bufferTime = 5.0;
 	    stream.client = new MyStreamClient();
 
@@ -288,6 +305,7 @@ public class MySubscriber extends Sprite
 		}
 	    );
 
+	    buffering_complete = false;
 	    frame_no = 0;
 	    video.addEventListener (Event.ENTER_FRAME, onEnterFrame);
 
@@ -368,6 +386,7 @@ public class MySubscriber extends Sprite
 		}
 	    );
 
+	    buffering_complete = false;
 	    frame_no = 0;
 	    video.addEventListener (Event.ENTER_FRAME, onEnterFrame);
 
@@ -480,6 +499,9 @@ public class MySubscriber extends Sprite
 
     public function MySubscriber ()
     {
+	buffering_complete = false;
+	frame_no = 0;
+
 	buttons_visible = true;
 	horizontal_mode = false;
 
