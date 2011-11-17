@@ -4,7 +4,7 @@ EXTRA_DIST = \
 myplayerdir = $(datadir)/moment/myplayer
 myplayer_DATA = index.html		\
 		MySubscriber.swf	\
-		playlist.json		\
+		playlist.json.tpl	\
 		splash.png		\
 		buffering.png		\
 		connecting.png		\
