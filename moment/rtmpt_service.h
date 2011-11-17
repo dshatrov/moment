@@ -48,8 +48,9 @@ private:
   mt_iface (RtmptServer::Frontend)
     static RtmptServer::Frontend rtmpt_server_frontend;
 
-    static Result clientConnected (RtmpConnection * mt_nonnull rtmp_conn,
-				   void           *_self);
+    static Result clientConnected (RtmpConnection  * mt_nonnull rtmp_conn,
+				   IpAddress const &client_addr,
+				   void            *_self);
 
     static void connectionClosed (void *_pollable_key,
 				  void *_self);

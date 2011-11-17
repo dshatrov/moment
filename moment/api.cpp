@@ -365,12 +365,12 @@ public:
 
     MomentClientSession ()
     {
-	logD_ (_func, "0x", fmt_hex, (UintPtr) this);
+//	logD_ (_func, "0x", fmt_hex, (UintPtr) this);
     }
 
     ~MomentClientSession ()
     {
-	logD_ (_func, "0x", fmt_hex, (UintPtr) this);
+//	logD_ (_func, "0x", fmt_hex, (UintPtr) this);
     }
 };
 
@@ -421,8 +421,8 @@ void client_clientDisconnected (void * const _api_client_session)
 {
     MomentClientSession * const api_client_session = static_cast <MomentClientSession*> (_api_client_session);
 
-    logD_ (_func, "api_client_session: 0x", fmt_hex, (UintPtr) api_client_session);
-    logD_ (_func, "api_client_session refcount before: ", api_client_session->getRefCount ());
+//    logD_ (_func, "api_client_session: 0x", fmt_hex, (UintPtr) api_client_session);
+//    logD_ (_func, "api_client_session refcount before: ", api_client_session->getRefCount ());
 
     if (api_client_session->api_client_handler_wrapper->ext_client_handler.disconnected_cb) {
 	api_client_session->api_client_handler_wrapper->ext_client_handler.disconnected_cb (
@@ -430,7 +430,7 @@ void client_clientDisconnected (void * const _api_client_session)
 		api_client_session->api_client_handler_wrapper->ext_client_handler.disconnected_cb_data);
     }
 
-    logD_ (_func, "api_client_session refcount after: ", api_client_session->getRefCount ());
+//    logD_ (_func, "api_client_session refcount after: ", api_client_session->getRefCount ());
     api_client_session->unref ();
 }
 

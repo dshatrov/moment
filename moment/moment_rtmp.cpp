@@ -33,10 +33,9 @@ namespace Moment {
 
 namespace {
 
-namespace {
-LogGroup libMary_logGroup_mod_rtmp ("mod_rtmp", LogLevel::E);
-LogGroup libMary_logGroup_framedrop ("mod_rtmp_framedrop", LogLevel::D);
-}
+static LogGroup libMary_logGroup_mod_rtmp ("mod_rtmp", LogLevel::I);
+static LogGroup libMary_logGroup_session ("mod_rtmp.session", LogLevel::I);
+static LogGroup libMary_logGroup_framedrop ("mod_rtmp.framedrop", LogLevel::I);
 
 RtmpService rtmp_service (NULL);
 RtmptService rtmpt_service (NULL);
@@ -51,6 +50,8 @@ class ClientSession : public Object
 {
 public:
     mt_mutex (mutex) bool valid;
+
+    IpAddress client_addr;
 
     mt_const RtmpConnection *rtmp_conn;
     // Remember that RtmpConnection must be available when we're calling
@@ -115,12 +116,12 @@ public:
 #endif
 	  watching (false)
     {
-	logD_ (_func, "0x", fmt_hex, (UintPtr) this);
+	logD (session, _func, "0x", fmt_hex, (UintPtr) this);
     }
 
     ~ClientSession ()
     {
-	logD_ (_func, "0x", fmt_hex, (UintPtr) this);
+	logD (session, _func, "0x", fmt_hex, (UintPtr) this);
     }
 };
 
@@ -279,7 +280,7 @@ void streamVideoMessage (VideoStream::VideoMessage * const mt_nonnull msg,
 
 void streamClosed (void * const _session)
 {
-    logD_ (_func_);
+    logD (session, _func_);
     ClientSession * const client_session = static_cast <ClientSession*> (_session);
 // Unnecessary    destroyClientSession (client_session);
     client_session->rtmp_conn->closeAfterFlush ();
@@ -295,14 +296,15 @@ VideoStream::EventHandler /* TODO Allow consts in Informer_ */ /* const */ video
 Result connect (ConstMemory const &app_name,
 		void * const _client_session)
 {
-    logD_ (_func, "app_name: ", app_name);
+    logD (session, _func, "app_name: ", app_name);
 
     ClientSession * const client_session = static_cast <ClientSession*> (_client_session);
 
     // TODO class MomentRtmpModule
     MomentServer * const moment = MomentServer::getInstance();
 
-    Ref<MomentServer::ClientSession> const srv_session = moment->rtmpClientConnected (app_name, client_session->rtmp_conn);
+    Ref<MomentServer::ClientSession> const srv_session =
+	    moment->rtmpClientConnected (app_name, client_session->rtmp_conn, client_session->client_addr);
     if (!srv_session)
 	return Result::Failure;
 
@@ -321,7 +323,7 @@ Result connect (ConstMemory const &app_name,
 Result startStreaming (ConstMemory const &_stream_name,
 		       void * const _client_session)
 {
-    logD_ (_func, "stream_name: ", _stream_name);
+    logD (session, _func, "stream_name: ", _stream_name);
 
     ConstMemory stream_name = _stream_name;
     {
@@ -381,7 +383,7 @@ Result startWatching (ConstMemory const &stream_name,
     Ref<VideoStream> const video_stream = moment->getVideoStream (stream_name);
 #endif
     if (!video_stream) {
-	logE (mod_rtmp, _func, "video stream not found: ", stream_name);
+	logD (mod_rtmp, _func, "video stream not found: ", stream_name);
 	return Result::Failure;
     }
 
@@ -400,7 +402,7 @@ RtmpServer::CommandResult server_commandMessage (RtmpConnection       * const mt
 						 AmfDecoder           * const mt_nonnull amf_decoder,
 						 void                 * const _client_session)
 {
-    logD_ (_func, "method_name: ", method_name);
+    logD (session, _func, "method_name: ", method_name);
 
     MomentServer * const moment = MomentServer::getInstance();
     ClientSession * const client_session = static_cast <ClientSession*> (_client_session);
@@ -506,7 +508,7 @@ void closed (Exception * const exc,
     logD (mod_rtmp, _func, "client_session 0x", fmt_hex, (UintPtr) _client_session);
 
     if (exc)
-	logE (mod_rtmp, _func, exc->toString());
+	logD (mod_rtmp, _func, exc->toString());
 
     ClientSession * const client_session = static_cast <ClientSession*> (_client_session);
     destroyClientSession (client_session);
@@ -521,12 +523,15 @@ RtmpConnection::Frontend const rtmp_frontend = {
     closed
 };
 
-Result clientConnected (RtmpConnection * mt_nonnull const rtmp_conn,
-			void * const /* cb_data */)
+Result clientConnected (RtmpConnection  * const mt_nonnull rtmp_conn,
+			IpAddress const &client_addr,
+			void            * const /* cb_data */)
 {
     logD (mod_rtmp, _func_);
+    logD_ (_func, "--- client_addr: ", client_addr);
 
     Ref<ClientSession> const client_session = grab (new ClientSession);
+    client_session->client_addr = client_addr;
     client_session->rtmp_conn = rtmp_conn;
 
     client_session->rtmp_server.setFrontend (Cb<RtmpServer::Frontend> (
@@ -602,8 +607,9 @@ void momentRtmpInit ()
 
 	if (enable == MConfig::Config::Boolean_True)
 	    rtmpt_no_keepalive_conns = true;
+
+	logI_ (_func, opt_name, ": ", rtmpt_no_keepalive_conns);
     }
-    logD_ (_func, "rtmpt_no_keepalive_conns: ", rtmpt_no_keepalive_conns);
 
     {
 	rtmp_service.setFrontend (Cb<RtmpVideoService::Frontend> (
@@ -621,7 +627,7 @@ void momentRtmpInit ()
 	    ConstMemory const opt_name = "mod_rtmp/rtmp_bind";
 	    ConstMemory rtmp_bind = config->getString_default (opt_name, ":1935");
 
-	    logD_ (_func, opt_name, ": ", rtmp_bind);
+	    logI_ (_func, opt_name, ": ", rtmp_bind);
 	    if (!rtmp_bind.isNull ()) {
 		IpAddress addr;
 		if (!setIpAddress_default (rtmp_bind,
@@ -668,7 +674,7 @@ void momentRtmpInit ()
 	do {
 	    ConstMemory const opt_name = "mod_rtmp/rtmpt_bind";
 	    ConstMemory const rtmpt_bind = config->getString_default (opt_name, ":8081");
-	    logD_ (_func, opt_name, ": ", rtmpt_bind);
+	    logI_ (_func, opt_name, ": ", rtmpt_bind);
 	    if (!rtmpt_bind.isNull ()) {
 		IpAddress addr;
 		if (!setIpAddress_default (rtmpt_bind,
@@ -725,14 +731,14 @@ namespace M {
 
 void libMary_moduleInit ()
 {
-    logD_ ("RTMP MODULE INIT");
+    logI_ ("Initializing mod_rtmp");
 
     Moment::momentRtmpInit ();
 }
 
 void libMary_moduleUnload()
 {
-    logD_ ("RTMP MODULE UNLOAD");
+    logI_ ("Unloading mod_rtmp");
 
     Moment::momentRtmpUnload ();
 }

@@ -165,7 +165,7 @@ cmdline_exit_after (char const * /* short_nmae */,
 
 static void exitTimerTick (void * const /* cb_data */)
 {
-    logD_ (_func, "Exit timer expired (", options.exit_after, " seconds)");
+    logI_ (_func, "Exit timer expired (", options.exit_after, " seconds)");
     mutex.lock ();
     server_app.getTimers()->deleteTimer (exit_timer_key);
     mutex.unlock ();
@@ -311,7 +311,7 @@ int main (int argc, char **argv)
 		return EXIT_FAILURE;
 	    }
 
-	    logD_ (_func, opt_name, ": ", num_threads);
+	    logI_ (_func, opt_name, ": ", num_threads);
 	}
 
 	server_app.setNumThreads (num_threads);
@@ -326,7 +326,7 @@ int main (int argc, char **argv)
 		return EXIT_FAILURE;
 	    }
 
-	    logD_ (_func, opt_name, ": ", num_file_threads);
+	    logI_ (_func, opt_name, ": ", num_file_threads);
 	}
 
 	recorder_thread_pool.setNumThreads (num_file_threads);
@@ -356,8 +356,9 @@ int main (int argc, char **argv)
 
 	if (enable == MConfig::Config::Boolean_True)
 	    no_keepalive_conns = true;
+
+	logI_ (_func, opt_name, ": ", no_keepalive_conns);
     }
-    logD_ (_func, "no_keepalive_conns: ", no_keepalive_conns);
 
     ConstMemory http_bind;
     {
@@ -374,7 +375,7 @@ int main (int argc, char **argv)
 	do {
 	    ConstMemory const opt_name = "http/http_bind";
 	    http_bind = config.getString_default (opt_name, ":8080");
-	    logD_ (_func, opt_name, ": ", http_bind);
+	    logI_ (_func, opt_name, ": ", http_bind);
 	    if (http_bind.isNull()) {
 		logI_ (_func, "HTTP service is not bound to any port "
 		       "and won't accept any connections. "
@@ -409,7 +410,7 @@ int main (int argc, char **argv)
 	do {
 	    ConstMemory const opt_name = "http/admin_bind";
 	    ConstMemory const admin_bind = config.getString_default (opt_name, ":8082");
-	    logD_ (_func, opt_name, ": ", admin_bind);
+	    logI_ (_func, opt_name, ": ", admin_bind);
 	    if (admin_bind.isNull()) {
 		logI_ (_func, "HTTP-Admin service is not bound to any port "
 		       "and won't accept any connections. "
@@ -461,7 +462,6 @@ int main (int argc, char **argv)
 	return EXIT_FAILURE;
     }
 
-    logD_ (_func, "CREATING MOMENT SERVER");
     if (!moment_server.init (&server_app,
 			     &page_pool,
 			     &http_service,
@@ -475,8 +475,8 @@ int main (int argc, char **argv)
 	goto _stop_recorder;
     }
 
-    logD_ (_func, "options.exit_after: ", options.exit_after);
     if (options.exit_after != (Uint64) -1) {
+	logI_ (_func, "options.exit_after: ", options.exit_after);
 	mutex.lock ();
 	exit_timer_key = server_app.getTimers()->addTimer (exitTimerTick,
 							   NULL /* cb_data */,
@@ -492,7 +492,7 @@ int main (int argc, char **argv)
 	goto _stop_recorder;
     }
 
-    logD_ (_func, "DONE");
+    logI_ (_func, "done");
 
 _stop_recorder:
     recorder_thread_pool.stop ();

@@ -24,6 +24,8 @@ namespace Moment {
 
 using namespace M;
 
+static LogGroup libMary_logGroup_session ("MomentServer.session", LogLevel::I);
+
 MomentServer* MomentServer::instance = NULL;
 
 namespace {
@@ -114,12 +116,12 @@ MomentServer::ClientSession::ClientSession ()
     : disconnected (false),
       event_informer (this, &mutex)
 {
-    logD_ (_func, "0x", fmt_hex, (UintPtr) this);
+    logD (session, _func, "0x", fmt_hex, (UintPtr) this);
 }
 
 MomentServer::ClientSession::~ClientSession ()
 {
-    logD_ (_func, "0x", fmt_hex, (UintPtr) this);
+    logD (session, _func, "0x", fmt_hex, (UintPtr) this);
 }
 
 namespace {
@@ -212,7 +214,7 @@ MomentServer::loadModules ()
     if (module_path.len() == 0)
 	module_path = LIBMOMENT_PREFIX "/moment-1.0";
 
-    logD_ (_func, "MODULE PATH: ", module_path);
+    logD_ (_func, "module_path: ", module_path);
 
     Ref<Vfs> const vfs = Vfs::createDefaultLocalVfs (module_path);
     if (!vfs)
@@ -261,7 +263,7 @@ MomentServer::loadModules ()
 	{
 	    loaded_names.add (module_name, EmptyBase());
 
-	    logD_ (_func, "LOADING MODULE ", module_name);
+	    logD_ (_func, "loading module ", module_name);
 
 	    if (!loadModule (module_name))
 		logE_ (_func, "Could not load module ", module_name, ": ", exc->toString());
@@ -321,9 +323,10 @@ MomentServer::getInstance ()
 
 Ref<MomentServer::ClientSession>
 MomentServer::rtmpClientConnected (ConstMemory const &path,
-				   RtmpConnection    * const mt_nonnull conn)
+				   RtmpConnection    * const mt_nonnull conn,
+				   IpAddress   const &client_addr)
 {
-    logD_ (_func_);
+    logD (session, _func_);
 
     ConstMemory path_tail;
 
@@ -338,13 +341,14 @@ MomentServer::rtmpClientConnected (ConstMemory const &path,
     Ref<ClientSession> const client_session = grab (new ClientSession);
     client_session->weak_rtmp_conn = conn;
     client_session->unsafe_rtmp_conn = conn;
+    client_session->client_addr = client_addr;
     client_session->processing_connected_event = true;
 
     client_session_list.append (client_session);
     client_session->ref ();
     mutex.unlock ();
 
-    logD_ (_func, "client_session refcount before: ", client_session->getRefCount());
+    logD (session, _func, "client_session refcount before: ", client_session->getRefCount());
     if (client_entry)
 	client_entry->fireClientConnected (client_session, path_tail, path);
 
@@ -357,14 +361,14 @@ MomentServer::rtmpClientConnected (ConstMemory const &path,
     }
     client_session->mutex.unlock ();
 
-    logD_ (_func, "client_session refcount after: ", client_session->getRefCount());
+    logD (session, _func, "client_session refcount after: ", client_session->getRefCount());
     return client_session;
 }
 
 void
 MomentServer::clientDisconnected (ClientSession * const mt_nonnull client_session)
 {
-    logD_ (_func, "client_session refcount before: ", client_session->getRefCount());
+    logD (session, _func, "client_session refcount before: ", client_session->getRefCount());
 
     client_session->clientDisconnected ();
 
@@ -375,7 +379,7 @@ MomentServer::clientDisconnected (ClientSession * const mt_nonnull client_sessio
     client_session_list.remove (client_session);
     mutex.unlock ();
 
-    logD_ (_func, "client_session refcount after: ", client_session->getRefCount());
+    logD (session, _func, "client_session refcount after: ", client_session->getRefCount());
     client_session->unref ();
 }
 
@@ -394,63 +398,83 @@ Ref<VideoStream>
 MomentServer::startWatching (ClientSession * const mt_nonnull client_session,
 			     ConstMemory const stream_name)
 {
+    Ref<VideoStream> video_stream;
+
     if (client_session->backend
 	&& client_session->backend->startWatching)
     {
-	logD_ (_func, "calling backend->startWatching()");
-	Ref<VideoStream> video_stream;
+	logD (session, _func, "calling backend->startWatching()");
 	if (!client_session->backend.call_ret< Ref<VideoStream> > (&video_stream,
 								   client_session->backend->startWatching,
 								   /* ( */ stream_name /* ) */))
 	{
-	    return NULL;
+	    goto _not_found;
 	}
 
-	return video_stream;
+	goto _return;
     }
 
-    logD_ (_func, "default path");
+    logD (session, _func, "default path");
 
-    return getVideoStream (stream_name);
+    video_stream = getVideoStream (stream_name);
+    if (!video_stream)
+	goto _not_found;
+
+_return:
+    logA_ ("moment OK ", client_session->client_addr, " watch ", stream_name);
+    return video_stream;
+
+_not_found:
+    logA_ ("moment NOT_FOUND ", client_session->client_addr, " watch ", stream_name);
+    return NULL;
 }
 
 Ref<VideoStream>
 MomentServer::startStreaming (ClientSession * const mt_nonnull client_session,
 			      ConstMemory const stream_name)
 {
+    Ref<VideoStream> video_stream;
+  {
+
     if (client_session->backend
 	&& client_session->backend->startStreaming)
     {
-	logD_ (_func, "calling backend->startStreaming()");
-	Ref<VideoStream> video_stream;
+	logD (session, _func, "calling backend->startStreaming()");
 	if (!client_session->backend.call_ret< Ref<VideoStream> > (&video_stream,
 								   client_session->backend->startStreaming,
 								   /* ( */ stream_name /* ) */))
 	{
-	    return NULL;
+	    goto _denied;
 	}
 
-	return video_stream;
+	goto _return;
     }
 
-    logD_ (_func, "default path");
+    logD (session, _func, "default path");
 
     if (!publish_all_streams)
-	return NULL;
+	goto _denied;
 
-    Ref<VideoStream> const video_stream = grab (new VideoStream);
+    video_stream = grab (new VideoStream);
     VideoStreamKey const video_stream_key = addVideoStream (video_stream, stream_name);
 
     client_session->mutex.lock ();
     if (client_session->disconnected) {
 	client_session->mutex.unlock ();
 	removeVideoStream (video_stream_key);
-	return NULL;
+	goto _denied;
     }
     client_session->video_stream_key = video_stream_key;
     client_session->mutex.unlock ();
+  }
 
+_return:
+    logA_ ("moment OK ", client_session->client_addr, " stream ", stream_name);
     return video_stream;
+
+_denied:
+    logA_ ("moment DENIED ", client_session->client_addr, " stream ", stream_name);
+    return NULL;
 }
 
 mt_mutex (mutex) MomentServer::ClientHandlerKey

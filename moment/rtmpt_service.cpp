@@ -34,13 +34,14 @@ TcpServer::Frontend RtmptService::tcp_server_frontend = {
 };
 
 Result
-RtmptService::clientConnected (RtmpConnection * const mt_nonnull rtmp_conn,
-			       void           * const _self)
+RtmptService::clientConnected (RtmpConnection  * const mt_nonnull rtmp_conn,
+			       IpAddress const &client_addr,
+			       void            * const _self)
 {
     RtmptService * const self = static_cast <RtmptService*> (_self);
 
     Result res;
-    if (!self->frontend.call_ret<Result> (&res, self->frontend->clientConnected, /*(*/ rtmp_conn /*)*/)
+    if (!self->frontend.call_ret<Result> (&res, self->frontend->clientConnected, /*(*/ rtmp_conn, client_addr /*)*/)
 	|| !res)
     {
 	return Result::Failure;
@@ -69,12 +70,13 @@ RtmptService::connectionClosed (void * const _conn_data,
 bool
 RtmptService::acceptOneConnection ()
 {
-    logD_ (_func_);
+//    logD_ (_func_);
 
     TcpConnection * const tcp_conn = new TcpConnection (NULL /* coderef_container */);
     assert (tcp_conn);
+    IpAddress client_addr;
     {
-	TcpServer::AcceptResult const res = tcp_server.accept (tcp_conn);
+	TcpServer::AcceptResult const res = tcp_server.accept (tcp_conn, &client_addr);
 	if (res == TcpServer::AcceptResult::Error) {
 	    delete tcp_conn;
 	    logE_ (_func, exc->toString());
@@ -95,6 +97,7 @@ RtmptService::acceptOneConnection ()
 
     rtmpt_server.addConnection (tcp_conn,
 				tcp_conn  /* dep_code_referenced */,
+				client_addr,
 				conn_data /* conn_cb_data */,
 				conn_data /* ref_data */);
 
@@ -119,7 +122,7 @@ RtmptService::accepted (void * const _self)
 {
     RtmptService * const self = static_cast <RtmptService*> (_self);
 
-    logD_ (_func_);
+//    logD_ (_func_);
 
     for (;;) {
 	if (!self->acceptOneConnection ())

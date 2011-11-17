@@ -27,9 +27,7 @@ using namespace M;
 
 namespace Moment {
 
-namespace {
-LogGroup libMary_logGroup_rtmp_server ("rtmp_server", LogLevel::I);
-}
+static LogGroup libMary_logGroup_rtmp_server ("rtmp_server", LogLevel::I);
 
 Result
 RtmpServer::doConnect (Uint32       const msg_stream_id,
@@ -308,7 +306,7 @@ RtmpServer::doPlay (Uint32       const msg_stream_id,
 	}
 
 	if (!res) {
-	    logE_ (_func, "frontend->startWatching() failed");
+//	    logD_ (_func, "frontend->startWatching() failed");
 	    return Result::Failure;
 	}
     }
@@ -604,7 +602,7 @@ RtmpServer::commandMessage (VideoStream::Message * const mt_nonnull msg,
 	return Result::Failure;
     }
 
-    logI (rtmp_server, _func, "method: ", ConstMemory (method_name, method_name_len));
+    logD (rtmp_server, _func, "method: ", ConstMemory (method_name, method_name_len));
 
     ConstMemory method_mem (method_name, method_name_len);
     if (!compare (method_mem, "connect")) {

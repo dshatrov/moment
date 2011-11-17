@@ -217,13 +217,13 @@ RtmptServer::RtmptSession::RtmptSession (RtmptServer * const rtmpt_server,
 
 RtmptServer::RtmptSession::~RtmptSession ()
 {
-    logD_ (_func, "0x", fmt_hex, (UintPtr) this);
+//    logD_ (_func, "0x", fmt_hex, (UintPtr) this);
 }
 
 void
 RtmptServer::sessionKeepaliveTimerTick (void * const _session)
 {
-    logD_ (_func_);
+//    logD_ (_func_);
 
     RtmptSession * const session = static_cast <RtmptSession*> (_session);
 
@@ -256,7 +256,7 @@ mt_rev (11.06.18)
 mt_mutex (mutex) void
 RtmptServer::destroyRtmptSession (RtmptSession * const mt_nonnull session)
 {
-    logD_ (_func, "session 0x", fmt_hex, (UintPtr) session);
+//    logD_ (_func, "session 0x", fmt_hex, (UintPtr) session);
 
     if (!session->valid) {
 	logD (rtmpt, _func, "session is invalid already");
@@ -265,7 +265,7 @@ RtmptServer::destroyRtmptSession (RtmptSession * const mt_nonnull session)
     session->valid = false;
 
     if (session->session_keepalive_timer) {
-	logD_ (_func, "deleting session_keepalive_timer");
+//	logD_ (_func, "deleting session_keepalive_timer");
 	timers->deleteTimer (session->session_keepalive_timer);
 	session->session_keepalive_timer = NULL;
     }
@@ -334,10 +334,10 @@ RtmptServer::rtmpClosed (void * const _session)
     }
     session->valid = false;
 
-    logD_ (_func, "session 0x", fmt_hex, (UintPtr) session);
+//    logD_ (_func, "session 0x", fmt_hex, (UintPtr) session);
 
     if (session->session_keepalive_timer) {
-	logD_ (_func, "deleting session_keepalive_timer");
+//	logD_ (_func, "deleting session_keepalive_timer");
 	self->timers->deleteTimer (session->session_keepalive_timer);
 	session->session_keepalive_timer = NULL;
     }
@@ -386,7 +386,8 @@ RtmptServer::sendDataInReply (RtmptConnection * const mt_nonnull rtmpt_conn,
 
 mt_rev (11.06.18)
 mt_mutex (mutex) void
-RtmptServer::doOpen (RtmptConnection * const rtmpt_conn)
+RtmptServer::doOpen (RtmptConnection * const rtmpt_conn,
+		     IpAddress const &client_addr)
 {
     logD (rtmpt, _func_);
 
@@ -403,7 +404,7 @@ RtmptServer::doOpen (RtmptConnection * const rtmpt_conn)
 
     {
 	Time const timeout = session_keepalive_timeout >= 10 ? 10 : session_keepalive_timeout;
-	logD_ (_func, "session_keepalive_timer period: ", timeout);
+//	logD_ (_func, "session_keepalive_timer period: ", timeout);
 	// Checking for session timeout at least each 10 seconds.
 	session->session_keepalive_timer = timers->addTimer (sessionKeepaliveTimerTick,
 							     session,
@@ -423,7 +424,7 @@ RtmptServer::doOpen (RtmptConnection * const rtmpt_conn)
 	    "\n");
 
     if (frontend && frontend->clientConnected)
-	frontend.call (frontend->clientConnected, /*(*/ &session->rtmp_conn /*)*/);
+	frontend.call (frontend->clientConnected, /*(*/ &session->rtmp_conn, client_addr /*)*/);
 }
 
 mt_rev (11.06.18)
@@ -535,7 +536,8 @@ RtmptServer::httpRequest (HttpRequest * const req,
     logD (rtmpt, _func, "command: ", command);
     // TODO Arrange in the order of frequency (send, then idle, then open)
     if (!compare (command, "open")) {
-	self->doOpen (rtmpt_conn);
+	logD_ (_func, "--- client address: ", req->getClientAddress());
+	self->doOpen (rtmpt_conn, req->getClientAddress());
     } else
     if (!compare (command, "send")) {
 	Uint32 const session_id = strToUlong (req->getPath (1));
@@ -669,6 +671,7 @@ mt_rev (11.06.18)
 mt_async void
 RtmptServer::addConnection (Connection              * const mt_nonnull conn,
 			    DependentCodeReferenced * const mt_nonnull dep_code_referenced,
+			    IpAddress const         &client_addr,
 			    void                    * const conn_cb_data,
 			    VirtReferenced          * const ref_data)
 {
@@ -685,6 +688,8 @@ RtmptServer::addConnection (Connection              * const mt_nonnull conn,
     rtmpt_conn->conn_sender.setConnection (conn);
     rtmpt_conn->conn_receiver.setConnection (conn);
     rtmpt_conn->conn_receiver.setFrontend (rtmpt_conn->http_server.getReceiverFrontend ());
+
+    rtmpt_conn->http_server.init (client_addr);
     rtmpt_conn->http_server.setSender (&rtmpt_conn->conn_sender, page_pool);
     rtmpt_conn->http_server.setFrontend (Cb<HttpServer::Frontend> (&http_frontend, rtmpt_conn, rtmpt_conn /* coderef_container */));
 

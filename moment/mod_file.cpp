@@ -105,7 +105,7 @@ Result httpRequest (HttpRequest  * const mt_nonnull req,
 {
     PathEntry * const path_entry = static_cast <PathEntry*> (_path_entry);
 
-    logD_ (_func, "HTTP request: ", req->getRequestLine());
+    logD_ (_func, req->getRequestLine());
 
   // TODO On Linux, we could do a better job with sendfile() or splice().
 
@@ -134,6 +134,8 @@ Result httpRequest (HttpRequest  * const mt_nonnull req,
 		    reply_body);
 	    if (!req->getKeepalive())
 		conn_sender->closeAfterFlush();
+
+	    logA_ ("file 500 ", req->getClientAddress(), " ", req->getRequestLine());
 
 	    return Result::Success;
 	}
@@ -204,7 +206,7 @@ Result httpRequest (HttpRequest  * const mt_nonnull req,
 		mime_type = "image/jpeg";
 	}
     }
-    logD_ (_func, "try_template: ", try_template);
+//    logD_ (_func, "try_template: ", try_template);
 
     Ref<String> const filename = makeString (path_entry->path->mem(), !path_entry->path->isNull() ? "/" : "", file_path);
 //    logD_ (_func, "Opening ", filename);
@@ -222,6 +224,8 @@ Result httpRequest (HttpRequest  * const mt_nonnull req,
 	    {
 		if (!req->getKeepalive())
 		    conn_sender->closeAfterFlush();
+
+		logA_ ("file 200 ", req->getClientAddress(), " ", req->getRequestLine());
 
 		return Result::Success;
 	    }
@@ -241,6 +245,8 @@ Result httpRequest (HttpRequest  * const mt_nonnull req,
 	if (!req->getKeepalive())
 	    conn_sender->closeAfterFlush();
 
+	logA_ ("file 404 ", req->getClientAddress(), " ", req->getRequestLine());
+
 	return Result::Success;
     }
 
@@ -259,6 +265,8 @@ Result httpRequest (HttpRequest  * const mt_nonnull req,
 	if (!req->getKeepalive())
 	    conn_sender->closeAfterFlush();
 
+	logA_ ("file 500 ", req->getClientAddress(), " ", req->getRequestLine());
+
 	return Result::Success;
     }
 
@@ -272,6 +280,9 @@ Result httpRequest (HttpRequest  * const mt_nonnull req,
     if (equal (req->getMethod(), "HEAD")) {
 	if (!req->getKeepalive())
 	    conn_sender->closeAfterFlush();
+
+	logA_ ("file 200 ", req->getClientAddress(), " ", req->getRequestLine());
+
 	return Result::Success;
     }
 
@@ -312,11 +323,14 @@ Result httpRequest (HttpRequest  * const mt_nonnull req,
     if (total_sent != stat.size) {
 	logE_ (_func, "File size mismatch: total_sent: ", total_sent, ", stat.size: ", stat.size);
 	conn_sender->closeAfterFlush ();
+	logA_ ("file 200 ", req->getRequestLine());
 	return Result::Success;
     }
 
     if (!req->getKeepalive())
 	conn_sender->closeAfterFlush();
+
+    logA_ ("file 200 ", req->getClientAddress(), " ", req->getRequestLine());
 
 //    logD_ (_func, "done");
     return Result::Success;
@@ -348,11 +362,11 @@ static Result momentFile_sendTemplate (ConstMemory   const filename,
 				    &dict,
 				    &str))
     {
-	logD_ ("could not expand template \"", filename, "\": ", str.c_str());
+	logE_ ("could not expand template \"", filename, "\": ", str.c_str());
 	return Result::Failure;
     }
 
-    logD_ ("template \"", filename, "\" expanded: ", str.c_str());
+//    logD_ ("template \"", filename, "\" expanded: ", str.c_str());
 //    logD_ ("template \"", filename, "\" expanded");
 
     return momentFile_sendMemory (ConstMemory ((Byte const *) str.data(), str.length()), sender, mime_type);
@@ -444,7 +458,7 @@ void momentFile_addPathForSection (MConfig::Section * const section,
 //
 void momentFileInit ()
 {
-    logD_ (_func_);
+    logI_ (_func, "Initializing mod_file");
 
     MomentServer * const moment = MomentServer::getInstance();
 //    ServerApp * const server_app = moment->getServerApp();
@@ -471,7 +485,7 @@ void momentFileInit ()
     {
 	ConstMemory const opt_name = "moment/this_http_server_addr";
 	ConstMemory const opt_val = config->getString (opt_name);
-	logD_ (_func, opt_name, ": ", opt_val);
+	logI_ (_func, opt_name, ":  ", opt_val);
 	if (!opt_val.isNull()) {
 	    this_http_server_addr = grab (new String (opt_val));
 	} else {
@@ -484,7 +498,7 @@ void momentFileInit ()
     {
 	ConstMemory const opt_name = "moment/this_rtmp_server_addr";
 	ConstMemory const opt_val = config->getString (opt_name);
-	logD_ (_func, opt_name, ": ", opt_val);
+	logI_ (_func, opt_name, ":  ", opt_val);
 	if (!opt_val.isNull()) {
 	    this_rtmp_server_addr = grab (new String (opt_val));
 	} else {
@@ -497,7 +511,7 @@ void momentFileInit ()
     {
 	ConstMemory const opt_name = "moment/this_rtmpt_server_addr";
 	ConstMemory const opt_val = config->getString (opt_name);
-	logD_ (_func, opt_name, ": ", opt_val);
+	logI_ (_func, opt_name, ": ", opt_val);
 	if (!opt_val.isNull()) {
 	    this_rtmpt_server_addr = grab (new String (opt_val));
 	} else {

@@ -33,8 +33,9 @@ class RtmpVideoService
 {
 public:
     struct Frontend {
-	Result (*clientConnected) (RtmpConnection * mt_nonnull rtmp_conn,
-				   void *cb_data);
+	Result (*clientConnected) (RtmpConnection  * mt_nonnull rtmp_conn,
+				   IpAddress const &client_addr,
+				   void            *cb_data);
     };
 
 protected:

@@ -37,8 +37,9 @@ public:
     {
     public:
 	// The frontend should setup RtmpConnection::Frontend or reject the connection.
-	Result (*clientConnected) (RtmpConnection * mt_nonnull rtmp_conn,
-				   void           *cb_data);
+	Result (*clientConnected) (RtmpConnection  * mt_nonnull rtmp_conn,
+				   IpAddress const &client_addr,
+				   void            *cb_data);
 
 	void (*closed) (void *conn_cb_data,
 			void *cb_data);
@@ -211,7 +212,8 @@ private:
     mt_mutex (mutex) void sendDataInReply (RtmptConnection * mt_nonnull rtmpt_conn,
 					   RtmptSession    * mt_nonnull session);
 
-    mt_mutex (mutex) void doOpen (RtmptConnection * mt_nonnull rtmpt_conn);
+    mt_mutex (mutex) void doOpen (RtmptConnection * mt_nonnull rtmpt_conn,
+				  IpAddress const &client_addr);
 
     mt_mutex (mutex) void doSend (RtmptConnection * mt_nonnull rtmpt_conn,
 				  Uint32           session_id);
@@ -249,6 +251,7 @@ public:
     // TODO Грубая несогласованность по Coderef containers.
     mt_async void addConnection (Connection              * mt_nonnull conn,
 				 DependentCodeReferenced * mt_nonnull dep_code_referenced,
+				 IpAddress const         &client_addr,
 				 void                    *conn_cb_data,
 				 VirtReferenced          *ref_data);
 

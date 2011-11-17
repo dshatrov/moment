@@ -79,8 +79,9 @@ RtmpService::acceptOneConnection ()
     session->weak_rtmp_service = this;
     session->unsafe_rtmp_service = this;
 
+    IpAddress client_addr;
     {
-	TcpServer::AcceptResult const res = tcp_server.accept (&session->tcp_conn);
+	TcpServer::AcceptResult const res = tcp_server.accept (&session->tcp_conn, &client_addr);
 	if (res == TcpServer::AcceptResult::Error) {
 	    logE (rtmp_service, _func, "accept() failed: ", exc->toString());
 	    return false;
@@ -112,7 +113,7 @@ RtmpService::acceptOneConnection ()
 
     {
 	Result res;
-	if (!frontend.call_ret (&res, frontend->clientConnected, /*(*/ /* session, */ &session->rtmp_conn /*)*/)
+	if (!frontend.call_ret (&res, frontend->clientConnected, /*(*/ /* session, */ &session->rtmp_conn, client_addr /*)*/)
 	    || !res)
 	{
 	    return true;

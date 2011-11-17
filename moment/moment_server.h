@@ -113,6 +113,8 @@ public:
 	mt_const WeakCodeRef weak_rtmp_conn;
 	mt_const RtmpConnection *unsafe_rtmp_conn;
 
+	IpAddress client_addr;
+
 	Informer_<Events> event_informer;
 	Cb<Backend> backend;
 
@@ -279,7 +281,8 @@ public:
   // Client events
 
     Ref<ClientSession> rtmpClientConnected (ConstMemory const &path,
-					    RtmpConnection    * mt_nonnull conn);
+					    RtmpConnection    * mt_nonnull conn,
+					    IpAddress   const &client_addr);
 
     void clientDisconnected (ClientSession * mt_nonnull client_session);
 

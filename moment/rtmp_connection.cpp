@@ -207,7 +207,7 @@ RtmpConnection::fillMessageHeader (MessageDesc const * const mt_nonnull mdesc,
 //	force_type0 = true;
 
 	if (!timestampGreater (chunk_stream->out_msg_timestamp, timestamp)) {
-	    logW_ (_func, "!timestampGreater: ", chunk_stream->out_msg_timestamp, ", ", timestamp);
+//	    logW_ (_func, "!timestampGreater: ", chunk_stream->out_msg_timestamp, ", ", timestamp);
 	    force_type0 = true;
 	}
 
@@ -2247,7 +2247,7 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 		    resetChunkRecvState ();
 
 		    if (!res) {
-			logE_ (_func, "processMessage() failed");
+			logD_ (_func, "processMessage() failed");
 			ret_res = Receiver::ProcessInputResult::Error;
 			goto _return;
 		    }
@@ -2348,7 +2348,7 @@ RtmpConnection::processError (Exception * const exc_,
 mt_const void
 RtmpConnection::startClient ()
 {
-    logD_ (_func_);
+//    logD_ (_func_);
 
     conn_state = ReceiveState::ClientWaitS0;
 

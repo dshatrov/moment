@@ -124,7 +124,7 @@ void frameTimerTick (void * const /* cb_data */)
 
 void modTestInit ()
 {
-    logD_ (_func_);
+    logD_ (_func, "Initializing mod_test");
 
     MomentServer * const moment = MomentServer::getInstance();
     MConfig::Config * const config = moment->getConfig();
