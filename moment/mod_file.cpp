@@ -407,8 +407,9 @@ void momentFile_addPath (ConstMemory const &path,
 
     logD_ (_func, "Adding path \"", path_entry->path, "\", prefix \"", path_entry->prefix->mem(), "\"");
 
-    http_service->addHttpHandler (Cb<HttpService::HttpHandler> (&http_handler, path_entry, NULL /* coderef_container */),
-				  path_entry->prefix->mem());
+    http_service->addHttpHandler (
+	    CbDesc<HttpService::HttpHandler> (&http_handler, path_entry, NULL /* coderef_container */),
+	    path_entry->prefix->mem());
 
     path_list.append (path_entry);
 }
