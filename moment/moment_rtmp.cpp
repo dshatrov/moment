@@ -327,6 +327,7 @@ Result startStreaming (ConstMemory const &_stream_name,
 
     ConstMemory stream_name = _stream_name;
     {
+      // This will be unnecessary after parameter parsing is implemented in HttpServer.
 	Byte const * const name_sep = (Byte const *) memchr (stream_name.mem(), '?', stream_name.len());
 	if (name_sep)
 	    stream_name = stream_name.region (0, name_sep - stream_name.mem());
