@@ -82,14 +82,14 @@
       <rus>собственно видеосервер и его базовая библиотека. Поддержка протоколов RTMP и RTMPT, модули mod_rtmp и mod_file;</rus>
     </li>
     <li>
-      <b>videochat</b> &mdash;
-      <eng>simple video chat server.</eng>
-      <rus>простой сервер видеочата;</rus>
-    </li>
-    <li>
       <b>moment-gst</b> &mdash;
       <eng>integration with <a href="http://gstreamer.freedesktop.org">gstreamer</a> (mod_gst module).</eng>
-      <rus>интеграция с <a href="http://gstreamer.freedesktop.org">gstreamer</a> (модуль mod_gst).</rus>
+      <rus>интеграция с <a href="http://gstreamer.freedesktop.org">gstreamer</a> (модуль mod_gst);</rus>
+    </li>
+    <li>
+      <b>mychat</b> &mdash;
+      <eng>Video Phone application.</eng>
+      <rus>приложение &laquo;Видеозвонки&raquo;.</rus>
     </li>
   </ul>
 

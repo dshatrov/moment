@@ -321,9 +321,9 @@
 <div class="main_div">
 
   <div>
-    <a href="http://momentvideo.org">
+<!--    <a href="http://momentvideo.org"> -->
       <img src="img/logo2.png" alt="Moment Video Server" class="logo_image"/>
-    </a>
+<!--    </a> -->
   </div>
 
   <div style="position: absolute; z-index: 10; top: 0; right: 0">
