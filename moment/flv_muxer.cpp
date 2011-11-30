@@ -28,7 +28,6 @@ namespace {
 LogGroup libMary_logGroup_flvmux ("flvmux", LogLevel::I);
 }
 
-namespace {
 static Byte const flv_header [] = {
     0x46, // 'F'
     0x4c, // 'L'
@@ -49,7 +48,6 @@ static Byte const flv_header [] = {
     0x0,
     0x0
 };
-}
 
 mt_throws Result
 FlvMuxer::beginMuxing ()
