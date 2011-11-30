@@ -94,7 +94,7 @@ private:
 
     static void closeRtmpConn (void * const _session);
 
-  mt_iface_end()
+  mt_iface_end
 
   mt_iface (TcpServer::Frontend)
 
@@ -102,7 +102,7 @@ private:
 
     static void accepted (void * const _self);
 
-  mt_iface_end()
+  mt_iface_end
 
 public:
     mt_throws Result init ();

@@ -54,7 +54,7 @@ private:
 
     static void connectionClosed (void *_pollable_key,
 				  void *_self);
-  mt_iface_end()
+  mt_iface_end
 
     bool acceptOneConnection ();
 
@@ -62,7 +62,7 @@ private:
     static TcpServer::Frontend tcp_server_frontend;
 
     static void accepted (void *_self);
-  mt_iface_end()
+  mt_iface_end
 
 public:
     mt_throws Result init (Time session_keepalive_timeout,

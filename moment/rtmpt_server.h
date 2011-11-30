@@ -200,7 +200,7 @@ private:
 
     static void senderClosed (Exception *exc_,
 			      void      *_rtmpt_conn);
-  mt_iface_end()
+  mt_iface_end
 
   mt_iface (RtmpConnection::Backend)
   // {
