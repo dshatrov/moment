@@ -41,7 +41,9 @@
 	"Server: Moment/1.0\r\n" \
 	"Date: ", ConstMemory (date_buf, date_len), "\r\n" \
 	"Connection: Keep-Alive\r\n" \
-	"Cache-Control: no-cache\r\n"
+	"Cache-Control: max-age=604800\r\n"
+//	"Cache-Control: public\r\n"
+//	"Cache-Control: no-cache\r\n"
 
 #define MOMENT_FILE__OK_HEADERS(mime_type, content_length) \
 	"HTTP/1.1 200 OK\r\n" \
