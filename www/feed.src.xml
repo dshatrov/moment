@@ -28,6 +28,48 @@
   </image>
 
   <item>
+    <pubDate>Thu, 24 Nov 2011 09:00:00 GMT</pubDate>
+    <author>Moment</author>
+    <link>http://momentvideo.org</link>
+    <title>
+      <eng>Moment Video Server 1.2 is out</eng>
+      <rus>Вышел Moment Video Server 1.2</rus>
+    </title>
+    <description>
+      <eng>
+        <![CDATA[
+	The new version brings many new capabilities:
+	receiving video from Flash clients,
+	built-in video chat application,
+	video recording,
+	support for h.264 and AAC codecs,
+	support for arbitrary GStreamer pipelines,
+	API for plugins in C/C++,
+	server-side playlists,
+	FreeBSD port.
+        See the <a href="doc_desc.html">technical description</a>
+	for a list of features available in Moment VS.</eng>
+	]]>
+      </eng>
+      <rus>
+        <![CDATA[
+	В новой версии добавлено много новых возможностей:
+	получение видео от Flash-клиентов,
+	встроенное приложение видеочата,
+	запись видео на диск,
+	поддержка кодеков h.264 и AAC,
+	поддержка произвольных конвейеров GStreamer,
+	API для плагинов на C/C++,
+	плейлисты на стороне сервера,
+	поддержка FreeBSD.
+        Список основных возможностях видеосервера можно найти
+	в <a href="doc_desc.ru.html">техническом описании</a>.</rus>
+	]]>
+      </rus>
+    </description>
+  </item>
+
+  <item>
     <pubDate>Wed, 28 Jul 2011 07:51:06 GMT</pubDate>
     <author>Moment</author>
     <link>http://momentvideo.org</link>
