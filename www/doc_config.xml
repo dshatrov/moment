@@ -881,18 +881,14 @@ http {
 <eng><![CDATA[  <!-- Playback starts on 27th of November at 12:00 -->]]></eng><!--
 --><rus><![CDATA[  <!-- Начинаем показ 27-го ноября в 12:00 -->]]></rus>
 <![CDATA[  <item start="11/27 12:00" end="13:00" seek="15">
-    <path>
-      /home/user/video/Movie.avi
-    </path>
+    <path>/home/user/video/Movie.avi</path>
   </item>
   <item start="13:30" duration="15:00">
-    <uri>
-      rtsp://channel_one.com/live/stream.sdp
-    </uri>
+    <uri>rtsp://channel_one.com/live/stream.sdp</uri>
   </item>
   <item>
     <chain>
-      chain = "videotestsrc ! ffenc_flv ! fakesink name=video sync=true"
+      videotestsrc ! ffenc_flv ! fakesink name=video sync=true
     </chain>
   </item>
 </playlist>]]>
