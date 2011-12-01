@@ -93,6 +93,9 @@ private:
     mt_mutex (mutex) Time first_frame_time;
     mt_mutex (mutex) Time cur_frame_time;
 
+    mt_const Uint64 recording_limit;
+    mt_mutex (mutex) Uint64 total_bytes_recorded;
+
     Mutex mutex;
 
     mt_const Cb<Frontend> frontend;
@@ -141,6 +144,11 @@ public:
     mt_const void setFrontend (CbDesc<Frontend> const &frontend)
     {
 	this->frontend = frontend;
+    }
+
+    mt_const void setRecordingLimit (Uint64 recording_limit)
+    {
+	this->recording_limit = recording_limit;
     }
 
     mt_const void init (ServerThreadContext *thread_ctx,

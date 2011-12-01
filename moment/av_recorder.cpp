@@ -183,6 +183,12 @@ AvRecorder::streamAudioMessage (VideoStream::AudioMessage * const mt_nonnull msg
 	return;
     }
 
+    if (self->total_bytes_recorded >= self->recording_limit) {
+	self->doStop ();
+	self->mutex.unlock ();
+	return;
+    }
+
     if (!self->got_first_frame & msg->frame_type.isAudioData()) {
 	logD (recorder_frames, _func, "first frame (audio)");
 	self->got_first_frame = true;
@@ -199,6 +205,8 @@ AvRecorder::streamAudioMessage (VideoStream::AudioMessage * const mt_nonnull msg
 	logE (recorder, _func, "muxer->muxAudioMessage() failed: ", exc->toString());
 	self->doStop ();
     }
+
+    self->total_bytes_recorded += alt_msg.msg_len;
 
     self->mutex.unlock ();
 }
@@ -221,6 +229,12 @@ AvRecorder::streamVideoMessage (VideoStream::VideoMessage * const mt_nonnull msg
 	return;
     }
 
+    if (self->total_bytes_recorded >= self->recording_limit) {
+	self->doStop ();
+	self->mutex.unlock ();
+	return;
+    }
+
     if (!self->got_first_frame && msg->frame_type.isVideoData()) {
 	logD (recorder_frames, _func, "first frame (video)");
 	self->got_first_frame = true;
@@ -237,6 +251,8 @@ AvRecorder::streamVideoMessage (VideoStream::VideoMessage * const mt_nonnull msg
 	logE (recorder, _func, "muxer->muxVideoMessage() failed: ", exc->toString());
 	self->doStop ();
     }
+
+    self->total_bytes_recorded += alt_msg.msg_len;
 
     self->mutex.unlock ();
 }
@@ -373,7 +389,8 @@ AvRecorder::AvRecorder (Object * const coderef_container)
       paused (false),
       got_first_frame (false),
       first_frame_time (0),
-      cur_frame_time (0)
+      cur_frame_time (0),
+      total_bytes_recorded (0)
 {
 }
 
