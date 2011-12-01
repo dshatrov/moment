@@ -353,9 +353,38 @@ RtmpServer::doPublish (Uint32       const msg_stream_id,
 	       "(length ", vs_name_full_len, " bytes, limit ", sizeof (vs_name_buf), " bytes)");
     }
 
+    RecordingMode rec_mode = RecordingMode::NoRecording;
+    {
+	Byte rec_mode_buf [512];
+	Size rec_mode_len;
+	Size rec_mode_full_len;
+	if (decoder->decodeString (Memory::forObject (rec_mode_buf), &rec_mode_len, &rec_mode_full_len)) {
+	    if (rec_mode_full_len > rec_mode_len) {
+		logW_ (_func, "recording mode length exceeds limit "
+		       "(length ", rec_mode_full_len, " bytes, limit ", sizeof (rec_mode_buf), " bytes)");
+	    } else {
+		ConstMemory const rec_mode_mem (rec_mode_buf, rec_mode_len);
+		if (equal (rec_mode_mem, "live"))
+		    rec_mode = RecordingMode::NoRecording;
+		else
+		if (equal (rec_mode_mem, "record"))
+		    rec_mode = RecordingMode::Replace;
+		else
+		if (equal (rec_mode_mem, "append"))
+		    rec_mode = RecordingMode::Append;
+		else
+		    logW_ (_func, "unknown recording mode: ", rec_mode_mem);
+	    }
+	} else {
+	    logD_ (_func, "could not decode recording mode");
+	}
+    }
+
     if (frontend && frontend->startStreaming) {
 	Result res;
-	if (!frontend.call_ret<Result> (&res, frontend->startStreaming, /*(*/ ConstMemory (vs_name_buf, vs_name_len) /*)*/)) {
+	if (!frontend.call_ret<Result> (&res, frontend->startStreaming,
+		    /*(*/ ConstMemory (vs_name_buf, vs_name_len), rec_mode /*)*/))
+	{
 	    logE_ (_func, "frontend gone");
 	    return Result::Failure;
 	}

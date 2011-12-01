@@ -23,7 +23,7 @@ moment_private_headers =
 moment_target_headers =		\
 	libmoment.h		\
 				\
-	types.h			\
+	moment_types.h		\
 	amf_encoder.h		\
 	amf_decoder.h		\
 	rtmp_connection.h	\
@@ -34,6 +34,8 @@ moment_target_headers =		\
 	rtmpt_service.h		\
 				\
 	video_stream.h		\
+				\
+	video_source.h		\
 				\
 	av_recorder.h		\
 	av_muxer.h		\
@@ -47,6 +49,8 @@ moment_target_headers =		\
 	api.h			\
 				\
 	module_init.h
+
+#	flv_file_source.h
 
 libmomentincludedir = $(includedir)/moment-1.0/moment
 libmomentinclude_HEADERS = $(moment_target_headers)
@@ -78,6 +82,8 @@ libmoment_1_0_la_SOURCES =	\
 	hmac/sha2.c		\
 	hmac/hmac_sha2.c
 
+#	flv_file_source.cpp
+
 moment_extra_dist =
 
 libmoment_1_0_la_LDFLAGS = -no-undefined -version-info "0:0:0" $(COMMON_LDFLAGS)
@@ -87,25 +93,34 @@ libmoment_1_0_la_LIBADD += -lws2_32
 endif
 
 momentdir = $(libdir)/moment-1.0
-moment_LTLIBRARIES = libmoment-file-1.0.la libmoment-rtmp-1.0.la libmoment-test-1.0.la
+moment_LTLIBRARIES = libmoment-file-1.0.la libmoment-rtmp-1.0.la libmoment-test-1.0.la # libmoment-archive-1.0.la
 
+libmoment_file_1_0_la_DEPENDENCIES = libmoment-1.0.la
 libmoment_file_1_0_la_SOURCES = \
 	mod_file.cpp
 libmoment_file_1_0_la_LDFLAGS = -no-undefined -version-info "0:0:0" $(COMMON_LDFLAGS)
-libmoment_file_1_0_la_LIBADD = $(THIS_LIBS)
+libmoment_file_1_0_la_LIBADD = $(top_builddir)/moment/libmoment-1.0.la $(THIS_LIBS)
 
+libmoment_rtmp_1_0_la_DEPENDENCIES = libmoment-1.0.la
 libmoment_rtmp_1_0_la_SOURCES =	\
 	moment_rtmp.cpp
 libmoment_rtmp_1_0_la_LDFLAGS = -no-undefined -version-info "0:0:0" $(COMMON_LDFLAGS)
-libmoment_rtmp_1_0_la_LIBADD = $(THIS_LIBS)
+libmoment_rtmp_1_0_la_LIBADD = $(top_builddir)/moment/libmoment-1.0.la $(THIS_LIBS)
 if PLATFORM_WIN32
 libmoment_rtmp_1_0_la_LIBADD += -lws2_32
 endif
 
+libmoment_archive_1_0_la_DEPENDENCIES = libmoment-1.0.la
+libmoment_archive_1_0_la_SOURCES = \
+	mod_archive.cpp
+libmoment_archive_1_0_la_LDFLAGS = -no-undefined -version-info "0:0:0" $(COMMON_LDFLAGS)
+libmoment_archive_1_0_la_LIBADD = $(top_builddir)/moment/libmoment-1.0.la $(THIS_LIBS)
+
+libmoment_test_1_0_la_DEPENDENCIES = libmoment-1.0.la
 libmoment_test_1_0_la_SOURCES =	\
 	mod_test.cpp
 libmoment_test_1_0_la_LDFLAGS = -no-undefined -version-info "0:0:0" $(COMMON_LDFLAGS)
-libmoment_test_1_0_la_LIBADD = $(THIS_LIBS)
+libmoment_test_1_0_la_LIBADD = $(top_builddir)/moment/libmoment-1.0.la $(THIS_LIBS)
 
 bin_PROGRAMS = moment rtmptool
 

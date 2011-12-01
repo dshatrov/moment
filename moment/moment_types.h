@@ -17,39 +17,29 @@
 */
 
 
-#ifndef __LIBMOMENT__LIBMOMENT_H__
-#define __LIBMOMENT__LIBMOMENT_H__
-
-
-#include <libmary/libmary.h>
-
-#include <moment/moment_types.h>
-
-#include <moment/amf_encoder.h>
-#include <moment/amf_decoder.h>
-
-#include <moment/rtmp_connection.h>
-#include <moment/rtmp_server.h>
-#include <moment/rtmp_service.h>
-#include <moment/rtmpt_server.h>
-#include <moment/rtmpt_service.h>
-
-#include <moment/video_stream.h>
-
-#include <moment/av_recorder.h>
-#include <moment/av_muxer.h>
-#include <moment/flv_muxer.h>
-
-#include <moment/storage.h>
-#include <moment/local_storage.h>
-
-#include <moment/moment_server.h>
+#ifndef __LIBMOMENT__MOMENT_TYPES__H__
+#define __LIBMOMENT__MOMENT_TYPES__H__
 
 
 namespace Moment {
 
+class RecordingMode
+{
+public:
+    enum Value {
+	NoRecording,
+	Replace,
+	Append
+    };
+    operator Value () const { return value; }
+    RecordingMode (Value const value) : value (value) {}
+    RecordingMode () {}
+private:
+    Value value;
+};
+
 }
 
 
-#endif /* __LIBMOMENT__LIBMOMENT_H__ */
+#endif /* __LIBMOMENT__MOMENT_TYPES__H__ */
 

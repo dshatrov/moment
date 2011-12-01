@@ -458,8 +458,9 @@ Ref<VideoStream> client_startWatching (ConstMemory   const stream_name,
     return NULL;
 }
 
-Ref<VideoStream> client_startStreaming (ConstMemory   const stream_name,
-					void        * const _api_client_session)
+Ref<VideoStream> client_startStreaming (ConstMemory     const stream_name,
+					RecordingMode   const rec_mode,
+					void          * const _api_client_session)
 {
     MomentClientSession * const api_client_session = static_cast <MomentClientSession*> (_api_client_session);
 
@@ -468,6 +469,7 @@ Ref<VideoStream> client_startStreaming (ConstMemory   const stream_name,
 		api_client_session->api_client_handler_wrapper->ext_client_handler.start_streaming_cb (
 			(char const *) stream_name.mem(),
 			stream_name.len(),
+			(MomentRecordingMode) (Uint32) rec_mode,
 			api_client_session->client_cb_data,
 			api_client_session->api_client_handler_wrapper->ext_client_handler.start_streaming_cb_data);
 

@@ -42,6 +42,10 @@ RtmptService rtmpt_service (NULL);
 
 bool audio_waits_video = false;
 
+bool record_all = false;
+ConstMemory record_path = "/opt/moment/records";
+Uint64 recording_limit = 1 << 24 /* 16 Mb */;
+
 #ifdef MOMENT_RTMP__WAIT_FOR_KEYFRAME
 Count no_keyframe_limit = 250; // 25 fps * 10 seconds
 #endif
@@ -58,6 +62,10 @@ public:
     // RtmpServer's methods. We must take special care to ensure that this
     // holds. See takeRtmpConnRef().
     RtmpServer rtmp_server;
+
+    ServerThreadContext *recorder_thread_ctx;
+    AvRecorder recorder;
+    FlvMuxer flv_muxer;
 
     mt_mutex (mutex) Ref<MomentServer::ClientSession> srv_session;
 
@@ -77,6 +85,7 @@ public:
 #endif
 
     // Synchronized by rtmp_server.
+    bool streaming;
     bool watching;
 
 #if 0
@@ -106,6 +115,8 @@ public:
 
     ClientSession ()
 	: valid (true),
+	  recorder_thread_ctx (NULL),
+	  recorder (this),
 #ifdef MOMENT_RTMP__FLOW_CONTROL
 	  overloaded (false),
 #endif
@@ -114,6 +125,7 @@ public:
 	  keyframe_sent (false),
 	  first_keyframe_sent (false),
 #endif
+	  streaming (false),
 	  watching (false)
     {
 	logD (session, _func, "0x", fmt_hex, (UintPtr) this);
@@ -122,11 +134,20 @@ public:
     ~ClientSession ()
     {
 	logD (session, _func, "0x", fmt_hex, (UintPtr) this);
+
+	MomentServer * const moment = MomentServer::getInstance();
+
+	if (recorder_thread_ctx) {
+	    moment->getRecorderThreadPool()->releaseThreadContext (recorder_thread_ctx);
+	    recorder_thread_ctx = NULL;
+	}
     }
 };
 
 void destroyClientSession (ClientSession * const client_session)
 {
+    client_session->recorder.stop();
+
     client_session->mutex.lock ();
 
     if (!client_session->valid) {
@@ -320,10 +341,14 @@ Result connect (ConstMemory const &app_name,
     return Result::Success;
 }
 
-Result startStreaming (ConstMemory const &_stream_name,
-		       void * const _client_session)
+Result startStreaming (ConstMemory     const &_stream_name,
+		       RecordingMode   const rec_mode,
+		       void          * const _client_session)
 {
     logD (session, _func, "stream_name: ", _stream_name);
+
+    // TODO class MomentRtmpModule
+    MomentServer * const moment = MomentServer::getInstance();
 
     ConstMemory stream_name = _stream_name;
     {
@@ -333,16 +358,33 @@ Result startStreaming (ConstMemory const &_stream_name,
 	    stream_name = stream_name.region (0, name_sep - stream_name.mem());
     }
 
-    // TODO class MomentRtmpModule
-    MomentServer * const moment = MomentServer::getInstance();
-
     ClientSession * const client_session = static_cast <ClientSession*> (_client_session);
+
+    if (client_session->streaming) {
+	logE (mod_rtmp, _func, "already streaming another stream");
+	return Result::Success;
+    }
+    client_session->streaming = true;
 
     // 'srv_session' is created in connect(), which is synchronized with
     // startStreaming(). No locking needed.
-    Ref<VideoStream> const video_stream = moment->startStreaming (client_session->srv_session, stream_name);
+    Ref<VideoStream> const video_stream =
+	    moment->startStreaming (client_session->srv_session, stream_name, rec_mode);
     if (!video_stream)
 	return Result::Failure;
+
+    if (record_all) {
+	logD_ (_func, "rec_mode: ", (Uint32) rec_mode);
+	if (rec_mode == RecordingMode::Replace ||
+	    rec_mode == RecordingMode::Append)
+	{
+	    logD_ (_func, "recording");
+	    // TODO Support "append" mode.
+	    client_session->recorder.setVideoStream (video_stream);
+	    client_session->recorder.start (
+		    makeString (record_path, stream_name, ".flv")->mem());
+	}
+    }
 
     client_session->mutex.lock ();
     client_session->video_stream = video_stream;
@@ -535,6 +577,26 @@ Result clientConnected (RtmpConnection  * const mt_nonnull rtmp_conn,
     client_session->client_addr = client_addr;
     client_session->rtmp_conn = rtmp_conn;
 
+    {
+	MomentServer * const moment = MomentServer::getInstance();
+
+	ServerThreadContext *thread_ctx =
+		moment->getRecorderThreadPool()->grabThreadContext ("flash" /* TODO Configurable prefix */);
+	if (thread_ctx) {
+	    client_session->recorder_thread_ctx = thread_ctx;
+	} else {
+	    logE_ (_func, "Couldn't get recorder thread context: ", exc->toString());
+	    thread_ctx = moment->getServerApp()->getMainThreadContext();
+	}
+
+	client_session->flv_muxer.setPagePool (moment->getPagePool());
+
+	client_session->recorder.init (thread_ctx, moment->getStorage());
+	client_session->recorder.setRecordingLimit (recording_limit);
+	client_session->recorder.setMuxer (&client_session->flv_muxer);
+	// TODO recorder frontend + error reporting
+    }
+
     client_session->rtmp_server.setFrontend (Cb<RtmpServer::Frontend> (
 	    &rtmp_server_frontend, client_session, client_session));
     client_session->rtmp_server.setRtmpConnection (rtmp_conn);
@@ -610,6 +672,34 @@ void momentRtmpInit ()
 	    rtmpt_no_keepalive_conns = true;
 
 	logI_ (_func, opt_name, ": ", rtmpt_no_keepalive_conns);
+    }
+
+    {
+	ConstMemory const opt_name = "mod_rtmp/record_all";
+	MConfig::Config::BooleanValue const value = config->getBoolean (opt_name);
+	if (value == MConfig::Config::Boolean_Invalid) {
+	    logE_ (_func, "Invalid value for ", opt_name, ": ", config->getString (opt_name),
+		   ", assuming \"", record_all, "\"");
+	} else {
+	    if (value == MConfig::Config::Boolean_True)
+		record_all = true;
+	    else
+		record_all = false;
+
+	    logI_ (_func, opt_name, ": ", record_all);
+	}
+    }
+
+    record_path = config->getString_default ("mod_rtmp/record_path", record_path);
+
+    {
+	ConstMemory const opt_name = "mod_rtmp/record_limit";
+	MConfig::GetResult const res = config->getUint64_default (
+		opt_name, &recording_limit, recording_limit);
+	if (!res)
+	    logE_ (_func, "bad value for ", opt_name);
+
+	logI_ (_func, opt_name, ": ", recording_limit);
     }
 
     {
@@ -732,14 +822,14 @@ namespace M {
 
 void libMary_moduleInit ()
 {
-    logI_ ("Initializing mod_rtmp");
+    logI_ (_func, "Initializing mod_rtmp");
 
     Moment::momentRtmpInit ();
 }
 
 void libMary_moduleUnload()
 {
-    logI_ ("Unloading mod_rtmp");
+    logI_ (_func, "Unloading mod_rtmp");
 
     Moment::momentRtmpUnload ();
 }

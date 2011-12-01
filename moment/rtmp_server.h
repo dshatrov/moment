@@ -23,6 +23,7 @@
 
 #include <libmary/libmary.h>
 
+#include <moment/moment_types.h>
 #include <moment/rtmp_connection.h>
 #include <moment/video_stream.h>
 
@@ -54,8 +55,9 @@ public:
 	Result (*connect) (ConstMemory const &app_name,
 			   void *cb_data);
 
-	Result (*startStreaming) (ConstMemory const &stream_name,
-				  void  *cb_data);
+	Result (*startStreaming) (ConstMemory   const &stream_name,
+				  RecordingMode const  rec_mode,
+				  void                *cb_data);
 
 	Result (*startWatching) (ConstMemory const &stream_name,
 				 void  *cb_data);

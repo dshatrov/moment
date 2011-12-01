@@ -233,7 +233,6 @@ MomentServer::loadModules ()
 	    break;
 
 	Ref<String> const stat_path = makeString (module_path, "/", dir_entry->mem());
-
 	ConstMemory const entry_name = stat_path->mem();
 
 	Ref<Vfs::FileStat> const stat_data = vfs->stat (dir_entry->mem());
@@ -332,11 +331,6 @@ MomentServer::rtmpClientConnected (ConstMemory const &path,
 
     mutex.lock ();
     Ref<ClientEntry> const client_entry = getClientEntry (path, &path_tail, &root_namespace);
-#if 0
-// TODO 'free_access' config option.
-    if (!client_entry) {
-    }
-#endif
 
     Ref<ClientSession> const client_session = grab (new ClientSession);
     client_session->weak_rtmp_conn = conn;
@@ -431,7 +425,8 @@ _not_found:
 
 Ref<VideoStream>
 MomentServer::startStreaming (ClientSession * const mt_nonnull client_session,
-			      ConstMemory const stream_name)
+			      ConstMemory     const stream_name,
+			      RecordingMode   const rec_mode)
 {
     Ref<VideoStream> video_stream;
   {
@@ -442,7 +437,7 @@ MomentServer::startStreaming (ClientSession * const mt_nonnull client_session,
 	logD (session, _func, "calling backend->startStreaming()");
 	if (!client_session->backend.call_ret< Ref<VideoStream> > (&video_stream,
 								   client_session->backend->startStreaming,
-								   /* ( */ stream_name /* ) */))
+								   /* ( */ stream_name, rec_mode /* ) */))
 	{
 	    goto _denied;
 	}

@@ -25,6 +25,7 @@
 #include <mconfig/mconfig.h>
 
 
+#include <moment/moment_types.h>
 #include <moment/rtmp_connection.h>
 #include <moment/video_stream.h>
 #include <moment/storage.h>
@@ -102,8 +103,9 @@ public:
 	    Ref<VideoStream> (*startWatching) (ConstMemory  stream_name,
 					       void        *cb_data);
 
-	    Ref<VideoStream> (*startStreaming) (ConstMemory  stream_name,
-						void        *cb_data);
+	    Ref<VideoStream> (*startStreaming) (ConstMemory    stream_name,
+						RecordingMode  rec_mode,
+						void          *cb_data);
 	};
 
     private:
@@ -301,7 +303,8 @@ public:
 				    ConstMemory    stream_name);
 
     Ref<VideoStream> startStreaming (ClientSession * mt_nonnull client_session,
-				     ConstMemory    stream_name);
+				     ConstMemory    stream_name,
+				     RecordingMode  rec_mode);
 
     struct ClientHandlerKey {
 	ClientEntry *client_entry;
