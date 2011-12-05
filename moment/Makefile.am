@@ -35,8 +35,6 @@ moment_target_headers =		\
 				\
 	video_stream.h		\
 				\
-	video_source.h		\
-				\
 	av_recorder.h		\
 	av_muxer.h		\
 	flv_muxer.h		\
