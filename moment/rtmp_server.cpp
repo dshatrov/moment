@@ -86,12 +86,28 @@ RtmpServer::doConnect (Uint32       const msg_stream_id,
     rtmp_conn->sendUserControl_StreamBegin (0 /* msg_stream_id */);
 
     {
-	AmfAtom atoms [19];
+	AmfAtom atoms [25];
 	AmfEncoder encoder (atoms);
 
 	encoder.addString ("_result");
-	encoder.addNumber (1.0); // FIXME Incorrect transaction_id?
-	encoder.addNullObject ();
+	encoder.addNumber (transaction_id);
+
+	{
+	    encoder.beginObject ();
+
+	    encoder.addFieldName ("fmsVer");
+	    encoder.addString ("MMNT/0,1,0,0");
+//	    encoder.addString ("FMS/3,5,7,7009");
+
+	    encoder.addFieldName ("capabilities");
+	    // TODO Define capabilities. Docs?
+	    encoder.addNumber (31.0);
+
+	    encoder.addFieldName ("mode");
+	    encoder.addNumber (1.0);
+
+	    encoder.endObject ();
+	}
 
 	{
 	    encoder.beginObject ();
@@ -105,21 +121,20 @@ RtmpServer::doConnect (Uint32       const msg_stream_id,
 	    encoder.addFieldName ("description");
 	    encoder.addString ("Connection succeeded.");
 
-	    encoder.endObject ();
-	}
+	    encoder.addFieldName ("objectEncoding");
+	    encoder.addNumber (0.0);
 
-	{
-	    encoder.beginObject ();
+#if 0
+// This seems to be unnecessary
 
-	    encoder.addFieldName ("fmsVer");
-	    encoder.addString ("MMNT/0,1,0,0");
+	    encoder.addFieldName ("data");
+	    encoder.beginEcmaArray (0);
 
-	    encoder.addFieldName ("capabilities");
-	    // TODO Define capabilities. Docs?
-	    encoder.addNumber (31.0);
+	    encoder.addFieldName ("version");
+	    encoder.addString ("3,5,7,7009");
 
-	    encoder.addFieldName ("mode");
-	    encoder.addNumber (1.0);
+	    encoder.endEcmaArray ();
+#endif
 
 	    encoder.endObject ();
 	}
