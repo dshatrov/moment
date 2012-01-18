@@ -226,6 +226,8 @@ private:
 
     mt_mutex (mutex) VideoStreamHash video_stream_hash;
 
+    mt_const Ref<VideoStream> mix_video_stream;
+
     class Namespace : public BasicReferenced
     {
     public:
@@ -345,6 +347,8 @@ private:
 
 public:
     void removeVideoStream (VideoStreamKey video_stream_key);
+
+    Ref<VideoStream> getMixVideoStream ();
 
     void toAccessLog (ConstMemory addr,
 		      ConstMemory request_line,

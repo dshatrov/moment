@@ -93,6 +93,16 @@ public:
 		   value == GeneratedKeyFrame;
 	}
 
+	bool isKeyFrame () const
+	{
+	    return isVideoData() && (value == KeyFrame || value == GeneratedKeyFrame);
+	}
+
+	bool isInterFrame () const
+	{
+	    return isVideoData() && (value == InterFrame || value == DisposableInterFrame);
+	}
+
 	Byte toFlvFrameType () const;
     };
 

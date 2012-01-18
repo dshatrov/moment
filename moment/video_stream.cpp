@@ -527,7 +527,8 @@ VideoStream::informAudioMessage (EventHandler * const event_handler,
 				 void * const _inform_data)
 {
     InformAudioMessage_Data * const inform_data = static_cast <InformAudioMessage_Data*> (_inform_data);
-    event_handler->audioMessage (inform_data->msg, cb_data);
+    if (event_handler->audioMessage)
+	event_handler->audioMessage (inform_data->msg, cb_data);
 }
 
 namespace {
@@ -547,7 +548,8 @@ VideoStream::informVideoMessage (EventHandler * const event_handler,
 				 void * const _inform_data)
 {
     InformVideoMessage_Data * const inform_data = static_cast <InformVideoMessage_Data*> (_inform_data);
-    event_handler->videoMessage (inform_data->msg, cb_data);
+    if (event_handler->videoMessage)
+	event_handler->videoMessage (inform_data->msg, cb_data);
 }
 
 namespace {
@@ -579,11 +581,12 @@ VideoStream::informRtmpCommandMessage (EventHandler * const event_handler,
 	    static_cast <InformRtmpCommandMessage_Data*> (_inform_data);
     // TODO Save/restore amf_decoder state between  callback invocations.
     //      Viable option - abstract away the parsing process.
-    event_handler->rtmpCommandMessage (inform_data->conn,
-				       inform_data->msg,
-				       inform_data->method_name,
-				       inform_data->amf_decoder,
-				       cb_data);
+    if (event_handler->rtmpCommandMessage)
+	event_handler->rtmpCommandMessage (inform_data->conn,
+					   inform_data->msg,
+					   inform_data->method_name,
+					   inform_data->amf_decoder,
+					   cb_data);
 }
 
 void
@@ -591,7 +594,8 @@ VideoStream::informClosed (EventHandler * const event_handler,
 			   void * const cb_data,
 			   void * const /* inform_data */)
 {
-    event_handler->closed (cb_data);
+    if (event_handler->closed)
+	event_handler->closed (cb_data);
 }
 
 void
@@ -601,10 +605,10 @@ VideoStream::fireAudioMessage (AudioMessage * const mt_nonnull msg)
 
     mutex.lock ();
 
-    frame_saver.processAudioFrame (msg);
-
     InformAudioMessage_Data inform_data (msg);
     event_informer.informAll_unlocked (informAudioMessage, &inform_data);
+
+    frame_saver.processAudioFrame (msg);
 
     mutex.unlock ();
 }
@@ -616,10 +620,10 @@ VideoStream::fireVideoMessage (VideoMessage * const mt_nonnull msg)
 
     mutex.lock ();
 
-    frame_saver.processVideoFrame (msg);
-
     InformVideoMessage_Data inform_data (msg);
     event_informer.informAll_unlocked (informVideoMessage, &inform_data);
+
+    frame_saver.processVideoFrame (msg);
 
     mutex.unlock ();
 }

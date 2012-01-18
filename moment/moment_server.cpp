@@ -609,6 +609,12 @@ MomentServer::removeVideoStream (VideoStreamKey const video_stream_key)
     mutex.unlock ();
 }
 
+Ref<VideoStream>
+MomentServer::getMixVideoStream ()
+{
+    return mix_video_stream;
+}
+
 Result
 MomentServer::init (ServerApp        * const mt_nonnull server_app,
 		    PagePool         * const mt_nonnull page_pool,
@@ -625,6 +631,8 @@ MomentServer::init (ServerApp        * const mt_nonnull server_app,
     this->config = config;
     this->recorder_thread_pool = recorder_thread_pool;
     this->storage = storage;
+
+    mix_video_stream = grab (new VideoStream);
 
     {
 	ConstMemory const opt_name = "moment/publish_all";

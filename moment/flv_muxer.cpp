@@ -116,8 +116,6 @@ FlvMuxer::doMuxMessage (VideoStream::Message * const mt_nonnull msg,
 	Sender::MessageEntry_Pages * const msg_pages =
 		Sender::MessageEntry_Pages::createNew (max_header_len);
 
-	// TODO Normalize message if prechunk_size != 0
-
 	memcpy (msg_pages->getHeaderData(), tag_header, sizeof (tag_header));
 	msg_pages->header_len = sizeof (tag_header);
 

@@ -363,7 +363,10 @@ AvRecorder::setVideoStream (VideoStream * const stream)
 
     stream->getEventInformer()->subscribe (
 	    CbDesc<VideoStream::EventHandler> (
-		    &stream_handler, cur_stream_ticket /* cb_data */, getCoderefContainer(), cur_stream_ticket));
+		    &stream_handler,
+		    cur_stream_ticket /* cb_data */,
+		    getCoderefContainer(),
+		    cur_stream_ticket));
 
     mutex.unlock ();
 }
