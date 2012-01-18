@@ -22,7 +22,9 @@
 #include <moment/libmoment.h>
 
 
+// Needed for "start_paused" as well.
 #define MOMENT_RTMP__WAIT_FOR_KEYFRAME
+
 #define MOMENT_RTMP__AUDIO_WAITS_VIDEO
 
 // Flow control is disabled until done right.
@@ -34,21 +36,38 @@ namespace Moment {
 namespace {
 
 static LogGroup libMary_logGroup_mod_rtmp ("mod_rtmp", LogLevel::I);
-static LogGroup libMary_logGroup_session ("mod_rtmp.session", LogLevel::I);
+static LogGroup libMary_logGroup_session ("mod_rtmp.session", LogLevel::D);
 static LogGroup libMary_logGroup_framedrop ("mod_rtmp.framedrop", LogLevel::I);
 
 RtmpService rtmp_service (NULL);
 RtmptService rtmpt_service (NULL);
 
-bool audio_waits_video = false;
+mt_const bool audio_waits_video = false;
+mt_const bool default_start_paused = false;
 
-bool record_all = false;
-ConstMemory record_path = "/opt/moment/records";
-Uint64 recording_limit = 1 << 24 /* 16 Mb */;
+mt_const bool record_all = false;
+mt_const ConstMemory record_path = "/opt/moment/records";
+mt_const Uint64 recording_limit = 1 << 24 /* 16 Mb */;
 
 #ifdef MOMENT_RTMP__WAIT_FOR_KEYFRAME
-Count no_keyframe_limit = 250; // 25 fps * 10 seconds
+mt_const Count no_keyframe_limit = 250; // 25 fps * 10 seconds
 #endif
+
+class WatchingParams
+{
+public:
+    bool start_paused;
+
+    void reset ()
+    {
+	start_paused = default_start_paused;
+    }
+
+    WatchingParams ()
+    {
+	reset ();
+    }
+};
 
 class ClientSession : public Object
 {
@@ -73,6 +92,8 @@ public:
     // TODO Deprecated field
     mt_mutex (mutex) MomentServer::VideoStreamKey video_stream_key;
 
+    mt_mutex (mutex) WatchingParams watching_params;
+
 #ifdef MOMENT_RTMP__FLOW_CONTROL
     mt_mutex (mutex) bool overloaded;
 #endif
@@ -83,6 +104,8 @@ public:
     mt_mutex (mutex) bool keyframe_sent;
     mt_mutex (mutex) bool first_keyframe_sent;
 #endif
+
+    mt_mutex (mutex) bool resumed;
 
     // Synchronized by rtmp_server.
     bool streaming;
@@ -125,6 +148,7 @@ public:
 	  keyframe_sent (false),
 	  first_keyframe_sent (false),
 #endif
+	  resumed (false),
 	  streaming (false),
 	  watching (false)
     {
@@ -285,8 +309,18 @@ void streamVideoMessage (VideoStream::VideoMessage * const mt_nonnull msg,
 	}
     }
 
-    if (got_keyframe) {
+    if (got_keyframe)
 	client_session->no_keyframe_counter = 0;
+
+    if (client_session->watching_params.start_paused &&
+	client_session->first_keyframe_sent &&
+	!client_session->resumed)
+    {
+	client_session->mutex.unlock ();
+	return;
+    }
+
+    if (got_keyframe) {
 	client_session->keyframe_sent = true;
 	client_session->first_keyframe_sent = true;
     }
@@ -341,6 +375,52 @@ Result connect (ConstMemory const &app_name,
     return Result::Success;
 }
 
+typedef void (*ParameterCallback) (ConstMemory  name,
+				   ConstMemory  value,
+				   void        *cb_data);
+
+// Very similar to M::HttpRequest::parseParameters().
+static void parseParameters (ConstMemory         const mem,
+			     ParameterCallback   const param_cb,
+			     void              * const param_cb_data)
+{
+    Byte const *uri_end = mem.mem() + mem.len();
+    Byte const *param_pos = mem.mem();
+
+    while (param_pos < uri_end) {
+	ConstMemory name;
+	ConstMemory value;
+	Byte const *value_start = (Byte const *) memchr (param_pos, '=', uri_end - param_pos);
+	if (value_start) {
+	    ++value_start; // Skipping '='
+	    if (value_start > uri_end)
+		value_start = uri_end;
+
+	    name = ConstMemory (param_pos, value_start - 1 /*'='*/ - param_pos);
+
+	    Byte const *value_end = (Byte const *) memchr (value_start, '&', uri_end - value_start);
+	    if (value_end) {
+		if (value_end > uri_end)
+		    value_end = uri_end;
+
+		value = ConstMemory (value_start, value_end - value_start);
+		param_pos = value_end + 1; // Skipping '&'
+	    } else {
+		value = ConstMemory (value_start, uri_end - value_start);
+		param_pos = uri_end;
+	    }
+	} else {
+	    name = ConstMemory (param_pos, uri_end - param_pos);
+	    param_pos = uri_end;
+	}
+
+	logD_ (_func, "parameter: ", name, " = ", value);
+
+	param_cb (name, value, param_cb_data);
+    }
+}
+
+
 Result startStreaming (ConstMemory     const &_stream_name,
 		       RecordingMode   const rec_mode,
 		       void          * const _client_session)
@@ -350,14 +430,6 @@ Result startStreaming (ConstMemory     const &_stream_name,
     // TODO class MomentRtmpModule
     MomentServer * const moment = MomentServer::getInstance();
 
-    ConstMemory stream_name = _stream_name;
-    {
-      // This will be unnecessary after parameter parsing is implemented in HttpServer.
-	Byte const * const name_sep = (Byte const *) memchr (stream_name.mem(), '?', stream_name.len());
-	if (name_sep)
-	    stream_name = stream_name.region (0, name_sep - stream_name.mem());
-    }
-
     ClientSession * const client_session = static_cast <ClientSession*> (_client_session);
 
     if (client_session->streaming) {
@@ -365,6 +437,15 @@ Result startStreaming (ConstMemory     const &_stream_name,
 	return Result::Success;
     }
     client_session->streaming = true;
+
+    ConstMemory stream_name = _stream_name;
+    {
+      // This will be unnecessary after parameter parsing is implemented in HttpServer.
+      // 12.01.17 ^^ ? How's this related?
+	Byte const * const name_sep = (Byte const *) memchr (stream_name.mem(), '?', stream_name.len());
+	if (name_sep)
+	    stream_name = stream_name.region (0, name_sep - stream_name.mem());
+    }
 
     // 'srv_session' is created in connect(), which is synchronized with
     // startStreaming(). No locking needed.
@@ -403,14 +484,24 @@ Result startStreaming (ConstMemory     const &_stream_name,
     return Result::Success;
 }
 
-Result startWatching (ConstMemory const &stream_name,
+void startWatching_paramCallback (ConstMemory   const name,
+				  ConstMemory   const /* value */,
+				  void        * const _watching_params)
+{
+    WatchingParams * const watching_params = static_cast <WatchingParams*> (_watching_params);
+
+    if (equal (name, "paused"))
+	watching_params->start_paused = true;
+}
+
+Result startWatching (ConstMemory const &_stream_name,
 		      void * const _client_session)
 {
     // TODO class MomentRtmpModule
     MomentServer * const moment = MomentServer::getInstance();
 
     logD (mod_rtmp, _func, "client_session 0x", fmt_hex, (UintPtr) _client_session);
-    logD (mod_rtmp, _func, "stream_name: ", stream_name);
+    logD (mod_rtmp, _func, "stream_name: ", _stream_name);
 
     ClientSession * const client_session = static_cast <ClientSession*> (_client_session);
 
@@ -419,6 +510,20 @@ Result startWatching (ConstMemory const &stream_name,
 	return Result::Success;
     }
     client_session->watching = true;
+
+    ConstMemory stream_name = _stream_name;
+
+    client_session->mutex.lock ();
+    client_session->watching_params.reset ();
+    client_session->resumed = false;
+    {
+	Byte const * const name_sep = (Byte const *) memchr (stream_name.mem(), '?', stream_name.len());
+	if (name_sep) {
+	    parseParameters (stream_name.region (name_sep + 1 - stream_name.mem()), startWatching_paramCallback, &client_session->watching_params);
+	    stream_name = stream_name.region (0, name_sep - stream_name.mem());
+	}
+    }
+    client_session->mutex.unlock ();
 
     Ref<VideoStream> const video_stream = moment->startWatching (client_session->srv_session, stream_name);
 #if 0
@@ -450,25 +555,57 @@ RtmpServer::CommandResult server_commandMessage (RtmpConnection       * const mt
     MomentServer * const moment = MomentServer::getInstance();
     ClientSession * const client_session = static_cast <ClientSession*> (_client_session);
 
-    client_session->mutex.lock ();
-    Ref<MomentServer::ClientSession> const srv_session = client_session->srv_session;
-    client_session->mutex.unlock ();
+    if (equal (method_name, "resume")) {
+	// TODO Unused, we never get here.
 
-    if (!srv_session) {
-	logW_ (_func, "No server session, command message dropped");
-	return RtmpServer::CommandResult::UnknownCommand;
+	client_session->mutex.lock ();
+	client_session->resumed = true;
+	client_session->mutex.unlock ();
+
+	conn->doBasicMessage (msg_stream_id, amf_decoder);
+    } else {
+	client_session->mutex.lock ();
+	Ref<MomentServer::ClientSession> const srv_session = client_session->srv_session;
+	client_session->mutex.unlock ();
+
+	if (!srv_session) {
+	    logW_ (_func, "No server session, command message dropped");
+	    return RtmpServer::CommandResult::UnknownCommand;
+	}
+
+	moment->rtmpCommandMessage (srv_session, conn, /* TODO Unnecessary? msg_stream_id, */ msg, method_name, amf_decoder);
     }
-
-    moment->rtmpCommandMessage (srv_session, conn, /* TODO Unnecessary? msg_stream_id, */ msg, method_name, amf_decoder);
 
     return RtmpServer::CommandResult::Success;
 }
 
-RtmpServer::Frontend const rtmp_server_frontend = {
+static Result pauseCmd (void * const /* _client_session */)
+{
+  // No-op
+    logD_ (_func);
+    return Result::Success;
+}
+
+static Result resumeCmd (void * const _client_session)
+{
+    logD_ (_func);
+
+    ClientSession * const client_session = static_cast <ClientSession*> (_client_session);
+
+    client_session->mutex.lock ();
+    client_session->resumed = true;
+    client_session->mutex.unlock ();
+
+    return Result::Success;
+}
+
+static RtmpServer::Frontend const rtmp_server_frontend = {
     connect,
     startStreaming /* startStreaming */,
     startWatching,
-    server_commandMessage
+    server_commandMessage,
+    pauseCmd,
+    resumeCmd
 };
 
 Result audioMessage (VideoStream::AudioMessage * const mt_nonnull msg,
@@ -571,7 +708,7 @@ Result clientConnected (RtmpConnection  * const mt_nonnull rtmp_conn,
 			void            * const /* cb_data */)
 {
     logD (mod_rtmp, _func_);
-    logD_ (_func, "--- client_addr: ", client_addr);
+//    logD_ (_func, "--- client_addr: ", client_addr);
 
     Ref<ClientSession> const client_session = grab (new ClientSession);
     client_session->client_addr = client_addr;
@@ -796,16 +933,39 @@ void momentRtmpInit ()
     }
 
     {
+	ConstMemory const opt_name = "mod_rtmp/rtmpt_from_http";
+	MConfig::Config::BooleanValue const opt_val = config->getBoolean (opt_name);
+	if (opt_val == MConfig::Config::Boolean_Invalid)
+	    logE_ (_func, "Invalid value for config option ", opt_name);
+	else
+	if (opt_val != MConfig::Config::Boolean_False)
+	    rtmpt_service.getRtmptServer()->attachToHttpService (moment->getHttpService());
+    }
+
+    {
 	ConstMemory const opt_name = "mod_rtmp/audio_waits_video";
 	MConfig::Config::BooleanValue const opt_val = config->getBoolean (opt_name);
-	if (opt_val == MConfig::Config::Boolean_Invalid) {
+	if (opt_val == MConfig::Config::Boolean_Invalid)
 	    logE_ (_func, "Invalid value for config option ", opt_name);
-	} else
-	if (opt_val != MConfig::Config::Boolean_True) {
-	    audio_waits_video = false;
-	} else {
+	else
+	if (opt_val == MConfig::Config::Boolean_True)
 	    audio_waits_video = true;
-	}
+	else
+	    audio_waits_video = false;
+    }
+
+    {
+	ConstMemory const opt_name = "mod_rtmp/start_paused";
+	MConfig::Config::BooleanValue const opt_val = config->getBoolean (opt_name);
+	if (opt_val == MConfig::Config::Boolean_Invalid)
+	    logE_ (_func, "Invalid value for config option ", opt_name);
+	else
+	if (opt_val == MConfig::Config::Boolean_True)
+	    default_start_paused = true;
+	else
+	    default_start_paused = false;
+
+	logD_ (_func, "default_start_paused: ", default_start_paused);
     }
 }
 
