@@ -54,13 +54,31 @@ void moment_message_get_data (MomentMessage *msg,
 
 typedef struct MomentStreamHandler MomentStreamHandler;
 
+// TODO This is a temporal form. It depends on VideoStream::AudioMessage.
+typedef void (*MomentAudioMessageCallback) (void *_audio_msg,
+					    void *user_data);
+
+// TODO This is a temporal form. It depends on VideoStream::VideoMessage.
+typedef void (*MomentVideoMessageCallback) (void *_video_msg,
+					    void *user_data);
+
 typedef void (*MomentRtmpDataMessageCallback) (MomentMessage *msg,
 					       // TODO AMF decoder
 					       void          *user_data);
 
 typedef void (*MomentStreamClosedCallback) (void *user_data);
 
-void moment_stream_handler_init (MomentStreamHandler *stream_handler);
+MomentStreamHandler* moment_stream_handler_new (void);
+
+void moment_stream_handler_delete (MomentStreamHandler *stream_handler);
+
+void moment_stream_handler_set_audio_message (MomentStreamHandler        *stream_handler,
+					      MomentAudioMessageCallback  cb,
+					      void                       *user_data);
+
+void moment_stream_handler_set_video_message (MomentStreamHandler        *stream_handler,
+					      MomentVideoMessageCallback  cb,
+					      void                       *user_data);
 
 void moment_stream_handler_set_rtmp_command_message (MomentStreamHandler           *stream_handler,
 						     MomentRtmpDataMessageCallback  cb,

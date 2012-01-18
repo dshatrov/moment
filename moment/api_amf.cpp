@@ -184,7 +184,9 @@ struct MomentAmfEncoder {
 
 MomentAmfEncoder* moment_amf_encoder_new_AMF0 (void)
 {
-    return new MomentAmfEncoder;
+    MomentAmfEncoder * const encoder = new MomentAmfEncoder;
+    assert (encoder);
+    return encoder;
 }
 
 void moment_amf_encoder_delete (MomentAmfEncoder * const ext_encoder)

@@ -47,7 +47,7 @@ using namespace M;
 using namespace Moment;
 
 
-#define MOMENT_API_INITIALIZED_MAGIC 0x1234
+//#define MOMENT_API_INITIALIZED_MAGIC 0x1234
 
 
 extern "C" {
@@ -98,7 +98,13 @@ void moment_message_get_data (MomentMessage * const message,
 // _______________________________ Stream events _______________________________
 
 struct MomentStreamHandler {
-    unsigned initialized;
+//    unsigned initialized;
+
+    MomentAudioMessageCallback audio_cb;
+    void *audio_cb_data;
+
+    MomentVideoMessageCallback video_cb;
+    void *video_cb_data;
 
     MomentRtmpDataMessageCallback command_cb;
     void *command_cb_data;
@@ -107,15 +113,47 @@ struct MomentStreamHandler {
     void *closed_cb_data;
 };
 
-void moment_stream_handler_init (MomentStreamHandler * const stream_handler)
+MomentStreamHandler* moment_stream_handler_new (void)
 {
+    MomentStreamHandler * const stream_handler = new MomentStreamHandler;
+    assert (stream_handler);
+
+    stream_handler->audio_cb = NULL;
+    stream_handler->audio_cb_data = NULL;
+
+    stream_handler->video_cb = NULL;
+    stream_handler->video_cb_data = NULL;
+
     stream_handler->command_cb = NULL;
     stream_handler->command_cb_data = NULL;
 
     stream_handler->closed_cb = NULL;
     stream_handler->closed_cb_data = NULL;
 
-    stream_handler->initialized = MOMENT_API_INITIALIZED_MAGIC;
+//    stream_handler->initialized = MOMENT_API_INITIALIZED_MAGIC;
+
+    return stream_handler;
+}
+
+void moment_stream_handler_delete (MomentStreamHandler * const stream_handler)
+{
+    delete stream_handler;
+}
+
+void moment_stream_handler_set_audio_message (MomentStreamHandler        * const stream_handler,
+					      MomentAudioMessageCallback   const cb,
+					      void                       * const user_data)
+{
+    stream_handler->audio_cb = cb;
+    stream_handler->audio_cb_data = user_data;
+}
+
+void moment_stream_handler_set_video_message (MomentStreamHandler        * const stream_handler,
+					      MomentVideoMessageCallback   const cb,
+					      void                       * const user_data)
+{
+    stream_handler->video_cb = cb;
+    stream_handler->video_cb_data = user_data;
 }
 
 void moment_stream_handler_set_rtmp_command_message (MomentStreamHandler           * const stream_handler,
@@ -193,7 +231,7 @@ void moment_remove_stream (MomentStreamKey const stream_key)
 }
 
 namespace {
-class MomentStreamHandlerWrapper : public Referenced
+class Api_StreamHandler_Wrapper : public Referenced
 {
 public:
     MomentStreamHandler stream_handler;
@@ -202,12 +240,31 @@ public:
     // TODO Make use of cb_mutex
     Mutex cb_mutex;
 };
+}
 
-void stream_rtmpCommandMessage (RtmpConnection       * const mt_nonnull conn,
-				VideoStream::Message * const mt_nonnull msg,
-				ConstMemory const    &method_name,
-				AmfDecoder           * const mt_nonnull amf_decoder,
-				void                 * const _stream_handler)
+static void stream_audioMessage (VideoStream::AudioMessage * const audio_msg,
+				 void                      * const _stream_handler)
+{
+    MomentStreamHandler * const stream_handler = static_cast <MomentStreamHandler*> (_stream_handler);
+
+    if (stream_handler->audio_cb)
+	stream_handler->audio_cb (audio_msg, stream_handler->audio_cb_data);
+}
+
+static void stream_videoMessage (VideoStream::VideoMessage * const video_msg,
+				 void                      * const _stream_handler)
+{
+    MomentStreamHandler * const stream_handler = static_cast <MomentStreamHandler*> (_stream_handler);
+
+    if (stream_handler->video_cb)
+	stream_handler->video_cb (video_msg, stream_handler->video_cb_data);
+}
+
+static void stream_rtmpCommandMessage (RtmpConnection       * const mt_nonnull conn,
+				       VideoStream::Message * const mt_nonnull msg,
+				       ConstMemory const    &method_name,
+				       AmfDecoder           * const mt_nonnull amf_decoder,
+				       void                 * const _stream_handler)
 {
     MomentStreamHandler * const stream_handler = static_cast <MomentStreamHandler*> (_stream_handler);
 
@@ -224,7 +281,7 @@ void stream_rtmpCommandMessage (RtmpConnection       * const mt_nonnull conn,
 #endif
 }
 
-void stream_closed (void * const _stream_handler)
+static void stream_closed (void * const _stream_handler)
 {
     MomentStreamHandler * const stream_handler = static_cast <MomentStreamHandler*> (_stream_handler);
 
@@ -232,31 +289,31 @@ void stream_closed (void * const _stream_handler)
 	stream_handler->closed_cb (stream_handler->closed_cb_data);
 }
 
-VideoStream::EventHandler stream_event_handler = {
-    NULL /* audioMessage */,
-    NULL /* videoMessage */,
+static VideoStream::EventHandler stream_event_handler = {
+    stream_audioMessage,
+    stream_videoMessage,
     stream_rtmpCommandMessage,
     stream_closed
 };
-} // namespace {}
 
 MomentStreamHandlerKey moment_stream_add_handler (MomentStream        * const stream,
 						  MomentStreamHandler * const stream_handler)
 {
-    Ref<MomentStreamHandlerWrapper> wrapper = grab (new MomentStreamHandlerWrapper);
+    Ref<Api_StreamHandler_Wrapper> wrapper = grab (new Api_StreamHandler_Wrapper);
     wrapper->stream_handler = *stream_handler;
     wrapper->subscription_key =
 	    static_cast <VideoStream*> (stream)->getEventInformer()->subscribe (
-		    &stream_event_handler, wrapper, wrapper /* ref_data */, NULL);
+		    &stream_event_handler, &wrapper->stream_handler, wrapper /* ref_data */, NULL);
     return static_cast <void*> (wrapper);
 }
 
 void moment_stream_remove_handler (MomentStream           * const stream,
 				   MomentClientHandlerKey   const stream_handler_key)
 {
-    MomentStreamHandlerWrapper * const wrapper =
-	    static_cast <MomentStreamHandlerWrapper*> (stream_handler_key);
+    Api_StreamHandler_Wrapper * const wrapper =
+	    static_cast <Api_StreamHandler_Wrapper*> (stream_handler_key);
     static_cast <VideoStream*> (stream)->getEventInformer()->unsubscribe (wrapper->subscription_key);
+    delete wrapper;
 }
 
 
@@ -302,7 +359,7 @@ MomentClientHandler* moment_client_handler_new (void)
     return client_handler;
 }
 
-void moment_client_handler_delete (MomentClientHandler *client_handler)
+void moment_client_handler_delete (MomentClientHandler * const client_handler)
 {
     delete client_handler;
 }
@@ -390,14 +447,16 @@ void moment_client_session_disconnect (MomentClientSession * const api_client_se
     moment->disconnect (api_client_session->int_client_session);
 }
 
-namespace {
-void client_rtmpCommandMessage (RtmpConnection       * const mt_nonnull conn,
-				VideoStream::Message * const mt_nonnull int_msg,
-				ConstMemory const    &method_name,
-				AmfDecoder           * const mt_nonnull amf_decoder,
-				void                 * const _api_client_session)
+static void client_rtmpCommandMessage (RtmpConnection       * const mt_nonnull conn,
+				       VideoStream::Message * const mt_nonnull int_msg,
+				       ConstMemory const    &method_name,
+				       AmfDecoder           * const mt_nonnull amf_decoder,
+				       void                 * const _api_client_session)
 {
     MomentClientSession * const api_client_session = static_cast <MomentClientSession*> (_api_client_session);
+
+    if (!api_client_session->api_client_handler_wrapper->ext_client_handler.rtmp_command_cb)
+	return;
 
     MomentMessage ext_msg;
 
@@ -406,18 +465,42 @@ void client_rtmpCommandMessage (RtmpConnection       * const mt_nonnull conn,
     ext_msg.msg_offset    = int_msg->msg_offset;
     ext_msg.prechunk_size = int_msg->prechunk_size;
 
-    PagePool::PageListArray pl_array (int_msg->page_list.first, int_msg->msg_len);
+    PagePool *normalized_page_pool;
+    PagePool::PageListHead normalized_pages;
+    Size normalized_offset = 0;
+    bool unref_normalized_pages;
+    if (int_msg->prechunk_size == 0) {
+	normalized_pages = int_msg->page_list;
+	unref_normalized_pages = false;
+    } else {
+	unref_normalized_pages = true;
+
+	RtmpConnection::normalizePrechunkedData (int_msg->page_pool,
+						 &int_msg->page_list,
+						 int_msg->msg_offset,
+						 int_msg->prechunk_size,
+						 int_msg->page_pool,
+						 &normalized_page_pool,
+						 &normalized_pages,
+						 &normalized_offset);
+	// TODO This assertion should become unnecessary (support msg_offs
+	//      in PagePool::PageListArray).
+	assert (normalized_offset == 0);
+    }
+
+    PagePool::PageListArray pl_array (normalized_pages.first, int_msg->msg_len);
     ext_msg.pl_array = &pl_array;
 
-    if (api_client_session->api_client_handler_wrapper->ext_client_handler.rtmp_command_cb) {
-	api_client_session->api_client_handler_wrapper->ext_client_handler.rtmp_command_cb (
-		&ext_msg,
-		api_client_session->client_cb_data,
-		api_client_session->api_client_handler_wrapper->ext_client_handler.rtmp_command_cb_data);
-    }
+    api_client_session->api_client_handler_wrapper->ext_client_handler.rtmp_command_cb (
+	    &ext_msg,
+	    api_client_session->client_cb_data,
+	    api_client_session->api_client_handler_wrapper->ext_client_handler.rtmp_command_cb_data);
+
+    if (unref_normalized_pages)
+	normalized_page_pool->msgUnref (normalized_pages.first);
 }
 
-void client_clientDisconnected (void * const _api_client_session)
+static void client_clientDisconnected (void * const _api_client_session)
 {
     MomentClientSession * const api_client_session = static_cast <MomentClientSession*> (_api_client_session);
 
@@ -434,13 +517,13 @@ void client_clientDisconnected (void * const _api_client_session)
     api_client_session->unref ();
 }
 
-MomentServer::ClientSession::Events client_session_events = {
+static MomentServer::ClientSession::Events client_session_events = {
     client_rtmpCommandMessage,
     client_clientDisconnected
 };
 
-Ref<VideoStream> client_startWatching (ConstMemory   const stream_name,
-				       void        * const _api_client_session)
+static Ref<VideoStream> client_startWatching (ConstMemory   const stream_name,
+					      void        * const _api_client_session)
 {
     MomentClientSession * const api_client_session = static_cast <MomentClientSession*> (_api_client_session);
 
@@ -458,9 +541,9 @@ Ref<VideoStream> client_startWatching (ConstMemory   const stream_name,
     return NULL;
 }
 
-Ref<VideoStream> client_startStreaming (ConstMemory     const stream_name,
-					RecordingMode   const rec_mode,
-					void          * const _api_client_session)
+static Ref<VideoStream> client_startStreaming (ConstMemory     const stream_name,
+					       RecordingMode   const rec_mode,
+					       void          * const _api_client_session)
 {
     MomentClientSession * const api_client_session = static_cast <MomentClientSession*> (_api_client_session);
 
@@ -479,15 +562,15 @@ Ref<VideoStream> client_startStreaming (ConstMemory     const stream_name,
     return NULL;
 }
 
-MomentServer::ClientSession::Backend client_session_backend = {
+static MomentServer::ClientSession::Backend client_session_backend = {
     client_startWatching,
     client_startStreaming
 };
 
-void client_clientConnected (MomentServer::ClientSession * const int_client_session,
-			     ConstMemory const &app_name,
-			     ConstMemory const &full_app_name,
-			     void * const _api_client_handler_wrapper)
+static void client_clientConnected (MomentServer::ClientSession * const int_client_session,
+				    ConstMemory const &app_name,
+				    ConstMemory const &full_app_name,
+				    void * const _api_client_handler_wrapper)
 {
     Api_ClientHandler_Wrapper * const api_client_handler_wrapper =
 	    static_cast <Api_ClientHandler_Wrapper*> (_api_client_handler_wrapper);
@@ -525,10 +608,9 @@ void client_clientConnected (MomentServer::ClientSession * const int_client_sess
     api_client_session.setNoUnref ((MomentClientSession*) NULL);
 }
 
-MomentServer::ClientHandler api_client_handler = {
+static MomentServer::ClientHandler api_client_handler = {
     client_clientConnected
 };
-} // namespace {}
 
 MomentClientHandlerKey moment_add_client_handler (MomentClientHandler * const ext_client_handler,
 						  char const          * const prefix_buf,
@@ -557,6 +639,7 @@ void moment_remove_client_handler (MomentClientHandlerKey const ext_client_handl
     MomentServer * const moment = MomentServer::getInstance ();
 
     moment->removeClientHandler (api_client_handler_wrapper->int_client_handler_key);
+    delete api_client_handler_wrapper;
 }
 
 void moment_client_send_rtmp_command_message (MomentClientSession * const api_client_session,
