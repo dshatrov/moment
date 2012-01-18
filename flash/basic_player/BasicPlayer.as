@@ -138,6 +138,7 @@ public class BasicPlayer extends Sprite
 	msg.y = (stage_height - msg.height) * (4.0 / 5.0);
     }
 
+    /* Unused
     private function loaderComplete (loader : Loader) : Boolean
     {
         if (loader.contentLoaderInfo
@@ -163,6 +164,7 @@ public class BasicPlayer extends Sprite
 	    doLoaderLoadComplete (loaded_element);
 	};
     }
+    */
 
     private function showVideo () : void
     {
@@ -398,6 +400,7 @@ public class BasicPlayer extends Sprite
         }
     }
 
+    /* Unused
     private function createLoadedElement (img_url  : String,
 					  visible_ : Boolean) : LoadedElement
     {
@@ -421,6 +424,7 @@ public class BasicPlayer extends Sprite
 
 	return loaded_element;
     }
+    */
 
     public function BasicPlayer ()
     {
@@ -522,6 +526,7 @@ public class BasicPlayer extends Sprite
 
 }
 
+/* Unused
 internal class LoadedElement
 {
     private var visible_allowed : Boolean;
@@ -553,4 +558,5 @@ internal class LoadedElement
 	visible_allowed = false;
     }
 }
+*/
 
