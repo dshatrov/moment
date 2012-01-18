@@ -72,6 +72,11 @@ public:
 
     mt_throws Result start ();
 
+    RtmptServer* getRtmptServer ()
+    {
+	return &rtmpt_server;
+    }
+
     void setTimers (Timers * const timers)
     {
 	rtmpt_server.setTimers (timers);

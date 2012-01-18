@@ -203,42 +203,59 @@ private:
   mt_iface_end
 
   mt_iface (RtmpConnection::Backend)
-  // {
     static RtmpConnection::Backend const rtmp_conn_backend;
 
     static mt_async void rtmpClosed (void *_session);
-  // }
+  mt_iface_end
 
-    mt_mutex (mutex) void sendDataInReply (RtmptConnection * mt_nonnull rtmpt_conn,
-					   RtmptSession    * mt_nonnull session);
+    mt_mutex (mutex) void sendDataInReply (Sender       * mt_nonnull conn_sender,
+					   RtmptSession * mt_nonnull session);
 
-    mt_mutex (mutex) void doOpen (RtmptConnection * mt_nonnull rtmpt_conn,
+    mt_mutex (mutex) void doOpen (Sender * mt_nonnull conn_sender,
 				  IpAddress const &client_addr);
 
-    mt_mutex (mutex) void doSend (RtmptConnection * mt_nonnull rtmpt_conn,
-				  Uint32           session_id);
+    mt_mutex (mutex) Ref<RtmptSession> doSend (Sender * mt_nonnull conn_sender,
+					       Uint32  session_id);
 
-    mt_mutex (mutex) void doIdle (RtmptConnection * mt_nonnull rtmpt_conn,
-				  Uint32           session_id);
+    mt_mutex (mutex) void doIdle (Sender * mt_nonnull conn_sender,
+				  Uint32  session_id);
 
-    mt_mutex (mutex) void doClose (RtmptConnection * mt_nonnull rtmpt_conn,
-				   Uint32           session_id);
+    mt_mutex (mutex) void doClose (Sender * mt_nonnull conn_sender,
+				   Uint32  session_id);
 
   mt_iface (HttpServer::Frontend)
-  // {
     static HttpServer::Frontend const http_frontend;
 
     static mt_async void httpRequest (HttpRequest * mt_nonnull req,
 				      void        *_rtmpt_conn);
 
-    static mt_async void httpMessageBody (HttpRequest * mt_nonnull req,
+    static mt_async void httpMessageBody (HttpRequest  * mt_nonnull req,
 					  Memory const &mem,
-					  Size        * mt_nonnull ret_accepted,
-					  void        *_rtmpt_conn);
+					  bool          end_of_request,
+					  Size         * mt_nonnull ret_accepted,
+					  void         *_rtmpt_conn);
 
     static mt_async void httpClosed (Exception *exc,
 				     void      *_rtmpt_conn);
-  // }
+  mt_iface_end
+
+  mt_iface (HttpService::HttpHandler)
+    static HttpService::HttpHandler const http_handler;
+
+    static Result service_httpRequest (HttpRequest   * mt_nonnull req,
+				       Sender        * mt_nonnull conn_sender,
+				       Memory const  &msg_body,
+				       void         ** mt_nonnull ret_msg_data,
+				       void          *_self);
+
+    static Result service_httpMessageBody (HttpRequest  * mt_nonnull req,
+					   Sender       * mt_nonnull conn_sender,
+					   Memory const &mem,
+					   bool          end_of_request,
+					   Size         * mt_nonnull ret_accepted,
+					   void         *msg_data,
+					   void         *_self);
+  mt_iface_end
 
 public:
     // API-разрыв: нужно делать accept на структуру данных TcpConnection... (так?).
@@ -254,6 +271,10 @@ public:
 				 IpAddress const         &client_addr,
 				 void                    *conn_cb_data,
 				 VirtReferenced          *ref_data);
+
+    // mostly mt_const
+    void attachToHttpService (HttpService *http_service,
+			      ConstMemory  path = ConstMemory());
 
     mt_const void setFrontend (Cb<Frontend> const frontend)
     {
