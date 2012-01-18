@@ -580,6 +580,10 @@ public:
     Result doDeleteStream (Uint32      msg_stream_id,
 			   AmfDecoder * mt_nonnull amf_decoder);
 
+    // Parses transaction_id from amf_decoder and sends a basic reply.
+    Result doBasicMessage (Uint32      msg_stream_id,
+	    		   AmfDecoder * mt_nonnull amf_decoder);
+
     Result fireVideoMessage (VideoStream::VideoMessage * mt_nonnull video_msg);
 
     // Deprecated constructor.

@@ -330,6 +330,66 @@ RtmpServer::doPlay (Uint32       const msg_stream_id,
 }
 
 Result
+RtmpServer::doPause (Uint32       const msg_stream_id,
+		     AmfDecoder * const mt_nonnull decoder)
+{
+    logD (rtmp_server, _func_);
+
+    if (!playing.get()) {
+	logW_ (_func, "not playing");
+	return Result::Success;
+    }
+
+    double transaction_id;
+    if (!decoder->decodeNumber (&transaction_id)) {
+	logE_ (_func, "could not decode transaction_id");
+	return Result::Failure;
+    }
+
+    if (!decoder->skipObject ()) {
+	logE_ (_func, "could not skip command object");
+	return Result::Failure;
+    }
+
+    bool is_pause;
+    if (!decoder->decodeBoolean (&is_pause)) {
+	logE_ (_func, "could not decode boolean");
+	return Result::Failure;
+    }
+
+    {
+	AmfAtom atoms [4];
+	AmfEncoder encoder (atoms);
+
+	encoder.addString ("_result");
+	encoder.addNumber (transaction_id);
+	encoder.addNullObject ();
+
+	Byte msg_buf [512];
+	Size msg_len;
+	if (!encoder.encode (Memory::forObject (msg_buf), AmfEncoding::AMF0, &msg_len)) {
+	    logE_ (_func, "could not encode reply");
+	    return Result::Failure;
+	}
+
+	rtmp_conn->sendCommandMessage_AMF0 (msg_stream_id, ConstMemory (msg_buf, msg_len));
+    }
+
+    {
+	Result res;
+	if (!frontend.call_ret<Result> (&res, (is_pause ? frontend->pause : frontend->resume) /*(*/ /*)*/)) {
+	    logE_ (_func, "frontend gone");
+	    return Result::Failure;
+	}
+
+	if (!res)
+	    return Result::Failure;
+    }
+
+    return Result::Success;
+}
+
+Result
 RtmpServer::doPublish (Uint32       const msg_stream_id,
 		       AmfDecoder * const mt_nonnull decoder)
 {
@@ -649,44 +709,45 @@ RtmpServer::commandMessage (VideoStream::Message * const mt_nonnull msg,
     logD (rtmp_server, _func, "method: ", ConstMemory (method_name, method_name_len));
 
     ConstMemory method_mem (method_name, method_name_len);
-    if (!compare (method_mem, "connect")) {
+    if (equal (method_mem, "connect")) {
 //	decoder.decodeNumber ();
 //	decoder.beginObject ();
 	// TODO Decode URL
 
 	return doConnect (msg_stream_id, &decoder);
     } else
-    if (!compare (method_mem, "createStream")) {
+    if (equal (method_mem, "createStream")) {
 	return rtmp_conn->doCreateStream (msg_stream_id, &decoder);
     } else
-    if (!compare (method_mem, "FCPublish")) {
+    if (equal (method_mem, "FCPublish")) {
       // TEMPORAL TEST
 	return rtmp_conn->doReleaseStream (msg_stream_id, &decoder);
     } else
-    if (!compare (method_mem, "releaseStream")) {
+    if (equal (method_mem, "releaseStream")) {
 	return rtmp_conn->doReleaseStream (msg_stream_id, &decoder);
     } else
-    if (!compare (method_mem, "closeStream")) {
+    if (equal (method_mem, "closeStream")) {
 	return rtmp_conn->doCloseStream (msg_stream_id, &decoder);
     } else
-    if (!compare (method_mem, "deleteStream")) {
+    if (equal (method_mem, "deleteStream")) {
 	return rtmp_conn->doDeleteStream (msg_stream_id, &decoder);
     } else
-    if (!compare (method_mem, "receiveVideo")) {
+    if (equal (method_mem, "receiveVideo")) {
       // TODO
     } else
-    if (!compare (method_mem, "receiveAudio")) {
+    if (equal (method_mem, "receiveAudio")) {
       // TODO
     } else
-    if (!compare (method_mem, "play") ||
-	!compare (method_mem, "pause"))
-    {
+    if (equal (method_mem, "play")) {
 	return doPlay (msg_stream_id, &decoder);
     } else
-    if (!compare (method_mem, "publish")) {
+    if (equal (method_mem, "pause")) {
+	return doPause (msg_stream_id, &decoder);
+    } else
+    if (equal (method_mem, "publish")) {
 	return doPublish (msg_stream_id, &decoder);
     } else
-    if (!compare (method_mem, "@setDataFrame")) {
+    if (equal (method_mem, "@setDataFrame")) {
 #if 0
 	logD_ (_func, method_mem);
 
@@ -715,7 +776,7 @@ RtmpServer::commandMessage (VideoStream::Message * const mt_nonnull msg,
 
 	return rtmp_conn->fireVideoMessage (&video_msg);
     } else
-    if (!compare (method_mem, "@clearDataFrame")) {
+    if (equal (method_mem, "@clearDataFrame")) {
 #if 0
 	logD_ (_func, method_mem);
 

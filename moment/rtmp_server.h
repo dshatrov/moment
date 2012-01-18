@@ -68,6 +68,10 @@ public:
 					 VideoStream::Message * mt_nonnull msg,
 					 AmfDecoder           * mt_nonnull amf_decoder,
 					 void                 *cb_data);
+
+	Result (*pause) (void *cb_data);
+
+	Result (*resume) (void *cb_data);
     };
 
 private:
@@ -84,6 +88,9 @@ private:
 
     Result doPlay (Uint32      msg_stream_id,
 		   AmfDecoder * mt_nonnull decoder);
+
+    Result doPause (Uint32      msg_streamd_id,
+	   	    AmfDecoder * mt_nonnull decoder);
 
     Result doPublish (Uint32       msg_stream_id,
 		      AmfDecoder * mt_nonnull decoder);

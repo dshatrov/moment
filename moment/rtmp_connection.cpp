@@ -2513,6 +2513,37 @@ RtmpConnection::doDeleteStream (Uint32       const msg_stream_id,
 }
 
 Result
+RtmpConnection::doBasicMessage (Uint32       const msg_stream_id,
+				AmfDecoder * const mt_nonnull amf_decoder)
+{
+    double transaction_id;
+    if (!amf_decoder->decodeNumber (&transaction_id)) {
+	logE_ (_func, "could not decode transaction_id");
+	return Result::Failure;
+    }
+
+    {
+	AmfAtom atoms [3];
+	AmfEncoder encoder (atoms);
+
+	encoder.addString ("_result");
+	encoder.addNumber (transaction_id);
+	encoder.addNullObject ();
+
+	Byte msg_buf [512];
+	Size msg_len;
+	if (!encoder.encode (Memory::forObject (msg_buf), AmfEncoding::AMF0, &msg_len)) {
+	    logE_ (_func, "encode() failed");
+	    return Result::Failure;
+	}
+
+	sendCommandMessage_AMF0 (msg_stream_id, ConstMemory (msg_buf, msg_len));
+    }
+
+    return Result::Success;
+}
+
+Result
 RtmpConnection::fireVideoMessage (VideoStream::VideoMessage * const mt_nonnull video_msg)
 {
     Result res = Result::Failure;
