@@ -5,7 +5,7 @@
   <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
   <title>BasicPlayer</title>
 </head>
-<body bgcolor="#000000">
+<body bgcolor="#444444">
   <div style="position: relative; width: 640px; height: 480px; margin-left: auto; margin-right: auto">
     <object classid="clsid:d27cdb6e-ae6d-11cf-96b8-444553540000"
 	width="100%"
@@ -18,9 +18,14 @@
       <param name="quality" value="high"/>
       <param name="allowfullscreen" value="true"/>
       <param name="allowscriptaccess" value="always"/>
-      <param name="FlashVars" value="server=rtmpt://188.127.236.58:80&stream=cam_1"/>
+<!--      <param name="FlashVars" value="server=rtmpt://188.127.236.58:80&stream=cam_1"/> -->
+<!--      <param name="FlashVars" value="server=rtmp://188.127.236.58&stream=cam_1"/> -->
+      <param name="FlashVars" value="server=rtmp://78.46.194.123&stream=test?paused&play_duration=10&buffer=0.0"/>
+<!--          FlashVars="server=rtmpt://188.127.236.58:80&stream=cam_1" -->
+<!--          FlashVars="server=rtmp://78.46.194.123&stream=test?paused&play_duration=10" -->
+<!--          FlashVars="server=rtmp://78.46.194.123&stream=test?paused&play_duration=10&shadow=0.4" -->
       <embed src="BasicPlayer.swf"
-          FlashVars="server=rtmpt://188.127.236.58:80&stream=cam_1"
+          FlashVars="server=rtmpt://188.127.236.58:80&stream=cam_1&play_duration=10&buffer=0.0&shadow=0.4"
 	  name="BasicPlayer"
 	  align="Default"
 	  width="100%"
