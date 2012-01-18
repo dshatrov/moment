@@ -40,8 +40,8 @@
 #define MOMENT_FILE__COMMON_HEADERS \
 	"Server: Moment/1.0\r\n" \
 	"Date: ", ConstMemory (date_buf, date_len), "\r\n" \
-	"Connection: Keep-Alive\r\n" \
-	"Cache-Control: max-age=604800\r\n"
+	"Connection: Keep-Alive\r\n"
+//	"Cache-Control: max-age=604800\r\n"
 //	"Cache-Control: public\r\n"
 //	"Cache-Control: no-cache\r\n"
 
@@ -99,11 +99,11 @@ static Result momentFile_sendMemory (ConstMemory  mem,
 				     Sender      * mt_nonnull sender,
 				     ConstMemory  mime_type);
 
-Result httpRequest (HttpRequest  * const mt_nonnull req,
-		    Sender       * const mt_nonnull conn_sender,
-		    Memory const & /* msg_body */,
-		    void        ** const mt_nonnull /* ret_msg_data */,
-		    void         * const _path_entry)
+Result httpRequest (HttpRequest   * const mt_nonnull req,
+		    Sender        * const mt_nonnull conn_sender,
+		    Memory const  & /* msg_body */,
+		    void         ** const mt_nonnull /* ret_msg_data */,
+		    void          * const _path_entry)
 {
     PathEntry * const path_entry = static_cast <PathEntry*> (_path_entry);
 
@@ -144,6 +144,7 @@ Result httpRequest (HttpRequest  * const mt_nonnull req,
 
 	file_path = full_path.region (prefix.len());
     }
+    logD_ (_func, "file_path: ", file_path);
 
     while (file_path.len() > 0
 	   && file_path.mem() [0] == '/')
@@ -211,6 +212,7 @@ Result httpRequest (HttpRequest  * const mt_nonnull req,
 //    logD_ (_func, "try_template: ", try_template);
 
     Ref<String> const filename = makeString (path_entry->path->mem(), !path_entry->path->isNull() ? "/" : "", file_path);
+    logD_ (_func, "path_entry->path: ", path_entry->path, ", filename: ", filename->mem());
 //    logD_ (_func, "Opening ", filename);
     NativeFile native_file (filename->mem(),
 			    0 /* open_flags */,
@@ -407,7 +409,7 @@ void momentFile_addPath (ConstMemory const &path,
     path_entry->path = grab (new String (path));
     path_entry->prefix = grab (new String (prefix));
 
-    logD_ (_func, "Adding path \"", path_entry->path, "\", prefix \"", path_entry->prefix->mem(), "\"");
+    logD_ (_func, "Adding path \"", path_entry->path, "\", prefix \"", path_entry->prefix, "\"");
 
     http_service->addHttpHandler (
 	    CbDesc<HttpService::HttpHandler> (&http_handler, path_entry, NULL /* coderef_container */),
