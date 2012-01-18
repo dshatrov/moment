@@ -278,7 +278,7 @@ public:
 
 	void processVideoFrame (VideoMessage * mt_nonnull msg);
 
-	bool getSavedKeyframe (SavedFrame * mt_nonnull ret_frame);
+	bool getSavedKeyframe (SavedFrame *ret_frame);
 
 	bool getSavedMetaData (SavedFrame * mt_nonnull ret_frame);
 

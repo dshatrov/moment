@@ -412,12 +412,14 @@ VideoStream::FrameSaver::processVideoFrame (VideoMessage * const mt_nonnull msg)
 }
 
 bool
-VideoStream::FrameSaver::getSavedKeyframe (SavedFrame * const mt_nonnull ret_frame)
+VideoStream::FrameSaver::getSavedKeyframe (SavedFrame * const ret_frame)
 {
     if (!got_saved_keyframe)
 	return false;
 
-    *ret_frame = saved_keyframe;
+    if (ret_frame)
+	*ret_frame = saved_keyframe;
+
     return true;
 }
 

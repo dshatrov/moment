@@ -92,6 +92,8 @@ public:
     // TODO Deprecated field
     mt_mutex (mutex) MomentServer::VideoStreamKey video_stream_key;
 
+    mt_mutex (mutex) Ref<VideoStream> watching_video_stream;
+
     mt_mutex (mutex) WatchingParams watching_params;
 
 #ifdef MOMENT_RTMP__FLOW_CONTROL
@@ -313,11 +315,22 @@ void streamVideoMessage (VideoStream::VideoMessage * const mt_nonnull msg,
 	client_session->no_keyframe_counter = 0;
 
     if (client_session->watching_params.start_paused &&
-	client_session->first_keyframe_sent &&
 	!client_session->resumed)
     {
-	client_session->mutex.unlock ();
-	return;
+	bool match = client_session->first_keyframe_sent;
+	if (!match) {
+	    if (client_session->watching_video_stream) {
+		// TODO No lock inversion?
+		client_session->watching_video_stream->lock ();
+		match = client_session->watching_video_stream->getFrameSaver()->getSavedKeyframe (NULL);
+		client_session->watching_video_stream->unlock ();
+	    }
+	}
+
+	if (match) {
+	    client_session->mutex.unlock ();
+	    return;
+	}
     }
 
     if (got_keyframe) {
@@ -526,6 +539,13 @@ Result startWatching (ConstMemory const &_stream_name,
     client_session->mutex.unlock ();
 
     Ref<VideoStream> const video_stream = moment->startWatching (client_session->srv_session, stream_name);
+
+    // TODO Repetitive locking of 'client_session' - bad.
+    client_session->mutex.lock ();
+    // TODO Set watching_video_stream to NULL when it's not needed anymore.
+    client_session->watching_video_stream = video_stream;
+    client_session->mutex.unlock ();
+
 #if 0
 // Deprecated
     Ref<VideoStream> const video_stream = moment->getVideoStream (stream_name);
