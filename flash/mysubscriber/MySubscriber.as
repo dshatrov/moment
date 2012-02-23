@@ -248,8 +248,8 @@ public class MySubscriber extends Sprite
 
 	// This doesn't filter all spurious EnterFrame events.
 	if (frame_no == 1) {
-	    showBuffering ();
-//	    hideMessages ();
+//	    showBuffering ();
+	    hideMessages ();
 	}
 
 	++frame_no;
@@ -286,11 +286,11 @@ public class MySubscriber extends Sprite
 	    }
 
 	    var stream : NetStream = new NetStream (conn);
-//	    stream.bufferTime = 0.0;
+	    stream.bufferTime = 0.0;
 //	    stream.bufferTime = 0.1;
 //	    stream.bufferTime = 0.0;
-	    stream.bufferTime = 1.0;
-//	    stream.bufferTime = 2.0;
+//	    stream.bufferTime = 1.0;
+//	    stream.bufferTime = 0.5;
 //	    stream.bufferTime = 5.0;
 	    stream.client = new MyStreamClient();
 
