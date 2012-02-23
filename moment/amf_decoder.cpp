@@ -75,7 +75,7 @@ AmfDecoder::decodeBoolean (bool * const ret_boolean)
     if (ret_boolean)
 	*ret_boolean = data [1];
 
-    cur_offset += 1;
+    cur_offset += 2;
 
     return Result::Success;
 }
