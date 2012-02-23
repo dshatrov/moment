@@ -177,6 +177,7 @@ public class BasicPlayer extends Sprite
 	if (event.info.code == "NetStream.Buffer.Full") {
 	    buffering_complete = true;
 
+	    // Why resetting reconnect_interval?
 	    reconnect_interval = 0;
 
 	    repositionVideo ();
