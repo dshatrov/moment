@@ -615,6 +615,137 @@ MomentServer::getMixVideoStream ()
     return mix_video_stream;
 }
 
+namespace {
+    class InformPageRequest_Data {
+    public:
+	MomentServer::PageRequest * const page_req;
+	ConstMemory const path;
+	ConstMemory const full_path;
+
+	MomentServer::PageRequestResult result;
+
+	InformPageRequest_Data (MomentServer::PageRequest * const page_req,
+				ConstMemory const path,
+				ConstMemory const full_path)
+	    : page_req (page_req),
+	      path (path),
+	      full_path (full_path),
+	      result (MomentServer::PageRequestResult::Success)
+	{
+	}
+    };
+}
+
+void
+MomentServer::PageRequestHandlerEntry::informPageRequest (PageRequestHandler * const handler,
+							  void               * const cb_data,
+							  void               * const _inform_data)
+{
+    InformPageRequest_Data * const inform_data =
+	    static_cast <InformPageRequest_Data*> (_inform_data);
+
+    PageRequestResult const res = handler->pageRequest (inform_data->page_req,
+							inform_data->path,
+							inform_data->full_path,
+							cb_data);
+    if (inform_data->result == PageRequestResult::Success)
+	inform_data->result = res;
+}
+
+MomentServer::PageRequestResult
+MomentServer::PageRequestHandlerEntry::firePageRequest (PageRequest * const page_req,
+							ConstMemory   const path,
+							ConstMemory   const full_path)
+{
+    InformPageRequest_Data inform_data (page_req, path, full_path);
+    event_informer.informAll (informPageRequest, &inform_data);
+    return inform_data.result;
+}
+
+MomentServer::PageRequestHandlerKey
+MomentServer::addPageRequestHandler (CbDesc<PageRequestHandler> const &cb,
+				     ConstMemory path)
+{
+    PageRequestHandlerEntry *handler_entry;
+    GenericInformer::SubscriptionKey sbn_key;
+
+    mutex.lock ();
+
+    PageRequestHandlerHash::EntryKey const hash_key = page_handler_hash.lookup (path);
+    if (hash_key) {
+	handler_entry = hash_key.getData();
+    } else {
+	handler_entry = new PageRequestHandlerEntry;
+	handler_entry->hash_key = page_handler_hash.add (path, handler_entry);
+    }
+
+    sbn_key = handler_entry->event_informer.subscribe (cb);
+
+    ++handler_entry->num_handlers;
+
+    mutex.unlock ();
+
+    PageRequestHandlerKey handler_key;
+    handler_key.handler_entry = handler_entry;
+    handler_key.sbn_key = sbn_key;
+
+    return handler_key;
+}
+
+void
+MomentServer::removePageRequestHandler (PageRequestHandlerKey handler_key)
+{
+    PageRequestHandlerEntry * const handler_entry = handler_key.handler_entry;
+
+    mutex.lock ();
+
+    handler_entry->event_informer.unsubscribe (handler_key.sbn_key);
+    --handler_entry->num_handlers;
+    if (handler_entry->num_handlers == 0)
+	page_handler_hash.remove (handler_entry->hash_key);
+
+    mutex.unlock ();
+}
+
+MomentServer::PageRequestResult
+MomentServer::processPageRequest (PageRequest * const page_req,
+				  ConstMemory   const path)
+{
+    mutex.lock ();
+
+    PageRequestHandlerHash::EntryKey const hash_key = page_handler_hash.lookup (path);
+    if (!hash_key) {
+	mutex.unlock ();
+	return PageRequestResult::Success;
+    }
+
+    PageRequestHandlerEntry * const handler = hash_key.getData();
+    PageRequestResult const res = handler->firePageRequest (page_req,
+							    path,
+							    path /* full_path */);
+    mutex.unlock ();
+
+    return res;
+}
+
+void
+MomentServer::dumpStreamList ()
+{
+    log__ (_func_);
+
+    {
+      StateMutexLock l (&mutex);
+
+	VideoStreamHash::iter iter (video_stream_hash);
+	while (!video_stream_hash.iter_done (iter)) {
+	    VideoStreamHash::EntryKey const entry = video_stream_hash.iter_next (iter);
+	    log__ (_func, "    ", entry.getKey());
+	}
+    }
+
+    log__ (_func_, "done");
+}
+
 Result
 MomentServer::init (ServerApp        * const mt_nonnull server_app,
 		    PagePool         * const mt_nonnull page_pool,

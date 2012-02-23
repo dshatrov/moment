@@ -178,7 +178,7 @@ public:
 private:
     class Namespace;
 
-public:
+//public:
     class ClientEntry : public Object
     {
 	friend class MomentServer;
@@ -209,6 +209,82 @@ public:
 	}
     };
 
+public:
+    class PageRequestResult
+    {
+    public:
+	enum Value {
+	    Success,
+	    NotFound,
+	    AccessDenied,
+	    InternalError
+	};
+	operator Value () const { return value; }
+	PageRequestResult (Value const value) : value (value) {}
+	PageRequestResult () {}
+    private:
+	Value value;
+    };
+
+    class PageRequest
+    {
+    public:
+	// If ret.mem() == NULL, then the parameter is not set.
+	// If ret.len() == 0, then the parameter has empty value.
+	virtual ConstMemory getParameter (ConstMemory name) = 0;
+
+	virtual IpAddress getClientAddress () = 0;
+
+	virtual void addHashVar (ConstMemory name,
+				 ConstMemory value) = 0;
+
+	virtual void showSection (ConstMemory name) = 0;
+    };
+
+    struct PageRequestHandler
+    {
+	PageRequestResult (*pageRequest) (PageRequest  *req,
+					  ConstMemory   path,
+					  ConstMemory   full_path,
+					  void         *cb_data);
+    };
+
+private:
+    class PageRequestHandlerEntry : public Object
+    {
+	friend class MomentServer;
+
+    private:
+	Informer_<PageRequestHandler> event_informer;
+
+	typedef StringHash< Ref<PageRequestHandlerEntry> > PageRequestHandlerHash;
+	mt_const PageRequestHandlerHash::EntryKey hash_key;
+
+	mt_mutex (MomentServer::mutex) Count num_handlers;
+
+	static void informPageRequest (PageRequestHandler *handler,
+				       void               *cb_data,
+				       void               *inform_data);
+
+	PageRequestResult firePageRequest (PageRequest *page_req,
+					   ConstMemory  path,
+					   ConstMemory  full_path);
+
+    public:
+	Informer_<PageRequestHandler>* getEventInformer ()
+	{
+	    return &event_informer;
+	}
+
+	PageRequestHandlerEntry ()
+	    : event_informer (this, &mutex),
+	      num_handlers (0)
+	{
+	}
+    };
+
+    typedef PageRequestHandlerEntry::PageRequestHandlerHash PageRequestHandlerHash;
+
 private:
     mt_const ServerApp *server_app;
     mt_const PagePool *page_pool;
@@ -219,6 +295,8 @@ private:
     mt_const Storage *storage;
 
     mt_const bool publish_all_streams;
+
+    mt_mutex (mutex) PageRequestHandlerHash page_handler_hash;
 
     mt_mutex (mutex) ClientSessionList client_session_list;
 
@@ -350,10 +428,30 @@ public:
 
     Ref<VideoStream> getMixVideoStream ();
 
+  // Serving of static pages (mod_file)
+
+    struct PageRequestHandlerKey {
+	PageRequestHandlerEntry *handler_entry;
+	GenericInformer::SubscriptionKey sbn_key;
+    };
+
+    PageRequestHandlerKey addPageRequestHandler (CbDesc<PageRequestHandler> const &cb,
+						 ConstMemory path);
+
+    void removePageRequestHandler (PageRequestHandlerKey handler_key);
+
+    PageRequestResult processPageRequest (PageRequest *page_req,
+					  ConstMemory  path);
+
+  // Utility
+
+    // Unimplemented?
     void toAccessLog (ConstMemory addr,
 		      ConstMemory request_line,
 		      unsigned    status_code,
 		      Size        data_length);
+
+    void dumpStreamList ();
 
   // Initialization
 

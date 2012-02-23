@@ -258,6 +258,8 @@ void moment_log_e (char const *fmt, ...);
 void moment_log_h (char const *fmt, ...);
 void moment_log_f (char const *fmt, ...);
 
+void moment_log_dump_stream_list ();
+
 
 // ________________________________ AMF Decoder ________________________________
 

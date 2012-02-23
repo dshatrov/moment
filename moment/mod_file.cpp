@@ -83,17 +83,20 @@ public:
     Ref<String> prefix;
 };
 
-Ref<String> this_http_server_addr;
-Ref<String> this_rtmp_server_addr;
-Ref<String> this_rtmpt_server_addr;
+static Ref<String> this_http_server_addr;
+static Ref<String> this_rtmp_server_addr;
+static Ref<String> this_rtmpt_server_addr;
 
-MyCpp::List< Ref<PathEntry> > path_list;
+static MyCpp::List< Ref<PathEntry> > path_list;
 
-PagePool *page_pool = NULL;
+static MomentServer *moment = NULL;
+static PagePool *page_pool = NULL;
 
-static Result momentFile_sendTemplate (ConstMemory  filename,
+static Result momentFile_sendTemplate (HttpRequest *http_req,
+				       ConstMemory  full_path,
+				       ConstMemory  filename,
 				       Sender      * mt_nonnull sender,
-				       ConstMemory  mimet_type);
+				       ConstMemory  mime_type);
 
 static Result momentFile_sendMemory (ConstMemory  mem,
 				     Sender      * mt_nonnull sender,
@@ -221,6 +224,8 @@ Result httpRequest (HttpRequest   * const mt_nonnull req,
 #ifdef MOMENT_FILE__CTEMPLATE
 	if (try_template) {
 	    if (momentFile_sendTemplate (
+			req,
+			req->getFullPath(),
 			makeString (filename->mem().region (0, filename->mem().len() - ext_length),
 				    ".tpl")->mem(),
 			conn_sender,
@@ -349,7 +354,52 @@ Result httpRequest (HttpRequest  * const mt_nonnull req,
 #endif
 
 #ifdef MOMENT_FILE__CTEMPLATE
-static Result momentFile_sendTemplate (ConstMemory   const filename,
+namespace {
+    class SendTemplate_PageRequest : public MomentServer::PageRequest
+    {
+    private:
+	mt_const HttpRequest *http_req;
+	mt_const ctemplate::TemplateDictionary *dict;
+
+    public:
+      mt_iface (MomentServer::PageRequest)
+
+	ConstMemory getParameter (ConstMemory const name)
+	{
+	    return http_req->getParameter (name);
+	}
+
+	IpAddress getClientAddress ()
+	{
+          return http_req->getClientAddress();
+	}
+
+	void addHashVar (ConstMemory const name,
+			 ConstMemory const value)
+	{
+	    logD_ (_func, "name: ", name, ", value: ", value);
+	    dict->SetValue (String (name).cstr(), String (value).cstr());
+	}
+
+	void showSection (ConstMemory const name)
+	{
+	    dict->ShowSection (String (name).cstr());
+	}
+
+      mt_iface_end
+
+	SendTemplate_PageRequest (HttpRequest * const http_req,
+				  ctemplate::TemplateDictionary * const dict)
+	    : http_req (http_req),
+	      dict (dict)
+	{
+	}
+    };
+}
+
+static Result momentFile_sendTemplate (HttpRequest * const http_req,
+				       ConstMemory   const full_path,
+				       ConstMemory   const filename,
 				       Sender      * const mt_nonnull sender,
 				       ConstMemory   const mime_type)
 {
@@ -360,6 +410,13 @@ static Result momentFile_sendTemplate (ConstMemory   const filename,
     dict.SetValue ("ThisHttpServerAddr", this_http_server_addr->cstr());
     dict.SetValue ("ThisRtmpServerAddr", this_rtmp_server_addr->cstr());
     dict.SetValue ("ThisRtmptServerAddr", this_rtmpt_server_addr->cstr());
+
+    {
+	SendTemplate_PageRequest page_req (http_req, &dict);
+	MomentServer::PageRequestResult const res = moment->processPageRequest (&page_req, full_path);
+	// TODO Check 'res' and react.
+    }
+
     std::string str;
     if (!ctemplate::ExpandTemplate (grab (new String (filename))->cstr(),
 				    ctemplate::DO_NOT_STRIP,
@@ -465,7 +522,7 @@ void momentFileInit ()
 {
     logI_ (_func, "Initializing mod_file");
 
-    MomentServer * const moment = MomentServer::getInstance();
+    moment = MomentServer::getInstance();
 //    ServerApp * const server_app = moment->getServerApp();
     MConfig::Config * const config = moment->getConfig();
     HttpService * const http_service = moment->getHttpService();

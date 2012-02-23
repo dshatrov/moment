@@ -839,6 +839,12 @@ void moment_log_f (char const *fmt, ...)
     va_end (ap);
 }
 
+void moment_log_dump_stream_list ()
+{
+    MomentServer * const moment = MomentServer::getInstance ();
+    moment->dumpStreamList ();
+}
+
 
 } // extern "C"
 
