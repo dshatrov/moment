@@ -277,7 +277,9 @@ int main (int argc, char **argv)
 	}
     }
 
+    logLock ();
     config.dump (logs);
+    logUnlock ();
 
     if (!server_app.init ()) {
 	logE_ (_func, "server_app.init() failed: ", exc->toString());

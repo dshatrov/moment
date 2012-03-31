@@ -590,8 +590,11 @@ RtmptServer::httpMessageBody (HttpRequest * const mt_nonnull /* req */,
     RtmptServer * const self = rtmpt_conn->unsafe_rtmpt_server;
 
     logD (rtmpt, _func);
-    if (logLevelOn (rtmpt, LogLevel::D))
+    if (logLevelOn (rtmpt, LogLevel::D)) {
+        logLock ();
 	hexdump (logs, mem);
+        logUnlock ();
+    }
 
     self->mutex.lock ();
 
@@ -747,8 +750,11 @@ RtmptServer::service_httpMessageBody (HttpRequest  * const mt_nonnull req,
     }
 
     logD (rtmpt, _func);
-    if (logLevelOn (rtmpt, LogLevel::D))
+    if (logLevelOn (rtmpt, LogLevel::D)) {
+        logLock ();
 	hexdump (logs, mem);
+        logUnlock ();
+    }
 
     self->mutex.lock ();
 

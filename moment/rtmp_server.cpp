@@ -607,6 +607,13 @@ RtmpServer::sendVideoMessage (VideoStream::VideoMessage * const mt_nonnull msg)
 {
 //    logD (rtmp_server, _func);
 
+#if 0
+    logD_ (_func_);
+    logLock ();
+    PagePool::dumpPages (logs, &msg->page_list);
+    logUnlock ();
+#endif
+
     // TODO Do not ignore RtmpClearMetaData.
     if (msg->frame_type == VideoStream::VideoFrameType::RtmpClearMetaData)
 	return;
@@ -635,7 +642,17 @@ RtmpServer::sendVideoMessage (VideoStream::VideoMessage * const mt_nonnull msg)
 void
 RtmpServer::sendAudioMessage (VideoStream::AudioMessage * const mt_nonnull msg)
 {
+    // Note that nellymoser codec may generate data which makes valgrind
+    // complain about uninitialized bytes.
+
 //    logD (rtmp_server, _func);
+
+#if 0
+    logD_ (_func_);
+    logLock ();
+    PagePool::dumpPages (logs, &msg->page_list);
+    logUnlock ();
+#endif
 
     RtmpConnection::MessageDesc mdesc;
     mdesc.timestamp = msg->timestamp;
@@ -754,8 +771,11 @@ RtmpServer::commandMessage (VideoStream::Message * const mt_nonnull msg,
 	{
 	    PagePool::Page * const page = msg->page_list->first;
 	    logD_ (_func, "page: 0x", fmt_hex, (UintPtr) page);
-	    if (page)
+	    if (page) {
+                logLock ();
 		hexdump (logs, page->mem());
+                logUnlock ():
+            }
 	}
 #endif
 
@@ -782,8 +802,11 @@ RtmpServer::commandMessage (VideoStream::Message * const mt_nonnull msg,
 
 	{
 	    PagePool::Page * const page = msg->page_list->first;
-	    if (page)
+	    if (page) {
+                logLock ();
 		hexdump (logs, page->mem());
+                logUnlock ();
+            }
 	}
 #endif
 

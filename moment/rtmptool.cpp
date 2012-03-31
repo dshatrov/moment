@@ -31,7 +31,7 @@ using namespace Moment;
 
 namespace {
 
-LogGroup libMary_logGroup_time ("rtmptool_time", LogLevel::N);
+LogGroup libMary_logGroup_time ("rtmptool_time", LogLevel::D);
 
 class Options
 {
@@ -253,8 +253,11 @@ RtmpClient::commandMessageCallback (VideoStream::Message   * const mt_nonnull ms
 #if 0
 	{
 	    PagePool::Page * const page = msg->page_list->first;
-	    if (page)
+	    if (page) {
+                logLock ();
 		hexdump (logs, page->mem());
+                logUnlock ();
+            }
 	}
 #endif
     } else
@@ -264,8 +267,11 @@ RtmpClient::commandMessageCallback (VideoStream::Message   * const mt_nonnull ms
 #if 0
 	{
 	    PagePool::Page * const page = msg->page_list->first;
-	    if (page)
+	    if (page) {
+                logLock ();
 		hexdump (logs, page->mem());
+                logUnlock ();
+            }
 	}
 #endif
     } else {
@@ -274,8 +280,11 @@ RtmpClient::commandMessageCallback (VideoStream::Message   * const mt_nonnull ms
 #if 0
 	{
 	    PagePool::Page * const page = msg->page_list->first;
-	    if (page)
+	    if (page) {
+                logLock ();
 		hexdump (logs, page->mem());
+                logUnlock ();
+            }
 	}
 #endif
     }
@@ -307,8 +316,10 @@ RtmpClient::videoMessage (VideoStream::VideoMessage * const mt_nonnull msg,
 	if (debug_counter >= options.report_interval) {
 	    debug_counter = 0;
 
+            logLock ();
 	    logs->print (ConstMemory::forObject (self->id_char));
 	    logs->flush ();
+            logUnlock ();
 	}
     }
 

@@ -425,7 +425,9 @@ RtmpConnection::fillMessageHeader (MessageDesc const * const mt_nonnull mdesc,
     header_buf [0] = (header_type << 6) | (Byte) chunk_stream->chunk_stream_id;
 
 //    logD_ (_func, "header_type: ", header_type, ", offs: ", offs);
+//    logLock ();
 //    hexdump (logs, ConstMemory (header_buf, offs));
+//    logUnlock ();
 
     assert (offs <= MaxHeaderLen);
     return offs;
@@ -1155,8 +1157,11 @@ RtmpConnection::processMessage (ChunkStream * const chunk_stream)
 #if 0
     {
 	PagePool::Page * const page = chunk_stream->page_list.first;
-	if (page)
+	if (page) {
+            logLock ();
 	    hexdump (logs, page->mem());
+            logUnlock ();
+        }
     }
 #endif
 

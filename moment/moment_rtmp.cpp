@@ -277,8 +277,10 @@ void streamVideoMessage (VideoStream::VideoMessage * const mt_nonnull msg,
 	logD (framedrop, _func, "Connection overloaded, dropping video frame");
 
 	// TEST
+//      logLock ();
 //	logs->print (".");
 //	logs->flush ();
+//      logUnlock ();
 
 #ifdef MOMENT_RTMP__WAIT_FOR_KEYFRAME
 	client_session->no_keyframe_counter = 0;
