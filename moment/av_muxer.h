@@ -55,6 +55,8 @@ public:
 	: sender (NULL)
     {
     }
+
+    virtual ~AvMuxer () {}
 };
 
 }

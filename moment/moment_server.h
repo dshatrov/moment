@@ -239,6 +239,8 @@ public:
 				 ConstMemory value) = 0;
 
 	virtual void showSection (ConstMemory name) = 0;
+
+        virtual ~PageRequest () {}
     };
 
     struct PageRequestHandler

@@ -37,6 +37,8 @@ public:
 					Connection  **ret_conn) = 0;
 
     virtual void releaseFile (FileKey file_key) = 0;
+
+    virtual ~Storage () {}
 };
 
 }
