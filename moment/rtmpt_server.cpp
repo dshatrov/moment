@@ -299,7 +299,11 @@ RtmptServer::senderClosed (Exception * const /* exc_ */,
     RtmptServer * const self = rtmpt_conn->unsafe_rtmpt_server;
 
     self->frontend.call (self->frontend->closed, /*(*/ rtmpt_conn->conn_cb_data /*)*/);
-    rtmpt_conn->conn->close ();
+
+// Too early to close the connection. It is still in use.
+// In particular, it is very likely that processInput() is yet to be called
+// for this connection.
+//    rtmpt_conn->conn->close ();
 
     self->mutex.lock ();
     logD (rtmpt, _func, "calling destroyRtmptConnection");
