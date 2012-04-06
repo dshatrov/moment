@@ -70,13 +70,58 @@ public:
 		return VideoStreamKey (VideoStreamHash::EntryKey::fromVoidPtr (ptr)); }
     };
 
-#if 0
-    // TODO Unused
+
+// ___________________________ Video stream handlers ___________________________
+
+public:
     struct VideoStreamHandler
     {
-	Result (*videoStreamOpened) (VideoStream * mt_nonnull video_stream);
+        void (*videoStreamAdded) (VideoStream * mt_nonnull video_stream,
+                                  ConstMemory  stream_name,
+                                  void        *cb_data);
     };
-#endif
+
+    class VideoStreamHandlerKey
+    {
+        friend class MomentServer;
+
+    private:
+	GenericInformer::SubscriptionKey sbn_key;
+    };
+
+private:
+    struct VideoStreamAddedNotification
+    {
+        Ref<VideoStream> video_stream;
+        Ref<String> stream_name;
+    };
+
+    Informer_<VideoStreamHandler> video_stream_informer;
+
+    DeferredProcessor::Registration vs_inform_reg;
+    DeferredProcessor::Task vs_added_inform_task;
+
+    mt_mutex (mutex) List<VideoStreamAddedNotification> vs_added_notifications;
+
+    static void informVideoStreamAdded (VideoStreamHandler *vs_handler,
+                                        void               *cb_data,
+                                        void               *inform_data);
+
+    void fireVideoStreamAdded (VideoStream * mt_nonnull video_stream,
+                               ConstMemory  stream_name);
+
+    mt_mutex (mutex) void notifyDeferred_VideoStreamAdded (VideoStream * mt_nonnull video_stream,
+                                                           ConstMemory  stream_name);
+
+    static bool videoStreamAddedInformTask (void *_self);
+
+public:
+    VideoStreamHandlerKey addVideoStreamHandler (CbDesc<VideoStreamHandler> const &vs_handler);
+
+    void removeVideoStreamHandler (VideoStreamHandlerKey vs_handler_key);
+
+// _____________________________________________________________________________
+
 
     class ClientSessionList_name;
 
@@ -388,7 +433,8 @@ public:
 				     ConstMemory    stream_name,
 				     RecordingMode  rec_mode);
 
-    struct ClientHandlerKey {
+    struct ClientHandlerKey
+    {
 	ClientEntry *client_entry;
 	GenericInformer::SubscriptionKey sbn_key;
     };

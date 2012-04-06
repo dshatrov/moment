@@ -28,6 +28,106 @@ static LogGroup libMary_logGroup_session ("MomentServer.session", LogLevel::I);
 
 MomentServer* MomentServer::instance = NULL;
 
+
+// ___________________________ Video stream handlers ___________________________
+
+namespace {
+    class InformVideoStreamAdded_Data
+    {
+    public:
+        VideoStream * const video_stream;
+        ConstMemory   const stream_name;
+
+        InformVideoStreamAdded_Data (VideoStream * const video_stream,
+                                     ConstMemory   const stream_name)
+            : video_stream (video_stream),
+              stream_name (stream_name)
+        {
+        }
+    };
+}
+
+void
+MomentServer::informVideoStreamAdded (VideoStreamHandler * const vs_handler,
+                                      void               * const cb_data,
+                                      void               * const _inform_data)
+{
+    InformVideoStreamAdded_Data * const inform_data =
+            static_cast <InformVideoStreamAdded_Data*> (_inform_data);
+    vs_handler->videoStreamAdded (inform_data->video_stream,
+                                  inform_data->stream_name,
+                                  cb_data);
+}
+
+#if 0
+void
+MomentServer::fireVideoStreamAdded (VideoStream * const mt_nonnull video_stream,
+                                    ConstMemory   const stream_name)
+{
+    InformVideoStreamAdded_Data inform_data (video_stream, stream_name);
+    video_stream_informer.informAll (informVideoStreamAdded, &inform_data);
+}
+#endif
+
+mt_mutex (mutex) void
+MomentServer::notifyDeferred_VideoStreamAdded (VideoStream * const mt_nonnull video_stream,
+                                               ConstMemory  const stream_name)
+{
+    VideoStreamAddedNotification * const notification = &vs_added_notifications.appendEmpty ()->data;
+    notification->video_stream = video_stream;
+    notification->stream_name = grab (new String (stream_name));
+
+    vs_inform_reg.scheduleTask (&vs_added_inform_task, false /* permanent */);
+}
+
+bool
+MomentServer::videoStreamAddedInformTask (void * const _self)
+{
+    MomentServer * const self = static_cast <MomentServer*> (_self);
+
+    logD_ (_func_);
+
+    self->mutex.lock ();
+
+    while (!self->vs_added_notifications.isEmpty()) {
+        VideoStreamAddedNotification * const notification = &self->vs_added_notifications.getFirst();
+
+        Ref<VideoStream> video_stream;
+        video_stream.setNoRef ((VideoStream*) notification->video_stream);
+        notification->video_stream.setNoUnref ((VideoStream*) NULL);
+
+        Ref<String> stream_name;
+        stream_name.setNoRef ((String*) notification->stream_name);
+        notification->stream_name.setNoUnref ((String*) NULL);
+
+        self->vs_added_notifications.remove (self->vs_added_notifications.getFirstElement());
+
+        InformVideoStreamAdded_Data inform_data (video_stream, stream_name->mem());
+        mt_unlocks_locks (self->mutex) self->video_stream_informer.informAll_unlocked (informVideoStreamAdded, &inform_data);
+    }
+
+    self->mutex.unlock ();
+
+    return false /* Do not reschedule */;
+}
+
+MomentServer::VideoStreamHandlerKey
+MomentServer::addVideoStreamHandler (CbDesc<VideoStreamHandler> const &vs_handler)
+{
+    VideoStreamHandlerKey vs_handler_key;
+    vs_handler_key.sbn_key = video_stream_informer.subscribe (vs_handler);
+    return vs_handler_key;
+}
+
+void
+MomentServer::removeVideoStreamHandler (VideoStreamHandlerKey vs_handler_key)
+{
+    video_stream_informer.unsubscribe (vs_handler_key.sbn_key);
+}
+
+// _____________________________________________________________________________
+
+
 namespace {
     class InformRtmpCommandMessage_Data {
     public:
@@ -429,8 +529,8 @@ MomentServer::startStreaming (ClientSession * const mt_nonnull client_session,
 			      RecordingMode   const rec_mode)
 {
     Ref<VideoStream> video_stream;
-  {
 
+  {
     if (client_session->backend
 	&& client_session->backend->startStreaming)
     {
@@ -592,7 +692,10 @@ MomentServer::addVideoStream (VideoStream * const  video_stream,
 			      ConstMemory   const &path)
 {
   StateMutexLock l (&mutex);
-    return video_stream_hash.add (path, video_stream);
+
+    MomentServer::VideoStreamKey const vs_key = video_stream_hash.add (path, video_stream);
+    notifyDeferred_VideoStreamAdded (video_stream, path);
+    return vs_key;
 }
 
 mt_mutex (mutex) void
@@ -605,6 +708,7 @@ void
 MomentServer::removeVideoStream (VideoStreamKey const video_stream_key)
 {
     mutex.lock ();
+// TODO Is deferred notification about stream removal necessary?
     removeVideoStream_unlocked (video_stream_key);
     mutex.unlock ();
 }
@@ -765,6 +869,8 @@ MomentServer::init (ServerApp        * const mt_nonnull server_app,
 
     mix_video_stream = grab (new VideoStream);
 
+    vs_inform_reg.setDeferredProcessor (server_app->getMainThreadContext()->getDeferredProcessor());
+
     {
 	ConstMemory const opt_name = "moment/publish_all";
 	MConfig::Config::BooleanValue const value = config->getBoolean (opt_name);
@@ -788,7 +894,8 @@ MomentServer::init (ServerApp        * const mt_nonnull server_app,
 }
 
 MomentServer::MomentServer ()
-    : server_app (NULL),
+    : video_stream_informer (NULL /* coderef_container */, &mutex),
+      server_app (NULL),
       page_pool (NULL),
       http_service (NULL),
       config (NULL),
@@ -797,12 +904,17 @@ MomentServer::MomentServer ()
       publish_all_streams (true)
 {
     instance = this;
+
+    vs_added_inform_task.cb = CbDesc<DeferredProcessor::TaskCallback> (
+            videoStreamAddedInformTask, this /* cb_data */, NULL /* coderef_container */);
 }
 
 MomentServer::~MomentServer ()
 {
     mutex.lock ();
     mutex.unlock ();
+
+    vs_inform_reg.release ();
 }
 
 }
