@@ -197,13 +197,13 @@ void destroyClientSession (ClientSession * const client_session)
     if (srv_session)
 	moment->clientDisconnected (srv_session);
 
+    if (video_stream_key)
+	moment->removeVideoStream (video_stream_key);
+
     // Closing video stream *after* firing clientDisconnected() to avoid
     // premature closing of client connections in streamClosed().
     if (video_stream)
 	video_stream->close ();
-
-    if (video_stream_key)
-	moment->removeVideoStream (video_stream_key);
 
     client_session->unref ();
 }
@@ -356,7 +356,7 @@ void streamClosed (void * const _session)
     client_session->rtmp_conn->closeAfterFlush ();
 }
 
-VideoStream::EventHandler /* TODO Allow consts in Informer_ */ /* const */ video_event_handler = {
+VideoStream::EventHandler const video_event_handler = {
     streamAudioMessage,
     streamVideoMessage,
     NULL /* rtmpCommandMessage */,
@@ -540,27 +540,41 @@ Result startWatching (ConstMemory const &_stream_name,
     }
     client_session->mutex.unlock ();
 
-    Ref<VideoStream> const video_stream = moment->startWatching (client_session->srv_session, stream_name);
+    Ref<VideoStream> video_stream;
+    for (unsigned long watchdog_cnt = 0; watchdog_cnt < 100; ++watchdog_cnt) {
+        video_stream = moment->startWatching (client_session->srv_session, stream_name);
+        if (!video_stream) {
+            logD (mod_rtmp, _func, "video stream not found: ", stream_name);
+            return Result::Failure;
+        }
 
-    // TODO Repetitive locking of 'client_session' - bad.
-    client_session->mutex.lock ();
-    // TODO Set watching_video_stream to NULL when it's not needed anymore.
-    client_session->watching_video_stream = video_stream;
-    client_session->mutex.unlock ();
+        // TODO Repetitive locking of 'client_session' - bad.
+        client_session->mutex.lock ();
+        // TODO Set watching_video_stream to NULL when it's not needed anymore.
+        client_session->watching_video_stream = video_stream;
+        client_session->mutex.unlock ();
 
-#if 0
-// Deprecated
-    Ref<VideoStream> const video_stream = moment->getVideoStream (stream_name);
-#endif
-    if (!video_stream) {
-	logD (mod_rtmp, _func, "video stream not found: ", stream_name);
-	return Result::Failure;
+        video_stream->lock ();
+        if (video_stream->isClosed_unlocked()) {
+            video_stream->unlock ();
+
+            // TODO Repetitive locking of 'client_session' - bad.
+            client_session->mutex.lock ();
+            client_session->watching_video_stream = NULL;
+            client_session->mutex.unlock ();
+
+            continue;
+        }
+
+        client_session->rtmp_server.sendInitialMessages_unlocked (video_stream->getFrameSaver());
+        video_stream->getEventInformer()->subscribe_unlocked (&video_event_handler, client_session, NULL /* ref_data */, client_session);
+        video_stream->unlock ();
+        break;
     }
-
-    video_stream->lock ();
-    client_session->rtmp_server.sendInitialMessages_unlocked (video_stream->getFrameSaver());
-    video_stream->getEventInformer()->subscribe_unlocked (&video_event_handler, client_session, NULL /* ref_data */, client_session);
-    video_stream->unlock ();
+    if (!video_stream) {
+        logH_ (_func, "startWatching() watchdog counter hit");
+        return Result::Failure;
+    }
 
     return Result::Success;
 }
@@ -911,12 +925,13 @@ void momentRtmpInit ()
 	rtmpt_service.setFrontend (Cb<RtmpVideoService::Frontend> (
 		&rtmp_video_service_frontend, NULL, NULL));
 
-	rtmpt_service.setTimers (server_app->getTimers());
-	// TODO setServerContext()
-	rtmpt_service.setPollGroup (server_app->getMainPollGroup());
-	rtmpt_service.setPagePool (moment->getPagePool());
-
-	if (!rtmpt_service.init (rtmpt_session_timeout, rtmpt_no_keepalive_conns)) {
+	if (!rtmpt_service.init (server_app->getServerContext()->getTimers(),
+                                 moment->getPagePool(),
+                                 // TODO setServerContext()
+                                 server_app->getServerContext()->getMainPollGroup(),
+                                 rtmpt_session_timeout,
+                                 rtmpt_no_keepalive_conns))
+        {
 	    logE_ (_func, "rtmpt_service.init() failed: ", exc->toString());
 	    return;
 	}

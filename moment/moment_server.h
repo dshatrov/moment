@@ -107,8 +107,10 @@ private:
                                         void               *cb_data,
                                         void               *inform_data);
 
+#if 0
     void fireVideoStreamAdded (VideoStream * mt_nonnull video_stream,
                                ConstMemory  stream_name);
+#endif
 
     mt_mutex (mutex) void notifyDeferred_VideoStreamAdded (VideoStream * mt_nonnull video_stream,
                                                            ConstMemory  stream_name);

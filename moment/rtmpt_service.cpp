@@ -24,12 +24,12 @@ using namespace M;
 
 namespace Moment {
 
-RtmptServer::Frontend RtmptService::rtmpt_server_frontend = {
+RtmptServer::Frontend const RtmptService::rtmpt_server_frontend = {
     clientConnected,
     connectionClosed
 };
 
-TcpServer::Frontend RtmptService::tcp_server_frontend = {
+TcpServer::Frontend const RtmptService::tcp_server_frontend = {
     accepted
 };
 
@@ -130,11 +130,22 @@ RtmptService::accepted (void * const _self)
     }
 }
 
-mt_throws Result
-RtmptService::init (Time const session_keepalive_timeout,
-		    bool const no_keepalive_conns)
+    mt_const mt_throws Result init (Timers    * mt_nonnull timers,
+                                    PollGroup * mt_nonnull poll_group,
+                                    PagePool  * mt_nonnull page_pool,
+                                    Time       session_keepalive_timeout,
+                                    bool       no_keepalive_conns);
+
+mt_const mt_throws Result
+RtmptService::init (Timers    * const mt_nonnull timers,
+                    PagePool  * const mt_nonnull page_pool,
+                    PollGroup * const mt_nonnull poll_group,
+                    Time        const session_keepalive_timeout,
+		    bool        const no_keepalive_conns)
 {
-    rtmpt_server.init (session_keepalive_timeout, no_keepalive_conns);
+    this->poll_group = poll_group;
+
+    rtmpt_server.init (timers, page_pool, session_keepalive_timeout, no_keepalive_conns);
 
     if (!tcp_server.open ())
 	return Result::Failure;

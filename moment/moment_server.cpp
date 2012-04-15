@@ -665,16 +665,6 @@ MomentServer::removeClientHandler (ClientHandlerKey const client_handler_key)
     mutex.unlock ();
 }
 
-#if 0
-// Unused
-void
-MomentServer::addVideoStreamHandler (Cb<VideoStreamHandler> const &cb,
-				     ConstMemory const &path_prefix)
-{
-  // TODO
-}
-#endif
-
 Ref<VideoStream>
 MomentServer::getVideoStream (ConstMemory const &path)
 {

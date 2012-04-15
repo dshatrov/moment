@@ -156,6 +156,7 @@ private:
 	      http_server   (this /* coderef_container */),
 	      cur_req_session (NULL)
 	{
+//            logD_ (_func, " 0x", fmt_hex, (UintPtr) this);
 	}
 
 	~RtmptConnection ()
@@ -281,19 +282,13 @@ public:
 	this->frontend = frontend;
     }
 
-    mt_const void setTimers (Timers * const mt_nonnull timers)
+    mt_const void init (Timers   * const timers,
+                        PagePool * const page_pool,
+                        Time       const session_keepalive_timeout,
+			bool       const no_keepalive_conns)
     {
-	this->timers = timers;
-    }
-
-    mt_const void setPagePool (PagePool * const mt_nonnull page_pool)
-    {
-	this->page_pool = page_pool;
-    }
-
-    mt_const void init (Time const session_keepalive_timeout,
-			bool const no_keepalive_conns)
-    {
+        this->timers = timers;
+        this->page_pool = page_pool;
 	this->session_keepalive_timeout = session_keepalive_timeout;
 	this->no_keepalive_conns = no_keepalive_conns;
     }

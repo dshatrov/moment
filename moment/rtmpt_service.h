@@ -46,7 +46,7 @@ private:
     RtmptServer rtmpt_server;
 
   mt_iface (RtmptServer::Frontend)
-    static RtmptServer::Frontend rtmpt_server_frontend;
+    static RtmptServer::Frontend const rtmpt_server_frontend;
 
     static Result clientConnected (RtmpConnection  * mt_nonnull rtmp_conn,
 				   IpAddress const &client_addr,
@@ -59,14 +59,17 @@ private:
     bool acceptOneConnection ();
 
   mt_iface (TcpServer::Frontend)
-    static TcpServer::Frontend tcp_server_frontend;
+    static TcpServer::Frontend const tcp_server_frontend;
 
     static void accepted (void *_self);
   mt_iface_end
 
 public:
-    mt_throws Result init (Time session_keepalive_timeout,
-			   bool no_keepalive_conns);
+    mt_const mt_throws Result init (Timers    * mt_nonnull timers,
+                                    PagePool  * mt_nonnull page_pool,
+                                    PollGroup * mt_nonnull poll_group,
+                                    Time       session_keepalive_timeout,
+                                    bool       no_keepalive_conns);
 
     mt_throws Result bind (IpAddress const &addr);
 
@@ -75,21 +78,6 @@ public:
     RtmptServer* getRtmptServer ()
     {
 	return &rtmpt_server;
-    }
-
-    void setTimers (Timers * const timers)
-    {
-	rtmpt_server.setTimers (timers);
-    }
-
-    void setPollGroup (PollGroup * const poll_group)
-    {
-	this->poll_group = poll_group;
-    }
-
-    void setPagePool (PagePool * const page_pool)
-    {
-	rtmpt_server.setPagePool (page_pool);
     }
 
     RtmptService (Object * const coderef_container)

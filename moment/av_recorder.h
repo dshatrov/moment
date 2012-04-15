@@ -106,7 +106,7 @@ private:
 
     mt_iface (Sender::Frontend)
     mt_begin
-      static Sender::Frontend sender_frontend;
+      static Sender::Frontend const sender_frontend;
 
       static void senderSendStateChanged (Sender::SendState  send_state,
 					  void              *_recording);
@@ -117,7 +117,7 @@ private:
 
     mt_iface (VideoStream::EventHandler)
     mt_begin
-      static VideoStream::EventHandler stream_handler;
+      static VideoStream::EventHandler const stream_handler;
 
       static void streamAudioMessage (VideoStream::AudioMessage * mt_nonnull msg,
 				      void *_stream_ticket);

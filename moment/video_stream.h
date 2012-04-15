@@ -297,6 +297,8 @@ public:
     };
 
 private:
+    mt_mutex (mutex) bool is_closed;
+
     mt_mutex (mutex) FrameSaver frame_saver;
 
     Informer_<EventHandler> event_informer;
@@ -341,6 +343,10 @@ public:
 				 AmfDecoder        * mt_nonnull amf_decoder);
 
     void close ();
+
+    mt_mutex (mutex) bool isClosed_unlocked () {
+        return is_closed;
+    }
 
     void lock ()
     {

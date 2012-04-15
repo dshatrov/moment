@@ -167,7 +167,7 @@ static void exitTimerTick (void * const /* cb_data */)
 {
     logI_ (_func, "Exit timer expired (", options.exit_after, " seconds)");
     mutex.lock ();
-    server_app.getTimers()->deleteTimer (exit_timer_key);
+    server_app.getServerContext()->getTimers()->deleteTimer (exit_timer_key);
     mutex.unlock ();
 
 //    exit (0);
@@ -364,8 +364,8 @@ int main (int argc, char **argv)
 
     ConstMemory http_bind;
     {
-	if (!http_service.init (server_app.getMainPollGroup(),
-				server_app.getTimers(),
+	if (!http_service.init (server_app.getServerContext()->getMainPollGroup(),
+				server_app.getServerContext()->getTimers(),
 				&page_pool,
 				http_keepalive_timeout,
 				no_keepalive_conns))
@@ -425,8 +425,8 @@ int main (int argc, char **argv)
 		break;
 	    }
 
-	    if (!separate_admin_http_service.init (server_app.getMainPollGroup(),
-						   server_app.getTimers(),
+	    if (!separate_admin_http_service.init (server_app.getServerContext()->getMainPollGroup(),
+						   server_app.getServerContext()->getTimers(),
 						   &page_pool,
 						   http_keepalive_timeout,
 						   no_keepalive_conns))
@@ -480,11 +480,12 @@ int main (int argc, char **argv)
     if (options.exit_after != (Uint64) -1) {
 	logI_ (_func, "options.exit_after: ", options.exit_after);
 	mutex.lock ();
-	exit_timer_key = server_app.getTimers()->addTimer (exitTimerTick,
-							   NULL /* cb_data */,
-							   NULL /* coderef_container */,
-							   options.exit_after,
-							   false /* periodical */);
+	exit_timer_key = server_app.getServerContext()->getTimers()->addTimer (
+                exitTimerTick,
+                NULL /* cb_data */,
+                NULL /* coderef_container */,
+                options.exit_after,
+                false /* periodical */);
 	mutex.unlock ();
     }
 

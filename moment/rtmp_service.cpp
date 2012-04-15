@@ -28,11 +28,11 @@ namespace {
 LogGroup libMary_logGroup_rtmp_service ("rtmp_service", LogLevel::N);
 }
 
-RtmpConnection::Backend RtmpService::rtmp_conn_backend = {
+RtmpConnection::Backend const RtmpService::rtmp_conn_backend = {
     closeRtmpConn
 };
 
-TcpServer::Frontend RtmpService::tcp_server_frontend = {
+TcpServer::Frontend const RtmpService::tcp_server_frontend = {
     accepted
 };
 

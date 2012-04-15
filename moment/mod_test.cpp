@@ -238,11 +238,12 @@ void modTestInit ()
     video_stream = grab (new VideoStream);
     moment->addVideoStream (video_stream, stream_name);
 
-    server_app->getTimers()->addTimer_microseconds (frameTimerTick,
-						    NULL /* cb_data */,
-						    NULL /* coderef_container */,
-						    (Time) (frame_duration * 1000 * burst_width),
-						    true /* periodical */);
+    server_app->getServerContext()->getTimers()->addTimer_microseconds (
+            frameTimerTick,
+            NULL /* cb_data */,
+            NULL /* coderef_container */,
+            (Time) (frame_duration * 1000 * burst_width),
+            true /* periodical */);
 }
 
 void modTestUnload ()

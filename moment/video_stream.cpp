@@ -643,11 +643,15 @@ VideoStream::fireRtmpCommandMessage (RtmpConnection * const  mt_nonnull conn,
 void
 VideoStream::close ()
 {
-    event_informer.informAll (informClosed, NULL /* inform_data */);
+    mutex.lock ();
+    is_closed = true;
+    event_informer.informAll_unlocked (informClosed, NULL /* inform_data */);
+    mutex.unlock ();
 }
 
 VideoStream::VideoStream ()
-    : event_informer (this, &mutex)
+    : is_closed (false),
+      event_informer (this, &mutex)
 {
 }
 

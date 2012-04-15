@@ -185,6 +185,13 @@ Result httpRequest (HttpRequest   * const mt_nonnull req,
 	void const * const dot_ptr = memrchr (file_path.mem(), '.', file_path.len());
 	if (dot_ptr) {
 	    ConstMemory const ext = file_path.region ((Byte const *) (dot_ptr) + 1 - file_path.mem());
+            if (equal (ext, "ts"))
+                mime_type = "video/MP2T";
+            else
+            if (equal (ext, "m3u8"))
+//                mime_type = "application/x-mpegURL";
+                mime_type = "application/vnd.apple.mpegurl";
+            else
 	    if (equal (ext, "html")) {
 		mime_type = "text/html";
 		try_template = true;
@@ -345,14 +352,6 @@ Result httpRequest (HttpRequest   * const mt_nonnull req,
     return Result::Success;
 }
 
-#if 0
-Result httpRequest (HttpRequest  * const mt_nonnull req,
-		    Sender       * const mt_nonnull conn_sender,
-		    Memory const & /* msg_body */,
-		    void        ** const mt_nonnull /* ret_msg_data */,
-		    void         * const _path_entry)
-#endif
-
 #ifdef MOMENT_FILE__CTEMPLATE
 namespace {
     class SendTemplate_PageRequest : public MomentServer::PageRequest
@@ -452,7 +451,7 @@ static Result momentFile_sendMemory (ConstMemory   const mem,
 }
 #endif
 
-HttpService::HttpHandler http_handler = {
+static HttpService::HttpHandler const http_handler = {
     httpRequest,
     NULL /* httpMessageBody */
 };
@@ -613,9 +612,9 @@ void momentFileUnload ()
 {
 }
 
-}
+} // namespace {}
 
-}
+} // namespace Moment
 
 
 namespace M {

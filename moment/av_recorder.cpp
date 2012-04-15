@@ -29,7 +29,7 @@ LogGroup libMary_logGroup_recorder ("av_recorder", LogLevel::I);
 LogGroup libMary_logGroup_recorder_frames ("av_recorder_frames", LogLevel::I);
 }
 
-Sender::Frontend AvRecorder::sender_frontend = {
+Sender::Frontend const AvRecorder::sender_frontend = {
     senderSendStateChanged,
     senderClosed
 };
@@ -158,7 +158,7 @@ AvRecorder::senderClosed (Exception * const exc_,
     recording->mutex.unlock ();
 }
 
-VideoStream::EventHandler AvRecorder::stream_handler = {
+VideoStream::EventHandler const AvRecorder::stream_handler = {
     streamAudioMessage,
     streamVideoMessage,
     NULL /* rtmpCommandMessage */,
@@ -361,6 +361,7 @@ AvRecorder::setVideoStream (VideoStream * const stream)
 
     got_first_frame = false;
 
+    // TODO Fix race condition with stream_closed() (What if the stream has just been closed?)
     stream->getEventInformer()->subscribe (
 	    CbDesc<VideoStream::EventHandler> (
 		    &stream_handler,

@@ -289,7 +289,7 @@ static void stream_closed (void * const _stream_handler)
 	stream_handler->closed_cb (stream_handler->closed_cb_data);
 }
 
-static VideoStream::EventHandler stream_event_handler = {
+static VideoStream::EventHandler const stream_event_handler = {
     stream_audioMessage,
     stream_videoMessage,
     stream_rtmpCommandMessage,
@@ -301,6 +301,7 @@ MomentStreamHandlerKey moment_stream_add_handler (MomentStream        * const st
 {
     Ref<Api_StreamHandler_Wrapper> wrapper = grab (new Api_StreamHandler_Wrapper);
     wrapper->stream_handler = *stream_handler;
+    // TODO Fix race condition with stream_closed() (What if the stream has just been closed?)
     wrapper->subscription_key =
 	    static_cast <VideoStream*> (stream)->getEventInformer()->subscribe (
 		    &stream_event_handler, &wrapper->stream_handler, wrapper /* ref_data */, NULL);
@@ -562,7 +563,7 @@ static Ref<VideoStream> client_startStreaming (ConstMemory     const stream_name
     return NULL;
 }
 
-static MomentServer::ClientSession::Backend client_session_backend = {
+static MomentServer::ClientSession::Backend const client_session_backend = {
     client_startWatching,
     client_startStreaming
 };
