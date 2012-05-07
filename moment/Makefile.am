@@ -6,9 +6,15 @@ COMMON_CFLAGS =					\
 
 if PLATFORM_WIN32
     COMMON_CFLAGS += -DPLATFORM_WIN32
-else
+endif
+if PLATFORM_CYGWIN
+    COMMON_CFLAGS += -DPLATFORM_CYGWIN -pthread
+endif
+
+if PLATFORM_DEFAULT
+    COMMON_CFLAGS += -DPLATFORM_DEFAULT -pthread
     # For backtraces
-    COMMON_CFLAGS += -rdynamic -pthread
+    COMMON_CFLAGS += -rdynamic
 endif
 
 COMMON_LDFLAGS =

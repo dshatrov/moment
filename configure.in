@@ -15,14 +15,23 @@ AC_PROG_LIBTOOL
 #AC_DEFINE_UNQUOTED(LIBMOMENT_PREFIX, "$prefix", [Installation prefix])
 
 case "$host" in
-  *-*-mingw*|*-*-cygwin*)
+  *-*-cygwin*)
+    platform_cygwin=yes
+    platform_default=no
+    ;;
+  *-*-mingw*)
     platform_win32=yes
+    platform_default=no
     ;;
   *)
     platform_win32=no
+    platform_cygwin=no
+    platform_default=yes
     ;;
 esac
-AM_CONDITIONAL(PLATFORM_WIN32, test x$platform_win32 = xyes)
+AM_CONDITIONAL(PLATFORM_CYGWIN,  test x$platform_cygwin  = xyes)
+AM_CONDITIONAL(PLATFORM_WIN32,   test x$platform_win32   = xyes)
+AM_CONDITIONAL(PLATFORM_DEFAULT, test x$platform_default = xyes)
 
 AC_CONFIG_FILES([Makefile
 		 moment/Makefile
