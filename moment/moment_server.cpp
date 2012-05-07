@@ -29,6 +29,23 @@ static LogGroup libMary_logGroup_session ("MomentServer.session", LogLevel::I);
 MomentServer* MomentServer::instance = NULL;
 
 
+// __________________________________ Events ___________________________________
+
+void
+MomentServer::informDestroy (Events * const events,
+                             void   * const cb_data,
+                             void   * const /* inform_data */)
+{
+    events->destroy (cb_data);
+}
+
+void
+MomentServer::fireDestroy ()
+{
+    event_informer.informAll (informDestroy, NULL /* inform_cb_data */);
+}
+
+
 // ___________________________ Video stream handlers ___________________________
 
 namespace {
@@ -325,6 +342,9 @@ MomentServer::loadModules ()
 	return Result::Failure;
 
     StringHash<EmptyBase> loaded_names;
+
+    Ref<String> const mod_gst_name = makeString (module_path, "/libmoment-gst-1.0");
+
     for (;;) {
 	Ref<String> dir_entry;
 	if (!dir->getNextEntry (dir_entry))
@@ -357,6 +377,9 @@ MomentServer::loadModules ()
 		module_name = entry_name.region (0, (Byte const *) dot_ptr - entry_name.mem());
 	}
 
+        if (equal (module_name, mod_gst_name->mem()))
+            continue;
+
 	if (stat_data->file_type == Vfs::FileType::RegularFile &&
 	    !loaded_names.lookup (module_name))
 	{
@@ -367,6 +390,24 @@ MomentServer::loadModules ()
 	    if (!loadModule (module_name))
 		logE_ (_func, "Could not load module ", module_name, ": ", exc->toString());
 	}
+    }
+
+    {
+      // Loading mod_gst first, so that it deinitializes first.
+      // We count on the fact that M::Informer prepends new subscribers
+      // to the beginning of subscriber list, which is hacky, because
+      // M::Informer has no explicit guarantees for that.
+      //
+      // This is important for proper deinitialization. Ideally, the order
+      // of module deinitialization should not matter.
+      // The process of deinitialization needs extra though.
+
+	assert (!loaded_names.lookup (mod_gst_name->mem()));
+        loaded_names.add (mod_gst_name->mem(), EmptyBase());
+
+        logD_ (_func, "loading module (forced last) ", mod_gst_name);
+        if (!loadModule (mod_gst_name->mem()))
+            logE_ (_func, "Could not load module ", mod_gst_name, ": ", exc->toString());
     }
 
     return Result::Success;
@@ -884,7 +925,8 @@ MomentServer::init (ServerApp        * const mt_nonnull server_app,
 }
 
 MomentServer::MomentServer ()
-    : video_stream_informer (NULL /* coderef_container */, &mutex),
+    : event_informer (NULL /* coderef_container */, &mutex),
+      video_stream_informer (NULL /* coderef_container */, &mutex),
       server_app (NULL),
       page_pool (NULL),
       http_service (NULL),
@@ -901,10 +943,15 @@ MomentServer::MomentServer ()
 
 MomentServer::~MomentServer ()
 {
+    logH_ (_func_);
+
     mutex.lock ();
     mutex.unlock ();
 
     vs_inform_reg.release ();
+
+    fireDestroy ();
+    server_app->release ();
 }
 
 }

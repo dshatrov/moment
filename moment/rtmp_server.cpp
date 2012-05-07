@@ -605,7 +605,7 @@ RtmpServer::doPublish (Uint32       const msg_stream_id,
 void
 RtmpServer::sendVideoMessage (VideoStream::VideoMessage * const mt_nonnull msg)
 {
-//    logD (rtmp_server, _func);
+//    logD (rtmp_server, _func_);
 
 #if 0
     logD_ (_func_);
@@ -645,7 +645,7 @@ RtmpServer::sendAudioMessage (VideoStream::AudioMessage * const mt_nonnull msg)
     // Note that nellymoser codec may generate data which makes valgrind
     // complain about uninitialized bytes.
 
-//    logD (rtmp_server, _func);
+//    logD (rtmp_server, _func_);
 
 #if 0
     logD_ (_func_);

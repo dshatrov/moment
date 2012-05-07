@@ -71,6 +71,29 @@ public:
     };
 
 
+// __________________________________ Events ___________________________________
+
+public:
+    struct Events
+    {
+        void (*destroy) (void *cb_data);
+    };
+
+private:
+    Informer_<Events> event_informer;
+
+    static void informDestroy (Events *events,
+                               void   *cb_data,
+                               void   *inform_data);
+
+    void fireDestroy ();
+
+public:
+    Informer_<Events>* getEventInformer ()
+    {
+        return &event_informer;
+    }
+
 // ___________________________ Video stream handlers ___________________________
 
 public:

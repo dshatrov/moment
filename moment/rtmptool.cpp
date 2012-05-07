@@ -31,7 +31,7 @@ using namespace Moment;
 
 namespace {
 
-LogGroup libMary_logGroup_time ("rtmptool_time", LogLevel::D);
+LogGroup libMary_logGroup_time ("rtmptool_time", LogLevel::I);
 
 class Options
 {

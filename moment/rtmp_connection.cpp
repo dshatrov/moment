@@ -1419,7 +1419,7 @@ RtmpConnection::callCommandMessage (ChunkStream * const chunk_stream,
 {
     if (logLevelOn (proto_in, LogLevel::Debug)) {
 	if (chunk_stream->page_list.first) {
-	    logD (proto_in, _func);
+	    logD (proto_in, _func_);
 	    hexdump (ConstMemory (chunk_stream->page_list.first->getData(),
 				  chunk_stream->page_list.first->data_len));
 	}
@@ -2655,6 +2655,11 @@ RtmpConnection::RtmpConnection (Object * const coderef_container)
 
 RtmpConnection::~RtmpConnection ()
 {
+    // closed() event should always be fired for frontend listeners
+    // before RtmpConnection is destroyed. This extra call ensures that.
+    if (frontend)
+      frontend.call (frontend->closed, /*(*/ (Exception*) NULL /*)*/);
+
     in_destr_mutex.lock ();
 
     if (ping_send_timer)

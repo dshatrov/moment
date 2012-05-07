@@ -39,8 +39,21 @@ static LogGroup libMary_logGroup_mod_rtmp ("mod_rtmp", LogLevel::I);
 static LogGroup libMary_logGroup_session ("mod_rtmp.session", LogLevel::D);
 static LogGroup libMary_logGroup_framedrop ("mod_rtmp.framedrop", LogLevel::I);
 
-RtmpService rtmp_service (NULL);
-RtmptService rtmpt_service (NULL);
+class MomentRtmpModule : public Object
+{
+public:
+    RtmpService  rtmp_service;
+    RtmptService rtmpt_service;
+
+    MomentRtmpModule ()
+          // TODO Is it possible to pass NULL as coderef_container?
+          //      That would make sense since MomentRtmpModule is effectively
+          //      a global object.
+        : rtmp_service  (this /* coderef_container */),
+          rtmpt_service (this /* coderef_container */)
+    {
+    }
+};
 
 mt_const bool audio_waits_video = false;
 mt_const bool default_start_paused = false;
@@ -216,6 +229,8 @@ void streamAudioMessage (VideoStream::AudioMessage * const mt_nonnull msg,
     ClientSession * const client_session = static_cast <ClientSession*> (_session);
 
     Ref<Object> rtmp_conn_ref;
+    // TODO client_session->mutex is locked/unlocked here, and then we lock it again
+    //      in the likely path. That's not effective.
     client_session->takeRtmpConnRef (&rtmp_conn_ref);
     if (!rtmp_conn_ref)
 	return;
@@ -257,6 +272,8 @@ void streamVideoMessage (VideoStream::VideoMessage * const mt_nonnull msg,
     ClientSession * const client_session = static_cast <ClientSession*> (_session);
 
     Ref<Object> rtmp_conn_ref;
+    // TODO client_session->mutex is locked/unlocked here, and then we lock it again
+    //      in the likely path. That's not effective.
     client_session->takeRtmpConnRef (&rtmp_conn_ref);
     if (!rtmp_conn_ref)
 	return;
@@ -618,13 +635,13 @@ RtmpServer::CommandResult server_commandMessage (RtmpConnection       * const mt
 static Result pauseCmd (void * const /* _client_session */)
 {
   // No-op
-    logD_ (_func);
+    logD_ (_func_);
     return Result::Success;
 }
 
 static Result resumeCmd (void * const _client_session)
 {
-    logD_ (_func);
+    logD_ (_func_);
 
     ClientSession * const client_session = static_cast <ClientSession*> (_client_session);
 
@@ -678,7 +695,7 @@ Result commandMessage (VideoStream::Message * const mt_nonnull msg,
     logD (mod_rtmp, _func_);
 
     ClientSession * const client_session = static_cast <ClientSession*> (_client_session);
-    // No need to call takeRtmpConnRef(), because this it rtmp_conn's callback.
+    // No need to call takeRtmpConnRef(), because this is rtmp_conn's callback.
     return client_session->rtmp_server.commandMessage (msg, msg_stream_id, amf_encoding);
 }
 
@@ -788,11 +805,26 @@ RtmpVideoService::Frontend const rtmp_video_service_frontend = {
     clientConnected
 };
 
+static void serverDestroy (void * const _rtmp_module)
+{
+    MomentRtmpModule * const rtmp_module = static_cast <MomentRtmpModule*> (_rtmp_module);
+
+    logH_ (_func_);
+    rtmp_module->unref ();
+}
+
+static MomentServer::Events const server_events = {
+    serverDestroy
+};
+
 void momentRtmpInit ()
 {
     MomentServer * const moment = MomentServer::getInstance();
     ServerApp * const server_app = moment->getServerApp();
     MConfig::Config * const config = moment->getConfig();
+
+    MomentRtmpModule * const rtmp_module = new MomentRtmpModule;
+    moment->getEventInformer()->subscribe (CbDesc<MomentServer::Events> (&server_events, rtmp_module, NULL));
 
     {
 	ConstMemory const opt_name = "mod_rtmp/enable";
@@ -818,7 +850,7 @@ void momentRtmpInit ()
 	    logE_ (_func, "bad value for ", opt_name);
 	} else {
 	    logI_ (_func, "RTMP send delay: ", send_delay_val, " milliseconds");
-	    rtmp_service.setSendDelay (send_delay_val);
+	    rtmp_module->rtmp_service.setSendDelay (send_delay_val);
 	}
     }
 
@@ -876,13 +908,13 @@ void momentRtmpInit ()
     }
 
     {
-	rtmp_service.setFrontend (Cb<RtmpVideoService::Frontend> (
+	rtmp_module->rtmp_service.setFrontend (Cb<RtmpVideoService::Frontend> (
 		&rtmp_video_service_frontend, NULL, NULL));
 
-	rtmp_service.setServerContext (server_app->getServerContext());
-	rtmp_service.setPagePool (moment->getPagePool());
+	rtmp_module->rtmp_service.setServerContext (server_app->getServerContext());
+	rtmp_module->rtmp_service.setPagePool (moment->getPagePool());
 
-	if (!rtmp_service.init()) {
+	if (!rtmp_module->rtmp_service.init()) {
 	    logE_ (_func, "rtmp_service.init() failed: ", exc->toString());
 	    return;
 	}
@@ -904,12 +936,12 @@ void momentRtmpInit ()
 		    return;
 		}
 
-		if (!rtmp_service.bind (addr)) {
+		if (!rtmp_module->rtmp_service.bind (addr)) {
 		    logE_ (_func, "rtmp_service.bind() failed: ", exc->toString());
 		    break;
 		}
 
-		if (!rtmp_service.start ()) {
+		if (!rtmp_module->rtmp_service.start ()) {
 		    logE_ (_func, "rtmp_service.start() failed: ", exc->toString());
 		    return;
 		}
@@ -922,10 +954,10 @@ void momentRtmpInit ()
     }
 
     {
-	rtmpt_service.setFrontend (Cb<RtmpVideoService::Frontend> (
+	rtmp_module->rtmpt_service.setFrontend (Cb<RtmpVideoService::Frontend> (
 		&rtmp_video_service_frontend, NULL, NULL));
 
-	if (!rtmpt_service.init (server_app->getServerContext()->getTimers(),
+	if (!rtmp_module->rtmpt_service.init (server_app->getServerContext()->getTimers(),
                                  moment->getPagePool(),
                                  // TODO setServerContext()
                                  server_app->getServerContext()->getMainPollGroup(),
@@ -952,12 +984,12 @@ void momentRtmpInit ()
 		    return;
 		}
 
-		if (!rtmpt_service.bind (addr)) {
+		if (!rtmp_module->rtmpt_service.bind (addr)) {
 		    logE_ (_func, "rtmpt_service.bind() failed: ", exc->toString());
 		    break;
 		}
 
-		if (!rtmpt_service.start ()) {
+		if (!rtmp_module->rtmpt_service.start ()) {
 		    logE_ (_func, "rtmpt_service.start() failed: ", exc->toString());
 		    return;
 		}
@@ -976,7 +1008,7 @@ void momentRtmpInit ()
 	    logE_ (_func, "Invalid value for config option ", opt_name);
 	else
 	if (opt_val != MConfig::Config::Boolean_False)
-	    rtmpt_service.getRtmptServer()->attachToHttpService (moment->getHttpService());
+	    rtmp_module->rtmpt_service.getRtmptServer()->attachToHttpService (moment->getHttpService());
     }
 
     {
