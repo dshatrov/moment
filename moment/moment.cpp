@@ -228,6 +228,7 @@ int main (int argc, char **argv)
     }
 
     if (options.help) {
+        setGlobalLogLevel (LogLevel::Failure);
 	printUsage ();
 	return 0;
     }
