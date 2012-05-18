@@ -531,7 +531,7 @@ MomentServer::disconnect (ClientSession * const mt_nonnull client_session)
 
 Ref<VideoStream>
 MomentServer::startWatching (ClientSession * const mt_nonnull client_session,
-			     ConstMemory const stream_name)
+			     ConstMemory     const stream_name)
 {
     Ref<VideoStream> video_stream;
 
@@ -951,7 +951,9 @@ MomentServer::~MomentServer ()
     vs_inform_reg.release ();
 
     fireDestroy ();
-    server_app->release ();
+
+    if (server_app)
+        server_app->release ();
 }
 
 }
