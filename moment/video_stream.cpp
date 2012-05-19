@@ -608,7 +608,7 @@ VideoStream::fireAudioMessage (AudioMessage * const mt_nonnull msg)
     mutex.lock ();
 
     InformAudioMessage_Data inform_data (msg);
-    event_informer.informAll_unlocked (informAudioMessage, &inform_data);
+    mt_unlocks_locks (mutex) event_informer.informAll_unlocked (informAudioMessage, &inform_data);
 
     frame_saver.processAudioFrame (msg);
 
@@ -623,7 +623,7 @@ VideoStream::fireVideoMessage (VideoMessage * const mt_nonnull msg)
     mutex.lock ();
 
     InformVideoMessage_Data inform_data (msg);
-    event_informer.informAll_unlocked (informVideoMessage, &inform_data);
+    mt_unlocks_locks (mutex) event_informer.informAll_unlocked (informVideoMessage, &inform_data);
 
     frame_saver.processVideoFrame (msg);
 
