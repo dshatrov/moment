@@ -30,7 +30,7 @@ namespace {
 Mutex tick_mutex;
 
 Ref<VideoStream> video_stream = NULL;
-Uint64 frame_size = 4096;
+Uint64 frame_size = 2500;
 Uint64 prechunk_size = 65536;
 
 Uint64 keyframe_interval = 10;
@@ -145,7 +145,7 @@ void modTestInit ()
 	}
     }
 
-    Uint64 frame_duration = 1000;
+    Uint64 frame_duration = 40;
     {
 	ConstMemory const opt_name = "mod_test/frame_duration";
 	MConfig::GetResult const res = config->getUint64_default (opt_name, &frame_duration, frame_duration);
