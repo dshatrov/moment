@@ -138,8 +138,27 @@ RtmpConnection::mangleOutTimestamp (Uint32 const timestamp)
     // TEST
 //    return timestamp + 0x00ffffff;
 
-    // TEST
 //    return timestamp;
+
+    if (!out_got_first_timestamp) {
+        out_first_timestamp = timestamp;
+        out_got_first_timestamp = true;
+        return 0;
+    }
+
+    Uint32 mangled_timestamp = timestamp - out_first_timestamp;
+
+    if (out_first_frames_counter < 1000 /* Artificial limit */) {
+        if (mangled_timestamp > (Uint32) - 60000 /* 1 minute */)
+            mangled_timestamp = 0;
+
+        ++out_first_frames_counter;
+    }
+
+    return mangled_timestamp;
+
+#if 0
+// Deprecated and wrong.
 
     if (!out_got_first_timestamp) {
 	if (timestamp != 0) {
@@ -151,10 +170,14 @@ RtmpConnection::mangleOutTimestamp (Uint32 const timestamp)
 	}
     }
 
+    if (timestamp == 0)
+        return 0;
+
     if (out_first_timestamp <= timestamp)
 	return timestamp - out_first_timestamp;
 
     return 0;
+#endif
 }
 
 mt_mutex (send_mutex) Size
@@ -535,7 +558,8 @@ RtmpConnection::sendMessagePages (MessageDesc const      * const mt_nonnull mdes
     if (!unlocked)
 	send_mutex.lock ();
 
-    Uint32 const timestamp = mangleOutTimestamp (mdesc->timestamp);
+    Uint32 const timestamp =
+            (mdesc->adjustable_timestamp ? mangleOutTimestamp (mdesc->timestamp) : mdesc->timestamp);
 
     logD (proto_out, _func, "ts 0x", fmt_hex, timestamp, " (orig 0x", mdesc->timestamp, "), "
 	  "tid ", fmt_def, mdesc->msg_type_id,
@@ -2577,6 +2601,7 @@ RtmpConnection::RtmpConnection (Object     * const coderef_container,
 
       out_got_first_timestamp (false),
       out_first_timestamp (0),
+      out_first_frames_counter (0),
 
       out_last_flush_time (0),
 
@@ -2629,6 +2654,7 @@ RtmpConnection::RtmpConnection (Object * const coderef_container)
 
       out_got_first_timestamp (false),
       out_first_timestamp (0),
+      out_first_frames_counter (0),
 
       out_last_flush_time (0),
 

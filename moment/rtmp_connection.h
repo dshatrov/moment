@@ -285,6 +285,7 @@ private:
 
     mt_mutex (send_mutex) Size out_got_first_timestamp;
     mt_mutex (send_mutex) Uint32 out_first_timestamp;
+    mt_mutex (send_mutex) Count out_first_frames_counter;
 
     mt_mutex (send_mutex) Time out_last_flush_time;
 
@@ -404,6 +405,13 @@ public:
 	Size msg_len;
 	// Chunk stream header compression.
 	bool cs_hdr_comp;
+
+        bool adjustable_timestamp;
+
+        MessageDesc ()
+            : adjustable_timestamp (false)
+        {
+        }
 
 	// TODO ChunkStream *chunk_stream;
     };

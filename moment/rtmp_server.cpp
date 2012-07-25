@@ -635,6 +635,7 @@ RtmpServer::sendVideoMessage (VideoStream::VideoMessage * const mt_nonnull msg)
     mdesc.msg_stream_id = RtmpConnection::DefaultMessageStreamId;
     mdesc.msg_len = msg->msg_len;
     mdesc.cs_hdr_comp = true;
+    mdesc.adjustable_timestamp = msg->frame_type.isVideoData();
 
     rtmp_conn->sendMessagePages (&mdesc, chunk_stream, &msg->page_list, msg->msg_offset, msg->prechunk_size);
 }
@@ -660,13 +661,44 @@ RtmpServer::sendAudioMessage (VideoStream::AudioMessage * const mt_nonnull msg)
     mdesc.msg_stream_id = RtmpConnection::DefaultMessageStreamId;
     mdesc.msg_len = msg->msg_len;
     mdesc.cs_hdr_comp = true;
+    mdesc.adjustable_timestamp = msg->frame_type.isAudioData();
 
     rtmp_conn->sendMessagePages (&mdesc, audio_chunk_stream, &msg->page_list, msg->msg_offset, msg->prechunk_size);
 }
 
+static void
+savedAudioFrame (VideoStream::AudioMessage * const mt_nonnull audio_msg,
+                 void                      * const _self)
+{
+    RtmpServer * const self = static_cast <RtmpServer*> (_self);
+    VideoStream::AudioMessage tmp_audio_msg = *audio_msg;
+    tmp_audio_msg.timestamp = 0;
+    self->sendAudioMessage (&tmp_audio_msg);
+}
+
+static void
+savedVideoFrame (VideoStream::VideoMessage * const mt_nonnull video_msg,
+                 void                      * const _self)
+{
+    RtmpServer * const self = static_cast <RtmpServer*> (_self);
+    VideoStream::VideoMessage tmp_video_msg = *video_msg;
+    tmp_video_msg.timestamp = 0;
+    self->sendVideoMessage (&tmp_video_msg);
+}
+
+static VideoStream::FrameSaver::FrameHandler const saved_frame_handler = {
+    savedAudioFrame,
+    savedVideoFrame
+};
+
 void
 RtmpServer::sendInitialMessages_unlocked (VideoStream::FrameSaver * const mt_nonnull frame_saver)
 {
+    frame_saver->reportSavedFrames (&saved_frame_handler, this);
+
+#if 0
+// Deprecated
+
     VideoStream::SavedFrame saved_frame;
     VideoStream::SavedAudioFrame saved_audio_frame;
 
@@ -698,6 +730,7 @@ RtmpServer::sendInitialMessages_unlocked (VideoStream::FrameSaver * const mt_non
 	saved_frame.msg.timestamp = 0;
 	sendVideoMessage (&saved_frame.msg);
     }
+#endif
 }
 
 Result
