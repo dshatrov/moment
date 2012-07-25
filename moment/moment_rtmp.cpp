@@ -20,6 +20,7 @@
 #include <libmary/module_init.h>
 
 #include <moment/libmoment.h>
+#include <moment/rtmp_push_protocol.h>
 
 
 // Needed for "start_paused" as well.
@@ -267,7 +268,7 @@ void streamAudioMessage (VideoStream::AudioMessage * const mt_nonnull msg,
 void streamVideoMessage (VideoStream::VideoMessage * const mt_nonnull msg,
 			 void                      * const _session)
 {
-//    logD_ (_func_);
+//    logD_ (_func, "ts 0x", fmt_hex, msg->timestamp, " ", msg->frame_type, (msg->is_saved_frame ? " SAVED" : ""));
 
     ClientSession * const client_session = static_cast <ClientSession*> (_session);
 
@@ -311,10 +312,18 @@ void streamVideoMessage (VideoStream::VideoMessage * const mt_nonnull msg,
 
 #ifdef MOMENT_RTMP__WAIT_FOR_KEYFRAME
     bool got_keyframe = false;
-    if (msg->frame_type == VideoStream::VideoFrameType::KeyFrame ||
-	msg->frame_type == VideoStream::VideoFrameType::GeneratedKeyFrame)
+    if (!msg->is_saved_frame
+        && (msg->frame_type == VideoStream::VideoFrameType::KeyFrame ||
+	    msg->frame_type == VideoStream::VideoFrameType::GeneratedKeyFrame))
     {
+//        logD_ (_func, "KEYFRAME");
 	got_keyframe = true;
+    } else
+    if (msg->frame_type == VideoStream::VideoFrameType::AvcSequenceHeader ||
+        msg->frame_type == VideoStream::VideoFrameType::AvcEndOfSequence)
+    {
+//        logD_ (_func, "KEYFRAME NOT SENT");
+        client_session->keyframe_sent = false;
     } else
     if (!client_session->keyframe_sent
 	&& (   msg->frame_type == VideoStream::VideoFrameType::InterFrame
@@ -322,10 +331,12 @@ void streamVideoMessage (VideoStream::VideoMessage * const mt_nonnull msg,
     {
 	++client_session->no_keyframe_counter;
 	if (client_session->no_keyframe_counter >= no_keyframe_limit) {
+            logD_ (_func, "no_keyframe_limit hit: ", client_session->no_keyframe_counter);
 	    got_keyframe = true;
 	} else {
 	  // Waiting for a keyframe, dropping current video frame.
 	    client_session->mutex.unlock ();
+//            logD_ (_func, "DROPPING FRAME");
 	    return;
 	}
     }
@@ -334,7 +345,8 @@ void streamVideoMessage (VideoStream::VideoMessage * const mt_nonnull msg,
 	client_session->no_keyframe_counter = 0;
 
     if (client_session->watching_params.start_paused &&
-	!client_session->resumed)
+	!client_session->resumed &&
+        msg->frame_type.isVideoData())
     {
 	bool match = client_session->first_keyframe_sent;
 	if (!match) {
@@ -348,6 +360,7 @@ void streamVideoMessage (VideoStream::VideoMessage * const mt_nonnull msg,
 
 	if (match) {
 	    client_session->mutex.unlock ();
+//            logD_ (_func, "START PAUSED, DROPPING");
 	    return;
 	}
     }
@@ -377,7 +390,8 @@ VideoStream::EventHandler const video_event_handler = {
     streamAudioMessage,
     streamVideoMessage,
     NULL /* rtmpCommandMessage */,
-    streamClosed
+    streamClosed,
+    NULL /* numWatchersChanged */
 };
 
 Result connect (ConstMemory const &app_name,
@@ -585,6 +599,7 @@ Result startWatching (ConstMemory const &_stream_name,
 
         client_session->rtmp_server.sendInitialMessages_unlocked (video_stream->getFrameSaver());
         video_stream->getEventInformer()->subscribe_unlocked (&video_event_handler, client_session, NULL /* ref_data */, client_session);
+        video_stream->plusOneWatcher_unlocked (client_session /* guard_obj */);
         video_stream->unlock ();
         break;
     }
@@ -822,6 +837,8 @@ void momentRtmpInit ()
     MomentServer * const moment = MomentServer::getInstance();
     ServerApp * const server_app = moment->getServerApp();
     MConfig::Config * const config = moment->getConfig();
+
+    moment->addPushProtocol ("rtmp", grab (new RtmpPushProtocol));
 
     MomentRtmpModule * const rtmp_module = new MomentRtmpModule;
     moment->getEventInformer()->subscribe (CbDesc<MomentServer::Events> (&server_events, rtmp_module, NULL));

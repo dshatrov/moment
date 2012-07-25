@@ -29,6 +29,7 @@
 #include <moment/rtmp_connection.h>
 #include <moment/video_stream.h>
 #include <moment/storage.h>
+#include <moment/push_protocol.h>
 
 
 namespace Moment {
@@ -475,14 +476,6 @@ public:
 
     void removeClientHandler (ClientHandlerKey client_handler_key);
 
-  // Video stream handlers
-
-#if 0
-// Unused
-    void addVideoStreamHandler (Cb<VideoStreamHandler> const &cb,
-				ConstMemory const &path_prefix);
-#endif
-
   // Get/add/remove video streams
 
     // TODO There's a logical problem here. A stream can only be deleted
@@ -515,6 +508,24 @@ public:
 
     PageRequestResult processPageRequest (PageRequest *page_req,
 					  ConstMemory  path);
+
+  // Push protocols
+
+private:
+    typedef StringHash< Ref<PushProtocol> > PushProtocolHash;
+
+    mt_mutex (mutex) PushProtocolHash push_protocol_hash;
+
+public:
+    void addPushProtocol (ConstMemory   protocol_name,
+                          PushProtocol * mt_nonnull push_protocol);
+
+    Ref<PushProtocol> getPushProtocolForUri (ConstMemory uri);
+
+    Ref<PushConnection> createPushConnection (VideoStream *video_stream,
+                                              ConstMemory  uri,
+                                              ConstMemory  username,
+                                              ConstMemory  password);
 
   // Utility
 

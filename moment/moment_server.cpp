@@ -372,6 +372,12 @@ MomentServer::loadModules ()
 	    // Skipping the second dot (-1.0 in library version).
 	    if (dot_ptr)
 		dot_ptr = memchr ((void*) ((Byte const *) dot_ptr + 1), '.', entry_name.len() - ((Byte const *) dot_ptr - entry_name.mem()) - 1);
+#ifdef LIBMARY_PLATFORM_WIN32
+// TEST: skipping the third dot.
+// TODO The dots should be skipped from the end of the string!
+	    if (dot_ptr)
+		dot_ptr = memchr ((void*) ((Byte const *) dot_ptr + 1), '.', entry_name.len() - ((Byte const *) dot_ptr - entry_name.mem()) - 1);
+#endif
 
 	    if (dot_ptr)
 		module_name = entry_name.region (0, (Byte const *) dot_ptr - entry_name.mem());
@@ -409,6 +415,28 @@ MomentServer::loadModules ()
         if (!loadModule (mod_gst_name->mem()))
             logE_ (_func, "Could not load module ", mod_gst_name, ": ", exc->toString());
     }
+
+#ifdef LIBMARY_PLATFORM_WIN32
+    {
+        if (!loadModule ("C:/MinGW/msys/1.0/opt/moment/lib/bin/libmoment-file-1.0-0.dll"))
+            logE_ (_func, "Could not load mod_file (win32)");
+
+        if (!loadModule ("C:/MinGW/msys/1.0/opt/moment/lib/bin/libmoment-gst-1.0-0.dll"))
+            logE_ (_func, "Could not load mod_gst (win32)");
+
+        if (!loadModule ("C:/MinGW/msys/1.0/opt/moment/lib/bin/libmoment-rtmp-1.0-0.dll"))
+            logE_ (_func, "Could not load mod_rtmp (win32)");
+
+        if (!loadModule ("C:/MinGW/msys/1.0/opt/moment/lib/bin/libmoment-mychat-1.0-0.dll"))
+            logE_ (_func, "Could not load mychat module (win32)");
+
+        if (!loadModule ("C:/MinGW/msys/1.0/opt/moment/lib/bin/libmoment-test-1.0-0.dll"))
+            logE_ (_func, "Could not load mychat module (win32)");
+
+        if (!loadModule ("C:/MinGW/msys/1.0/opt/moment/lib/bin/libmoment-lectorium-1.0-0.dll"))
+            logE_ (_func, "Could not load lectorium (win32)");
+    }
+#endif
 
     return Result::Success;
 }
@@ -680,7 +708,10 @@ MomentServer::removeClientHandler (ClientHandlerKey const client_handler_key)
 
     bool remove_client_entry = false;
     client_entry->mutex.lock ();
+//#error Initially, this should have been unsubscribe_unlocked()
     client_entry->event_informer.unsubscribe (client_handler_key.sbn_key);
+//#error Informer's mutex is not held here!
+//#warning This condition looks strange.
     if (!client_entry->event_informer.gotSubscriptions_unlocked ()) {
 	remove_client_entry = true;
     }
@@ -854,13 +885,70 @@ MomentServer::processPageRequest (PageRequest * const page_req,
 	return PageRequestResult::Success;
     }
 
-    PageRequestHandlerEntry * const handler = hash_key.getData();
+    Ref<PageRequestHandlerEntry> const handler = hash_key.getData();
+
+    mutex.unlock ();
+
     PageRequestResult const res = handler->firePageRequest (page_req,
 							    path,
 							    path /* full_path */);
-    mutex.unlock ();
 
     return res;
+}
+
+void
+MomentServer::addPushProtocol (ConstMemory    const protocol_name,
+                               PushProtocol * const mt_nonnull push_protocol)
+{
+    mutex.lock ();
+    push_protocol_hash.add (protocol_name, push_protocol);
+    mutex.unlock ();
+}
+
+Ref<PushProtocol>
+MomentServer::getPushProtocolForUri (ConstMemory const uri)
+{
+    ConstMemory protocol_name;
+    {
+        Count i = 0;
+        for (Count const i_end = uri.len(); i < i_end; ++i) {
+            if (uri.mem() [i] == ':')
+                break;
+        }
+
+        protocol_name = uri.region (0, i);
+    }
+
+    Ref<PushProtocol> push_protocol;
+    {
+        mutex.lock ();
+
+        PushProtocolHash::EntryKey const push_protocol_key = push_protocol_hash.lookup (protocol_name);
+        if (push_protocol_key)
+            push_protocol = push_protocol_key.getData();
+
+        mutex.unlock ();
+    }
+
+    if (!push_protocol) {
+        logE_ (_func, "Push protocol not found: ", protocol_name);
+        return NULL;
+    }
+
+    return push_protocol;
+}
+
+Ref<PushConnection>
+MomentServer::createPushConnection (VideoStream * const video_stream,
+                                    ConstMemory   const uri,
+                                    ConstMemory   const username,
+                                    ConstMemory   const password)
+{
+    Ref<PushProtocol> const push_protocol = getPushProtocolForUri (uri);
+    if (!push_protocol)
+        return NULL;
+
+    return push_protocol->connect (video_stream, uri, username, password);
 }
 
 void
