@@ -182,7 +182,22 @@ Result httpRequest (HttpRequest   * const mt_nonnull req,
     bool try_template = false;
     Size ext_length = 0;
     {
+#ifdef PLATFORM_WIN32
+        // MinGW doesn't have memrchr().
+        void const *dot_ptr = NULL;
+        {
+            unsigned char const * const mem = file_path.mem();
+            Size const len = file_path.len();
+            for (Size i = len; i > 0; --i) {
+                if (mem [i - 1] == '.') {
+                    dot_ptr = mem + (i - 1);
+                    break;
+                }
+            }
+        }
+#else
 	void const * const dot_ptr = memrchr (file_path.mem(), '.', file_path.len());
+#endif
 	if (dot_ptr) {
 	    ConstMemory const ext = file_path.region ((Byte const *) (dot_ptr) + 1 - file_path.mem());
             if (equal (ext, "ts"))
@@ -224,10 +239,18 @@ Result httpRequest (HttpRequest   * const mt_nonnull req,
     Ref<String> const filename = makeString (path_entry->path->mem(), !path_entry->path->isNull() ? "/" : "", file_path);
     logD_ (_func, "path_entry->path: ", path_entry->path, ", filename: ", filename->mem());
 //    logD_ (_func, "Opening ", filename);
+#if 0
+// Deprecated form.
     NativeFile native_file (filename->mem(),
 			    0 /* open_flags */,
 			    File::AccessMode::ReadOnly);
     if (exc) {
+#endif
+    NativeFile native_file;
+    if (!native_file.open (filename->mem(),
+                           0 /* open_flags */,
+                           File::AccessMode::ReadOnly))
+    {
 #ifdef MOMENT_FILE__CTEMPLATE
 	if (try_template) {
 	    if (momentFile_sendTemplate (
@@ -332,6 +355,21 @@ Result httpRequest (HttpRequest   * const mt_nonnull req,
 	if (res == IoResult::Eof)
 	    break;
     }
+
+#if 0
+    {
+      // DEBUG
+
+        Count size = 0;
+        PagePool::Page *cur_page = page_list.first;
+        while (cur_page) {
+            size += cur_page->data_len;
+            cur_page = cur_page->getNextMsgPage();
+        }
+
+        logD_ (_func, "total data length: ", size);
+    }
+#endif
 
     conn_sender->sendPages (page_pool, &page_list, true /* do_flush */);
 
