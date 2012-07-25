@@ -166,6 +166,13 @@ public:
     // Must be copyable.
     class Message
     {
+#if 0
+    private:
+        // TODO Remove the "must be copyable" comments
+        Message& operator = (Message const &);
+        Message (Message const &);
+#endif
+
     public:
 	Uint64 timestamp;
 
@@ -216,10 +223,12 @@ public:
 
 	VideoFrameType frame_type;
 	VideoCodecId codec_id;
+        bool is_saved_frame;
 
 	VideoMessage ()
 	    : frame_type (VideoFrameType::Unknown),
-	      codec_id (VideoCodecId::Unknown)
+	      codec_id (VideoCodecId::Unknown),
+              is_saved_frame (false)
 	{
 	}
     };
@@ -241,9 +250,13 @@ public:
 	// FIXME getVideoStream() and closed() imply a race condition.
 	// Add isClosed() method to VideoStream as a workaround.
 	void (*closed) (void *cb_data);
+
+        void (*numWatchersChanged) (Count  num_watchers,
+                                    void  *cb_data);
     };
 
     // TODO Rename to SavedVideoFrame.
+    // TODO Get rid of Saved*Frame in favor of VideoStream::Audio/VideoMessage
     struct SavedFrame
     {
 	VideoStream::VideoMessage msg;
@@ -273,6 +286,8 @@ public:
 
 	void releaseSavedSpeexHeaders ();
 
+        void releaseState ();
+
     public:
 	void processAudioFrame (AudioMessage * mt_nonnull msg);
 
@@ -291,15 +306,131 @@ public:
 	void getSavedSpeexHeaders (SavedAudioFrame *ret_frames,
 				   Size             ret_frame_size);
 
+        void copyStateFrom (FrameSaver *frame_saver);
+
+        struct FrameHandler
+        {
+            mt_unlocks_locks (mutex) void (*audioFrame) (AudioMessage * mt_nonnull audio_msg,
+                                                         void         *cb_data);
+
+            mt_unlocks_locks (mutex) void (*videoFrame) (VideoMessage * mt_nonnull video_msg,
+                                                         void         *cb_data);
+        };
+
+        mt_unlocks_locks (mutex) void reportSavedFrames (FrameHandler const * mt_nonnull frame_handler,
+                                                         void               *cb_data);
+
 	FrameSaver ();
 
 	~FrameSaver ();
     };
 
 private:
+    class PendingFrameList_name;
+
+    class PendingFrame : public IntrusiveListElement<PendingFrameList_name>
+    {
+    public:
+        enum Type {
+            t_Audio,
+            t_Video
+        };
+
+    private:
+        Type const type;
+
+    public:
+        Type getType() const
+        {
+            return type;
+        }
+
+        PendingFrame (Type const type)
+            : type (type)
+        {
+        }
+    };
+
+    typedef IntrusiveList<PendingFrame, PendingFrameList_name> PendingFrameList;
+
+    class PendingAudioFrame : public PendingFrame
+    {
+    public:
+        AudioMessage audio_msg;
+
+        PendingAudioFrame ()
+            : PendingFrame (t_Audio)
+        {
+        }
+    };
+
+    class PendingVideoFrame : public PendingFrame
+    {
+    public:
+        VideoMessage video_msg;
+
+        PendingVideoFrame ()
+            : PendingFrame (t_Video)
+        {
+        }
+    };
+
     mt_mutex (mutex) bool is_closed;
 
     mt_mutex (mutex) FrameSaver frame_saver;
+
+    mt_mutex (mutex) Count num_watchers;
+
+  // ___________________________ Stream binding data ___________________________
+
+    class BindTicket : public Referenced
+    {
+    public:
+        VideoStream *video_stream;
+        VideoStream *bind_stream;
+    };
+
+    mt_mutex (mutex) Count bind_inform_counter;
+
+    mt_mutex (mutex) Uint64 timestamp_offs;
+    mt_mutex (mutex) Uint64 last_adjusted_timestamp;
+    mt_mutex (mutex) bool   got_timestamp_offs;
+
+    mt_mutex (mutex) Uint64 pending_timestamp_offs;
+    mt_mutex (mutex) bool   pending_got_timestamp_offs;
+
+    mt_mutex (mutex) Ref<BindTicket> cur_bind_ticket;
+    mt_mutex (mutex) Ref<BindTicket> pending_bind_ticket;
+
+    mt_mutex (mutex) FrameSaver pending_frame_saver;
+    mt_mutex (mutex) PendingFrameList pending_frame_list;
+
+    mt_mutex (mutex) WeakRef<VideoStream> weak_bind_stream;
+    mt_mutex (mutex) GenericInformer::SubscriptionKey bind_sbn;
+
+    // Protects from concurrent invocations of bindToSrteam()
+    Mutex bind_mutex;
+
+  mt_iface (FrameSaver::FrameHandler)
+
+    static FrameSaver::FrameHandler const bind_frame_handler;
+
+    static mt_unlocks_locks (mutex) void bind_savedAudioFrame (AudioMessage * mt_nonnull audio_msg,
+                                                               void         *_self);
+
+    static mt_unlocks_locks (mutex) void bind_savedVideoFrame (VideoMessage * mt_nonnull video_msg,
+                                                               void         *_self);
+
+  mt_iface_end
+
+    bool bind_messageBegin (Message    * mt_nonnull msg,
+                            BindTicket *bind_ticket,
+                            bool        is_audio_msg,
+                            Uint64     * mt_nonnull ret_timestamp_offs);
+
+    mt_unlocks_locks (mutex) void bind_messageEnd ();
+
+  // ___________________________________________________________________________
 
     Informer_<EventHandler> event_informer;
 
@@ -342,9 +473,63 @@ public:
 				 ConstMemory const &method_name,
 				 AmfDecoder        * mt_nonnull amf_decoder);
 
+private:
+    static void informNumWatchersChanged (EventHandler *event_handler,
+                                          void         *cb_data,
+                                          void         *inform_data);
+
+    mt_unlocks_locks (mutex) void fireNumWatchersChanged (Count num_watchers);
+
+    static void watcherDeletionCallback (void *_self);
+
+public:
+    // 'guard_obj' must be unique. Only one pluOneWatcher() call should be made
+    // for any 'guard_obj' instance. If 'guard_obj' is not null, then minusOneWatcher()
+    // should not be called to cancel the effect of plusOneWatcher().
+    // That will be done automatically when 'guard_obj' is destroyed.
+    void plusOneWatcher (Object *guard_obj = NULL);
+    mt_unlocks_locks (mutex) void plusOneWatcher_unlocked (Object *guard_obj = NULL);
+
+    void minusOneWatcher ();
+    mt_unlocks_locks (mutex) void minusOneWatcher_unlocked ();
+
+    void plusWatchers (Count delta);
+    mt_unlocks_locks (mutex) void plusWatchers_unlocked (Count delta);
+
+    void minusWatchers (Count delta);
+    mt_unlocks_locks (mutex) void minusWatchers_unlocked (Count delta);
+
+    mt_mutex (mutex) bool getNumWatchers_unlocked ()
+    {
+        return num_watchers;
+    }
+
+private:
+  mt_iface (VideoStream::EventHandler)
+
+    static EventHandler const bind_handler;
+
+    static void bind_audioMessage (AudioMessage * mt_nonnull msg,
+                                   void         *_self);
+
+    static void bind_videoMessage (VideoMessage * mt_nonnull msg,
+                                   void         *_self);
+
+    static void bind_rtmpCommandMessage (RtmpConnection    * mt_nonnull conn,
+                                         Message           * mt_nonnull msg,
+                                         ConstMemory const &method_name,
+                                         AmfDecoder        * mt_nonnull amf_decoder,
+                                         void              *_self);
+
+  mt_iface_end
+
+public:
+    void bindToStream (VideoStream *bind_stream);
+
     void close ();
 
-    mt_mutex (mutex) bool isClosed_unlocked () {
+    mt_mutex (mutex) bool isClosed_unlocked ()
+    {
         return is_closed;
     }
 

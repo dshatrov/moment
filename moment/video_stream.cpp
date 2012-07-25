@@ -364,6 +364,7 @@ VideoStream::FrameSaver::processVideoFrame (VideoMessage * const mt_nonnull msg)
 
 	    got_saved_keyframe = true;
 	    saved_keyframe.msg = *msg;
+            saved_keyframe.msg.is_saved_frame = true;
 
 	    msg->page_pool->msgRef (msg->page_list.first);
 	} break;
@@ -375,6 +376,7 @@ VideoStream::FrameSaver::processVideoFrame (VideoMessage * const mt_nonnull msg)
 
 	    got_saved_avc_seq_hdr = true;
 	    saved_avc_seq_hdr.msg = *msg;
+            saved_avc_seq_hdr.msg.is_saved_frame = true;
 
 	    msg->page_pool->msgRef (msg->page_list.first);
 	} break;
@@ -394,6 +396,7 @@ VideoStream::FrameSaver::processVideoFrame (VideoMessage * const mt_nonnull msg)
 
 	    got_saved_metadata = true;
 	    saved_metadata.msg = *msg;
+            saved_metadata.msg.is_saved_frame = true;
 
 	    msg->page_pool->msgRef (msg->page_list.first);
 	} break;
@@ -477,6 +480,104 @@ VideoStream::FrameSaver::getSavedSpeexHeaders (SavedAudioFrame *ret_frames,
 }
 
 void
+VideoStream::FrameSaver::copyStateFrom (FrameSaver * const frame_saver)
+{
+    releaseState ();
+
+    got_saved_keyframe = frame_saver->got_saved_keyframe;
+    saved_keyframe = frame_saver->saved_keyframe;
+    saved_keyframe.msg.page_pool->msgRef (saved_keyframe.msg.page_list.first);
+
+    got_saved_metadata = frame_saver->got_saved_metadata;
+    saved_metadata = frame_saver->saved_metadata;
+    saved_metadata.msg.page_pool->msgRef (saved_metadata.msg.page_list.first);
+
+    got_saved_aac_seq_hdr = frame_saver->got_saved_aac_seq_hdr;
+    saved_aac_seq_hdr = frame_saver->saved_aac_seq_hdr;
+    saved_aac_seq_hdr.msg.page_pool->msgRef (saved_aac_seq_hdr.msg.page_list.first);
+
+    got_saved_avc_seq_hdr = frame_saver->got_saved_avc_seq_hdr;
+    saved_avc_seq_hdr = frame_saver->saved_avc_seq_hdr;
+    saved_avc_seq_hdr.msg.page_pool->msgRef (saved_avc_seq_hdr.msg.page_list.first);
+
+    {
+        saved_speex_headers.clear ();
+
+        List<SavedAudioFrame*>::iter iter (frame_saver->saved_speex_headers);
+        while (!frame_saver->saved_speex_headers.iter_done (iter)) {
+            SavedAudioFrame * const frame = frame_saver->saved_speex_headers.iter_next (iter)->data;
+            SavedAudioFrame * const new_frame = new SavedAudioFrame (*frame);
+            assert (new_frame);
+            new_frame->msg.page_pool->msgRef (new_frame->msg.page_list.first);
+            saved_speex_headers.append (new_frame);
+        }
+    }
+}
+
+// TODO Use reportSavedFrames() in rtmp_server and av_recorder.
+mt_unlocks_locks (mutex) void
+VideoStream::FrameSaver::reportSavedFrames (FrameHandler const * const mt_nonnull frame_handler,
+                                            void               * const cb_data)
+{
+    if (got_saved_metadata) {
+        if (frame_handler->videoFrame)
+            mt_unlocks_locks (mutex) frame_handler->videoFrame (&saved_metadata.msg, cb_data);
+    }
+
+    if (got_saved_aac_seq_hdr) {
+        if (frame_handler->audioFrame)
+            mt_unlocks_locks (mutex) frame_handler->audioFrame (&saved_aac_seq_hdr.msg, cb_data);
+    }
+
+    // TODO AAC end of sequence - ?
+    if (got_saved_avc_seq_hdr
+        && frame_handler->videoFrame)
+    {
+        VideoStream::VideoMessage msg;
+
+        msg.timestamp = saved_avc_seq_hdr.msg.timestamp;
+        msg.codec_id = VideoStream::VideoCodecId::AVC;
+        msg.frame_type = VideoStream::VideoFrameType::AvcEndOfSequence;
+
+        msg.page_pool = saved_avc_seq_hdr.msg.page_pool;
+        msg.prechunk_size = 0;
+        msg.msg_offset = 0;
+
+        msg.is_saved_frame = true;
+
+      // TODO Send AvcEndOfSequence only when AvcSequenceHeader was sent.
+        Byte avc_video_hdr [5] = { 0x17, 2, 0, 0, 0 }; // AVC, seekable frame;
+                                                       // AVC end of sequence;
+                                                       // Composition time offset = 0.
+
+        // TODO FIXME This should be done in mod_rtmp.
+        msg.page_pool->getFillPages (&msg.page_list, ConstMemory::forObject (avc_video_hdr));
+
+        msg.msg_len = sizeof (avc_video_hdr);
+
+        mt_unlocks_locks (mutex) frame_handler->videoFrame (&msg, cb_data);
+    }
+
+    if (got_saved_avc_seq_hdr) {
+        if (frame_handler->videoFrame)
+            mt_unlocks_locks (mutex) frame_handler->videoFrame (&saved_avc_seq_hdr.msg, cb_data);
+    }
+
+    if (frame_handler->audioFrame) {
+        List<SavedAudioFrame*>::iter iter (saved_speex_headers);
+        while (!saved_speex_headers.iter_done (iter)) {
+            SavedAudioFrame * const frame = saved_speex_headers.iter_next (iter)->data;
+            mt_unlocks_locks (mutex) frame_handler->audioFrame (&frame->msg, cb_data);
+        }
+    }
+
+    if (got_saved_keyframe) {
+        if (frame_handler->videoFrame)
+            mt_unlocks_locks (mutex) frame_handler->videoFrame (&saved_keyframe.msg, cb_data);
+    }
+}
+
+void
 VideoStream::FrameSaver::releaseSavedSpeexHeaders ()
 {
     List<SavedAudioFrame*>::iter iter (saved_speex_headers);
@@ -487,15 +588,8 @@ VideoStream::FrameSaver::releaseSavedSpeexHeaders ()
     }
 }
 
-VideoStream::FrameSaver::FrameSaver ()
-    : got_saved_keyframe (false),
-      got_saved_metadata (false),
-      got_saved_aac_seq_hdr (false),
-      got_saved_avc_seq_hdr (false)
-{
-}
-
-VideoStream::FrameSaver::~FrameSaver ()
+void
+VideoStream::FrameSaver::releaseState ()
 {
     if (got_saved_keyframe)
 	saved_keyframe.msg.page_pool->msgUnref (saved_keyframe.msg.page_list.first);
@@ -510,6 +604,19 @@ VideoStream::FrameSaver::~FrameSaver ()
 	saved_avc_seq_hdr.msg.page_pool->msgUnref (saved_avc_seq_hdr.msg.page_list.first);
 
     releaseSavedSpeexHeaders ();
+}
+
+VideoStream::FrameSaver::FrameSaver ()
+    : got_saved_keyframe (false),
+      got_saved_metadata (false),
+      got_saved_aac_seq_hdr (false),
+      got_saved_avc_seq_hdr (false)
+{
+}
+
+VideoStream::FrameSaver::~FrameSaver ()
+{
+    releaseState ();
 }
 
 namespace {
@@ -528,7 +635,9 @@ VideoStream::informAudioMessage (EventHandler * const event_handler,
 				 void * const cb_data,
 				 void * const _inform_data)
 {
-    InformAudioMessage_Data * const inform_data = static_cast <InformAudioMessage_Data*> (_inform_data);
+    InformAudioMessage_Data * const inform_data =
+            static_cast <InformAudioMessage_Data*> (_inform_data);
+
     if (event_handler->audioMessage)
 	event_handler->audioMessage (inform_data->msg, cb_data);
 }
@@ -549,7 +658,9 @@ VideoStream::informVideoMessage (EventHandler * const event_handler,
 				 void * const cb_data,
 				 void * const _inform_data)
 {
-    InformVideoMessage_Data * const inform_data = static_cast <InformVideoMessage_Data*> (_inform_data);
+    InformVideoMessage_Data * const inform_data =
+            static_cast <InformVideoMessage_Data*> (_inform_data);
+
     if (event_handler->videoMessage)
 	event_handler->videoMessage (inform_data->msg, cb_data);
 }
@@ -581,6 +692,7 @@ VideoStream::informRtmpCommandMessage (EventHandler * const event_handler,
 {
     InformRtmpCommandMessage_Data * const inform_data =
 	    static_cast <InformRtmpCommandMessage_Data*> (_inform_data);
+
     // TODO Save/restore amf_decoder state between  callback invocations.
     //      Viable option - abstract away the parsing process.
     if (event_handler->rtmpCommandMessage)
@@ -640,17 +752,530 @@ VideoStream::fireRtmpCommandMessage (RtmpConnection * const  mt_nonnull conn,
     event_informer.informAll (informRtmpCommandMessage, &inform_data);
 }
 
+namespace {
+    struct InformNumWatchersChanged_Data {
+        Count num_watchers;
+
+        InformNumWatchersChanged_Data (Count const num_watchers)
+            : num_watchers (num_watchers)
+	{
+	}
+    };
+}
+
+void
+VideoStream::informNumWatchersChanged (EventHandler *event_handler,
+                                       void         *cb_data,
+                                       void         *_inform_data)
+{
+    InformNumWatchersChanged_Data * const inform_data =
+            static_cast <InformNumWatchersChanged_Data*> (_inform_data);
+
+    if (event_handler->numWatchersChanged)
+        event_handler->numWatchersChanged (inform_data->num_watchers, cb_data);
+}
+
+mt_unlocks_locks (mutex) void
+VideoStream::fireNumWatchersChanged (Count const num_watchers)
+{
+    InformNumWatchersChanged_Data inform_data (num_watchers);
+    event_informer.informAll_unlocked (informNumWatchersChanged, &inform_data);
+}
+
+void
+VideoStream::watcherDeletionCallback (void * const _self)
+{
+    VideoStream * const self = static_cast <VideoStream*> (_self);
+    self->minusOneWatcher ();
+}
+
+void
+VideoStream::plusOneWatcher (Object * const guard_obj)
+{
+    mutex.lock ();
+    plusOneWatcher_unlocked (guard_obj);
+    mutex.unlock ();
+}
+
+mt_unlocks_locks (mutex) void
+VideoStream::plusOneWatcher_unlocked (Object * const guard_obj)
+{
+    // Keep in mind that bindToStream() can be called at any moment.
+    // Calling bind_stream->plusOneWatcher() *before* changing 'num_watchers'
+    // to avoid races.
+    Ref<VideoStream> const bind_stream = weak_bind_stream.getRef ();
+    if (bind_stream) {
+        mutex.unlock ();
+        bind_stream->plusOneWatcher ();
+        mutex.lock ();
+    }
+
+    ++num_watchers;
+
+    logD_ (_func, "calling fireNumWatchersChanged()");
+    mt_unlocks_locks (mutex) fireNumWatchersChanged (num_watchers);
+
+    mutex.unlock ();
+
+    if (guard_obj)
+        guard_obj->addDeletionCallback (watcherDeletionCallback,
+                                        this /* cb_data */,
+                                        NULL /* ref_data */,
+                                        this /* guard_obj */);
+
+    // TODO No need to lock() for plusOneWatcher()
+    mutex.lock ();
+}
+
+void
+VideoStream::minusOneWatcher ()
+{
+    mutex.lock ();
+    minusOneWatcher_unlocked ();
+    mutex.unlock ();
+}
+
+mt_unlocks_locks (mutex) void
+VideoStream::minusOneWatcher_unlocked ()
+{
+    assert (num_watchers > 0);
+    --num_watchers;
+
+    // Keep in mind that bindToStream() can be called at any moment.
+    // Calling bind_stream->minusOneWatcher() *after* changing 'num_watchers'
+    // to avoid races.
+    Ref<VideoStream> const bind_stream = weak_bind_stream.getRef ();
+    if (bind_stream) {
+        mutex.unlock ();
+        bind_stream->minusOneWatcher ();
+        mutex.lock ();
+    }
+
+    logD_ (_func, "calling fireNumWatchersChanged()");
+    mt_unlocks_locks (mutex) fireNumWatchersChanged (num_watchers);
+}
+
+void
+VideoStream::plusWatchers (Count const delta)
+{
+    if (delta == 0)
+        return;
+
+    mutex.lock ();
+    plusWatchers_unlocked (delta);
+    mutex.unlock ();
+}
+
+mt_unlocks_locks (mutex) void
+VideoStream::plusWatchers_unlocked (Count const delta)
+{
+    if (delta == 0)
+        return;
+
+    // Keep in mind that bindToStream() can be called at any moment.
+    // Calling bind_stream->plusWatchers() *before* changing 'num_watchers'
+    // to avoid races.
+    Ref<VideoStream> const bind_stream = weak_bind_stream.getRef ();
+    if (bind_stream) {
+        mutex.unlock ();
+        bind_stream->plusWatchers (delta);
+        mutex.lock ();
+    }
+
+    num_watchers += delta;
+
+    logD_ (_func, "calling fireNumWatchersChanged()");
+    mt_unlocks_locks (mutex) fireNumWatchersChanged (num_watchers);
+}
+
+void
+VideoStream::minusWatchers (Count const delta)
+{
+    if (delta == 0)
+        return;
+
+    mutex.lock ();
+    minusWatchers_unlocked (delta);
+    mutex.unlock ();
+}
+
+mt_unlocks_locks (mutex) void
+VideoStream::minusWatchers_unlocked (Count const delta)
+{
+    if (delta == 0)
+        return;
+
+    assert (num_watchers >= delta);
+    num_watchers -= delta;
+
+    // Keep in mind that bindToStream() can be called at any moment.
+    // Calling bind_stream->minusWatchers() *after* changing 'num_watchers'
+    // to avoid races.
+    Ref<VideoStream> const bind_stream = weak_bind_stream.getRef ();
+    if (bind_stream) {
+        mutex.unlock ();
+        bind_stream->minusWatchers (delta);
+        mutex.lock ();
+    }
+
+    logD_ (_func, "calling fireNumWatchersChanged()");
+    mt_unlocks_locks (mutex) fireNumWatchersChanged (num_watchers);
+}
+
+bool
+VideoStream::bind_messageBegin (Message    * const mt_nonnull msg,
+                                BindTicket * const bind_ticket,
+                                bool         const is_audio_msg,
+                                Uint64     * const mt_nonnull ret_timestamp_offs)
+{
+    mutex.lock ();
+    if (bind_ticket != cur_bind_ticket) {
+      // The message does not belong to the stream which we're currently bound to.
+
+        if (bind_ticket != pending_bind_ticket) {
+          // Spurious message from some stream we used to be subscribed to before.
+            mutex.unlock ();
+            return false;
+        }
+
+      // The messages belongs to the stream that we're about to switch to
+      // once the right moment comes.
+
+        if (is_audio_msg) {
+            AudioMessage * const audio_msg = static_cast <AudioMessage*> (msg);
+            PendingAudioFrame * const audio_frame = new PendingAudioFrame;
+            audio_frame->audio_msg = *audio_msg;
+            pending_frame_list.append (audio_frame);
+        } else {
+            VideoMessage * const video_msg = static_cast <VideoMessage*> (msg);
+            PendingVideoFrame * const video_frame = new PendingVideoFrame;
+            video_frame->video_msg = *video_msg;
+            pending_frame_list.append (video_frame);
+        }
+
+        if (!pending_got_timestamp_offs
+            && msg->timestamp > 0)
+        {
+            pending_timestamp_offs -= msg->timestamp;
+            pending_got_timestamp_offs = true;
+        }
+
+        mutex.unlock ();
+        return false;
+    }
+
+    if (!got_timestamp_offs
+        && msg->timestamp > 0)
+    {
+        timestamp_offs -= msg->timestamp;
+        got_timestamp_offs = true;
+        logD_ (_func, "updated timestamp_offs: 0x", fmt_hex, timestamp_offs);
+    }
+
+    last_adjusted_timestamp = msg->timestamp + timestamp_offs;
+#if 0
+    logD_ (_func, "msg->timestamp: 0x", fmt_hex, msg->timestamp);
+    logD_ (_func, "timestamp_offs: 0x", fmt_hex, timestamp_offs);
+    logD_ (_func, "last_adjusted_timestamp: 0x", fmt_hex, last_adjusted_timestamp);
+#endif
+
+    *ret_timestamp_offs = timestamp_offs;
+
+    ++bind_inform_counter;
+    mutex.unlock ();
+    return true;
+}
+
+VideoStream::FrameSaver::FrameHandler const VideoStream::bind_frame_handler = {
+    bind_savedAudioFrame,
+    bind_savedVideoFrame
+};
+
+mt_unlocks_locks (mutex) void
+VideoStream::bind_savedAudioFrame (AudioMessage * const mt_nonnull audio_msg,
+                                   void         * const _self)
+{
+    logD_ (_func, "ts 0x", fmt_hex, audio_msg->timestamp);
+
+    VideoStream * const self = static_cast <VideoStream*> (_self);
+
+    if (!self->got_timestamp_offs
+        && audio_msg->timestamp > 0)
+    {
+        self->timestamp_offs -= audio_msg->timestamp;
+        self->got_timestamp_offs = true;
+        logD_ (_func, "updated timestamp_offs: 0x", fmt_hex, self->timestamp_offs);
+    }
+
+    self->last_adjusted_timestamp =
+            audio_msg->timestamp + self->timestamp_offs /* = previous value of 'timestamp_offs' */;
+    Uint64 const tmp_timestamp = self->last_adjusted_timestamp;
+    self->mutex.unlock ();
+
+    AudioMessage tmp_audio_msg = *audio_msg;
+    tmp_audio_msg.timestamp = tmp_timestamp;
+
+    self->mutex.lock ();
+
+    InformAudioMessage_Data inform_data (&tmp_audio_msg);
+    mt_unlocks_locks (mutex) self->event_informer.informAll_unlocked (informAudioMessage, &inform_data);
+}
+
+mt_unlocks_locks (mutex) void
+VideoStream::bind_savedVideoFrame (VideoMessage * const mt_nonnull video_msg,
+                                   void         * const _self)
+{
+    logD_ (_func, "ts 0x", fmt_hex, video_msg->timestamp);
+
+    VideoStream * const self = static_cast <VideoStream*> (_self);
+
+    if (!self->got_timestamp_offs
+        && video_msg->timestamp > 0)
+    {
+        self->timestamp_offs -= video_msg->timestamp;
+        self->got_timestamp_offs = true;
+        logD_ (_func, "updated timestamp_offs: 0x", fmt_hex, self->timestamp_offs);
+    }
+
+    self->last_adjusted_timestamp =
+            video_msg->timestamp + self->timestamp_offs /* = previous value of 'timestamp_offs' */;
+    Uint64 const tmp_timestamp = self->last_adjusted_timestamp;
+    self->mutex.unlock ();
+
+    VideoMessage tmp_video_msg = *video_msg;
+    tmp_video_msg.timestamp = tmp_timestamp;
+
+    self->mutex.lock ();
+
+    InformVideoMessage_Data inform_data (&tmp_video_msg);
+    mt_unlocks_locks (mutex) self->event_informer.informAll_unlocked (informVideoMessage, &inform_data);
+}
+
+mt_unlocks_locks (mutex) void
+VideoStream::bind_messageEnd ()
+{
+    if (pending_bind_ticket
+        && bind_inform_counter == 1)
+    {
+        cur_bind_ticket = pending_bind_ticket;
+        pending_bind_ticket = NULL;
+
+        frame_saver.copyStateFrom (&pending_frame_saver);
+
+        PendingFrameList tmp_frame_list = pending_frame_list;
+        pending_frame_list.clear ();
+
+        logD_ (_func, "pending_timestamp_offs: 0x", fmt_hex, pending_timestamp_offs);
+        logD_ (_func, "last_adjusted_timestamp: 0x", fmt_hex, last_adjusted_timestamp);
+
+        timestamp_offs = pending_timestamp_offs + last_adjusted_timestamp;
+        got_timestamp_offs = pending_got_timestamp_offs;
+
+        logD_ (_func, "timestamp_offs: 0x", fmt_hex, timestamp_offs, ", "
+               "got_timestamp_offs: ", got_timestamp_offs);
+
+        pending_timestamp_offs = 0;
+        pending_got_timestamp_offs = false;
+
+      // TODO New messages should not be reported until bind_messageEnd() finishes reporting queued messages.
+      //      Extra intermediate queue is needed to put messages to while reporting saved frames.
+
+        mt_unlocks_locks (mutex) frame_saver.reportSavedFrames (&bind_frame_handler, this);
+
+        {
+            PendingFrameList::iter frame_iter (tmp_frame_list);
+            while (!tmp_frame_list.iter_done (frame_iter)) {
+                PendingFrame * const pending_frame = tmp_frame_list.iter_next (frame_iter);
+                switch (pending_frame->getType()) {
+                    case PendingFrame::t_Audio: {
+                        PendingAudioFrame * const audio_frame = static_cast <PendingAudioFrame*> (pending_frame);
+                        audio_frame->audio_msg.timestamp += timestamp_offs;
+                        last_adjusted_timestamp = audio_frame->audio_msg.timestamp;
+
+                        InformAudioMessage_Data inform_data (&audio_frame->audio_msg);
+                        mt_unlocks_locks (mutex) event_informer.informAll_unlocked (informAudioMessage, &inform_data);
+
+                        frame_saver.processAudioFrame (&audio_frame->audio_msg);
+                    } break;
+                    case PendingFrame::t_Video: {
+                        PendingVideoFrame * const video_frame = static_cast <PendingVideoFrame*> (pending_frame);
+                        video_frame->video_msg.timestamp += timestamp_offs;
+                        last_adjusted_timestamp = video_frame->video_msg.timestamp;
+
+                        InformVideoMessage_Data inform_data (&video_frame->video_msg);
+                        mt_unlocks_locks (mutex) event_informer.informAll_unlocked (informVideoMessage, &inform_data);
+
+                        frame_saver.processVideoFrame (&video_frame->video_msg);
+                    } break;
+                    default:
+                        unreachable ();
+                }
+            }
+        }
+
+        assert (bind_inform_counter > 0);
+        --bind_inform_counter;
+    } else {
+        assert (bind_inform_counter > 0);
+        --bind_inform_counter;
+    }
+}
+
+VideoStream::EventHandler const VideoStream::bind_handler = {
+    bind_audioMessage,
+    bind_videoMessage,
+    bind_rtmpCommandMessage,
+    NULL /* closed */,
+    NULL /* numWatchersChanged */
+};
+
+void
+VideoStream::bind_audioMessage (AudioMessage * const mt_nonnull audio_msg,
+                                void         * const _bind_ticket)
+{
+    BindTicket * const bind_ticket = static_cast <BindTicket*> (_bind_ticket);
+    VideoStream * const self = bind_ticket->video_stream;
+
+    Uint64 tmp_timestamp_offs;
+    if (!self->bind_messageBegin (audio_msg, bind_ticket, true /* is_audio_msg */, &tmp_timestamp_offs))
+        return;
+
+    AudioMessage tmp_audio_msg = *audio_msg;
+    tmp_audio_msg.timestamp += tmp_timestamp_offs;
+
+    self->mutex.lock ();
+
+    InformAudioMessage_Data inform_data (&tmp_audio_msg);
+    mt_unlocks_locks (mutex) self->event_informer.informAll_unlocked (informAudioMessage, &inform_data);
+
+    self->bind_messageEnd ();
+    self->frame_saver.processAudioFrame (&tmp_audio_msg);
+
+    self->mutex.unlock ();
+}
+
+void
+VideoStream::bind_videoMessage (VideoMessage * const mt_nonnull video_msg,
+                                void         * const _bind_ticket)
+{
+    BindTicket * const bind_ticket = static_cast <BindTicket*> (_bind_ticket);
+    VideoStream * const self = bind_ticket->video_stream;
+
+    Uint64 tmp_timestamp_offs;
+    if (!self->bind_messageBegin (video_msg, bind_ticket, false /* is_audio_msg */, &tmp_timestamp_offs))
+        return;
+
+    VideoMessage tmp_video_msg = *video_msg;
+    tmp_video_msg.timestamp += tmp_timestamp_offs;
+
+    self->mutex.lock ();
+
+    InformVideoMessage_Data inform_data (&tmp_video_msg);
+    mt_unlocks_locks (mutex) self->event_informer.informAll_unlocked (informVideoMessage, &inform_data);
+
+    self->bind_messageEnd ();
+    self->frame_saver.processVideoFrame (&tmp_video_msg);
+
+    self->mutex.unlock ();
+}
+
+void
+VideoStream::bind_rtmpCommandMessage (RtmpConnection    * const mt_nonnull conn,
+                                      Message           * const mt_nonnull msg,
+                                      ConstMemory const &method_name,
+                                      AmfDecoder        * const mt_nonnull amf_decoder,
+                                      void              * const _self)
+{
+    VideoStream * const self = static_cast <VideoStream*> (_self);
+    self->fireRtmpCommandMessage (conn, msg, method_name, amf_decoder);
+}
+
+void
+VideoStream::bindToStream (VideoStream * const bind_stream)
+{
+    bind_mutex.lock ();
+
+    // Cannot bind to self.
+    assert (bind_stream != this);
+
+    Ref<BindTicket> const bind_ticket = grab (new BindTicket);
+    bind_ticket->video_stream = this;
+    bind_ticket->bind_stream = bind_stream;
+
+    mutex.lock ();
+
+    Ref<VideoStream> const prv_bind_stream = weak_bind_stream.getRef ();
+    if (prv_bind_stream == bind_stream) {
+      // No-op if re-binding to the same stream.
+        mutex.unlock ();
+        bind_mutex.unlock ();
+        return;
+    }
+
+    weak_bind_stream = bind_stream;
+
+    Count const tmp_num_watchers = num_watchers;
+
+    pending_timestamp_offs = 0;
+    pending_got_timestamp_offs = false;
+
+    pending_bind_ticket = bind_ticket;
+    ++bind_inform_counter;
+
+    mutex.unlock ();
+
+    // TODO Don't hurry to unsubscribe (keyframe awaiting logics for instant transition).
+    if (prv_bind_stream) {
+        prv_bind_stream->getEventInformer()->unsubscribe (bind_sbn);
+        prv_bind_stream->minusWatchers (tmp_num_watchers);
+    }
+
+    if (!bind_stream) {
+        bind_mutex.unlock ();
+        return;
+    }
+
+    bind_stream->plusWatchers (num_watchers);
+
+    FrameSaver tmp_frame_saver;
+
+    bind_stream->lock ();
+    tmp_frame_saver.copyStateFrom (&bind_stream->frame_saver);
+    GenericInformer::SubscriptionKey const tmp_bind_sbn =
+            bind_stream->getEventInformer()->subscribe_unlocked (CbDesc<EventHandler> (
+                    &bind_handler, bind_ticket, this, bind_ticket));
+    bind_stream->unlock ();
+
+    mutex.lock ();
+    bind_sbn = tmp_bind_sbn;
+    pending_frame_saver.copyStateFrom (&tmp_frame_saver);
+    bind_messageEnd ();
+    mutex.unlock ();
+
+    bind_mutex.unlock ();
+}
+
 void
 VideoStream::close ()
 {
     mutex.lock ();
     is_closed = true;
-    event_informer.informAll_unlocked (informClosed, NULL /* inform_data */);
+    mt_unlocks_locks (mutex) event_informer.informAll_unlocked (informClosed, NULL /* inform_data */);
     mutex.unlock ();
 }
 
 VideoStream::VideoStream ()
     : is_closed (false),
+      num_watchers (0),
+      bind_inform_counter (0),
+
+      timestamp_offs (0),
+      last_adjusted_timestamp (0),
+      got_timestamp_offs (false),
+
+      pending_timestamp_offs (0),
+      pending_got_timestamp_offs (false),
+
       event_informer (this, &mutex)
 {
 }
@@ -658,7 +1283,19 @@ VideoStream::VideoStream ()
 VideoStream::~VideoStream ()
 {
   // This lock ensures data consistency for 'frame_saver's destructor.
+  // TODO ^^^ Does it? A single mutex lock/unlock pair does not (ideally) constitute
+  //      a full memory barrier.
   StateMutexLock l (&mutex);
+
+    {
+        Ref<VideoStream> const bind_stream = weak_bind_stream.getRef ();
+        if (bind_stream) {
+            Count const tmp_num_watchers = num_watchers;
+            mutex.unlock ();
+            bind_stream->minusWatchers (tmp_num_watchers);
+            mutex.lock ();
+        }
+    }
 }
 
 }
