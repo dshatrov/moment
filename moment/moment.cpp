@@ -18,7 +18,12 @@
 
 
 #include <libmary/types.h>
+
+#include <cstdio>
+
+#ifndef LIBMARY_PLATFORM_WIN32
 #include <unistd.h>
+#endif
 #include <errno.h>
 
 #include <moment/libmoment.h>
@@ -80,7 +85,9 @@ printUsage ()
 		  "  -c --config <config_file>  Configuration file to use (default: /opt/moment/moment.conf)\n"
 		  "  -l --log <log_file>        Log file to use (default: /var/log/moment.log)\n"
 		  "  --loglevel <loglevel>      Loglevel, one of A/D/I/W/E/H/F/N (default: I, \"Info\")\n"
+#ifndef PLATFORM_WIN32
 		  "  -d --daemonize             Daemonize (run in the background as a daemon).\n"
+#endif
 		  "  --exit-after <number>      Exit after specified timeout in seconds.\n"
 		  "  -h --help                  Show this help message.\n");
     outs->flush ();
@@ -237,6 +244,9 @@ int main (int argc, char **argv)
     setGlobalLogLevel (options.loglevel);
 
     if (options.daemonize) {
+#ifdef PLATFORM_WIN32
+        logW_ (_func, "Daemonization is not supported on Windows");
+#else
 	logI_ (_func, "Daemonizing. Server log is at /var/log/moment.log");
 	int const res = daemon (1 /* nochdir */, 0 /* noclose */);
 	if (res == -1)
@@ -244,6 +254,7 @@ int main (int argc, char **argv)
 	else
 	if (res != 0)
 	    logE_ (_func, "Unexpected return value from daemon(): ", res);
+#endif
     }
 
     {
