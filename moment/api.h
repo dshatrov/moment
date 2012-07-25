@@ -116,6 +116,13 @@ MomentStreamHandlerKey moment_stream_add_handler (MomentStream        *stream,
 void moment_stream_remove_handler (MomentStream           *stream,
 				   MomentStreamHandlerKey  stream_handler_key);
 
+void moment_stream_plus_one_watcher (MomentStream *stream);
+
+void moment_stream_minus_one_watcher (MomentStream *stream);
+
+void moment_stream_bind_to_stream (MomentStream *stream,
+                                   MomentStream *bind_stream);
+
 
 // _______________________________ Client events _______________________________
 

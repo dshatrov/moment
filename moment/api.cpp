@@ -317,6 +317,22 @@ void moment_stream_remove_handler (MomentStream           * const stream,
     delete wrapper;
 }
 
+void moment_stream_plus_one_watcher (MomentStream * const stream)
+{
+    static_cast <VideoStream*> (stream)->plusOneWatcher ();
+}
+
+void moment_stream_minus_one_watcher (MomentStream * const stream)
+{
+    static_cast <VideoStream*> (stream)->minusOneWatcher ();
+}
+
+void moment_stream_bind_to_stream (MomentStream * const stream,
+                                   MomentStream * const bind_stream)
+{
+    static_cast <VideoStream*> (stream)->bindToStream (static_cast <VideoStream*> (bind_stream));
+}
+
 
 // _______________________________ Client events _______________________________
 
