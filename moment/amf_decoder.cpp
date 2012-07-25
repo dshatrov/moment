@@ -28,7 +28,7 @@ Result
 AmfDecoder::decodeNumber (double * const ret_number)
 {
     if (msg_len - cur_offset < 9) {
-	logE_ (_func, "no number");
+	logD_ (_func, "no number");
 	return Result::Failure;
     }
 
@@ -36,7 +36,7 @@ AmfDecoder::decodeNumber (double * const ret_number)
     array->get (cur_offset, Memory::forObject (data));
 
     if (data [0] != AmfMarker::Number) {
-	logE_ (_func, "not a number");
+	logD_ (_func, "not a number");
 	return Result::Failure;
     }
 
@@ -60,7 +60,7 @@ Result
 AmfDecoder::decodeBoolean (bool * const ret_boolean)
 {
     if (msg_len - cur_offset < 2) {
-	logE_ (_func, "no boolean");
+	logD_ (_func, "no boolean");
 	return Result::Failure;
     }
 
@@ -68,7 +68,7 @@ AmfDecoder::decodeBoolean (bool * const ret_boolean)
     array->get (cur_offset, Memory::forObject (data));
 
     if (data [0] != AmfMarker::Boolean) {
-	logE_ (_func, "not a boolean");
+	logD_ (_func, "not a boolean");
 	return Result::Failure;
     }
 
@@ -86,7 +86,7 @@ AmfDecoder::decodeString (Memory const &mem,
 			  Size * const ret_full_len)
 {
     if (msg_len - cur_offset < 3) {
-	logE_ (_func, "no string");
+	logD_ (_func, "no string");
 	return Result::Failure;
     }
 
@@ -94,7 +94,7 @@ AmfDecoder::decodeString (Memory const &mem,
     array->get (cur_offset, Memory::forObject (header_data));
 
     if (header_data [0] != AmfMarker::String) {
-	logE_ (_func, "not a string");
+	logD_ (_func, "not a string");
 	return Result::Failure;
     }
 
@@ -128,7 +128,7 @@ AmfDecoder::decodeFieldName (Memory const &mem,
 			     Size * const ret_full_len)
 {
     if (msg_len - cur_offset < 2) {
-	logE_ (_func, "no field name");
+	logD_ (_func, "no field name");
 	return Result::Failure;
     }
 
@@ -163,7 +163,7 @@ Result
 AmfDecoder::beginObject ()
 {
     if (msg_len - cur_offset < 1) {
-	logE_ (_func, "no object marker");
+	logD_ (_func, "no object marker");
 	return Result::Failure;
     }
 
@@ -190,7 +190,7 @@ Result
 AmfDecoder::skipObject ()
 {
     if (msg_len - cur_offset < 1) {
-	logE_ (_func, "no object marker");
+	logD_ (_func, "no object marker");
 	return Result::Failure;
     }
 
@@ -202,7 +202,7 @@ AmfDecoder::skipObject ()
 	return Result::Success;
 
     if (obj_marker != AmfMarker::Object) {
-	logE_ (_func, "not an object");
+	logD_ (_func, "not an object");
 	return Result::Failure;
     }
 
