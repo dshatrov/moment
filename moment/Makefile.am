@@ -48,6 +48,10 @@ moment_target_headers =		\
 	storage.h		\
 	local_storage.h		\
 				\
+        push_protocol.h         \
+        rtmp_push_protocol.h    \
+        push_agent.h            \
+                                \
 	moment_server.h		\
 				\
 	api.h			\
@@ -78,16 +82,22 @@ libmoment_1_0_la_SOURCES =	\
 				\
 	local_storage.cpp	\
 				\
+        rtmp_push_protocol.cpp  \
+        push_agent.cpp          \
+                                \
 	moment_server.cpp	\
 				\
 	api.cpp			\
 	api_amf.cpp		\
 				\
 	hmac/sha2.c		\
-	hmac/hmac_sha2.c
+	hmac/hmac_sha2.c        \
+                                \
+        tsmux/tsmux.c           \
+        tsmux/tsmuxstream.c
 
 #	flv_file_source.cpp
-
+ 
 moment_extra_dist =
 
 libmoment_1_0_la_LDFLAGS = -no-undefined -version-info "0:0:0" $(COMMON_LDFLAGS)
@@ -97,7 +107,7 @@ libmoment_1_0_la_LIBADD += -lws2_32
 endif
 
 momentdir = $(libdir)/moment-1.0
-moment_LTLIBRARIES = libmoment-file-1.0.la libmoment-rtmp-1.0.la libmoment-test-1.0.la # libmoment-archive-1.0.la
+moment_LTLIBRARIES = libmoment-file-1.0.la libmoment-rtmp-1.0.la libmoment-test-1.0.la # libmoment-hls-1.0.la # libmoment-archive-1.0.la
 
 libmoment_file_1_0_la_DEPENDENCIES = libmoment-1.0.la
 libmoment_file_1_0_la_SOURCES = \
@@ -114,11 +124,17 @@ if PLATFORM_WIN32
 libmoment_rtmp_1_0_la_LIBADD += -lws2_32
 endif
 
-libmoment_archive_1_0_la_DEPENDENCIES = libmoment-1.0.la
-libmoment_archive_1_0_la_SOURCES = \
-	mod_archive.cpp
-libmoment_archive_1_0_la_LDFLAGS = -no-undefined -version-info "0:0:0" $(COMMON_LDFLAGS)
-libmoment_archive_1_0_la_LIBADD = $(top_builddir)/moment/libmoment-1.0.la $(THIS_LIBS)
+#libmoment_archive_1_0_la_DEPENDENCIES = libmoment-1.0.la
+#libmoment_archive_1_0_la_SOURCES = \
+#	mod_archive.cpp
+#libmoment_archive_1_0_la_LDFLAGS = -no-undefined -version-info "0:0:0" $(COMMON_LDFLAGS)
+#libmoment_archive_1_0_la_LIBADD = $(top_builddir)/moment/libmoment-1.0.la $(THIS_LIBS)
+
+#libmoment_hls_1_0_la_DEPENDENCIES = libmoment-1.0.la
+#libmoment_hls_1_0_la_SOURCES = \
+#	mod_hls.cpp
+#libmoment_hls_1_0_la_LDFLAGS = -no-undefined -version-info "0:0:0" $(COMMON_LDFLAGS)
+#libmoment_hls_1_0_la_LIBADD = $(top_builddir)/moment/libmoment-1.0.la $(THIS_LIBS)
 
 libmoment_test_1_0_la_DEPENDENCIES = libmoment-1.0.la
 libmoment_test_1_0_la_SOURCES =	\
