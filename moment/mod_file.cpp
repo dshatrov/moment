@@ -448,6 +448,23 @@ static Result momentFile_sendTemplate (HttpRequest * const http_req,
     dict.SetValue ("ThisRtmpServerAddr", this_rtmp_server_addr->cstr());
     dict.SetValue ("ThisRtmptServerAddr", this_rtmpt_server_addr->cstr());
 
+#if 0
+    {
+      // MD5 auth test.
+
+        ConstMemory const client_text = "192.168.0.1 12345";
+        Ref<String> const timed_text = makeString (((Uint64) getUnixtime() + 1800) / 3600 /* auth timestamp */,
+                                                   " ",
+                                                   client_text,
+                                                   "password");
+        logD_ (_func, "timed_text: ", timed_text->mem());
+        unsigned char hash_buf [32];
+        getMd5HexAscii (timed_text->mem(), Memory::forObject (hash_buf));
+        Ref<String> const auth_str = makeString (client_text, "|", Memory::forObject (hash_buf));
+        dict.SetValue ("MomentAuthTest", auth_str->cstr());
+    }
+#endif
+
     {
 	SendTemplate_PageRequest page_req (http_req, &dict);
 	MomentServer::PageRequestResult const res = moment->processPageRequest (&page_req, full_path);
