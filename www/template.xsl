@@ -379,6 +379,7 @@
       </a>
     </eng>
 -->
+<!-- Russian wiki is no more
     <rus>
       <a href="http://momentvideo.org/wiki/index.php?title=Moment:Main:Ru">
         <div class="menuarrow">
@@ -387,6 +388,7 @@
 	</div>
       </a>
     </rus>
+-->
     </xsl:when>
     <xsl:otherwise>
       <a href="http://momentvideo.org">
