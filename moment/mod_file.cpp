@@ -181,6 +181,7 @@ Result httpRequest (HttpRequest   * const mt_nonnull req,
     ConstMemory mime_type = "text/plain";
     bool try_template = false;
     Size ext_length = 0;
+    ConstMemory ext;
     {
 #ifdef PLATFORM_WIN32
         // MinGW doesn't have memrchr().
@@ -199,7 +200,7 @@ Result httpRequest (HttpRequest   * const mt_nonnull req,
 	void const * const dot_ptr = memrchr (file_path.mem(), '.', file_path.len());
 #endif
 	if (dot_ptr) {
-	    ConstMemory const ext = file_path.region ((Byte const *) (dot_ptr) + 1 - file_path.mem());
+	    ext = file_path.region ((Byte const *) (dot_ptr) + 1 - file_path.mem());
             if (equal (ext, "ts"))
                 mime_type = "video/MP2T";
             else
@@ -247,12 +248,14 @@ Result httpRequest (HttpRequest   * const mt_nonnull req,
     if (exc) {
 #endif
     NativeFile native_file;
+    logD_ (_func, "Trying ", filename->mem());
     if (!native_file.open (filename->mem(),
                            0 /* open_flags */,
                            File::AccessMode::ReadOnly))
     {
 #ifdef MOMENT_FILE__CTEMPLATE
 	if (try_template) {
+            logD_ (_func, "Trying .tpl");
 	    if (momentFile_sendTemplate (
 			req,
 			req->getFullPath(),
@@ -268,25 +271,112 @@ Result httpRequest (HttpRequest   * const mt_nonnull req,
 
 		return Result::Success;
 	    }
-	}
+        }
 #endif
 
-	logE_ (_func, "Could not open \"", filename, "\": ", exc->toString());
+        bool opened = false;
+        if (equal (ext, "html")) {
+          // TODO Set default language in config etc.
 
-	MOMENT_FILE__HEADERS_DATE;
-	ConstMemory const reply_body = "404 Not Found";
-	conn_sender->send (
-		page_pool,
-		true /* do_flush */,
-		MOMENT_FILE__404_HEADERS (reply_body.len()),
-		"\r\n",
-		reply_body);
-	if (!req->getKeepalive())
-	    conn_sender->closeAfterFlush();
+            List<HttpRequest::AcceptedLanguage> langs;
+            HttpRequest::parseAcceptLanguage (req->getAcceptLanguage(), &langs);
 
-	logA_ ("file 404 ", req->getClientAddress(), " ", req->getRequestLine());
+            {
+              // Default language with the lowest priority.
+                langs.appendEmpty ();
+                HttpRequest::AcceptedLanguage * const alang = &langs.getLast();
+                alang->lang = grab (new String ("en"));
+                // HTTP allows only positive weights, so '-1.0' is always the lowest.
+                alang->weight = -1.0;
+            }
 
-	return Result::Success;
+            typedef AvlTree< HttpRequest::AcceptedLanguage,
+                             MemberExtractor< HttpRequest::AcceptedLanguage const,
+                                              double const,
+                                              &HttpRequest::AcceptedLanguage::weight >,
+                             DirectComparator<double> >
+                    AcceptedLanguageTree;
+
+            AcceptedLanguageTree tree;
+
+            logD_ (_func, "accepted languages:");
+            {
+                List<HttpRequest::AcceptedLanguage>::iter iter (langs);
+                while (!langs.iter_done (iter)) {
+                    List<HttpRequest::AcceptedLanguage>::Element * const el = langs.iter_next (iter);
+                    HttpRequest::AcceptedLanguage * const alang = &el->data;
+                    logD_ (alang->lang, ", weight ", alang->weight);
+
+                    tree.add (*alang);
+                }
+            }
+
+#ifdef MOMENT_FILE__CTEMPLATE
+            if (try_template) {
+                AcceptedLanguageTree::BottomRightIterator iter (tree);
+                while (!iter.done()) {
+                    HttpRequest::AcceptedLanguage * const alang = &iter.next ().value;
+                    logD_ (_func, "Trying .tpl for language \"", alang->lang, "\"");
+
+                    if (momentFile_sendTemplate (
+                                req,
+                                req->getFullPath(),
+                                makeString (filename->mem().region (0, filename->mem().len() - ext_length),
+                                            ".",
+                                            alang->lang->mem(),
+                                            ".tpl")->mem(),
+                                conn_sender,
+                                mime_type))
+                    {
+                        if (!req->getKeepalive())
+                            conn_sender->closeAfterFlush();
+
+                        logA_ ("file 200 ", req->getClientAddress(), " ", req->getRequestLine());
+
+                        return Result::Success;
+                    }
+                }
+            }
+#endif
+
+            {
+                AcceptedLanguageTree::BottomRightIterator iter (tree);
+                while (!iter.done()) {
+                    HttpRequest::AcceptedLanguage * const alang = &iter.next ().value;
+                    logD_ (_func, "Trying .html for language \"", alang->lang, "\"");
+
+                    if (native_file.open (makeString (filename->mem().region (0, filename->mem().len() - ext_length),
+                                                      ".",
+                                                      alang->lang->mem(),
+                                                      ".html")->mem(),
+                                          0 /* open_flags */,
+                                          File::AccessMode::ReadOnly))
+                    {
+                        opened = true;
+                        break;
+                    }
+                }
+            }
+        } // if ("html")
+
+        if (!opened) {
+            logE_ (_func, "Could not open \"", filename, "\": ", exc->toString());
+
+            MOMENT_FILE__HEADERS_DATE;
+            ConstMemory const reply_body = "404 Not Found";
+            conn_sender->send (
+                    page_pool,
+                    true /* do_flush */,
+                    MOMENT_FILE__404_HEADERS (reply_body.len()),
+                    "\r\n",
+                    reply_body);
+            if (!req->getKeepalive())
+                conn_sender->closeAfterFlush();
+
+            logA_ ("file 404 ", req->getClientAddress(), " ", req->getRequestLine());
+
+            return Result::Success;
+        }
     }
 
     NativeFile::FileStat stat;
