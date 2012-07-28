@@ -27,7 +27,7 @@
 <xsl:variable name="langbar_width">117</xsl:variable>
 
 <xsl:template match="moment">
-<html style="height: 100%">
+<html style="height: 100%; overflow-y: scroll">
 
 <head>
   <title>
@@ -230,7 +230,6 @@
 	</xsl:otherwise>
       </xsl:choose>
       min-height: 180px;
-/*      border: 1px solid red; */
     }
 
     .content_home {
@@ -250,7 +249,6 @@
       position: absolute;
       bottom: 0;
       width: <xsl:value-of select="$main_width"/>px;
-/*      border-top: 2px solid #d1d3e9; */
       border-top: 2px solid #e4e5f1;
       padding-top: 20px;
       margin-top: 60px;
@@ -342,8 +340,8 @@
 	<rus><a href="index.ru.html"><div class="menuitem" style="padding-left: 30px">Главная</div></a></rus>
       </xsl:when>
       <xsl:otherwise>
-	<eng><a href="welcome.html"><div class="menuitem" style="padding-left: 30px">Home</div></a></eng>
-	<rus><a href="welcome.ru.html"><div class="menuitem" style="padding-left: 30px">Главная</div></a></rus>
+	<eng><a href="index.en.html"><div class="menuitem" style="padding-left: 30px">Home</div></a></eng>
+	<rus><a href="index.ru.html"><div class="menuitem" style="padding-left: 30px">Главная</div></a></rus>
 	<!--
 	<eng><a href="./"><div class="menuitem" style="padding-left: 30px">Home</div></a></eng>
 	<rus><a href="./"><div class="menuitem" style="padding-left: 30px">Главная</div></a></rus>
@@ -539,8 +537,8 @@
   <div class="footer">
     <xsl:choose>
       <xsl:when test="not ($moment_welcome)">
-	<eng>Copyright (c) 2011 <a href="mailto:shatrov@gmail.com">Dmitry Shatrov</a></eng>
-	<rus>(c) 2011 <a href="mailto:shatrov@gmail.com">Дмитрий Шатров</a></rus>
+	<eng>Copyright (c) 2011&ndash;2012 <a href="mailto:shatrov@gmail.com">Dmitry Shatrov</a></eng>
+	<rus>(c) 2011&ndash;2012 <a href="mailto:shatrov@gmail.com">Дмитрий Шатров</a></rus>
       </xsl:when>
       <xsl:otherwise>
         <eng>Moment Video Server, version 1.2.0</eng>
