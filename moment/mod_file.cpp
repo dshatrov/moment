@@ -51,8 +51,12 @@
 	"Content-Type: ", (mime_type), "\r\n" \
 	"Content-Length: ", (content_length), "\r\n"
 
+#define MOMENT_FILE__304_HEADERS \
+	"HTTP/1.1 304 Not Modified\r\n" \
+	MOMENT_FILE__COMMON_HEADERS
+
 #define MOMENT_FILE__404_HEADERS(content_length) \
-	"HTTP/1.1 404 Not found\r\n" \
+	"HTTP/1.1 404 Not Found\r\n" \
 	MOMENT_FILE__COMMON_HEADERS \
 	"Content-Type: text/plain\r\n" \
 	"Content-Length: ", (content_length), "\r\n"
@@ -379,6 +383,89 @@ Result httpRequest (HttpRequest   * const mt_nonnull req,
         }
     }
 
+    bool got_mtime = false;
+    struct tm mtime;
+    if (native_file.getModificationTime (&mtime))
+        got_mtime = true;
+    else
+        logE_ (_func, "native_file.getModificationTime() failed: ", exc->toString());
+
+// TODO Get file modification time on Win32 + enable "304 Not Modified".
+#ifndef PLATFORM_WIN32
+    if (got_mtime) {
+        bool if_none_match__any = false;
+        List<HttpRequest::EntityTag> etags;
+        {
+            ConstMemory const mem = req->getIfNoneMatch();
+            if (!mem.isEmpty())
+                HttpRequest::parseEntityTagList (mem, &if_none_match__any, &etags);
+        }
+
+        bool send_not_modified = false;
+        if (if_none_match__any) {
+          // We have already opened the file, so it does exist.
+            send_not_modified = true;
+        } else {
+            bool got_if_modified_since = false;
+            struct tm if_modified_since;
+            {
+                ConstMemory const mem = req->getIfModifiedSince();
+                if (!mem.isEmpty()) {
+                    if (parseHttpTime (mem, &if_modified_since))
+                        got_if_modified_since = true;
+                    else
+                        logW_ (_func, "Could not parse HTTP time: ", mem);
+                }
+            }
+
+            if (got_if_modified_since ||
+                if_none_match__any    ||
+                !etags.isEmpty())
+            {
+                bool expired = false;
+                if (compareTime (&mtime, &if_modified_since) == ComparisonResult::Greater)
+                    expired = true;
+
+                bool etag_match = etags.isEmpty();
+                {
+                    List<HttpRequest::EntityTag>::iter iter (etags);
+                    while (!etags.iter_done (iter)) {
+                        HttpRequest::EntityTag * const etag = &etags.iter_next (iter)->data;
+
+                        struct tm etag_time;
+                        if (parseHttpTime (etag->etag->mem(), &etag_time)) {
+                            if (compareTime (&mtime, &etag_time) == ComparisonResult::Equal) {
+                                etag_match = true;
+                                break;
+                            }
+                        } else {
+                            logW_ (_func, "Could not parse etag time: ", etag->etag->mem());
+                        }
+                    }
+                }
+
+                if (etag_match && !expired)
+                    send_not_modified = true;
+            }
+        }
+
+        if (send_not_modified) {
+            MOMENT_FILE__HEADERS_DATE;
+            conn_sender->send (
+                    page_pool,
+                    true /* do_flush */,
+                    MOMENT_FILE__304_HEADERS,
+                    "\r\n");
+            if (!req->getKeepalive())
+                conn_sender->closeAfterFlush();
+
+            logA_ ("file 304 ", req->getClientAddress(), " ", req->getRequestLine());
+
+            return Result::Success;
+        }
+    }
+#endif /* PLATFORM_WIN32 */
+
     NativeFile::FileStat stat;
     if (!native_file.stat (&stat)) {
 	logE_ (_func, "native_file.stat() failed: ", exc->toString());
@@ -400,10 +487,21 @@ Result httpRequest (HttpRequest   * const mt_nonnull req,
     }
 
     MOMENT_FILE__HEADERS_DATE;
+
+    Byte mtime_buf [timeToString_BufSize];
+    Size mtime_len = 0;
+    if (got_mtime)
+        mtime_len = timeToHttpString (Memory::forObject (mtime_buf), &mtime);
+
     conn_sender->send (
 	    page_pool,
-	    true /* do_flush */, // TODO No need to flush here?
+            // TODO No need to flush here? (Remember about HEAD path)
+	    true /* do_flush */,
 	    MOMENT_FILE__OK_HEADERS (mime_type, stat.size),
+            // TODO Send "ETag:" ?
+            got_mtime ? "Last-Modified: " : "", 
+            got_mtime ? ConstMemory (mtime_buf, mtime_len) : ConstMemory(),
+            got_mtime ? "\r\n" : "",
 	    "\r\n");
 
     if (equal (req->getMethod(), "HEAD")) {
