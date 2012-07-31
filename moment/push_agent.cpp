@@ -74,6 +74,9 @@ PushAgent::init (ConstMemory    const _stream_name,
                  ConstMemory    const username,
                  ConstMemory    const password)
 {
+  // TODO
+    return;
+
     moment = MomentServer::getInstance();
     stream_name = grab (new String (_stream_name));
 
