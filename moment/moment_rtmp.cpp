@@ -845,13 +845,13 @@ void momentRtmpInit ()
 
     {
 	ConstMemory const opt_name = "mod_rtmp/enable";
-	MConfig::Config::BooleanValue const enable = config->getBoolean (opt_name);
-	if (enable == MConfig::Config::Boolean_Invalid) {
+	MConfig::BooleanValue const enable = config->getBoolean (opt_name);
+	if (enable == MConfig::Boolean_Invalid) {
 	    logE_ (_func, "Invalid value for ", opt_name, ": ", config->getString (opt_name));
 	    return;
 	}
 
-	if (enable == MConfig::Config::Boolean_False) {
+	if (enable == MConfig::Boolean_False) {
 	    logI_ (_func, "Unrestricted RTMP access module is not enabled. "
 		   "Set \"", opt_name, "\" option to \"y\" to enable.");
 	    return;
@@ -884,13 +884,13 @@ void momentRtmpInit ()
     bool rtmpt_no_keepalive_conns = false;
     {
 	ConstMemory const opt_name = "mod_rtmp/rtmpt_no_keepalive_conns";
-	MConfig::Config::BooleanValue const enable = config->getBoolean (opt_name);
-	if (enable == MConfig::Config::Boolean_Invalid) {
+	MConfig::BooleanValue const enable = config->getBoolean (opt_name);
+	if (enable == MConfig::Boolean_Invalid) {
 	    logE_ (_func, "Invalid value for ", opt_name, ": ", config->getString (opt_name));
 	    return;
 	}
 
-	if (enable == MConfig::Config::Boolean_True)
+	if (enable == MConfig::Boolean_True)
 	    rtmpt_no_keepalive_conns = true;
 
 	logI_ (_func, opt_name, ": ", rtmpt_no_keepalive_conns);
@@ -898,12 +898,12 @@ void momentRtmpInit ()
 
     {
 	ConstMemory const opt_name = "mod_rtmp/record_all";
-	MConfig::Config::BooleanValue const value = config->getBoolean (opt_name);
-	if (value == MConfig::Config::Boolean_Invalid) {
+	MConfig::BooleanValue const value = config->getBoolean (opt_name);
+	if (value == MConfig::Boolean_Invalid) {
 	    logE_ (_func, "Invalid value for ", opt_name, ": ", config->getString (opt_name),
 		   ", assuming \"", record_all, "\"");
 	} else {
-	    if (value == MConfig::Config::Boolean_True)
+	    if (value == MConfig::Boolean_True)
 		record_all = true;
 	    else
 		record_all = false;
@@ -1020,21 +1020,21 @@ void momentRtmpInit ()
 
     {
 	ConstMemory const opt_name = "mod_rtmp/rtmpt_from_http";
-	MConfig::Config::BooleanValue const opt_val = config->getBoolean (opt_name);
-	if (opt_val == MConfig::Config::Boolean_Invalid)
+	MConfig::BooleanValue const opt_val = config->getBoolean (opt_name);
+	if (opt_val == MConfig::Boolean_Invalid)
 	    logE_ (_func, "Invalid value for config option ", opt_name);
 	else
-	if (opt_val != MConfig::Config::Boolean_False)
+	if (opt_val != MConfig::Boolean_False)
 	    rtmp_module->rtmpt_service.getRtmptServer()->attachToHttpService (moment->getHttpService());
     }
 
     {
 	ConstMemory const opt_name = "mod_rtmp/audio_waits_video";
-	MConfig::Config::BooleanValue const opt_val = config->getBoolean (opt_name);
-	if (opt_val == MConfig::Config::Boolean_Invalid)
+	MConfig::BooleanValue const opt_val = config->getBoolean (opt_name);
+	if (opt_val == MConfig::Boolean_Invalid)
 	    logE_ (_func, "Invalid value for config option ", opt_name);
 	else
-	if (opt_val == MConfig::Config::Boolean_True)
+	if (opt_val == MConfig::Boolean_True)
 	    audio_waits_video = true;
 	else
 	    audio_waits_video = false;
@@ -1042,11 +1042,11 @@ void momentRtmpInit ()
 
     {
 	ConstMemory const opt_name = "mod_rtmp/start_paused";
-	MConfig::Config::BooleanValue const opt_val = config->getBoolean (opt_name);
-	if (opt_val == MConfig::Config::Boolean_Invalid)
+	MConfig::BooleanValue const opt_val = config->getBoolean (opt_name);
+	if (opt_val == MConfig::Boolean_Invalid)
 	    logE_ (_func, "Invalid value for config option ", opt_name);
 	else
-	if (opt_val == MConfig::Config::Boolean_True)
+	if (opt_val == MConfig::Boolean_True)
 	    default_start_paused = true;
 	else
 	    default_start_paused = false;

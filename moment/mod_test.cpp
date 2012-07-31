@@ -133,13 +133,13 @@ void modTestInit ()
 
     {
 	ConstMemory const opt_name = "mod_test/enable";
-	MConfig::Config::BooleanValue const enable = config->getBoolean (opt_name);
-	if (enable == MConfig::Config::Boolean_Invalid) {
+	MConfig::BooleanValue const enable = config->getBoolean (opt_name);
+	if (enable == MConfig::Boolean_Invalid) {
 	    logE_ (_func, "Invalid value for ", opt_name, ": ", config->getString (opt_name));
 	    return;
 	}
 
-	if (enable != MConfig::Config::Boolean_True) {
+	if (enable != MConfig::Boolean_True) {
 	    logI_ (_func, "Test module (mod_test) is not enabled.");
 	    return;
 	}
@@ -201,13 +201,13 @@ void modTestInit ()
 
     {
 	ConstMemory const opt_name = "mod_test/same_pages";
-	MConfig::Config::BooleanValue const val = config->getBoolean (opt_name);
-	if (val == MConfig::Config::Boolean_Invalid) {
+	MConfig::BooleanValue const val = config->getBoolean (opt_name);
+	if (val == MConfig::Boolean_Invalid) {
 	    logE_ (_func, "Invalid value for ", opt_name, ": ", config->getString (opt_name));
 	    return;
 	}
 
-	if (val == MConfig::Config::Boolean_False)
+	if (val == MConfig::Boolean_False)
 	    use_same_pages = false;
 	else
 	    use_same_pages = true;

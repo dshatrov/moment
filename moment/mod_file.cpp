@@ -773,13 +773,13 @@ void momentFileInit ()
 
     {
 	ConstMemory const opt_name = "mod_file/enable";
-	MConfig::Config::BooleanValue const enable = config->getBoolean (opt_name);
-	if (enable == MConfig::Config::Boolean_Invalid) {
+	MConfig::BooleanValue const enable = config->getBoolean (opt_name);
+	if (enable == MConfig::Boolean_Invalid) {
 	    logE_ (_func, "Invalid value for ", opt_name, ": ", config->getString (opt_name));
 	    return;
 	}
 
-	if (enable == MConfig::Config::Boolean_False) {
+	if (enable == MConfig::Boolean_False) {
 	    logI_ (_func, "Static HTTP content module (mod_file) is not enabled. "
 		   "Set \"", opt_name, "\" option to \"y\" to enable.");
 	    return;

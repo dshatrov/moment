@@ -992,12 +992,12 @@ MomentServer::init (ServerApp        * const mt_nonnull server_app,
 
     {
 	ConstMemory const opt_name = "moment/publish_all";
-	MConfig::Config::BooleanValue const value = config->getBoolean (opt_name);
-	if (value == MConfig::Config::Boolean_Invalid) {
+	MConfig::BooleanValue const value = config->getBoolean (opt_name);
+	if (value == MConfig::Boolean_Invalid) {
 	    logE_ (_func, "Invalid value for ", opt_name, ": ", config->getString (opt_name),
 		   ", assuming \"", publish_all_streams, "\"");
 	} else {
-	    if (value == MConfig::Config::Boolean_False)
+	    if (value == MConfig::Boolean_False)
 		publish_all_streams = false;
 	    else
 		publish_all_streams = true;

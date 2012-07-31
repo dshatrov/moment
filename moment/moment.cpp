@@ -362,13 +362,13 @@ int main (int argc, char **argv)
     bool no_keepalive_conns = false;
     {
 	ConstMemory const opt_name ("http/no_keepalive_conns");
-	MConfig::Config::BooleanValue const enable = config.getBoolean (opt_name);
-	if (enable == MConfig::Config::Boolean_Invalid) {
+	MConfig::BooleanValue const enable = config.getBoolean (opt_name);
+	if (enable == MConfig::Boolean_Invalid) {
 	    logE_ (_func, "Invalid value for ", opt_name, ": ", config.getString (opt_name));
 	    return EXIT_FAILURE;
 	}
 
-	if (enable == MConfig::Config::Boolean_True)
+	if (enable == MConfig::Boolean_True)
 	    no_keepalive_conns = true;
 
 	logI_ (_func, opt_name, ": ", no_keepalive_conns);
