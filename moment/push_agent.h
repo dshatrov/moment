@@ -33,21 +33,13 @@ using namespace M;
 class PushAgent : public Object
 {
 private:
-#if 0
-    class StreamTicket : public Referenced
-    {
-    public:
-        PushAgent *push_agent;
-    };
-#endif
-
     mt_const MomentServer *moment;
     mt_const Ref<String> stream_name;
 
     mt_const Ref<PushConnection> push_conn;
     mt_const Ref<VideoStream> bound_stream;
 
-//    mt_mutex (mutex) Ref<StreamTicket> cur_stream_ticket;
+    void doVideoStreamAdded (VideoStream * mt_nonnull video_stream);
 
   mt_iface (MomentServer::VideoStreamHandler)
 
@@ -58,20 +50,6 @@ private:
                                   void        *_self);
 
   mt_iface_end
-
-#if 0
-  mt_iface (VideoStream::EventHandler)
-
-    static VideoStream::EventHandler bound_stream_handler;
-
-    static void streamAudioMessage (VideoStream::AudioMessage * mt_nonnull msg,
-                                    void                      *_self);
-
-    static void streamVideoMessage (VideoStream::VideoMessage * mt_nonnull msg,
-                                    void                      *_self);
-
-  mt_iface_end
-#endif
 
 public:
   // TODO PushAgent забирает видеопоток из VideoStream с определённым именем
