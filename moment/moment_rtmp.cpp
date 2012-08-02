@@ -24,6 +24,7 @@
 
 
 // Needed for "start_paused" as well.
+// TODO This belongs to class RtmpConnection.
 #define MOMENT_RTMP__WAIT_FOR_KEYFRAME
 
 #define MOMENT_RTMP__AUDIO_WAITS_VIDEO
@@ -37,7 +38,7 @@ namespace Moment {
 namespace {
 
 static LogGroup libMary_logGroup_mod_rtmp ("mod_rtmp", LogLevel::I);
-static LogGroup libMary_logGroup_session ("mod_rtmp.session", LogLevel::D);
+static LogGroup libMary_logGroup_session ("mod_rtmp.session", LogLevel::I);
 static LogGroup libMary_logGroup_framedrop ("mod_rtmp.framedrop", LogLevel::I);
 
 class MomentRtmpModule : public Object
@@ -262,7 +263,7 @@ void streamAudioMessage (VideoStream::AudioMessage * const mt_nonnull msg,
 
     client_session->mutex.unlock ();
 
-    client_session->rtmp_server.sendAudioMessage (msg);
+    client_session->rtmp_conn->sendAudioMessage (msg);
 }
 
 void streamVideoMessage (VideoStream::VideoMessage * const mt_nonnull msg,
@@ -375,7 +376,7 @@ void streamVideoMessage (VideoStream::VideoMessage * const mt_nonnull msg,
 
 //    logD_ (_func, "sending ", toString (msg->codec_id), ", ", toString (msgo->frame_type));
 
-    client_session->rtmp_server.sendVideoMessage (msg);
+    client_session->rtmp_conn->sendVideoMessage (msg);
 }
 
 void streamClosed (void * const _session)
@@ -838,7 +839,11 @@ void momentRtmpInit ()
     ServerApp * const server_app = moment->getServerApp();
     MConfig::Config * const config = moment->getConfig();
 
-    moment->addPushProtocol ("rtmp", grab (new RtmpPushProtocol));
+    {
+        Ref<RtmpPushProtocol> const rtmp_push_proto = grab (new RtmpPushProtocol);
+        rtmp_push_proto->init (moment);
+        moment->addPushProtocol ("rtmp", rtmp_push_proto);
+    }
 
     MomentRtmpModule * const rtmp_module = new MomentRtmpModule;
     moment->getEventInformer()->subscribe (CbDesc<MomentServer::Events> (&server_events, rtmp_module, NULL));

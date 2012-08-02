@@ -32,6 +32,7 @@ using namespace M;
 class PushConnection : public virtual Object
 {
 public:
+  // Nothing here.
 };
 
 class PushProtocol : public virtual Object
@@ -40,7 +41,7 @@ public:
   // 1. Connect (protocol-specific, +auth)
   // 2. Push messages: audio, video
 
-    virtual Ref<PushConnection> connect (VideoStream *video_stream,
+    virtual Ref<PushConnection> connect (VideoStream * mt_nonnull video_stream,
                                          ConstMemory  uri,
                                          ConstMemory  username,
                                          ConstMemory  password) = 0;

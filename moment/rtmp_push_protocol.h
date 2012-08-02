@@ -18,6 +18,7 @@
 
 
 #include <libmary/libmary.h>
+#include <moment/moment_server.h>
 #include <moment/push_protocol.h>
 #include <moment/rtmp_connection.h>
 
@@ -30,59 +31,136 @@ class RtmpPushConnection : public PushConnection,
                            public virtual Object
 {
 private:
+    enum ConnectionState {
+        ConnectionState_Connect,
+        ConnectionState_ConnectSent,
+        ConnectionState_CreateStreamSent,
+        ConnectionState_PublishSent,
+        ConnectionState_Streaming
+    };
+
     class Session : public Object
     {
     public:
+        // Must be referenced externally to use.
+        RtmpPushConnection *rtmp_push_conn;
+
         RtmpConnection rtmp_conn;
         TcpConnection tcp_conn;
         DeferredConnectionSender conn_sender;
         ConnectionReceiver conn_receiver;
 
+        // Synchronized by 'rtmp_conn_frontend'.
+        ConnectionState conn_state;
+
+        AtomicInt publishing;
+
+        mt_mutex (mutex) PollGroup::PollableKey pollable_key;
+
         Session ()
             : rtmp_conn     (this /* coderef_container */),
               tcp_conn      (this /* coderef_container */),
               conn_sender   (this /* coderef_container */),
-              conn_receiver (this /* coderef_container */)
+              conn_receiver (this /* coderef_container */),
+              conn_state    (ConnectionState_Connect),
+              publishing    (0),
+              pollable_key  (NULL)
         {
         }
     };
 
+    mt_const ServerThreadContext *thread_ctx;
     mt_const Timers *timers;
     mt_const PagePool *page_pool;
 
     mt_const Ref<VideoStream> video_stream;
 
-    mt_const IpAddress   server_addr;
+    mt_const IpAddress server_addr;
     mt_const Ref<String> username;
     mt_const Ref<String> password;
+    mt_const Ref<String> app_name;
+    mt_const Ref<String> stream_name;
 
     mt_mutex (mutex) Ref<Session> cur_session;
 
-    void startNewSession ();
+    void startNewSession (Session *old_session);
+
+  mt_iface (TcpConnection::Frontend)
+
+    static TcpConnection::Frontend const tcp_conn_frontend;
+
+    static void connected (Exception *exc_,
+                           void      *_session);
+
+  mt_iface_end
+
+  mt_iface (RtmpConnection::Backend)
+
+    static RtmpConnection::Backend const rtmp_conn_backend;
+
+    static void closeRtmpConn (void *_session);
+
+  mt_iface_end
+
+  mt_iface (RtmpConnection::Frontend)
+
+    static RtmpConnection::Frontend const rtmp_conn_frontend;
+
+    static Result handshakeComplete (void *_session);
+
+    static Result commandMessage (VideoStream::Message * mt_nonnull msg,
+                                  Uint32                msg_stream_id,
+                                  AmfEncoding           amf_encoding,
+                                  void                 *_session);
+
+    static void closed (Exception *exc_,
+                        void      *_session);
+
+  mt_iface_end
+
+  mt_iface (VideoStream::EventHandler)
+
+    static VideoStream::EventHandler const video_event_handler;
+
+    static void audioMessage (VideoStream::AudioMessage * mt_nonnull msg,
+                                void                    *_self);
+
+    static void videoMessage (VideoStream::VideoMessage * mt_nonnull msg,
+                              void                      *_self);
+
+  mt_iface_end
 
 public:
-    mt_const void init (Timers      * mt_nonnull _timers,
-                        PagePool    * mt_nonnull _page_pool,
-                        VideoStream *_video_stream,
-                        IpAddress    _server_addr,
-                        ConstMemory  _username,
-                        ConstMemory  _password);
+    mt_const void init (ServerThreadContext * mt_nonnull _thread_ctx,
+                        PagePool            * mt_nonnull _page_pool,
+                        VideoStream         *_video_stream,
+                        IpAddress            _server_addr,
+                        ConstMemory          _username,
+                        ConstMemory          _password,
+                        ConstMemory          _app_name,
+                        ConstMemory          _stream_name);
 
     RtmpPushConnection ();
+
+    ~RtmpPushConnection ();
 };
 
 class RtmpPushProtocol : public PushProtocol
 {
+private:
+    mt_const Ref<MomentServer> moment;
+
 public:
   mt_iface (PushProtocol)
 
-    // TODO Accept ServerContext or smth like that.
-    Ref<PushConnection> connect (VideoStream *video_stream,
-                                 ConstMemory  uri,
-                                 ConstMemory  username,
-                                 ConstMemory  password);
+    mt_throws Ref<PushConnection> connect (VideoStream * mt_nonnull video_stream,
+                                           ConstMemory  uri,
+                                           ConstMemory  username,
+                                           ConstMemory  password);
 
   mt_iface_end
+
+    mt_const void init (MomentServer * mt_nonnull moment);
 };
 
 }
