@@ -24,24 +24,33 @@ using namespace M;
 
 namespace Moment {
 
-void
+mt_mutex (mutex) void
+RtmpPushConnection::destroySession (Session * const mt_nonnull session)
+{
+    session->rtmp_conn.close_noBackendCb ();
+
+    if (session->pollable_key) {
+        thread_ctx->getPollGroup()->removePollable (session->pollable_key);
+        session->pollable_key = NULL;
+    }
+}
+
+mt_mutex (mutex) void
 RtmpPushConnection::startNewSession (Session * const old_session)
 {
-    mutex.lock ();
+    logD_ (_func_);
 
     if (old_session) {
         if (old_session != cur_session) {
-            mutex.unlock ();
+            logD_ (_func, "session mismatch: 0x", fmt_hex, (UintPtr) old_session, ", 0x", (UintPtr) cur_session.ptr());
             return;
         }
 
-        old_session->rtmp_conn.close_noBackendCb ();
-
-        if (old_session->pollable_key) {
-            thread_ctx->getPollGroup()->removePollable (old_session->pollable_key);
-            old_session->pollable_key = NULL;
-        }
+        destroySession (old_session);
     }
+
+    logD_ (_func, "calling deleteReconnectTimer()");
+    deleteReconnectTimer ();
 
     Ref<Session> const session = grab (new Session);
     cur_session = session;
@@ -76,15 +85,82 @@ RtmpPushConnection::startNewSession (Session * const old_session)
                                                                 this /* coderef_container */));
 
     if (!session->tcp_conn.connect (server_addr)) {
-        cur_session = NULL;
-        mutex.unlock ();
         logE_ (_func, "Could not connect to server: ", exc->toString());
-        // TODO Retry after timeout
+
+        destroySession (session);
+        cur_session = NULL;
+
+        setReconnectTimer ();
         return;
     }
 
     session->pollable_key = thread_ctx->getPollGroup()->addPollable (session->tcp_conn.getPollable(),
                                                                      NULL /* ret_reg */);
+}
+
+mt_mutex (mutex) void
+RtmpPushConnection::setReconnectTimer ()
+{
+    logD_ (_func_);
+
+    logD_ (_func, "calling deleteReconnectTimer()");
+    deleteReconnectTimer ();
+
+    reconnect_timer = timers->addTimer (CbDesc<Timers::TimerCallback> (reconnectTimerTick,
+                                                                       this /* cb_data */,
+                                                                       this /* coderef_container */),
+                                        // TODO Config parameter for the timeout.
+                                        1     /* time_seconds */,
+                                        false /* periodical */);
+}
+
+mt_mutex (mutex) void
+RtmpPushConnection::deleteReconnectTimer ()
+{
+    logD_ (_func_);
+
+    if (reconnect_timer) {
+        timers->deleteTimer (reconnect_timer);
+        reconnect_timer = NULL;
+    }
+}
+
+void
+RtmpPushConnection::reconnectTimerTick (void * const _self)
+{
+    logD_ (_func_);
+
+    RtmpPushConnection * const self = static_cast <RtmpPushConnection*> (_self);
+
+    self->mutex.lock ();
+    logD_ (_func, "calling deleteReconnectTimer()");
+    self->deleteReconnectTimer ();
+
+    if (self->cur_session) {
+        self->mutex.unlock ();
+        return;
+    }
+
+    self->startNewSession (NULL /* old_session */);
+    self->mutex.unlock ();
+}
+
+void
+RtmpPushConnection::scheduleReconnect (Session * const old_session)
+{
+    logD_ (_func, "session 0x", fmt_hex, (UintPtr) old_session);
+
+    mutex.lock ();
+    if (old_session != cur_session) {
+        logD_ (_func, "session mismatch: 0x", fmt_hex, (UintPtr) old_session, ", 0x", (UintPtr) cur_session.ptr());
+        mutex.unlock ();
+        return;
+    }
+
+    destroySession (old_session);
+    cur_session = NULL;
+
+    setReconnectTimer ();
 
     mutex.unlock ();
 }
@@ -97,13 +173,14 @@ void
 RtmpPushConnection::connected (Exception * const exc_,
                                void      * const _session)
 {
+    logD_ (_func_);
+
     Session * const session = static_cast <Session*> (_session);
     RtmpPushConnection * const self = session->rtmp_push_conn;
 
     if (exc_) {
         logE_ (_func, "Could not connect to server: ", exc_->toString());
-        // TODO Retry after timeout
-        self->startNewSession (session);
+        self->scheduleReconnect (session);
         return;
     }
 
@@ -117,10 +194,12 @@ RtmpConnection::Backend const RtmpPushConnection::rtmp_conn_backend = {
 void
 RtmpPushConnection::closeRtmpConn (void * const _session)
 {
+    logD_ (_func_);
+
     Session * const session = static_cast <Session*> (_session);
     RtmpPushConnection * const self = session->rtmp_push_conn;
 
-    self->startNewSession (session);
+    self->scheduleReconnect (session);
 }
 
 RtmpConnection::Frontend const RtmpPushConnection::rtmp_conn_frontend = {
@@ -220,9 +299,9 @@ void
 RtmpPushConnection::closed (Exception * const exc_,
                             void      * const /* _session */)
 {
-    if (exc_)
-        logE_ (_func, exc->toString());
-    else
+    if (exc_) {
+        logE_ (_func, exc_->toString());
+    } else
         logE_ (_func_);
 }
 
@@ -247,9 +326,8 @@ RtmpPushConnection::audioMessage (VideoStream::AudioMessage * const mt_nonnull m
     if (!session)
         return;
 
-    if (session->publishing.get() == 1) {
+    if (session->publishing.get() == 1)
         session->rtmp_conn.sendAudioMessage (msg);
-    }
 }
 
 void
@@ -296,7 +374,9 @@ RtmpPushConnection::init (ServerThreadContext * const mt_nonnull _thread_ctx,
     app_name = grab (new String (_app_name));
     stream_name = grab (new String (_stream_name));
 
+    mutex.lock ();
     startNewSession (NULL /* old_session */);
+    mutex.unlock ();
 
     video_stream->getEventInformer()->subscribe (
             CbDesc<VideoStream::EventHandler> (&video_event_handler,
@@ -305,6 +385,7 @@ RtmpPushConnection::init (ServerThreadContext * const mt_nonnull _thread_ctx,
 }
 
 RtmpPushConnection::RtmpPushConnection ()
+    : reconnect_timer (NULL)
 {
 }
 
@@ -312,14 +393,11 @@ RtmpPushConnection::~RtmpPushConnection ()
 {
     mutex.lock ();
 
+    logD_ (_func, "calling deleteReconnectTimer()");
+    deleteReconnectTimer ();
+
     if (cur_session) {
-        cur_session->rtmp_conn.close_noBackendCb ();
-
-        if (cur_session->pollable_key) {
-            thread_ctx->getPollGroup()->removePollable (cur_session->pollable_key);
-            cur_session->pollable_key = NULL;
-        }
-
+        destroySession (cur_session);
         cur_session = NULL;
     }
 

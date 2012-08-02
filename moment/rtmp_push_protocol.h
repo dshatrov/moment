@@ -82,8 +82,19 @@ private:
     mt_const Ref<String> stream_name;
 
     mt_mutex (mutex) Ref<Session> cur_session;
+    mt_mutex (mutex) Timers::TimerKey reconnect_timer;
 
-    void startNewSession (Session *old_session);
+    mt_mutex (mutex) void destroySession (Session * mt_nonnull session);
+
+    mt_mutex (mutex) void startNewSession (Session *old_session);
+
+    mt_mutex (mutex) void setReconnectTimer ();
+
+    mt_mutex (mutex) void deleteReconnectTimer ();
+
+    static void reconnectTimerTick (void *_self);
+
+    void scheduleReconnect (Session *old_session);
 
   mt_iface (TcpConnection::Frontend)
 
