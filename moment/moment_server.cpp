@@ -136,10 +136,24 @@ MomentServer::addVideoStreamHandler (CbDesc<VideoStreamHandler> const &vs_handle
     return vs_handler_key;
 }
 
+MomentServer::VideoStreamHandlerKey
+MomentServer::addVideoStreamHandler_unlocked (CbDesc<VideoStreamHandler> const &vs_handler)
+{
+    VideoStreamHandlerKey vs_handler_key;
+    vs_handler_key.sbn_key = video_stream_informer.subscribe_unlocked (vs_handler);
+    return vs_handler_key;
+}
+
 void
 MomentServer::removeVideoStreamHandler (VideoStreamHandlerKey vs_handler_key)
 {
     video_stream_informer.unsubscribe (vs_handler_key.sbn_key);
+}
+
+void
+MomentServer::removeVideoStreamHandler_unlocked (VideoStreamHandlerKey vs_handler_key)
+{
+    video_stream_informer.unsubscribe_unlocked (vs_handler_key.sbn_key);
 }
 
 // _____________________________________________________________________________
@@ -738,10 +752,15 @@ MomentServer::removeClientHandler (ClientHandlerKey const client_handler_key)
 }
 
 Ref<VideoStream>
-MomentServer::getVideoStream (ConstMemory const &path)
+MomentServer::getVideoStream (ConstMemory const path)
 {
   StateMutexLock l (&mutex);
+    return getVideoStream_unlocked (path);
+}
 
+Ref<VideoStream>
+MomentServer::getVideoStream_unlocked (ConstMemory const path)
+{
     VideoStreamHash::EntryKey const entry = video_stream_hash.lookup (path);
     if (!entry)
 	return NULL;
@@ -750,8 +769,8 @@ MomentServer::getVideoStream (ConstMemory const &path)
 }
 
 MomentServer::VideoStreamKey
-MomentServer::addVideoStream (VideoStream * const  video_stream,
-			      ConstMemory   const &path)
+MomentServer::addVideoStream (VideoStream * const video_stream,
+			      ConstMemory   const path)
 {
   StateMutexLock l (&mutex);
 
@@ -908,6 +927,8 @@ MomentServer::addPushProtocol (ConstMemory    const protocol_name,
 Ref<PushProtocol>
 MomentServer::getPushProtocolForUri (ConstMemory const uri)
 {
+    logD_ (_func, uri);
+
     ConstMemory protocol_name;
     {
         Count i = 0;
@@ -967,6 +988,18 @@ MomentServer::dumpStreamList ()
     }
 
     log__ (_func_, "done");
+}
+
+void
+MomentServer::lock ()
+{
+    mutex.lock ();
+}
+
+void
+MomentServer::unlock ()
+{
+    mutex.unlock ();
 }
 
 Result

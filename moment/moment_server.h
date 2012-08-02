@@ -38,7 +38,7 @@ using namespace M;
 
 // Only one MomentServer object may be initialized during program's lifetime.
 // This limitation comes form loadable modules support.
-class MomentServer
+class MomentServer : public Object
 {
 private:
     class VideoStreamEntry
@@ -98,6 +98,7 @@ public:
 // ___________________________ Video stream handlers ___________________________
 
 public:
+    // TODO Add a wrapper to api.h
     struct VideoStreamHandler
     {
         void (*videoStreamAdded) (VideoStream * mt_nonnull video_stream,
@@ -144,7 +145,11 @@ private:
 public:
     VideoStreamHandlerKey addVideoStreamHandler (CbDesc<VideoStreamHandler> const &vs_handler);
 
+    VideoStreamHandlerKey addVideoStreamHandler_unlocked (CbDesc<VideoStreamHandler> const &vs_handler);
+
     void removeVideoStreamHandler (VideoStreamHandlerKey vs_handler_key);
+
+    void removeVideoStreamHandler_unlocked (VideoStreamHandlerKey vs_handler_key);
 
 // _____________________________________________________________________________
 
@@ -481,10 +486,12 @@ public:
     // TODO There's a logical problem here. A stream can only be deleted
     // by the one who created it. This limitation makes little sense.
     // But overcoming it requires more complex synchronization.
-    Ref<VideoStream> getVideoStream (ConstMemory const &path);
+    Ref<VideoStream> getVideoStream (ConstMemory path);
 
-    VideoStreamKey addVideoStream (VideoStream * const video_stream,
-				   ConstMemory const &path);
+    Ref<VideoStream> getVideoStream_unlocked (ConstMemory path);
+
+    VideoStreamKey addVideoStream (VideoStream *video_stream,
+				   ConstMemory  path);
 
 private:
     mt_mutex (mutex) void removeVideoStream_unlocked (VideoStreamKey video_stream_key);
@@ -538,6 +545,10 @@ public:
     void dumpStreamList ();
 
   // Initialization
+
+    void lock ();
+
+    void unlock ();
 
     Result init (ServerApp        * mt_nonnull server_app,
 		 PagePool         * mt_nonnull page_pool,
