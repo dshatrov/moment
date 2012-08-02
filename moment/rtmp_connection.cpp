@@ -970,6 +970,70 @@ RtmpConnection::sendCommandMessage_AMF0_Pages (Uint32                   const ms
 }
 
 void
+RtmpConnection::sendVideoMessage (VideoStream::VideoMessage * const mt_nonnull msg)
+{
+//    logD (rtmp_server, _func_);
+
+#if 0
+    logD_ (_func_);
+    logLock ();
+    PagePool::dumpPages (logs, &msg->page_list);
+    logUnlock ();
+#endif
+
+    // TODO Do not ignore RtmpClearMetaData.
+    if (msg->frame_type == VideoStream::VideoFrameType::RtmpClearMetaData)
+	return;
+
+    MessageDesc mdesc;
+    mdesc.timestamp = msg->timestamp;
+//    logD_ (_func, "timestamp: 0x", fmt_hex, msg->timestamp);
+
+    ChunkStream *chunk_stream;
+    if (msg->frame_type == VideoStream::VideoFrameType::RtmpSetMetaData) {
+	mdesc.timestamp = 0;
+	mdesc.msg_type_id = RtmpMessageType::Data_AMF0;
+	chunk_stream = data_chunk_stream;
+    } else {
+	mdesc.msg_type_id = RtmpMessageType::VideoMessage;
+	chunk_stream = video_chunk_stream;
+    }
+
+    mdesc.msg_stream_id = DefaultMessageStreamId;
+    mdesc.msg_len = msg->msg_len;
+    mdesc.cs_hdr_comp = true;
+    mdesc.adjustable_timestamp = msg->frame_type.isVideoData();
+
+    sendMessagePages (&mdesc, chunk_stream, &msg->page_list, msg->msg_offset, msg->prechunk_size);
+}
+
+void
+RtmpConnection::sendAudioMessage (VideoStream::AudioMessage * const mt_nonnull msg)
+{
+    // Note that nellymoser codec may generate data which makes valgrind
+    // complain about uninitialized bytes.
+
+//    logD (rtmp_server, _func_);
+
+#if 0
+    logD_ (_func_);
+    logLock ();
+    PagePool::dumpPages (logs, &msg->page_list);
+    logUnlock ();
+#endif
+
+    MessageDesc mdesc;
+    mdesc.timestamp = msg->timestamp;
+    mdesc.msg_type_id = RtmpMessageType::AudioMessage;
+    mdesc.msg_stream_id = DefaultMessageStreamId;
+    mdesc.msg_len = msg->msg_len;
+    mdesc.cs_hdr_comp = true;
+    mdesc.adjustable_timestamp = msg->frame_type.isAudioData();
+
+    sendMessagePages (&mdesc, audio_chunk_stream, &msg->page_list, msg->msg_offset, msg->prechunk_size);
+}
+
+void
 RtmpConnection::sendConnect (ConstMemory const &app_name)
 {
 //    AmfAtom atoms [16];
@@ -1100,6 +1164,31 @@ RtmpConnection::sendPlay (ConstMemory const &stream_name)
     }
 
 //    sendCommandMessage_AMF0 (CommandMessageStreamId, ConstMemory (msg_buf, msg_len));
+    sendCommandMessage_AMF0 (1, ConstMemory (msg_buf, msg_len));
+}
+
+void
+RtmpConnection::sendPublish (ConstMemory const &stream_name)
+{
+    AmfAtom atoms [5];
+    AmfEncoder encoder (atoms);
+
+    encoder.addString ("publish");
+    // FIXME Use saner transaction ids.
+    encoder.addNumber (4.0);
+    encoder.addNullObject ();
+    encoder.addString (stream_name);
+    encoder.addString ("live");
+
+    // FIXME stream_name shouldn't be too long, otherwise the message will not be sent.
+    Byte msg_buf [4096];
+    Size msg_len;
+    if (!encoder.encode (Memory::forObject (msg_buf), AmfEncoding::AMF0, &msg_len)) {
+	logE_ (_func, "encode() failed");
+	// TODO Uncomment once message length limitation is resolved.
+	// unreachable ();
+    }
+
     sendCommandMessage_AMF0 (1, ConstMemory (msg_buf, msg_len));
 }
 
@@ -2623,7 +2712,9 @@ RtmpConnection::RtmpConnection (Object     * const coderef_container,
     resetChunkRecvState ();
 
     control_chunk_stream = getChunkStream (2, true /* create */);
-    data_chunk_stream    = getChunkStream (3, true /* create */);
+    data_chunk_stream    = getChunkStream (DefaultDataChunkStreamId,  true /* create */);
+    audio_chunk_stream   = getChunkStream (DefaultAudioChunkStreamId, true /* create */);
+    video_chunk_stream   = getChunkStream (DefaultVideoChunkStreamId, true /* create */);
 }
 
 mt_const void
@@ -2676,7 +2767,9 @@ RtmpConnection::RtmpConnection (Object * const coderef_container)
     resetChunkRecvState ();
 
     control_chunk_stream = getChunkStream (2, true /* create */);
-    data_chunk_stream    = getChunkStream (DefaultDataChunkStreamId, true /* create */);
+    data_chunk_stream    = getChunkStream (DefaultDataChunkStreamId,  true /* create */);
+    audio_chunk_stream   = getChunkStream (DefaultAudioChunkStreamId, true /* create */);
+    video_chunk_stream   = getChunkStream (DefaultVideoChunkStreamId, true /* create */);
 }
 
 RtmpConnection::~RtmpConnection ()

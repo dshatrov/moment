@@ -76,8 +76,6 @@ public:
 
 private:
     mt_const RtmpConnection *rtmp_conn;
-    mt_const RtmpConnection::ChunkStream *audio_chunk_stream;
-    mt_const RtmpConnection::ChunkStream *video_chunk_stream;
 
     Cb<Frontend> frontend;
 
@@ -95,14 +93,19 @@ private:
     Result doPublish (Uint32       msg_stream_id,
 		      AmfDecoder * mt_nonnull decoder);
 
+  mt_iface (VideoStream::FrameSaver::FrameHandler)
+
+    static VideoStream::FrameSaver::FrameHandler const saved_frame_handler;
+
+    static void savedAudioFrame (VideoStream::AudioMessage * mt_nonnull audio_msg,
+                                 void                      *_self);
+
+    static void savedVideoFrame (VideoStream::VideoMessage * mt_nonnull video_msg,
+                                 void                      *_self);
+
+  mt_iface_end
+
 public:
-  // sendVideoMessage() and sendAudioMessage() are here and not in
-  // RtmpConnection because of audio_chunk_stream/video_chunk_stream.
-
-    void sendVideoMessage (VideoStream::VideoMessage * mt_nonnull msg);
-
-    void sendAudioMessage (VideoStream::AudioMessage * mt_nonnull msg);
-
     // Helper method. Sends saved onMetaData, AvcSequenceHeader, KeyFrame.
     void sendInitialMessages_unlocked (VideoStream::FrameSaver * mt_nonnull frame_saver);
 
@@ -118,8 +121,6 @@ public:
     mt_const void setRtmpConnection (RtmpConnection * const rtmp_conn)
     {
 	this->rtmp_conn = rtmp_conn;
-	audio_chunk_stream = rtmp_conn->getChunkStream (RtmpConnection::DefaultAudioChunkStreamId, true /* create */);
-	video_chunk_stream = rtmp_conn->getChunkStream (RtmpConnection::DefaultVideoChunkStreamId, true /* create */);
     }
 
     class MetaData
@@ -223,14 +224,10 @@ public:
 	: rtmp_conn (rtmp_conn),
 	  playing (0)
     {
-	audio_chunk_stream = rtmp_conn->getChunkStream (RtmpConnection::DefaultAudioChunkStreamId, true /* create */);
-	video_chunk_stream = rtmp_conn->getChunkStream (RtmpConnection::DefaultVideoChunkStreamId, true /* create */);
     }
 
     RtmpServer ()
 	: rtmp_conn (NULL),           // extra initializer
-	  audio_chunk_stream (NULL),  // extra initializer
-	  video_chunk_stream (NULL),  // extra initializer
 	  playing (0)
     {
     }

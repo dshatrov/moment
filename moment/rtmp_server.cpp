@@ -602,94 +602,30 @@ RtmpServer::doPublish (Uint32       const msg_stream_id,
     return Result::Success;
 }
 
-void
-RtmpServer::sendVideoMessage (VideoStream::VideoMessage * const mt_nonnull msg)
-{
-//    logD (rtmp_server, _func_);
-
-#if 0
-    logD_ (_func_);
-    logLock ();
-    PagePool::dumpPages (logs, &msg->page_list);
-    logUnlock ();
-#endif
-
-    // TODO Do not ignore RtmpClearMetaData.
-    if (msg->frame_type == VideoStream::VideoFrameType::RtmpClearMetaData)
-	return;
-
-    RtmpConnection::MessageDesc mdesc;
-    mdesc.timestamp = msg->timestamp;
-//    logD_ (_func, "timestamp: 0x", fmt_hex, msg->timestamp);
-
-    RtmpConnection::ChunkStream *chunk_stream;
-    if (msg->frame_type == VideoStream::VideoFrameType::RtmpSetMetaData) {
-	mdesc.timestamp = 0;
-	mdesc.msg_type_id = RtmpConnection::RtmpMessageType::Data_AMF0;
-	chunk_stream = rtmp_conn->data_chunk_stream;
-    } else {
-	mdesc.msg_type_id = RtmpConnection::RtmpMessageType::VideoMessage;
-	chunk_stream = video_chunk_stream;
-    }
-
-    mdesc.msg_stream_id = RtmpConnection::DefaultMessageStreamId;
-    mdesc.msg_len = msg->msg_len;
-    mdesc.cs_hdr_comp = true;
-    mdesc.adjustable_timestamp = msg->frame_type.isVideoData();
-
-    rtmp_conn->sendMessagePages (&mdesc, chunk_stream, &msg->page_list, msg->msg_offset, msg->prechunk_size);
-}
+VideoStream::FrameSaver::FrameHandler const RtmpServer::saved_frame_handler = {
+    savedAudioFrame,
+    savedVideoFrame
+};
 
 void
-RtmpServer::sendAudioMessage (VideoStream::AudioMessage * const mt_nonnull msg)
-{
-    // Note that nellymoser codec may generate data which makes valgrind
-    // complain about uninitialized bytes.
-
-//    logD (rtmp_server, _func_);
-
-#if 0
-    logD_ (_func_);
-    logLock ();
-    PagePool::dumpPages (logs, &msg->page_list);
-    logUnlock ();
-#endif
-
-    RtmpConnection::MessageDesc mdesc;
-    mdesc.timestamp = msg->timestamp;
-    mdesc.msg_type_id = RtmpConnection::RtmpMessageType::AudioMessage;
-    mdesc.msg_stream_id = RtmpConnection::DefaultMessageStreamId;
-    mdesc.msg_len = msg->msg_len;
-    mdesc.cs_hdr_comp = true;
-    mdesc.adjustable_timestamp = msg->frame_type.isAudioData();
-
-    rtmp_conn->sendMessagePages (&mdesc, audio_chunk_stream, &msg->page_list, msg->msg_offset, msg->prechunk_size);
-}
-
-static void
-savedAudioFrame (VideoStream::AudioMessage * const mt_nonnull audio_msg,
-                 void                      * const _self)
+RtmpServer::savedAudioFrame (VideoStream::AudioMessage * const mt_nonnull audio_msg,
+                             void                      * const _self)
 {
     RtmpServer * const self = static_cast <RtmpServer*> (_self);
     VideoStream::AudioMessage tmp_audio_msg = *audio_msg;
     tmp_audio_msg.timestamp = 0;
-    self->sendAudioMessage (&tmp_audio_msg);
+    self->rtmp_conn->sendAudioMessage (&tmp_audio_msg);
 }
 
-static void
-savedVideoFrame (VideoStream::VideoMessage * const mt_nonnull video_msg,
-                 void                      * const _self)
+void
+RtmpServer::savedVideoFrame (VideoStream::VideoMessage * const mt_nonnull video_msg,
+                             void                      * const _self)
 {
     RtmpServer * const self = static_cast <RtmpServer*> (_self);
     VideoStream::VideoMessage tmp_video_msg = *video_msg;
     tmp_video_msg.timestamp = 0;
-    self->sendVideoMessage (&tmp_video_msg);
+    self->rtmp_conn->sendVideoMessage (&tmp_video_msg);
 }
-
-static VideoStream::FrameSaver::FrameHandler const saved_frame_handler = {
-    savedAudioFrame,
-    savedVideoFrame
-};
 
 void
 RtmpServer::sendInitialMessages_unlocked (VideoStream::FrameSaver * const mt_nonnull frame_saver)

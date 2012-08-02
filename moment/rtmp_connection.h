@@ -380,6 +380,8 @@ private:
 public:
     mt_const ChunkStream *control_chunk_stream;
     mt_const ChunkStream *data_chunk_stream;
+    mt_const ChunkStream *audio_chunk_stream;
+    mt_const ChunkStream *video_chunk_stream;
 
     mt_one_of(( mt_const, mt_sync_domain (receiver) ))
 	ChunkStream* getChunkStream (Uint32 chunk_stream_id,
@@ -476,11 +478,17 @@ public:
 
   // Extra send utility methods.
 
+    void sendVideoMessage (VideoStream::VideoMessage * mt_nonnull msg);
+
+    void sendAudioMessage (VideoStream::AudioMessage * mt_nonnull msg);
+
     void sendConnect (ConstMemory const &app_name);
 
     void sendCreateStream ();
 
     void sendPlay (ConstMemory const &stream_name);
+
+    void sendPublish (ConstMemory const &stream_name);
 
   // ______
 
