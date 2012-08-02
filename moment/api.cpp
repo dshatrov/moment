@@ -293,7 +293,8 @@ static VideoStream::EventHandler const stream_event_handler = {
     stream_audioMessage,
     stream_videoMessage,
     stream_rtmpCommandMessage,
-    stream_closed
+    stream_closed,
+    NULL /* numWatchersChanged */
 };
 
 MomentStreamHandlerKey moment_stream_add_handler (MomentStream        * const stream,

@@ -31,7 +31,7 @@ using namespace Moment;
 
 namespace {
 
-LogGroup libMary_logGroup_time ("rtmptool_time", LogLevel::I);
+LogGroup libMary_logGroup_time ("rtmptool_time", LogLevel::D);
 
 class Options
 {
@@ -86,9 +86,8 @@ private:
     DeferredConnectionSender conn_sender;
     ConnectionReceiver conn_receiver;
 
+    // Synchronized by 'rtmp_conn_frontend'.
     ConnectionState conn_state;
-
-    Uint32 glob_stream_id;
 
     static TcpConnection::Frontend const tcp_conn_frontend;
 
@@ -103,10 +102,10 @@ private:
 
     static Result handshakeComplete (void *cb_data);
 
-    static Result commandMessageCallback (VideoStream::Message * mt_nonnull msg,
-					  Uint32                msg_stream_id,
-					  AmfEncoding           amf_encoding,
-					  void                 *_self);
+    static Result commandMessage (VideoStream::Message * mt_nonnull msg,
+                                  Uint32                msg_stream_id,
+                                  AmfEncoding           amf_encoding,
+                                  void                 *_self);
 
     static Result audioMessage (VideoStream::AudioMessage * mt_nonnull msg,
 				void                      *_self);
@@ -137,7 +136,7 @@ RtmpConnection::Backend const RtmpClient::rtmp_conn_backend = {
 
 RtmpConnection::Frontend const RtmpClient::rtmp_conn_frontend = {
     handshakeComplete,
-    commandMessageCallback,
+    commandMessage,
     audioMessage,
     videoMessage,
     NULL /* sendStateChanged */,
@@ -172,17 +171,17 @@ RtmpClient::handshakeComplete (void * const _self)
 
     RtmpClient * const self = static_cast <RtmpClient*> (_self);
 
-    self->rtmp_conn.sendConnect (options.app_name->mem());
     self->conn_state = ConnectionState_ConnectSent;
+    self->rtmp_conn.sendConnect (options.app_name->mem());
 
     return Result::Success;
 }
 
 Result
-RtmpClient::commandMessageCallback (VideoStream::Message   * const mt_nonnull msg,
-				    Uint32                   const /* msg_stream_id */,
-				    AmfEncoding              const /* amf_encoding */,
-				    void                   * const _self)
+RtmpClient::commandMessage (VideoStream::Message   * const mt_nonnull msg,
+                            Uint32                   const /* msg_stream_id */,
+                            AmfEncoding              const /* amf_encoding */,
+                            void                   * const _self)
 {
     logD (time, _func, "ts:0x", fmt_hex, msg->timestamp);
 
@@ -200,7 +199,7 @@ RtmpClient::commandMessageCallback (VideoStream::Message   * const mt_nonnull ms
 			       &method_name_len,
 			       NULL /* ret_full_len */))
     {
-	logE_ (_func, "could not decode method name");
+	logE_ (_func, "Could not decode method name");
 	return Result::Failure;
     }
 
@@ -220,8 +219,6 @@ RtmpClient::commandMessageCallback (VideoStream::Message   * const mt_nonnull ms
 		    return Result::Failure;
 		}
 
-		self->glob_stream_id = lround (stream_id);
-
 		self->rtmp_conn.sendPlay (options.channel->mem());
 
 		self->conn_state = ConnectionState_Streaming;
@@ -230,7 +227,7 @@ RtmpClient::commandMessageCallback (VideoStream::Message   * const mt_nonnull ms
 		// Unused
 	    } break;
 	    default:
-	      // Ignoring.
+	      // Ignoring
 		;
 	}
     } else
@@ -243,7 +240,7 @@ RtmpClient::commandMessageCallback (VideoStream::Message   * const mt_nonnull ms
 		return Result::Failure;
 	    } break;
 	    default:
-	      // Ignoring.
+	      // Ignoring
 		;
 	}
     } else
@@ -367,8 +364,7 @@ RtmpClient::RtmpClient (Object * const coderef_container,
       tcp_conn      (coderef_container),
       conn_sender   (coderef_container),
       conn_receiver (coderef_container),
-      conn_state (ConnectionState_Connect),
-      glob_stream_id (0)
+      conn_state (ConnectionState_Connect)
 {
     conn_sender.setConnection (&tcp_conn);
 
