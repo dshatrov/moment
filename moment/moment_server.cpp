@@ -341,6 +341,7 @@ MomentServer::getClientEntry (ConstMemory  path,
 mt_throws Result
 MomentServer::loadModules ()
 {
+#ifndef LIBMARY_PLATFORM_WIN32
     ConstMemory module_path = config->getString ("moment/module_path");
     if (module_path.len() == 0)
 	module_path = LIBMOMENT_PREFIX "/moment-1.0";
@@ -429,17 +430,18 @@ MomentServer::loadModules ()
         if (!loadModule (mod_gst_name->mem()))
             logE_ (_func, "Could not load module ", mod_gst_name, ": ", exc->toString());
     }
+#endif /* LIBMARY_PLATFORM_WIN32 */
 
 #ifdef LIBMARY_PLATFORM_WIN32
     {
         if (!loadModule ("C:/MinGW/msys/1.0/opt/moment/lib/bin/libmoment-file-1.0-0.dll"))
             logE_ (_func, "Could not load mod_file (win32)");
 
-        if (!loadModule ("C:/MinGW/msys/1.0/opt/moment/lib/bin/libmoment-gst-1.0-0.dll"))
-            logE_ (_func, "Could not load mod_gst (win32)");
-
         if (!loadModule ("C:/MinGW/msys/1.0/opt/moment/lib/bin/libmoment-rtmp-1.0-0.dll"))
             logE_ (_func, "Could not load mod_rtmp (win32)");
+
+        if (!loadModule ("C:/MinGW/msys/1.0/opt/moment/lib/bin/libmoment-gst-1.0-0.dll"))
+            logE_ (_func, "Could not load mod_gst (win32)");
 
         if (!loadModule ("C:/MinGW/msys/1.0/opt/moment/lib/bin/libmoment-mychat-1.0-0.dll"))
             logE_ (_func, "Could not load mychat module (win32)");
