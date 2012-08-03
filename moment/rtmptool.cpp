@@ -187,7 +187,7 @@ RtmpClient::commandMessage (VideoStream::Message   * const mt_nonnull msg,
                             void                   * const _self)
 {
     if (options.dump_frames)
-        logD (frame_dump, _func, "ts:0x", fmt_hex, msg->timestamp);
+        logD (frame_dump, _func, "ts: 0x", fmt_hex, msg->timestamp, " (", fmt_def, msg->timestamp, ")");
 
     RtmpClient * const self = static_cast <RtmpClient*> (_self);
 
@@ -299,7 +299,7 @@ RtmpClient::audioMessage (VideoStream::AudioMessage * const mt_nonnull msg,
 			  void                      * const /* _self */)
 {
     if (options.dump_frames) {
-        logD (frame_dump, _func, "ts: 0x", fmt_hex, msg->timestamp, " ",
+        logD (frame_dump, _func, "ts: 0x", fmt_hex, msg->timestamp, " (", fmt_def, msg->timestamp, ") ",
               msg->codec_id, " ", msg->frame_type);
     }
 
@@ -311,7 +311,7 @@ RtmpClient::videoMessage (VideoStream::VideoMessage * const mt_nonnull msg,
 			  void                      * const _self)
 {
     if (options.dump_frames) {
-        logD (frame_dump, _func, "ts: 0x", fmt_hex, msg->timestamp, " ",
+        logD (frame_dump, _func, "ts: 0x", fmt_hex, msg->timestamp, " (", fmt_def, msg->timestamp, ") ",
               msg->codec_id, " ", msg->frame_type);
     }
 
