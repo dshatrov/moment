@@ -28,17 +28,15 @@ using namespace M;
 
 namespace Moment {
 
-namespace {
-LogGroup libMary_logGroup_chunk     ("rtmp_chunk",      LogLevel::I);
-LogGroup libMary_logGroup_msg       ("rtmp_msg",        LogLevel::I);
-LogGroup libMary_logGroup_codec     ("rtmp_codec",      LogLevel::I);
-LogGroup libMary_logGroup_send      ("rtmp_send",       LogLevel::I);
-LogGroup libMary_logGroup_time      ("rtmp_time",       LogLevel::I);
-LogGroup libMary_logGroup_close     ("rtmp_conn_close", LogLevel::I);
-LogGroup libMary_logGroup_proto_in  ("rtmp_proto_in",   LogLevel::I);
-LogGroup libMary_logGroup_proto_out ("rtmp_proto_out",  LogLevel::I);
-LogGroup libMary_logGroup_flush     ("rtmp_flush",      LogLevel::I);
-}
+static LogGroup libMary_logGroup_chunk     ("rtmp_chunk",      LogLevel::I);
+static LogGroup libMary_logGroup_msg       ("rtmp_msg",        LogLevel::I);
+static LogGroup libMary_logGroup_codec     ("rtmp_codec",      LogLevel::I);
+static LogGroup libMary_logGroup_send      ("rtmp_send",       LogLevel::I);
+static LogGroup libMary_logGroup_time      ("rtmp_time",       LogLevel::I);
+static LogGroup libMary_logGroup_close     ("rtmp_conn_close", LogLevel::I);
+static LogGroup libMary_logGroup_proto_in  ("rtmp_proto_in",   LogLevel::I);
+static LogGroup libMary_logGroup_proto_out ("rtmp_proto_out",  LogLevel::I);
+static LogGroup libMary_logGroup_flush     ("rtmp_flush",      LogLevel::I);
 
 Sender::Frontend const RtmpConnection::sender_frontend = {
     senderStateChanged,
@@ -1827,6 +1825,8 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 		{
 		  // Sending S0
 
+                    logD (proto_out, _func, "Sending S0");
+
 		    Sender::MessageEntry_Pages * const msg_pages =
 			    Sender::MessageEntry_Pages::createNew (1);
 
@@ -1955,6 +1955,8 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 				     msg + 1536, 1536 - 32,
 				     msg + (1536 * 2 - 32), sizeof (hash_key));
 		    }
+
+                    logD (proto_out, _func, "Sending S1+S2");
 
 		    sendRawPages (page_list.first, 0 /* msg_offset */);
 		}
