@@ -86,7 +86,7 @@ private:
 
     mt_mutex (mutex) void destroySession (Session * mt_nonnull session);
 
-    mt_mutex (mutex) void startNewSession (Session *old_session);
+    mt_unlocks (mutex) void startNewSession (Session *old_session);
 
     mt_mutex (mutex) void setReconnectTimer ();
 

@@ -35,7 +35,7 @@ RtmpPushConnection::destroySession (Session * const mt_nonnull session)
     }
 }
 
-mt_mutex (mutex) void
+mt_unlocks (mutex) void
 RtmpPushConnection::startNewSession (Session * const old_session)
 {
     logD_ (_func_);
@@ -84,18 +84,27 @@ RtmpPushConnection::startNewSession (Session * const old_session)
                                                                 session /* cb_data */,
                                                                 this /* coderef_container */));
 
+    // TcpConnection::connect() may call 'connected' callback immediately,
+    // which is very inconvenient because it complicates synchronization.
+    mutex.unlock ();
     if (!session->tcp_conn.connect (server_addr)) {
         logE_ (_func, "Could not connect to server: ", exc->toString());
 
+        mutex.lock ();
         destroySession (session);
         cur_session = NULL;
 
         setReconnectTimer ();
+        mutex.unlock ();
         return;
     }
 
-    session->pollable_key = thread_ctx->getPollGroup()->addPollable (session->tcp_conn.getPollable(),
-                                                                     NULL /* ret_reg */);
+    mutex.lock ();
+    if (cur_session.ptr() /* TODO Why doesn't plain '==' work? */ == session) {
+        session->pollable_key = thread_ctx->getPollGroup()->addPollable (session->tcp_conn.getPollable(),
+                                                                         NULL /* ret_reg */);
+    }
+    mutex.unlock ();
 }
 
 mt_mutex (mutex) void
