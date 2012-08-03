@@ -385,13 +385,13 @@ Result httpRequest (HttpRequest   * const mt_nonnull req,
 
     bool got_mtime = false;
     struct tm mtime;
+// TODO Get file modification time on Win32 + enable "304 Not Modified".
+#ifndef PLATFORM_WIN32
     if (native_file.getModificationTime (&mtime))
         got_mtime = true;
     else
         logE_ (_func, "native_file.getModificationTime() failed: ", exc->toString());
 
-// TODO Get file modification time on Win32 + enable "304 Not Modified".
-#ifndef PLATFORM_WIN32
     if (got_mtime) {
         bool if_none_match__any = false;
         List<HttpRequest::EntityTag> etags;
