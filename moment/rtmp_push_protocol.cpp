@@ -150,8 +150,7 @@ RtmpPushConnection::reconnectTimerTick (void * const _self)
         return;
     }
 
-    self->startNewSession (NULL /* old_session */);
-    self->mutex.unlock ();
+    mt_unlocks (mutex) self->startNewSession (NULL /* old_session */);
 }
 
 void
@@ -357,6 +356,7 @@ RtmpPushConnection::videoMessage (VideoStream::VideoMessage * const mt_nonnull m
       //      from mod_rtmp to RtmpConnection.
       //      The trickier part is making this work while
       //      sending saved frames in advance.
+        logD_ (_func, "sending video msg, ts 0x", fmt_hex, msg->timestamp);
         session->rtmp_conn.sendVideoMessage (msg);
     }
 }
@@ -384,8 +384,7 @@ RtmpPushConnection::init (ServerThreadContext * const mt_nonnull _thread_ctx,
     stream_name = grab (new String (_stream_name));
 
     mutex.lock ();
-    startNewSession (NULL /* old_session */);
-    mutex.unlock ();
+    mt_unlocks (mutex) startNewSession (NULL /* old_session */);
 
     video_stream->getEventInformer()->subscribe (
             CbDesc<VideoStream::EventHandler> (&video_event_handler,
@@ -441,7 +440,7 @@ RtmpPushProtocol::connect (VideoStream * const video_stream,
     IpAddress server_addr;
     // TODO Parse application name, channel name.
     Ref<String> const app_name = grab (new String ("app"));
-    Ref<String> const stream_name = grab (new String ("stream"));
+    Ref<String> const stream_name = grab (new String ("lecture.desktop"));
     {
       // URI forms:   rtmp://user:password@host:port/foo/bar
       //              rtmp://host:port/foo/bar
