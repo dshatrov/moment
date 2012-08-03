@@ -113,6 +113,14 @@ private:
 
   mt_iface_end
 
+    static VideoStream::FrameSaver::FrameHandler const saved_frame_handler;
+
+    static void savedAudioFrame (VideoStream::AudioMessage * mt_nonnull audio_msg,
+                                 void                      *_session);
+
+    static void savedVideoFrame (VideoStream::VideoMessage * mt_nonnull video_msg,
+                                 void                      *_session);
+
   mt_iface (RtmpConnection::Frontend)
 
     static RtmpConnection::Frontend const rtmp_conn_frontend;
