@@ -31,7 +31,7 @@ using namespace Moment;
 
 namespace {
 
-LogGroup libMary_logGroup_time ("rtmptool_time", LogLevel::I);
+LogGroup libMary_logGroup_frame_dump ("rtmptool_frame_dump", LogLevel::D /* Default: D */);
 
 class Options
 {
@@ -51,6 +51,8 @@ public:
     Uint32 num_threads;
     Uint32 report_interval;
 
+    bool dump_frames;
+
     Options ()
 	: help (false),
 	  num_clients (1),
@@ -59,7 +61,8 @@ public:
 	  app_name (grab (new String ("app"))),
 	  channel (grab (new String ("video"))),
 	  num_threads (0),
-	  report_interval (0)
+	  report_interval (0),
+          dump_frames (false)
     {
     }
 };
@@ -183,7 +186,8 @@ RtmpClient::commandMessage (VideoStream::Message   * const mt_nonnull msg,
                             AmfEncoding              const /* amf_encoding */,
                             void                   * const _self)
 {
-    logD (time, _func, "ts:0x", fmt_hex, msg->timestamp);
+    if (options.dump_frames)
+        logD (frame_dump, _func, "ts:0x", fmt_hex, msg->timestamp);
 
     RtmpClient * const self = static_cast <RtmpClient*> (_self);
 
@@ -203,7 +207,8 @@ RtmpClient::commandMessage (VideoStream::Message   * const mt_nonnull msg,
 	return Result::Failure;
     }
 
-    logD (time, _func, "method: ", ConstMemory (method_name, method_name_len));
+    if (options.dump_frames)
+        logD (frame_dump, _func, "method: ", ConstMemory (method_name, method_name_len));
 
     ConstMemory method (method_name, method_name_len);
     if (!compare (method, "_result")) {
@@ -293,8 +298,11 @@ Result
 RtmpClient::audioMessage (VideoStream::AudioMessage * const mt_nonnull msg,
 			  void                      * const /* _self */)
 {
-    logD (time, _func, "ts: 0x", fmt_hex, msg->timestamp, " ",
-	  msg->codec_id, " ", msg->frame_type);
+    if (options.dump_frames) {
+        logD (frame_dump, _func, "ts: 0x", fmt_hex, msg->timestamp, " ",
+              msg->codec_id, " ", msg->frame_type);
+    }
+
     return Result::Success;
 }
 
@@ -302,8 +310,10 @@ Result
 RtmpClient::videoMessage (VideoStream::VideoMessage * const mt_nonnull msg,
 			  void                      * const _self)
 {
-    logD (time, _func, "ts: 0x", fmt_hex, msg->timestamp, " ",
-	  msg->codec_id, " ", msg->frame_type);
+    if (options.dump_frames) {
+        logD (frame_dump, _func, "ts: 0x", fmt_hex, msg->timestamp, " ",
+              msg->codec_id, " ", msg->frame_type);
+    }
 
     RtmpClient * const self = static_cast <RtmpClient*> (_self);
 
@@ -631,6 +641,16 @@ bool cmdline_nonfatal_errors (char const * /* short_name */,
     return true;
 }
 
+bool cmdline_dump_frames (char const * /* short_name */,
+                          char const * /* long_name */,
+                          char const * /* value */,
+                          void       * /* opt_data */,
+                          void       * /* cb_data */)
+{
+    options.dump_frames = true;
+    return true;
+}
+
 } // namespace {}
 
 int main (int argc, char **argv)
@@ -639,7 +659,7 @@ int main (int argc, char **argv)
     libMaryInit ();
 
     {
-	unsigned const num_opts = 9;
+	unsigned const num_opts = 10;
 	MyCpp::CmdlineOption opts [num_opts];
 
 	opts [0].short_name = "h";
@@ -695,6 +715,12 @@ int main (int argc, char **argv)
 	opts [8].with_value = true;
 	opts [8].opt_data   = NULL;
 	opts [8].opt_callback = cmdline_num_threads;
+
+        opts [9].short_name = "d";
+        opts [9].long_name  = "dump-frames";
+        opts [9].with_value = false;
+        opts [9].opt_data   = NULL;
+        opts [9].opt_callback = cmdline_dump_frames;
 
 	MyCpp::ArrayIterator<MyCpp::CmdlineOption> opts_iter (opts, num_opts);
 	MyCpp::parseCmdline (&argc, &argv, opts_iter, NULL /* callback */, NULL /* callback_data */);
