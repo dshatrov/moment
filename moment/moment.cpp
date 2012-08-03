@@ -85,7 +85,7 @@ printUsage ()
 		  "  -c --config <config_file>  Configuration file to use (default: /opt/moment/moment.conf)\n"
 		  "  -l --log <log_file>        Log file to use (default: /var/log/moment.log)\n"
 		  "  --loglevel <loglevel>      Loglevel, one of A/D/I/W/E/H/F/N (default: I, \"Info\")\n"
-#ifndef PLATFORM_WIN32
+#ifndef LIBMARY_PLATFORM_WIN32
 		  "  -d --daemonize             Daemonize (run in the background as a daemon).\n"
 #endif
 		  "  --exit-after <number>      Exit after specified timeout in seconds.\n"
@@ -244,7 +244,7 @@ int main (int argc, char **argv)
     setGlobalLogLevel (options.loglevel);
 
     if (options.daemonize) {
-#ifdef PLATFORM_WIN32
+#ifdef LIBMARY_PLATFORM_WIN32
         logW_ (_func, "Daemonization is not supported on Windows");
 #else
 	logI_ (_func, "Daemonizing. Server log is at /var/log/moment.log");
@@ -260,7 +260,13 @@ int main (int argc, char **argv)
     {
 	ConstMemory const config_filename = options.config_filename ?
 						    options.config_filename->mem() :
-						    ConstMemory ("/opt/moment/moment.conf");
+						    ConstMemory (
+#ifdef LIBMARY_PLATFORM_WIN32
+                                                            "moment.conf"
+#else
+                                                            "/opt/moment/moment.conf"
+#endif
+                                                            );
 	if (!MConfig::parseConfig (config_filename, &config)) {
 	    logE_ (_func, "Failed to parse config file ", config_filename);
 	    return Result::Failure;
