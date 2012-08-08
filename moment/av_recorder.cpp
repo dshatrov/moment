@@ -34,6 +34,43 @@ Sender::Frontend const AvRecorder::sender_frontend = {
     senderClosed
 };
 
+VideoStream::FrameSaver::FrameHandler const AvRecorder::saved_frame_handler = {
+    savedAudioFrame,
+    savedVideoFrame
+};
+
+Result
+AvRecorder::savedAudioFrame (VideoStream::AudioMessage * const mt_nonnull audio_msg,
+                             void                      * const _self)
+{
+    AvRecorder * const self = static_cast <AvRecorder*> (_self);
+    VideoStream::AudioMessage tmp_audio_msg = *audio_msg;
+    tmp_audio_msg.timestamp = 0;
+
+    if (!self->muxer->muxAudioMessage (&tmp_audio_msg)) {
+        logE (recorder, _func, "muxer->muxAudioMessage() failed (aac seq hdr): ", exc->toString());
+        return Result::Failure;
+    }
+
+    return Result::Success;
+}
+
+Result
+AvRecorder::savedVideoFrame (VideoStream::VideoMessage * const mt_nonnull video_msg,
+                             void                      * const _self)
+{
+    AvRecorder * const self = static_cast <AvRecorder*> (_self);
+    VideoStream::VideoMessage tmp_video_msg = *video_msg;
+    tmp_video_msg.timestamp = 0;
+
+    if (!self->muxer->muxVideoMessage (&tmp_video_msg)) {
+        logE (recorder, _func, "muxer->muxVideoMessage() failed (metadata): ", exc->toString());
+        return Result::Failure;
+    }
+
+    return Result::Success;
+}
+
 mt_mutex (mutex) void
 AvRecorder::muxInitialMessages ()
 {
@@ -51,58 +88,9 @@ AvRecorder::muxInitialMessages ()
     if (!frame_saver)
 	goto _return;
 
-    if (frame_saver->getSavedMetaData (&saved_frame)) {
-	logD (recorder_frames, _func, "metadata");
-	saved_frame.msg.timestamp = 0;
-	if (!muxer->muxVideoMessage (&saved_frame.msg)) {
-	    logE (recorder, _func, "muxer->muxVideoMessage() failed (metadata): ", exc->toString());
-	    doStop ();
-	    goto _return;
-	}
-    }
-
-    if (frame_saver->getSavedAacSeqHdr (&saved_audio_frame)) {
-	logD (recorder_frames, _func, "AAC seq hdr");
-	saved_audio_frame.msg.timestamp = 0;
-	if (!muxer->muxAudioMessage (&saved_audio_frame.msg)) {
-	    logE (recorder, _func, "muxer->muxAudioMessage() failed (aac seq hdr): ", exc->toString());
-	    doStop ();
-	    goto _return;
-	}
-    }
-
-    if (frame_saver->getSavedAvcSeqHdr (&saved_frame)) {
-	logD (recorder_frames, _func, "AVC seq hdr");
-	saved_frame.msg.timestamp = 0;
-	if (!muxer->muxVideoMessage (&saved_frame.msg)) {
-	    logE (recorder, _func, "muxer->muxVideoMessage() failed (avc seq hdr): ", exc->toString());
-	    doStop ();
-	    goto _return;
-	}
-    }
-
-    if (frame_saver->getNumSavedSpeexHeaders () > 0) {
-	logD (recorder_frames, _func, "Speex headers");
-	VideoStream::SavedAudioFrame saved_speex_frames [2];
-	frame_saver->getSavedSpeexHeaders (saved_speex_frames, 2);
-	for (Count i = 0; i < frame_saver->getNumSavedSpeexHeaders(); ++i) {
-	    saved_speex_frames [i].msg.timestamp = 0;
-	    if (!muxer->muxAudioMessage (&saved_speex_frames [i].msg)) {
-		logE (recorder, _func, "muxer->muxAudioMessage() failed (speex hdr #", i + 1, ": ", exc->toString());
-		doStop ();
-		goto _return;
-	    }
-	}
-    }
-
-    if (frame_saver->getSavedKeyframe (&saved_frame)) {
-	logD (recorder_frames, _func, "keyframe");
-	saved_frame.msg.timestamp = 0;
-	if (!muxer->muxVideoMessage (&saved_frame.msg)) {
-	    logE (recorder, _func, "muxer->muxVideoMessage() failed (keyframe): ", exc->toString());
-	    doStop ();
-	    goto _return;
-	}
+    if (!frame_saver->reportSavedFrames (&saved_frame_handler, this)) {
+        doStop ();
+        goto _return;
     }
 
 _return:

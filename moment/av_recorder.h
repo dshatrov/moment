@@ -100,6 +100,18 @@ private:
 
     mt_const Cb<Frontend> frontend;
 
+  mt_iface (VideoStream::FrameSaver::FrameHandler)
+
+    static VideoStream::FrameSaver::FrameHandler const saved_frame_handler;
+
+    static Result savedAudioFrame (VideoStream::AudioMessage * mt_nonnull audio_msg,
+                                   void                      *_self);
+
+    static Result savedVideoFrame (VideoStream::VideoMessage * mt_nonnull video_msg,
+                                   void                      *_self);
+
+  mt_iface_end
+
     mt_mutex (mutex) void muxInitialMessages ();
 
     mt_mutex (mutex) void doStop ();
