@@ -130,22 +130,18 @@ RtmptService::accepted (void * const _self)
     }
 }
 
-    mt_const mt_throws Result init (Timers    * mt_nonnull timers,
-                                    PollGroup * mt_nonnull poll_group,
-                                    PagePool  * mt_nonnull page_pool,
-                                    Time       session_keepalive_timeout,
-                                    bool       no_keepalive_conns);
-
 mt_const mt_throws Result
 RtmptService::init (Timers    * const mt_nonnull timers,
                     PagePool  * const mt_nonnull page_pool,
                     PollGroup * const mt_nonnull poll_group,
+                    DeferredProcessor * const mt_nonnull deferred_processor,
                     Time        const session_keepalive_timeout,
 		    bool        const no_keepalive_conns)
 {
     this->poll_group = poll_group;
+    this->deferred_processor = deferred_processor;
 
-    rtmpt_server.init (timers, page_pool, session_keepalive_timeout, no_keepalive_conns);
+    rtmpt_server.init (timers, deferred_processor, page_pool, session_keepalive_timeout, no_keepalive_conns);
 
     if (!tcp_server.open ())
 	return Result::Failure;

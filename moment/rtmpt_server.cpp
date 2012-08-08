@@ -202,6 +202,7 @@ RtmptServer::RtmptSession::RtmptSession (RtmptServer * const rtmpt_server,
       session_id (0),
       weak_rtmpt_server (rtmpt_server),
       unsafe_rtmpt_server (rtmpt_server),
+      rtmpt_sender (this /* coderef_container */),
       rtmp_conn (this /* coderef_containter */, timers, page_pool),
       last_msg_time (0),
       session_keepalive_timer (NULL)
@@ -827,6 +828,7 @@ RtmptServer::addConnection (Connection              * const mt_nonnull conn,
     rtmpt_conn->conn = conn;
     rtmpt_conn->conn_cb_data = conn_cb_data;
     rtmpt_conn->ref_data = ref_data;
+    rtmpt_conn->conn_sender.init (deferred_processor);
     rtmpt_conn->conn_sender.setFrontend (CbDesc<Sender::Frontend> (&sender_frontend, rtmpt_conn, rtmpt_conn));
     rtmpt_conn->conn_sender.setConnection (conn);
     rtmpt_conn->conn_receiver.setConnection (conn);
@@ -863,8 +865,9 @@ RtmptServer::attachToHttpService (HttpService * const http_service,
 
 RtmptServer::RtmptServer (Object * const coderef_container)
     : DependentCodeReferenced (coderef_container),
-      timers (NULL),
-      page_pool (NULL),
+      timers             (coderef_container),
+      deferred_processor (coderef_container),
+      page_pool          (coderef_container),
       session_keepalive_timeout (30),
       no_keepalive_conns (false),
       session_id_counter (1)

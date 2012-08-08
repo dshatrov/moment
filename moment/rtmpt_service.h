@@ -40,7 +40,8 @@ private:
 	mt_mutex (mutex) PollGroup::PollableKey pollable_key;
     };
 
-    mt_const PollGroup *poll_group;
+    mt_const DataDepRef<PollGroup> poll_group;
+    mt_const DataDepRef<DeferredProcessor> deferred_processor;
 
     TcpServer tcp_server;
     RtmptServer rtmpt_server;
@@ -68,6 +69,7 @@ public:
     mt_const mt_throws Result init (Timers    * mt_nonnull timers,
                                     PagePool  * mt_nonnull page_pool,
                                     PollGroup * mt_nonnull poll_group,
+                                    DeferredProcessor * mt_nonnull deferred_processor,
                                     Time       session_keepalive_timeout,
                                     bool       no_keepalive_conns);
 
@@ -82,9 +84,10 @@ public:
 
     RtmptService (Object * const coderef_container)
 	: DependentCodeReferenced (coderef_container),
-	  poll_group (NULL),
-	  tcp_server (coderef_container),
-	  rtmpt_server (coderef_container)
+	  poll_group         (coderef_container),
+          deferred_processor (coderef_container),
+	  tcp_server         (coderef_container),
+	  rtmpt_server       (coderef_container)
     {
     }
 };

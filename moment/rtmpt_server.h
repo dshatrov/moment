@@ -46,7 +46,8 @@ public:
     };
 
 private:
-    class RtmptSender : public Sender
+    class RtmptSender : public Sender,
+                        public DependentCodeReferenced
     {
 	friend class RtmptServer;
 
@@ -79,8 +80,9 @@ private:
 
 	mt_mutex (sender_mutex) void sendPendingData (Sender * mt_nonnull sender);
 
-	RtmptSender ()
-	    : nonflushed_data_len (0),
+	RtmptSender (Object * const coderef_container)
+	    : DependentCodeReferenced (coderef_container),
+              nonflushed_data_len (0),
 	      pending_data_len (0),
 	      close_after_flush (false)
 	{
@@ -168,8 +170,9 @@ private:
 
     mt_const Cb<Frontend> frontend;
 
-    mt_const Timers *timers;
-    mt_const PagePool *page_pool;
+    mt_const DataDepRef<Timers>            timers;
+    mt_const DataDepRef<DeferredProcessor> deferred_processor;
+    mt_const DataDepRef<PagePool>          page_pool;
 
     mt_const Time session_keepalive_timeout;
     mt_const bool no_keepalive_conns;
@@ -283,11 +286,13 @@ public:
     }
 
     mt_const void init (Timers   * const timers,
+                        DeferredProcessor * const deferred_processor,
                         PagePool * const page_pool,
                         Time       const session_keepalive_timeout,
 			bool       const no_keepalive_conns)
     {
         this->timers = timers;
+        this->deferred_processor = deferred_processor;
         this->page_pool = page_pool;
 	this->session_keepalive_timeout = session_keepalive_timeout;
 	this->no_keepalive_conns = no_keepalive_conns;
