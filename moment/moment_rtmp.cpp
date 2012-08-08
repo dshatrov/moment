@@ -25,9 +25,9 @@
 
 // Needed for "start_paused" as well.
 // TODO This belongs to class RtmpConnection.
-#define MOMENT_RTMP__WAIT_FOR_KEYFRAME
+//#define MOMENT_RTMP__WAIT_FOR_KEYFRAME
 
-#define MOMENT_RTMP__AUDIO_WAITS_VIDEO
+//#define MOMENT_RTMP__AUDIO_WAITS_VIDEO
 
 // Flow control is disabled until done right.
 //#define MOMENT_RTMP__FLOW_CONTROL
@@ -295,12 +295,6 @@ void streamVideoMessage (VideoStream::VideoMessage * const mt_nonnull msg,
 
 	logD (framedrop, _func, "Connection overloaded, dropping video frame");
 
-	// TEST
-//      logLock ();
-//	logs->print (".");
-//	logs->flush ();
-//      logUnlock ();
-
 #ifdef MOMENT_RTMP__WAIT_FOR_KEYFRAME
 	client_session->no_keyframe_counter = 0;
 	client_session->keyframe_sent = false;
@@ -541,6 +535,29 @@ void startWatching_paramCallback (ConstMemory   const name,
 	watching_params->start_paused = true;
 }
 
+static mt_mutex (client_session) Result
+savedAudioFrame (VideoStream::AudioMessage * const mt_nonnull audio_msg,
+                 void                      * const _client_session)
+{
+    ClientSession * const client_session = static_cast <ClientSession*> (_client_session);
+    client_session->rtmp_conn->sendAudioMessage (audio_msg);
+    return Result::Success;
+}
+
+static mt_mutex (client_session) Result
+savedVideoFrame (VideoStream::VideoMessage * const mt_nonnull video_msg,
+                 void                      * const _client_session)
+{
+    ClientSession * const client_session = static_cast <ClientSession*> (_client_session);
+    client_session->rtmp_conn->sendVideoMessage (video_msg);
+    return Result::Success;
+}
+
+static VideoStream::FrameSaver::FrameHandler const saved_frame_handler = {
+    savedAudioFrame,
+    savedVideoFrame
+};
+
 Result startWatching (ConstMemory const &_stream_name,
 		      void * const _client_session)
 {
@@ -584,23 +601,24 @@ Result startWatching (ConstMemory const &_stream_name,
         client_session->mutex.lock ();
         // TODO Set watching_video_stream to NULL when it's not needed anymore.
         client_session->watching_video_stream = video_stream;
-        client_session->mutex.unlock ();
 
         video_stream->lock ();
         if (video_stream->isClosed_unlocked()) {
             video_stream->unlock ();
 
-            // TODO Repetitive locking of 'client_session' - bad.
-            client_session->mutex.lock ();
             client_session->watching_video_stream = NULL;
             client_session->mutex.unlock ();
-
             continue;
         }
 
-        client_session->rtmp_server.sendInitialMessages_unlocked (video_stream->getFrameSaver());
-        video_stream->getEventInformer()->subscribe_unlocked (&video_event_handler, client_session, NULL /* ref_data */, client_session);
-        video_stream->plusOneWatcher_unlocked (client_session /* guard_obj */);
+        video_stream->getFrameSaver()->reportSavedFrames (&saved_frame_handler, client_session);
+        client_session->mutex.unlock ();
+
+        video_stream->getEventInformer()->subscribe_unlocked (&video_event_handler,
+                                                              client_session,
+                                                              NULL /* ref_data */,
+                                                              client_session);
+        mt_async mt_unlocks_locks (video_stream->mutex) video_stream->plusOneWatcher_unlocked (client_session /* guard_obj */);
         video_stream->unlock ();
         break;
     }
@@ -982,7 +1000,9 @@ void momentRtmpInit ()
 	if (!rtmp_module->rtmpt_service.init (server_app->getServerContext()->getTimers(),
                                  moment->getPagePool(),
                                  // TODO setServerContext()
+                                 // TODO Pick a server thread context and pass it here.
                                  server_app->getServerContext()->getMainPollGroup(),
+                                 server_app->getMainThreadContext()->getDeferredProcessor(),
                                  rtmpt_session_timeout,
                                  rtmpt_no_keepalive_conns))
         {
