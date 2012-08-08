@@ -54,28 +54,49 @@ struct Options {
     }
 };
 
+Options options;
+
 const Count default__page_pool__min_pages     = 512;
 const Time  default__http__keepalive_timeout  =  60;
 
-Options options;
-MConfig::Config config;
+class MomentInstance : public Object
+{
+private:
+    MConfig::Config config;
 
-PagePool page_pool (4096 /* page_size */, default__page_pool__min_pages);
+    PagePool page_pool;
 
-ServerApp server_app (NULL /* coderef_container */);
-HttpService http_service (NULL /* coderef_container */);
+    ServerApp server_app;
+    HttpService http_service;
 
-HttpService separate_admin_http_service (NULL /* coderef_container */);
-HttpService *admin_http_service_ptr = &separate_admin_http_service;
+    HttpService separate_admin_http_service;
+    HttpService *admin_http_service_ptr;
 
-FixedThreadPool recorder_thread_pool (NULL /* coderef_container */);
+    FixedThreadPool recorder_thread_pool;
 
-LocalStorage storage;
+    LocalStorage storage;
 
-MomentServer moment_server;
+    MomentServer moment_server;
 
-mt_mutex (mutex) Timers::TimerKey exit_timer_key = NULL;
-Mutex mutex;
+    mt_mutex (mutex) Timers::TimerKey exit_timer_key;
+    Mutex mutex;
+
+    static void exitTimerTick (void * const /* cb_data */);
+
+public:
+    int run ();
+
+    MomentInstance ()
+        : page_pool    (this /* coderef_container */, 4096 /* page_size */, default__page_pool__min_pages),
+          server_app   (this /* coderef_container */),
+          http_service (this /* coderef_container */),
+          separate_admin_http_service (this /* coderef_container */),
+          admin_http_service_ptr (&separate_admin_http_service),
+          recorder_thread_pool (this /* coderef_container */),
+          exit_timer_key (NULL)
+    {
+    }
+};
 
 static void
 printUsage ()
@@ -170,92 +191,24 @@ cmdline_exit_after (char const * /* short_nmae */,
     return true;
 }
 
-static void exitTimerTick (void * const /* cb_data */)
+void
+MomentInstance::exitTimerTick (void * const _self)
 {
+    MomentInstance * const self = static_cast <MomentInstance*> (_self);
+
     logI_ (_func, "Exit timer expired (", options.exit_after, " seconds)");
-    mutex.lock ();
-    server_app.getServerContext()->getTimers()->deleteTimer (exit_timer_key);
-    mutex.unlock ();
+    self->mutex.lock ();
+    self->server_app.getServerContext()->getTimers()->deleteTimer (self->exit_timer_key);
+    self->mutex.unlock ();
 
 //    exit (0);
-    server_app.stop ();
+    self->server_app.stop ();
 }
 
-}
-
-int main (int argc, char **argv)
+int
+MomentInstance::run ()
 {
     int ret_res = 0;
-
-    MyCpp::myCppInit ();
-    libMaryInit ();
-
-    {
-	unsigned const num_opts = 6;
-	MyCpp::CmdlineOption opts [num_opts];
-
-	opts [0].short_name = "h";
-	opts [0].long_name  = "help";
-	opts [0].with_value = false;
-	opts [0].opt_data   = NULL;
-	opts [0].opt_callback = cmdline_help;
-
-	opts [1].short_name = "d";
-	opts [1].long_name  = "daemonize";
-	opts [1].with_value = false;
-	opts [1].opt_data   = NULL;
-	opts [1].opt_callback = cmdline_daemonize;
-
-	opts [2].short_name = "c";
-	opts [2].long_name  = "config";
-	opts [2].with_value = true;
-	opts [2].opt_data   = NULL;
-	opts [2].opt_callback = cmdline_config;
-
-	opts [3].short_name = "l";
-	opts [3].long_name  = "log";
-	opts [3].with_value = true;
-	opts [3].opt_data   = NULL;
-	opts [3].opt_callback = cmdline_log;
-
-	opts [4].short_name = "NULL";
-	opts [4].long_name = "loglevel";
-	opts [4].with_value = true;
-	opts [4].opt_data = NULL;
-	opts [4].opt_callback = cmdline_loglevel;
-
-	opts [5].short_name = NULL;
-	opts [5].long_name = "exit-after";
-	opts [5].with_value = true;
-	opts [5].opt_data = NULL;
-	opts [5].opt_callback = cmdline_exit_after;
-
-	MyCpp::ArrayIterator<MyCpp::CmdlineOption> opts_iter (opts, num_opts);
-	MyCpp::parseCmdline (&argc, &argv, opts_iter, NULL /* callback */, NULL /* callbackData */);
-    }
-
-    if (options.help) {
-        setGlobalLogLevel (LogLevel::Failure);
-	printUsage ();
-	return 0;
-    }
-
-// Unnecessary   getDefaultLogGroup()->setLogLevel (options.loglevel);
-    setGlobalLogLevel (options.loglevel);
-
-    if (options.daemonize) {
-#ifdef LIBMARY_PLATFORM_WIN32
-        logW_ (_func, "Daemonization is not supported on Windows");
-#else
-	logI_ (_func, "Daemonizing. Server log is at /var/log/moment.log");
-	int const res = daemon (1 /* nochdir */, 0 /* noclose */);
-	if (res == -1)
-	    logE_ (_func, "daemon() failed: ", errnoString (errno));
-	else
-	if (res != 0)
-	    logE_ (_func, "Unexpected return value from daemon(): ", res);
-#endif
-    }
 
     {
 	ConstMemory const config_filename = options.config_filename ?
@@ -384,6 +337,7 @@ int main (int argc, char **argv)
     {
 	if (!http_service.init (server_app.getServerContext()->getMainPollGroup(),
 				server_app.getServerContext()->getTimers(),
+                                server_app.getMainThreadContext()->getDeferredProcessor(),
 				&page_pool,
 				http_keepalive_timeout,
 				no_keepalive_conns))
@@ -445,6 +399,7 @@ int main (int argc, char **argv)
 
 	    if (!separate_admin_http_service.init (server_app.getServerContext()->getMainPollGroup(),
 						   server_app.getServerContext()->getTimers(),
+                                                   server_app.getMainThreadContext()->getDeferredProcessor(),
 						   &page_pool,
 						   http_keepalive_timeout,
 						   no_keepalive_conns))
@@ -500,8 +455,8 @@ int main (int argc, char **argv)
 	mutex.lock ();
 	exit_timer_key = server_app.getServerContext()->getTimers()->addTimer (
                 exitTimerTick,
-                NULL /* cb_data */,
-                NULL /* coderef_container */,
+                this /* cb_data */,
+                this /* coderef_container */,
                 options.exit_after,
                 false /* periodical */);
 	mutex.unlock ();
@@ -519,5 +474,83 @@ _stop_recorder:
     recorder_thread_pool.stop ();
 
     return ret_res;
+}
+
+} // namespace {}
+
+int main (int argc, char **argv)
+{
+    MyCpp::myCppInit ();
+    libMaryInit ();
+
+    {
+	unsigned const num_opts = 6;
+	MyCpp::CmdlineOption opts [num_opts];
+
+	opts [0].short_name = "h";
+	opts [0].long_name  = "help";
+	opts [0].with_value = false;
+	opts [0].opt_data   = NULL;
+	opts [0].opt_callback = cmdline_help;
+
+	opts [1].short_name = "d";
+	opts [1].long_name  = "daemonize";
+	opts [1].with_value = false;
+	opts [1].opt_data   = NULL;
+	opts [1].opt_callback = cmdline_daemonize;
+
+	opts [2].short_name = "c";
+	opts [2].long_name  = "config";
+	opts [2].with_value = true;
+	opts [2].opt_data   = NULL;
+	opts [2].opt_callback = cmdline_config;
+
+	opts [3].short_name = "l";
+	opts [3].long_name  = "log";
+	opts [3].with_value = true;
+	opts [3].opt_data   = NULL;
+	opts [3].opt_callback = cmdline_log;
+
+	opts [4].short_name = "NULL";
+	opts [4].long_name = "loglevel";
+	opts [4].with_value = true;
+	opts [4].opt_data = NULL;
+	opts [4].opt_callback = cmdline_loglevel;
+
+	opts [5].short_name = NULL;
+	opts [5].long_name = "exit-after";
+	opts [5].with_value = true;
+	opts [5].opt_data = NULL;
+	opts [5].opt_callback = cmdline_exit_after;
+
+	MyCpp::ArrayIterator<MyCpp::CmdlineOption> opts_iter (opts, num_opts);
+	MyCpp::parseCmdline (&argc, &argv, opts_iter, NULL /* callback */, NULL /* callbackData */);
+    }
+
+    if (options.help) {
+        setGlobalLogLevel (LogLevel::Failure);
+	printUsage ();
+	return 0;
+    }
+
+// Unnecessary   getDefaultLogGroup()->setLogLevel (options.loglevel);
+    setGlobalLogLevel (options.loglevel);
+
+    if (options.daemonize) {
+#ifdef LIBMARY_PLATFORM_WIN32
+        logW_ (_func, "Daemonization is not supported on Windows");
+#else
+	logI_ (_func, "Daemonizing. Server log is at /var/log/moment.log");
+	int const res = daemon (1 /* nochdir */, 0 /* noclose */);
+	if (res == -1)
+	    logE_ (_func, "daemon() failed: ", errnoString (errno));
+	else
+	if (res != 0)
+	    logE_ (_func, "Unexpected return value from daemon(): ", res);
+#endif
+    }
+
+    Ref<MomentInstance> const moment_instance = grab (new MomentInstance);
+    return moment_instance->run ();
 }
 
