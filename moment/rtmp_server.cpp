@@ -607,66 +607,34 @@ VideoStream::FrameSaver::FrameHandler const RtmpServer::saved_frame_handler = {
     savedVideoFrame
 };
 
-void
+Result
 RtmpServer::savedAudioFrame (VideoStream::AudioMessage * const mt_nonnull audio_msg,
                              void                      * const _self)
 {
     RtmpServer * const self = static_cast <RtmpServer*> (_self);
-    VideoStream::AudioMessage tmp_audio_msg = *audio_msg;
-    tmp_audio_msg.timestamp = 0;
-    self->rtmp_conn->sendAudioMessage (&tmp_audio_msg);
+//    VideoStream::AudioMessage tmp_audio_msg = *audio_msg;
+//    tmp_audio_msg.timestamp = 0;
+//    self->rtmp_conn->sendAudioMessage (&tmp_audio_msg);
+    self->rtmp_conn->sendAudioMessage (audio_msg);
+    return Result::Success;
 }
 
-void
+Result
 RtmpServer::savedVideoFrame (VideoStream::VideoMessage * const mt_nonnull video_msg,
                              void                      * const _self)
 {
     RtmpServer * const self = static_cast <RtmpServer*> (_self);
-    VideoStream::VideoMessage tmp_video_msg = *video_msg;
-    tmp_video_msg.timestamp = 0;
-    self->rtmp_conn->sendVideoMessage (&tmp_video_msg);
+//    VideoStream::VideoMessage tmp_video_msg = *video_msg;
+//    tmp_video_msg.timestamp = 0;
+//    self->rtmp_conn->sendVideoMessage (&tmp_video_msg);
+    self->rtmp_conn->sendVideoMessage (video_msg);
+    return Result::Success;
 }
 
 void
 RtmpServer::sendInitialMessages_unlocked (VideoStream::FrameSaver * const mt_nonnull frame_saver)
 {
     frame_saver->reportSavedFrames (&saved_frame_handler, this);
-
-#if 0
-// Deprecated
-
-    VideoStream::SavedFrame saved_frame;
-    VideoStream::SavedAudioFrame saved_audio_frame;
-
-    if (frame_saver->getSavedMetaData (&saved_frame)) {
-	saved_frame.msg.timestamp = 0;
-	sendVideoMessage (&saved_frame.msg);
-    }
-
-    if (frame_saver->getSavedAacSeqHdr (&saved_audio_frame)) {
-	saved_audio_frame.msg.timestamp = 0;
-	sendAudioMessage (&saved_audio_frame.msg);
-    }
-
-    if (frame_saver->getSavedAvcSeqHdr (&saved_frame)) {
-	saved_frame.msg.timestamp = 0;
-	sendVideoMessage (&saved_frame.msg);
-    }
-
-    if (frame_saver->getNumSavedSpeexHeaders () > 0) {
-	VideoStream::SavedAudioFrame saved_speex_frames [2];
-	frame_saver->getSavedSpeexHeaders (saved_speex_frames, 2);
-	for (Count i = 0; i < frame_saver->getNumSavedSpeexHeaders(); ++i) {
-	    saved_speex_frames [i].msg.timestamp = 0;
-	    sendAudioMessage (&saved_speex_frames [i].msg);
-	}
-    }
-
-    if (frame_saver->getSavedKeyframe (&saved_frame)) {
-	saved_frame.msg.timestamp = 0;
-	sendVideoMessage (&saved_frame.msg);
-    }
-#endif
 }
 
 Result

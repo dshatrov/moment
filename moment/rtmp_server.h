@@ -97,16 +97,19 @@ private:
 
     static VideoStream::FrameSaver::FrameHandler const saved_frame_handler;
 
-    static void savedAudioFrame (VideoStream::AudioMessage * mt_nonnull audio_msg,
-                                 void                      *_self);
+    static Result savedAudioFrame (VideoStream::AudioMessage * mt_nonnull audio_msg,
+                                   void                      *_self);
 
-    static void savedVideoFrame (VideoStream::VideoMessage * mt_nonnull video_msg,
-                                 void                      *_self);
+    static Result savedVideoFrame (VideoStream::VideoMessage * mt_nonnull video_msg,
+                                   void                      *_self);
 
   mt_iface_end
 
 public:
     // Helper method. Sends saved onMetaData, AvcSequenceHeader, KeyFrame.
+    //
+    // TODO This method doesn't belong here, and it has unclear locking semantics.
+    //      Get rid of it and use FrameSaver directly instead.
     void sendInitialMessages_unlocked (VideoStream::FrameSaver * mt_nonnull frame_saver);
 
     Result commandMessage (VideoStream::Message * mt_nonnull msg,
