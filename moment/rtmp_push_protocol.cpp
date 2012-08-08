@@ -236,28 +236,34 @@ VideoStream::FrameSaver::FrameHandler const RtmpPushConnection::saved_frame_hand
     savedVideoFrame
 };
 
-void
+Result
 RtmpPushConnection::savedAudioFrame (VideoStream::AudioMessage * const mt_nonnull audio_msg,
                                      void                      * const _session)
 {
     Session * const session = static_cast <Session*> (_session);
 
-    VideoStream::AudioMessage tmp_audio_msg = *audio_msg;
-    tmp_audio_msg.timestamp = 0;
+//    VideoStream::AudioMessage tmp_audio_msg = *audio_msg;
+//    tmp_audio_msg.timestamp = 0;
+//
+//    session->rtmp_conn.sendAudioMessage (&tmp_audio_msg);
 
-    session->rtmp_conn.sendAudioMessage (&tmp_audio_msg);
+    session->rtmp_conn.sendAudioMessage (audio_msg);
+    return Result::Success;
 }
 
-void
+Result
 RtmpPushConnection::savedVideoFrame (VideoStream::VideoMessage * const mt_nonnull video_msg,
                                      void                      * const _session)
 {
     Session * const session = static_cast <Session*> (_session);
 
-    VideoStream::VideoMessage tmp_video_msg = *video_msg;
-    tmp_video_msg.timestamp = 0;
+//    VideoStream::VideoMessage tmp_video_msg = *video_msg;
+//    tmp_video_msg.timestamp = 0;
+//
+//    session->rtmp_conn.sendVideoMessage (&tmp_video_msg);
 
-    session->rtmp_conn.sendVideoMessage (&tmp_video_msg);
+    session->rtmp_conn.sendVideoMessage (video_msg);
+    return Result::Success;
 }
 
 Result
@@ -303,6 +309,7 @@ RtmpPushConnection::commandMessage (VideoStream::Message * const mt_nonnull msg,
 
                 session->conn_state = ConnectionState_Streaming;
                 self->video_stream->getFrameSaver()->reportSavedFrames (&saved_frame_handler, session);
+//#error Synchronization: no frames should be lost between reportSavedFrames and publishing.set()
                 session->publishing.set (1);
             } break;
             case ConnectionState_PublishSent: {
