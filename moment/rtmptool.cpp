@@ -426,10 +426,16 @@ startClients (PagePool  * const page_pool,
 class ClientThreadData : public Referenced
 {
 public:
-    PagePool *page_pool;
-    ServerApp *server_app;
+    DataDepRef<PagePool>  page_pool;
+    DataDepRef<ServerApp> server_app;
 
     IpAddress server_addr;
+
+    ClientThreadData ()
+        : page_pool  (NULL /* coderef_container */),
+          server_app (NULL /* coderef_container */)
+    {
+    }
 };
 
 void clientThreadFunc (void * const _client_thread_data)
@@ -450,11 +456,25 @@ void clientThreadFunc (void * const _client_thread_data)
     logD_ (_func, "done");
 }
 
-Result doTest (void)
+class RtmptoolInstance : public Object
 {
-    PagePool page_pool (4096 /* page_size */, 4096 /* min_pages */);
+private:
+    PagePool page_pool;
+    ServerApp server_app;
 
-    ServerApp server_app (NULL /* coderef_container */);
+public:
+    Result run ();
+
+    RtmptoolInstance ()
+        : page_pool  (this /* coderef_container */, 4096 /* page_size */, 4096 /* min_pages */),
+          server_app (this /* coderef_container */)
+    {
+    }
+};
+
+Result
+RtmptoolInstance::run (void)
+{
     if (!server_app.init ()) {
 	logE_ (_func, "server_app.init() failed: ", exc->toString());
 	return Result::Failure;
@@ -731,7 +751,8 @@ int main (int argc, char **argv)
 	return 0;
     }
 
-    if (doTest ())
+    Ref<RtmptoolInstance> const rtmptool_instance = grab (new RtmptoolInstance);
+    if (rtmptool_instance->run ())
 	return 0;
 
     return EXIT_FAILURE;
