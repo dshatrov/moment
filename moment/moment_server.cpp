@@ -434,22 +434,22 @@ MomentServer::loadModules ()
 
 #ifdef LIBMARY_PLATFORM_WIN32
     {
-        if (!loadModule ("C:/MinGW/msys/1.0/opt/moment/lib/bin/libmoment-file-1.0-0.dll"))
+        if (!loadModule ("../lib/bin/libmoment-file-1.0-0.dll"))
             logE_ (_func, "Could not load mod_file (win32)");
 
-        if (!loadModule ("C:/MinGW/msys/1.0/opt/moment/lib/bin/libmoment-rtmp-1.0-0.dll"))
+        if (!loadModule ("../lib/bin/libmoment-rtmp-1.0-0.dll"))
             logE_ (_func, "Could not load mod_rtmp (win32)");
 
-        if (!loadModule ("C:/MinGW/msys/1.0/opt/moment/lib/bin/libmoment-gst-1.0-0.dll"))
+        if (!loadModule ("../lib/bin/libmoment-gst-1.0-0.dll"))
             logE_ (_func, "Could not load mod_gst (win32)");
 
-        if (!loadModule ("C:/MinGW/msys/1.0/opt/moment/lib/bin/libmoment-mychat-1.0-0.dll"))
+        if (!loadModule ("../lib/bin/libmoment-mychat-1.0-0.dll"))
             logE_ (_func, "Could not load mychat module (win32)");
 
-        if (!loadModule ("C:/MinGW/msys/1.0/opt/moment/lib/bin/libmoment-test-1.0-0.dll"))
+        if (!loadModule ("../lib/bin/libmoment-test-1.0-0.dll"))
             logE_ (_func, "Could not load mychat module (win32)");
 
-        if (!loadModule ("C:/MinGW/msys/1.0/opt/moment/lib/bin/libmoment-lectorium-1.0-0.dll"))
+        if (!loadModule ("../lib/bin/libmoment-lectorium-1.0-0.dll"))
             logE_ (_func, "Could not load lectorium (win32)");
     }
 #endif
@@ -1061,7 +1061,7 @@ MomentServer::MomentServer ()
     instance = this;
 
     vs_added_inform_task.cb = CbDesc<DeferredProcessor::TaskCallback> (
-            videoStreamAddedInformTask, this /* cb_data */, NULL /* coderef_container */);
+            videoStreamAddedInformTask, this /* cb_data */, this /* coderef_container */);
 }
 
 MomentServer::~MomentServer ()
