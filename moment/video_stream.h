@@ -273,6 +273,8 @@ public:
 	bool got_saved_keyframe;
 	SavedFrame saved_keyframe;
 
+        List<SavedFrame> saved_interframes;
+
 	bool got_saved_metadata;
 	SavedFrame saved_metadata;
 
@@ -283,6 +285,8 @@ public:
 	SavedFrame saved_avc_seq_hdr;
 
 	List<SavedAudioFrame*> saved_speex_headers;
+
+        void releaseSavedInterframes ();
 
 	void releaseSavedSpeexHeaders ();
 
@@ -310,15 +314,15 @@ public:
 
         struct FrameHandler
         {
-            mt_unlocks_locks (mutex) void (*audioFrame) (AudioMessage * mt_nonnull audio_msg,
-                                                         void         *cb_data);
+            Result (*audioFrame) (AudioMessage * mt_nonnull audio_msg,
+                                  void         *cb_data);
 
-            mt_unlocks_locks (mutex) void (*videoFrame) (VideoMessage * mt_nonnull video_msg,
-                                                         void         *cb_data);
+            Result (*videoFrame) (VideoMessage * mt_nonnull video_msg,
+                                  void         *cb_data);
         };
 
-        mt_unlocks_locks (mutex) void reportSavedFrames (FrameHandler const * mt_nonnull frame_handler,
-                                                         void               *cb_data);
+        Result reportSavedFrames (FrameHandler const * mt_nonnull frame_handler,
+                                  void               *cb_data);
 
 	FrameSaver ();
 
@@ -415,11 +419,11 @@ private:
 
     static FrameSaver::FrameHandler const bind_frame_handler;
 
-    static mt_unlocks_locks (mutex) void bind_savedAudioFrame (AudioMessage * mt_nonnull audio_msg,
-                                                               void         *_self);
+    static mt_unlocks_locks (mutex) Result bind_savedAudioFrame (AudioMessage * mt_nonnull audio_msg,
+                                                                 void         *_self);
 
-    static mt_unlocks_locks (mutex) void bind_savedVideoFrame (VideoMessage * mt_nonnull video_msg,
-                                                               void         *_self);
+    static mt_unlocks_locks (mutex) Result bind_savedVideoFrame (VideoMessage * mt_nonnull video_msg,
+                                                                 void         *_self);
 
   mt_iface_end
 
@@ -487,17 +491,17 @@ public:
     // for any 'guard_obj' instance. If 'guard_obj' is not null, then minusOneWatcher()
     // should not be called to cancel the effect of plusOneWatcher().
     // That will be done automatically when 'guard_obj' is destroyed.
-    void plusOneWatcher (Object *guard_obj = NULL);
-    mt_unlocks_locks (mutex) void plusOneWatcher_unlocked (Object *guard_obj = NULL);
+    mt_async void plusOneWatcher (Object *guard_obj = NULL);
+    mt_async mt_unlocks_locks (mutex) void plusOneWatcher_unlocked (Object *guard_obj = NULL);
 
-    void minusOneWatcher ();
-    mt_unlocks_locks (mutex) void minusOneWatcher_unlocked ();
+    mt_async void minusOneWatcher ();
+    mt_async mt_unlocks_locks (mutex) void minusOneWatcher_unlocked ();
 
-    void plusWatchers (Count delta);
-    mt_unlocks_locks (mutex) void plusWatchers_unlocked (Count delta);
+    mt_async void plusWatchers (Count delta);
+    mt_async mt_unlocks_locks (mutex) void plusWatchers_unlocked (Count delta);
 
-    void minusWatchers (Count delta);
-    mt_unlocks_locks (mutex) void minusWatchers_unlocked (Count delta);
+    mt_async void minusWatchers (Count delta);
+    mt_async mt_unlocks_locks (mutex) void minusWatchers_unlocked (Count delta);
 
     mt_mutex (mutex) bool getNumWatchers_unlocked ()
     {
