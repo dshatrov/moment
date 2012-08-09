@@ -70,7 +70,7 @@ RtmpService::acceptOneConnection ()
 
     Ref<ClientSession> const session = grab (new ClientSession);
     session->thread_ctx = thread_ctx;
-    session->rtmp_conn.init (thread_ctx->getTimers(), page_pool, send_delay);
+    session->rtmp_conn.init (thread_ctx->getTimers(), page_pool, send_delay, prechunking_enabled);
 
 // TEST
 //    session->traceReferences ();
@@ -175,8 +175,10 @@ RtmpService::accepted (void * const _self)
 }
 
 mt_throws Result
-RtmpService::init ()
+RtmpService::init (bool const prechunking_enabled)
 {
+    this->prechunking_enabled = prechunking_enabled;
+
     if (!tcp_server.open ())
 	return Result::Failure;
 
@@ -204,6 +206,16 @@ RtmpService::start ()
 	return Result::Failure;
 
     return Result::Success;
+}
+
+RtmpService::RtmpService (Object * const coderef_container)
+    : DependentCodeReferenced (coderef_container),
+      prechunking_enabled (true),
+      server_ctx (NULL),
+      page_pool (NULL),
+      send_delay (0),
+      tcp_server (coderef_container)
+{
 }
 
 RtmpService::~RtmpService ()

@@ -195,15 +195,13 @@ RtmptServer::RtmptSender::~RtmptSender ()
 }
 
 
-RtmptServer::RtmptSession::RtmptSession (RtmptServer * const rtmpt_server,
-					 Timers      * const timers,
-					 PagePool    * const page_pool)
+RtmptServer::RtmptSession::RtmptSession (RtmptServer * const rtmpt_server)
     : valid (true),
       session_id (0),
       weak_rtmpt_server (rtmpt_server),
       unsafe_rtmpt_server (rtmpt_server),
       rtmpt_sender (this /* coderef_container */),
-      rtmp_conn (this /* coderef_containter */, timers, page_pool),
+      rtmp_conn    (this /* coderef_containter */),
       last_msg_time (0),
       session_keepalive_timer (NULL)
 {
@@ -390,11 +388,12 @@ RtmptServer::doOpen (Sender * const mt_nonnull conn_sender,
 {
     logD (rtmpt, _func_);
 
-    Ref<RtmptSession> const session = grab (new RtmptSession (this, timers, page_pool));
+    Ref<RtmptSession> const session = grab (new RtmptSession (this));
 
     session->session_id = session_id_counter;
     ++session_id_counter;
 
+    session->rtmp_conn.init (timers, page_pool, 0 /* send_delay_millisec */, prechunking_enabled);
     session->rtmp_conn.setBackend (
 	    Cb<RtmpConnection::Backend> (
 		    &rtmp_conn_backend,
@@ -737,8 +736,8 @@ RtmptServer::service_httpRequest (HttpRequest   * const mt_nonnull req,
 
 // TODO Code duplication with httpMessaggeBody()
 Result
-RtmptServer::service_httpMessageBody (HttpRequest  * const mt_nonnull req,
-				      Sender       * const mt_nonnull conn_sender,
+RtmptServer::service_httpMessageBody (HttpRequest  * const mt_nonnull /* req */,
+				      Sender       * const mt_nonnull /* conn_sender */,
 				      Memory const &mem,
 				      bool           const end_of_request,
 				      Size         * const mt_nonnull ret_accepted,
@@ -847,6 +846,7 @@ RtmptServer::addConnection (Connection              * const mt_nonnull conn,
 
 void
 RtmptServer::attachToHttpService (HttpService * const http_service,
+                                  // TODO Use path?
 				  ConstMemory   const path)
 {
     ConstMemory const paths [] = { "send", "idle", "open", "close", "fcs" };
@@ -863,14 +863,31 @@ RtmptServer::attachToHttpService (HttpService * const http_service,
     }
 }
 
+mt_const void
+RtmptServer::init (Timers   * const timers,
+                   DeferredProcessor * const deferred_processor,
+                   PagePool * const page_pool,
+                   Time       const session_keepalive_timeout,
+                   bool       const no_keepalive_conns,
+                   bool       const prechunking_enabled)
+{
+    this->timers = timers;
+    this->deferred_processor = deferred_processor;
+    this->page_pool = page_pool;
+    this->session_keepalive_timeout = session_keepalive_timeout;
+    this->no_keepalive_conns = no_keepalive_conns;
+    this->prechunking_enabled = prechunking_enabled;
+}
+
 RtmptServer::RtmptServer (Object * const coderef_container)
-    : DependentCodeReferenced (coderef_container),
-      timers             (coderef_container),
-      deferred_processor (coderef_container),
-      page_pool          (coderef_container),
+    : DependentCodeReferenced   (coderef_container),
+      prechunking_enabled       (prechunking_enabled),
+      timers                    (coderef_container),
+      deferred_processor        (coderef_container),
+      page_pool                 (coderef_container),
       session_keepalive_timeout (30),
-      no_keepalive_conns (false),
-      session_id_counter (1)
+      no_keepalive_conns        (false),
+      session_id_counter        (1)
 {
 }
 

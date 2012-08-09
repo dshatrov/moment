@@ -68,7 +68,8 @@ RtmpPushConnection::startNewSession (Session * const old_session)
                              // It is expected that there will be few push RTMP conns.
                              // Using non-zero send delay gives negligible performance
                              // increase in this case.
-                             0 /* send_delay_millisec */);
+                             0    /* send_delay_millisec */,
+                             true /* prechunking_enabled */);
 
     // 'session' is surely referenced when a callback is called, because it serves
     // as a coderef container for 'rtmp_conn'. Same for 'tcp_conn'.

@@ -947,6 +947,23 @@ void momentRtmpInit ()
 	logI_ (_func, opt_name, ": ", recording_limit);
     }
 
+    bool prechunking_enabled = true;
+    {
+        ConstMemory const opt_name = "mod_rtmp/prechunking";
+        MConfig::BooleanValue const value = config->getBoolean (opt_name);
+        if (value == MConfig::Boolean_Invalid) {
+            logE_ (_func, "Invalid value for ", opt_name, ": ", config->getString (opt_name),
+                   ", assuming \"", prechunking_enabled, "\"");
+        } else {
+            if (value == MConfig::Boolean_False)
+                prechunking_enabled = false;
+            else
+                prechunking_enabled = true;
+
+            logI_ (_func, opt_name, ": ", prechunking_enabled);
+        }
+    }
+
     {
 	rtmp_module->rtmp_service.setFrontend (Cb<RtmpVideoService::Frontend> (
 		&rtmp_video_service_frontend, NULL, NULL));
@@ -954,7 +971,7 @@ void momentRtmpInit ()
 	rtmp_module->rtmp_service.setServerContext (server_app->getServerContext());
 	rtmp_module->rtmp_service.setPagePool (moment->getPagePool());
 
-	if (!rtmp_module->rtmp_service.init()) {
+	if (!rtmp_module->rtmp_service.init (prechunking_enabled)) {
 	    logE_ (_func, "rtmp_service.init() failed: ", exc->toString());
 	    return;
 	}
@@ -1004,7 +1021,8 @@ void momentRtmpInit ()
                                  server_app->getServerContext()->getMainPollGroup(),
                                  server_app->getMainThreadContext()->getDeferredProcessor(),
                                  rtmpt_session_timeout,
-                                 rtmpt_no_keepalive_conns))
+                                 rtmpt_no_keepalive_conns,
+                                 prechunking_enabled))
         {
 	    logE_ (_func, "rtmpt_service.init() failed: ", exc->toString());
 	    return;
@@ -1084,9 +1102,9 @@ void momentRtmpUnload ()
 {
 }
 
-}
+} // namespace {}
 
-}
+} // namespace Moment
 
 
 namespace M {

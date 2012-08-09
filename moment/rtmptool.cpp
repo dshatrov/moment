@@ -363,7 +363,10 @@ RtmpClient::init (ServerThreadContext * const thread_ctx,
 
     conn_sender.setQueue (thread_ctx->getDeferredConnectionSenderQueue());
 
-    rtmp_conn.init (thread_ctx->getTimers(), page_pool);
+    rtmp_conn.init (thread_ctx->getTimers(),
+                    page_pool,
+                    0    /* send_delay_millisec */,
+                    true /* prechunking_enabled */);
 }
 
 RtmpClient::RtmpClient (Object * const coderef_container,

@@ -2671,62 +2671,16 @@ RtmpConnection::fireVideoMessage (VideoStream::VideoMessage * const mt_nonnull v
     return res;
 }
 
-// Deprecated constructor
-RtmpConnection::RtmpConnection (Object     * const coderef_container,
-				Timers     * mt_nonnull const timers,
-				PagePool   * mt_nonnull const page_pool)
-    : DependentCodeReferenced (coderef_container),
-
-      timers (timers),
-	
-      page_pool (page_pool),
-      sender (NULL),
-
-      prechunking_enabled (true),
-      send_delay (0),
-
-      ping_send_timer (NULL),
-
-      in_chunk_size  (DefaultChunkSize),
-      out_chunk_size (DefaultChunkSize),
-
-      out_got_first_timestamp (false),
-      out_first_timestamp (0),
-      out_first_frames_counter (0),
-
-      out_last_flush_time (0),
-
-      extended_timestamp_is_delta (false),
-      ignore_extended_timestamp (false),
-
-      processing_input (false),
-      block_input (false),
-
-      remote_wack_size (1 << 20 /* 1 Mb */),
-
-      total_received (0),
-      last_ack (0),
-
-      conn_state (ReceiveState::Invalid),
-
-      local_wack_size (1 << 20 /* 1 Mb */)
-{
-    resetChunkRecvState ();
-
-    control_chunk_stream = getChunkStream (2, true /* create */);
-    data_chunk_stream    = getChunkStream (DefaultDataChunkStreamId,  true /* create */);
-    audio_chunk_stream   = getChunkStream (DefaultAudioChunkStreamId, true /* create */);
-    video_chunk_stream   = getChunkStream (DefaultVideoChunkStreamId, true /* create */);
-}
-
 mt_const void
 RtmpConnection::init (Timers     * const mt_nonnull timers,
 		      PagePool   * const mt_nonnull page_pool,
-		      Time         const send_delay)
+		      Time         const send_delay,
+                      bool         const prechunking_enabled)
 {
     this->timers = timers;
     this->page_pool = page_pool;
     this->send_delay = send_delay;
+    this->prechunking_enabled = prechunking_enabled;
 }
 
 RtmpConnection::RtmpConnection (Object * const coderef_container)

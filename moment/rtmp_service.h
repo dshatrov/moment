@@ -74,6 +74,8 @@ private:
 
     typedef IntrusiveList<ClientSession, SessionList_name> SessionList;
 
+    mt_const bool prechunking_enabled;
+
     mt_const ServerContext *server_ctx;
     mt_const PagePool *page_pool;
     mt_const Time send_delay;
@@ -105,7 +107,7 @@ private:
   mt_iface_end
 
 public:
-    mt_throws Result init ();
+    mt_throws Result init (bool const prechunking_enabled);
 
     mt_throws Result bind (IpAddress const &addr);
 
@@ -126,14 +128,7 @@ public:
 	this->send_delay = send_delay;
     }
 
-    RtmpService (Object * const coderef_container)
-	: DependentCodeReferenced (coderef_container),
-	  server_ctx (NULL),
-	  page_pool (NULL),
-	  send_delay (0),
-	  tcp_server (coderef_container)
-    {
-    }
+    RtmpService (Object *coderef_container);
 
     ~RtmpService ();
 };

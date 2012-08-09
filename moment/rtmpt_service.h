@@ -71,7 +71,8 @@ public:
                                     PollGroup * mt_nonnull poll_group,
                                     DeferredProcessor * mt_nonnull deferred_processor,
                                     Time       session_keepalive_timeout,
-                                    bool       no_keepalive_conns);
+                                    bool       no_keepalive_conns,
+                                    bool       prechunking_enabled);
 
     mt_throws Result bind (IpAddress const &addr);
 

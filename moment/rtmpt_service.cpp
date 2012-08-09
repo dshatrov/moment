@@ -136,12 +136,13 @@ RtmptService::init (Timers    * const mt_nonnull timers,
                     PollGroup * const mt_nonnull poll_group,
                     DeferredProcessor * const mt_nonnull deferred_processor,
                     Time        const session_keepalive_timeout,
-		    bool        const no_keepalive_conns)
+		    bool        const no_keepalive_conns,
+                    bool        const prechunking_enabled)
 {
     this->poll_group = poll_group;
     this->deferred_processor = deferred_processor;
 
-    rtmpt_server.init (timers, deferred_processor, page_pool, session_keepalive_timeout, no_keepalive_conns);
+    rtmpt_server.init (timers, deferred_processor, page_pool, session_keepalive_timeout, no_keepalive_conns, prechunking_enabled);
 
     if (!tcp_server.open ())
 	return Result::Failure;

@@ -602,14 +602,10 @@ public:
 
     Result fireVideoMessage (VideoStream::VideoMessage * mt_nonnull video_msg);
 
-    // Deprecated constructor.
-    RtmpConnection (Object   *coderef_container,
-		    Timers   * mt_nonnull timers,
-		    PagePool * mt_nonnull page_pool);
-
     mt_const void init (Timers   * mt_nonnull timers,
 			PagePool * mt_nonnull page_pool,
-			Time      send_delay_millisec = 0);
+			Time      send_delay_millisec,
+                        bool      prechunking_enabled);
 
     RtmpConnection (Object *coderef_container);
 

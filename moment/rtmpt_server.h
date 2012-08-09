@@ -116,9 +116,7 @@ private:
 	mt_mutex (RtmptServer::mutex) Time last_msg_time;
 	mt_mutex (RtmptServer::mutex) Timers::TimerKey session_keepalive_timer;
 
-	RtmptSession (RtmptServer *rtmpt_server,
-		      Timers      *timers,
-		      PagePool    *page_pool);
+	RtmptSession (RtmptServer *rtmpt_server);
 
 	~RtmptSession ();
     };
@@ -167,6 +165,8 @@ private:
 	    delete conn;
 	}
     };
+
+    mt_const bool prechunking_enabled;
 
     mt_const Cb<Frontend> frontend;
 
@@ -285,18 +285,12 @@ public:
 	this->frontend = frontend;
     }
 
-    mt_const void init (Timers   * const timers,
-                        DeferredProcessor * const deferred_processor,
-                        PagePool * const page_pool,
-                        Time       const session_keepalive_timeout,
-			bool       const no_keepalive_conns)
-    {
-        this->timers = timers;
-        this->deferred_processor = deferred_processor;
-        this->page_pool = page_pool;
-	this->session_keepalive_timeout = session_keepalive_timeout;
-	this->no_keepalive_conns = no_keepalive_conns;
-    }
+    mt_const void init (Timers   *timers,
+                        DeferredProcessor *deferred_processor,
+                        PagePool *page_pool,
+                        Time      session_keepalive_timeout,
+			bool      no_keepalive_conns,
+                        bool      prechunking_enabled);
 
     RtmptServer (Object *coderef_container);
 
