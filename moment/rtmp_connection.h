@@ -221,8 +221,8 @@ public:
 	    prechunk_offset = 0;
 	}
 
-	PrechunkContext ()
-	    : prechunk_offset (0)
+	PrechunkContext (Size const initial_offset = 0)
+	    : prechunk_offset (initial_offset)
 	{
 	}
     };
