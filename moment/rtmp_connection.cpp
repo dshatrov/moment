@@ -1505,7 +1505,7 @@ RtmpConnection::processMessage (ChunkStream * const chunk_stream)
 //			logD (proto_in, "audio header: 0x", fmt_hex, (unsigned) page->getData() [0]);
 
 			Byte const codec_id = (page->getData() [0] & 0xf0) >> 4;
-                        unsigned const rate = flvSamplingRateToNumeric (page->getData() [0] & 0x0c >> 2);
+                        unsigned const rate = flvSamplingRateToNumeric ((page->getData() [0] & 0x0c) >> 2);
                         unsigned const channels = (page->getData() [0] & 1) + 1;
 
 			audio_msg.codec_id = VideoStream::AudioCodecId::fromFlvCodecId (codec_id);

@@ -61,6 +61,7 @@ static inline unsigned numericSamplingRateToFlv (unsigned const rate)
             return 0;
         case 8000:
         case 11025:
+        case 16000:
             return 1;
         case 22050:
             return 2;

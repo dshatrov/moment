@@ -300,7 +300,7 @@ RtmpClient::audioMessage (VideoStream::AudioMessage * const mt_nonnull msg,
 {
     if (options.dump_frames) {
         logD (frame_dump, _func, "ts: 0x", fmt_hex, msg->timestamp, " (", fmt_def, msg->timestamp, ") ",
-              msg->codec_id, " ", msg->frame_type);
+              msg->codec_id, " ", msg->frame_type, ", rate ", msg->rate, ", ", msg->channels, " channels");
     }
 
     return Result::Success;

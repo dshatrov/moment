@@ -96,12 +96,26 @@ unsigned fillFlvAudioHeader (VideoStream::AudioMessage * const mt_nonnull audio_
             break;
     }
 
+    unsigned rate = audio_msg->rate;
+    unsigned channels = audio_msg->channels;
+
+    if (audio_msg->codec_id == VideoStream::AudioCodecId::AAC) {
+      // FLV spec forces these values.
+        rate = 44100;
+        channels = 2;
+    } else
+    if (audio_msg->codec_id == VideoStream::AudioCodecId::Speex) {
+      // FLV spec forces these values.
+        rate = 5512;
+        channels = 1;
+    }
+
     audio_hdr |= 0x02; // 16-bit samples
 
-    if (audio_msg->channels > 1)
+    if (channels > 1)
         audio_hdr |= 1; // stereo
 
-    switch (audio_msg->rate) {
+    switch (rate) {
         case 8000:
             if (audio_msg->codec_id == VideoStream::AudioCodecId::MP3) {
                 audio_hdr &= 0x0f;
@@ -113,7 +127,9 @@ unsigned fillFlvAudioHeader (VideoStream::AudioMessage * const mt_nonnull audio_
         case 5512:
         case 5513:
             audio_hdr |= 0x00; // 5.5 kHz
+            break;
         case 11025:
+        case 16000:
             audio_hdr |= 0x04; // 11 kHz
             break;
         case 22050:
@@ -129,6 +145,8 @@ unsigned fillFlvAudioHeader (VideoStream::AudioMessage * const mt_nonnull audio_
 
     mem.mem() [0] = audio_hdr;
     mem.mem() [1] = audio_hdr_ext;
+
+//    logD_ (_func, "audio_hdr: 0x", fmt_hex, audio_hdr, ", audio_hdr_len: ", audio_hdr_len);
 
     return audio_hdr_len;
 }
