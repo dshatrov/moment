@@ -91,7 +91,8 @@ public: // Temporally public
 	//  4 bytes - extended timestamp;
 	//  3 bytes - fix chunk basic header;
 	//  7 bytes - fix chunk message header (type 1).
-	MaxHeaderLen = 28
+        //  5 bytes - FLV VIDEODATA packet header
+        MaxHeaderLen = 33
     };
 private:
 
@@ -367,6 +368,7 @@ private:
     mt_mutex (send_mutex) Uint32 mangleOutTimestamp (Uint32 timestamp);
 
     mt_mutex (send_mutex) Size fillMessageHeader (MessageDesc const * mt_nonnull mdesc,
+                                                  Size               msg_len,
 						  ChunkStream       * mt_nonnull chunk_stream,
 						  Byte              * mt_nonnull header_buf,
 						  Uint32             timestamp,
@@ -432,8 +434,10 @@ public:
 			   PagePool::PageListHead * mt_nonnull page_list,
 			   Size                    msg_offset,
 			   Uint32                  prechunk_size,
-			   bool                    take_ownership = false,
-			   bool                    unlocked = false);
+			   bool                    take_ownership,
+			   bool                    unlocked,
+                           Byte const             *extra_header_buf,
+                           unsigned                extra_header_len);
 
     void sendRawPages (PagePool::Page *first_page,
 		       Size msg_offset);

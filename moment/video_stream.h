@@ -1,5 +1,5 @@
 /*  Moment Video Server - High performance media server
-    Copyright (C) 2011 Dmitry Shatrov
+    Copyright (C) 2011, 2012 Dmitry Shatrov
     e-mail: shatrov@gmail.com
 
     This program is free software: you can redistribute it and/or modify
@@ -202,10 +202,14 @@ public:
     public:
 	AudioFrameType frame_type;
 	AudioCodecId codec_id;
+        unsigned rate;
+        unsigned channels;
 
 	AudioMessage ()
-	    : frame_type (AudioFrameType::Unknown),
-	       codec_id (AudioCodecId::Unknown)
+            : frame_type (AudioFrameType::Unknown),
+              codec_id   (AudioCodecId::Unknown),
+              rate       (44100),
+              channels   (1)
 	{
 	}
     };

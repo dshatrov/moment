@@ -30,6 +30,7 @@ moment_target_headers =		\
 	libmoment.h		\
 				\
 	moment_types.h		\
+        flv_util.h              \
 	amf_encoder.h		\
 	amf_decoder.h		\
 	rtmp_connection.h	\
@@ -67,6 +68,7 @@ lib_LTLIBRARIES = libmoment-1.0.la
 libmoment_1_0_la_SOURCES =	\
 	libmoment.cpp		\
 				\
+        flv_util.cpp            \
 	amf_encoder.cpp		\
 	amf_decoder.cpp		\
 	rtmp_connection.cpp	\

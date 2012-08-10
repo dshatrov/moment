@@ -25,6 +25,7 @@
 
 #include <moment/moment_types.h>
 
+#include <moment/flv_util.h>
 #include <moment/amf_encoder.h>
 #include <moment/amf_decoder.h>
 

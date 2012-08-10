@@ -136,7 +136,7 @@ unsigned fillFlvAudioHeader (VideoStream::AudioMessage * const mt_nonnull audio_
 unsigned fillFlvVideoHeader (VideoStream::VideoMessage * const mt_nonnull video_msg,
                              Memory const mem)
 {
-    logD_ (_func, "codec_id: ", video_msg->codec_id, ", frame_type: ", video_msg->frame_type);
+//    logD_ (_func, "codec_id: ", video_msg->codec_id, ", frame_type: ", video_msg->frame_type);
 
     assert (mem.len() >= 5);
 

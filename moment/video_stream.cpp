@@ -166,6 +166,8 @@ VideoStream::VideoFrameType::toFlvFrameType () const
     switch (value) {
 	case Unknown:
 	    return 0;
+	case AvcSequenceHeader:
+	case AvcEndOfSequence:
 	case KeyFrame:
 	    return 1;
 	case InterFrame:
@@ -175,8 +177,6 @@ VideoStream::VideoFrameType::toFlvFrameType () const
 	case GeneratedKeyFrame:
 	    return 4;
 	case CommandFrame:
-	case AvcSequenceHeader:
-	case AvcEndOfSequence:
 	    return 5;
 	case RtmpSetMetaData:
 	case RtmpClearMetaData:
