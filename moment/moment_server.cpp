@@ -36,7 +36,8 @@ MomentServer::informDestroy (Events * const events,
                              void   * const cb_data,
                              void   * const /* inform_data */)
 {
-    events->destroy (cb_data);
+    if (events->destroy)
+        events->destroy (cb_data);
 }
 
 void
@@ -69,11 +70,13 @@ MomentServer::informVideoStreamAdded (VideoStreamHandler * const vs_handler,
                                       void               * const cb_data,
                                       void               * const _inform_data)
 {
-    InformVideoStreamAdded_Data * const inform_data =
-            static_cast <InformVideoStreamAdded_Data*> (_inform_data);
-    vs_handler->videoStreamAdded (inform_data->video_stream,
-                                  inform_data->stream_name,
-                                  cb_data);
+    if (vs_handler->videoStreamAdded) {
+        InformVideoStreamAdded_Data * const inform_data =
+                static_cast <InformVideoStreamAdded_Data*> (_inform_data);
+        vs_handler->videoStreamAdded (inform_data->video_stream,
+                                      inform_data->stream_name,
+                                      cb_data);
+    }
 }
 
 #if 0
@@ -185,13 +188,15 @@ MomentServer::ClientSession::informRtmpCommandMessage (Events * const events,
 						       void   * const cb_data,
 						       void   * const _inform_data)
 {
-    InformRtmpCommandMessage_Data * const inform_data =
-	    static_cast <InformRtmpCommandMessage_Data*> (_inform_data);
-    events->rtmpCommandMessage (inform_data->conn,
-				inform_data->msg,
-				inform_data->method_name,
-				inform_data->amf_decoder,
-				cb_data);
+    if (events->rtmpCommandMessage) {
+        InformRtmpCommandMessage_Data * const inform_data =
+                static_cast <InformRtmpCommandMessage_Data*> (_inform_data);
+        events->rtmpCommandMessage (inform_data->conn,
+                                    inform_data->msg,
+                                    inform_data->method_name,
+                                    inform_data->amf_decoder,
+                                    cb_data);
+    }
 }
 
 void
@@ -199,7 +204,8 @@ MomentServer::ClientSession::informClientDisconnected (Events * const events,
 						       void   * const cb_data,
 						       void   * const /* _inform_data */)
 {
-    events->clientDisconnected (cb_data);
+    if (events->clientDisconnected)
+        events->clientDisconnected (cb_data);
 }
 
 bool
@@ -278,12 +284,14 @@ MomentServer::ClientEntry::informClientConnected (ClientHandler * const client_h
 						  void          * const cb_data,
 						  void          * const _inform_data)
 {
-    InformClientConnected_Data * const inform_data =
-	    static_cast <InformClientConnected_Data*> (_inform_data);
-    client_handler->clientConnected (inform_data->client_session,
-				     inform_data->app_name,
-				     inform_data->full_app_name,
-				     cb_data);
+    if (client_handler->clientConnected) {
+        InformClientConnected_Data * const inform_data =
+                static_cast <InformClientConnected_Data*> (_inform_data);
+        client_handler->clientConnected (inform_data->client_session,
+                                         inform_data->app_name,
+                                         inform_data->full_app_name,
+                                         cb_data);
+    }
 }
 
 void
@@ -724,9 +732,7 @@ MomentServer::removeClientHandler (ClientHandlerKey const client_handler_key)
 
     bool remove_client_entry = false;
     client_entry->mutex.lock ();
-//#error Initially, this should have been unsubscribe_unlocked()
-    client_entry->event_informer.unsubscribe (client_handler_key.sbn_key);
-//#error Informer's mutex is not held here!
+    client_entry->event_informer.unsubscribe_unlocked (client_handler_key.sbn_key);
 //#warning This condition looks strange.
     if (!client_entry->event_informer.gotSubscriptions_unlocked ()) {
 	remove_client_entry = true;
@@ -831,6 +837,7 @@ MomentServer::PageRequestHandlerEntry::informPageRequest (PageRequestHandler * c
     InformPageRequest_Data * const inform_data =
 	    static_cast <InformPageRequest_Data*> (_inform_data);
 
+    assert (handler->pageRequest);
     PageRequestResult const res = handler->pageRequest (inform_data->page_req,
 							inform_data->path,
 							inform_data->full_path,
