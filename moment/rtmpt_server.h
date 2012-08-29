@@ -63,30 +63,33 @@ private:
 	bool close_after_flush;
       // }
 
-	Mutex sender_mutex;
+	StateMutex sender_mutex;
 
 	mt_mutex (mutex) void doFlush ();
 
     public:
       mt_iface (Sender)
-      // {
+
 	mt_async void sendMessage (Sender::MessageEntry * mt_nonnull msg_entry,
 				   bool do_flush = false);
 
 	mt_async void flush ();
 
 	mt_async void closeAfterFlush ();
-      // }
+
+        mt_async void close ();
+
+        mt_mutex (mutex) bool isClosed_unlocked ();
+
+        void lock ();
+
+        void unlock ();
+
+      mt_iface_end
 
 	mt_mutex (sender_mutex) void sendPendingData (Sender * mt_nonnull sender);
 
-	RtmptSender (Object * const coderef_container)
-	    : DependentCodeReferenced (coderef_container),
-              nonflushed_data_len (0),
-	      pending_data_len (0),
-	      close_after_flush (false)
-	{
-	}
+	RtmptSender (Object *coderef_container);
 
 	mt_async ~RtmptSender ();
     };

@@ -721,7 +721,7 @@ RtmpServer::commandMessage (VideoStream::Message * const mt_nonnull msg,
 //	logD_ (_func, "msg_offset: ", msg_offset);
 
 	VideoStream::VideoMessage video_msg;
-	video_msg.timestamp = msg->timestamp;
+	video_msg.timestamp_nanosec = msg->timestamp_nanosec;
 	video_msg.prechunk_size = msg->prechunk_size;
 	video_msg.frame_type = VideoStream::VideoFrameType::RtmpSetMetaData;
 	video_msg.codec_id = VideoStream::VideoCodecId::Unknown;
@@ -751,7 +751,7 @@ RtmpServer::commandMessage (VideoStream::Message * const mt_nonnull msg,
 	assert (msg_offset <= msg->msg_len);
 
 	VideoStream::VideoMessage video_msg;
-	video_msg.timestamp = msg->timestamp;
+	video_msg.timestamp_nanosec = msg->timestamp_nanosec;
 	video_msg.prechunk_size = msg->prechunk_size;
 	video_msg.frame_type = VideoStream::VideoFrameType::RtmpClearMetaData;
 	video_msg.codec_id = VideoStream::VideoCodecId::Unknown;
@@ -905,7 +905,7 @@ RtmpServer::encodeMetaData (MetaData                  * const mt_nonnull metadat
     }
 
     if (ret_msg) {
-	ret_msg->timestamp = 0;
+	ret_msg->timestamp_nanosec = 0;
 	ret_msg->prechunk_size = RtmpConnection::PrechunkSize;
 	ret_msg->frame_type = VideoStream::VideoFrameType::RtmpSetMetaData;
 	ret_msg->codec_id = VideoStream::VideoCodecId::Unknown;

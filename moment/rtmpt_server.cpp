@@ -152,6 +152,32 @@ RtmptServer::RtmptSender::closeAfterFlush ()
     sender_mutex.unlock ();
 }
 
+mt_async void
+RtmptServer::RtmptSender::close ()
+{
+    // TODO Correct?
+    closeAfterFlush ();
+}
+
+mt_mutex (mutex) bool
+RtmptServer::RtmptSender::isClosed_unlocked ()
+{
+    // TODO Correct?
+    return false;
+}
+
+void
+RtmptServer::RtmptSender::lock ()
+{
+    sender_mutex.lock ();
+}
+
+void
+RtmptServer::RtmptSender::unlock ()
+{
+    sender_mutex.unlock ();
+}
+
 mt_rev (11.06.18)
 mt_mutex (sender_mutex) void
 RtmptServer::RtmptSender::sendPendingData (Sender * const mt_nonnull sender)
@@ -167,6 +193,15 @@ RtmptServer::RtmptSender::sendPendingData (Sender * const mt_nonnull sender)
 
     pending_msg_list.clear ();
     pending_data_len = 0;
+}
+
+RtmptServer::RtmptSender::RtmptSender (Object * const coderef_container)
+    : Sender (coderef_container, &sender_mutex),
+      DependentCodeReferenced (coderef_container),
+      nonflushed_data_len (0),
+      pending_data_len (0),
+      close_after_flush (false)
+{
 }
 
 mt_rev (11.06.18)

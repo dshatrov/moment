@@ -80,6 +80,7 @@ private:
     mt_const Ref<String> password;
     mt_const Ref<String> app_name;
     mt_const Ref<String> stream_name;
+    bool momentrtmp_proto;
 
     mt_mutex (mutex) Ref<Session> cur_session;
     mt_mutex (mutex) Timers::TimerKey reconnect_timer;
@@ -161,7 +162,8 @@ public:
                         ConstMemory          _username,
                         ConstMemory          _password,
                         ConstMemory          _app_name,
-                        ConstMemory          _stream_name);
+                        ConstMemory          _stream_name,
+                        bool                 _momentrtmp_proto);
 
     RtmpPushConnection ();
 

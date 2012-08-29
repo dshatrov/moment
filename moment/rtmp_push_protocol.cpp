@@ -69,7 +69,9 @@ RtmpPushConnection::startNewSession (Session * const old_session)
                              // Using non-zero send delay gives negligible performance
                              // increase in this case.
                              0    /* send_delay_millisec */,
-                             true /* prechunking_enabled */);
+                             /* TODO Control prechunking, it's not always desirable here. */
+                             true /* prechunking_enabled */,
+                             momentrtmp_proto);
 
     // 'session' is surely referenced when a callback is called, because it serves
     // as a coderef container for 'rtmp_conn'. Same for 'tcp_conn'.
@@ -309,9 +311,11 @@ RtmpPushConnection::commandMessage (VideoStream::Message * const mt_nonnull msg,
                 session->rtmp_conn.sendPublish (self->stream_name->mem());
 
                 session->conn_state = ConnectionState_Streaming;
+
+                self->video_stream->lock ();
                 self->video_stream->getFrameSaver()->reportSavedFrames (&saved_frame_handler, session);
-//#error Synchronization: no frames should be lost between reportSavedFrames and publishing.set()
                 session->publishing.set (1);
+                self->video_stream->unlock ();
             } break;
             case ConnectionState_PublishSent: {
               // Unused
@@ -393,7 +397,6 @@ RtmpPushConnection::videoMessage (VideoStream::VideoMessage * const mt_nonnull m
       //      from mod_rtmp to RtmpConnection.
       //      The trickier part is making this work while
       //      sending saved frames in advance.
-        logD_ (_func, "sending video msg, ts 0x", fmt_hex, msg->timestamp);
         session->rtmp_conn.sendVideoMessage (msg);
     }
 }
@@ -406,7 +409,8 @@ RtmpPushConnection::init (ServerThreadContext * const mt_nonnull _thread_ctx,
                           ConstMemory           const _username,
                           ConstMemory           const _password,
                           ConstMemory           const _app_name,
-                          ConstMemory           const _stream_name)
+                          ConstMemory           const _stream_name,
+                          bool                  const _momentrtmp_proto)
 {
     thread_ctx = _thread_ctx;
     timers = thread_ctx->getTimers();
@@ -419,6 +423,7 @@ RtmpPushConnection::init (ServerThreadContext * const mt_nonnull _thread_ctx,
     password = grab (new String (_password));
     app_name = grab (new String (_app_name));
     stream_name = grab (new String (_stream_name));
+    momentrtmp_proto = _momentrtmp_proto;
 
     mutex.lock ();
     mt_unlocks (mutex) startNewSession (NULL /* old_session */);
@@ -430,7 +435,8 @@ RtmpPushConnection::init (ServerThreadContext * const mt_nonnull _thread_ctx,
 }
 
 RtmpPushConnection::RtmpPushConnection ()
-    : reconnect_timer (NULL)
+    : momentrtmp_proto (false),
+      reconnect_timer (NULL)
 {
 }
 
@@ -478,6 +484,7 @@ RtmpPushProtocol::connect (VideoStream * const video_stream,
     // TODO Parse application name, channel name.
     Ref<String> const app_name = grab (new String ("app"));
     Ref<String> const stream_name = grab (new String ("lecture.desktop"));
+    bool momentrtmp_proto = false;
     {
       // URI forms:   rtmp://user:password@host:port/foo/bar
       //              rtmp://host:port/foo/bar
@@ -488,6 +495,20 @@ RtmpPushProtocol::connect (VideoStream * const video_stream,
       // instead of explicit parameters when the latter are null.
 
         unsigned long pos = 0;
+
+        while (pos < uri.len()) {
+            if (uri.mem() [pos] == ':')
+                break;
+            ++pos;
+        }
+        ++pos;
+
+        if (pos >= 1
+            && equal ("momentrtmp", uri.region (0, pos - 1)))
+        {
+            momentrtmp_proto = true;
+        }
+
         while (pos < uri.len()) {
             if (uri.mem() [pos] == '/')
                 break;
@@ -543,7 +564,8 @@ RtmpPushProtocol::connect (VideoStream * const video_stream,
                           username,
                           password,
                           app_name->mem(),
-                          stream_name->mem());
+                          stream_name->mem(),
+                          momentrtmp_proto);
 
     return rtmp_push_conn;
   }

@@ -45,7 +45,7 @@ AvRecorder::savedAudioFrame (VideoStream::AudioMessage * const mt_nonnull audio_
 {
     AvRecorder * const self = static_cast <AvRecorder*> (_self);
     VideoStream::AudioMessage tmp_audio_msg = *audio_msg;
-    tmp_audio_msg.timestamp = 0;
+    tmp_audio_msg.timestamp_nanosec = 0;
 
     if (!self->muxer->muxAudioMessage (&tmp_audio_msg)) {
         logE (recorder, _func, "muxer->muxAudioMessage() failed (aac seq hdr): ", exc->toString());
@@ -61,7 +61,7 @@ AvRecorder::savedVideoFrame (VideoStream::VideoMessage * const mt_nonnull video_
 {
     AvRecorder * const self = static_cast <AvRecorder*> (_self);
     VideoStream::VideoMessage tmp_video_msg = *video_msg;
-    tmp_video_msg.timestamp = 0;
+    tmp_video_msg.timestamp_nanosec = 0;
 
     if (!self->muxer->muxVideoMessage (&tmp_video_msg)) {
         logE (recorder, _func, "muxer->muxVideoMessage() failed (metadata): ", exc->toString());
@@ -150,7 +150,8 @@ VideoStream::EventHandler const AvRecorder::stream_handler = {
     streamAudioMessage,
     streamVideoMessage,
     NULL /* rtmpCommandMessage */,
-    streamClosed
+    streamClosed,
+    NULL /* numWatchersChanged */
 };
 
 void
@@ -181,13 +182,13 @@ AvRecorder::streamAudioMessage (VideoStream::AudioMessage * const mt_nonnull msg
 	logD (recorder_frames, _func, "first frame (audio)");
 	self->got_first_frame = true;
 	// Note that integer overflows are possible here and that's fine.
-	self->first_frame_time = msg->timestamp /* - self->cur_frame_time */;
+	self->first_frame_time = msg->timestamp_nanosec /* - self->cur_frame_time */;
     }
-    self->cur_frame_time = msg->timestamp - self->first_frame_time;
+    self->cur_frame_time = msg->timestamp_nanosec - self->first_frame_time;
     logD (recorder_frames, _func, "cur_frame_time: ", self->cur_frame_time, ", got_first_frame: ", self->got_first_frame);
 
     VideoStream::AudioMessage alt_msg = *msg;
-    alt_msg.timestamp = self->cur_frame_time;
+    alt_msg.timestamp_nanosec = self->cur_frame_time;
 
     if (!self->muxer->muxAudioMessage (&alt_msg)) {
 	logE (recorder, _func, "muxer->muxAudioMessage() failed: ", exc->toString());
@@ -227,13 +228,13 @@ AvRecorder::streamVideoMessage (VideoStream::VideoMessage * const mt_nonnull msg
 	logD (recorder_frames, _func, "first frame (video)");
 	self->got_first_frame = true;
 	// Note that integer overflows are possible here and that's fine.
-	self->first_frame_time = msg->timestamp /* - self->cur_frame_time */;
+	self->first_frame_time = msg->timestamp_nanosec /* - self->cur_frame_time */;
     }
-    self->cur_frame_time = msg->timestamp - self->first_frame_time;
+    self->cur_frame_time = msg->timestamp_nanosec - self->first_frame_time;
     logD (recorder_frames, _func, "cur_frame_time: ", self->cur_frame_time, ", got_first_frame: ", self->got_first_frame);
 
     VideoStream::VideoMessage alt_msg = *msg;
-    alt_msg.timestamp = self->cur_frame_time;
+    alt_msg.timestamp_nanosec = self->cur_frame_time;
 
     if (!self->muxer->muxVideoMessage (&alt_msg)) {
 	logE (recorder, _func, "muxer->muxVideoMessage() failed: ", exc->toString());

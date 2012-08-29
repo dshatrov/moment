@@ -68,7 +68,7 @@ void frameTimerTick (void * const /* cb_data */)
 
 	if (first_frame) {
 	    timestamp_offset = getTimeMilliseconds();
-	    video_msg.timestamp = start_timestamp;
+	    video_msg.timestamp_nanosec = start_timestamp * 1000000;
 	    first_frame = false;
 	} else {
 	    Time timestamp = getTimeMilliseconds();
@@ -79,7 +79,7 @@ void frameTimerTick (void * const /* cb_data */)
 
 	    timestamp += start_timestamp;
 
-	    video_msg.timestamp = timestamp;
+	    video_msg.timestamp_nanosec = timestamp * 1000000;
 	}
 
 //	logD_ (_func, "timestamp: ", fmt_hex, video_msg.timestamp);

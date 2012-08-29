@@ -87,7 +87,6 @@ public: // Temporally public
     enum {
 	//  3 bytes - chunk basic header;
 	// 11 bytes - chunk message header (type 0);
-	//  4 bytes - extended timestamp.
 	//  4 bytes - extended timestamp;
 	//  3 bytes - fix chunk basic header;
 	//  7 bytes - fix chunk message header (type 1).
@@ -241,8 +240,9 @@ public:
 
 	Size in_msg_offset;
 
-	Uint32 in_msg_timestamp;
-	Uint32 in_msg_timestamp_delta;
+        Uint64 in_msg_timestamp_low;
+	Uint64 in_msg_timestamp;
+	Uint64 in_msg_timestamp_delta;
 	Uint32 in_msg_len;
 	Uint32 in_msg_type_id;
 	Uint32 in_msg_stream_id;
@@ -250,8 +250,8 @@ public:
 
 	mt_mutex (RtmpConnection::send_mutex)
 	mt_begin
-	  Uint32 out_msg_timestamp;
-	  Uint32 out_msg_timestamp_delta;
+	  Uint64 out_msg_timestamp;
+	  Uint64 out_msg_timestamp_delta;
 	  Uint32 out_msg_len;
 	  Uint32 out_msg_type_id;
 	  Uint32 out_msg_stream_id;
@@ -285,7 +285,7 @@ private:
     mt_mutex (send_mutex) Size out_chunk_size;
 
     mt_mutex (send_mutex) Size out_got_first_timestamp;
-    mt_mutex (send_mutex) Uint32 out_first_timestamp;
+    mt_mutex (send_mutex) Uint64 out_first_timestamp;
     mt_mutex (send_mutex) Count out_first_frames_counter;
 
     mt_mutex (send_mutex) Time out_last_flush_time;
@@ -326,6 +326,10 @@ private:
 
       ReceiveState conn_state;
 
+      // Can be set from 'receiver' when holding 'send_mutex'.
+      // For sending, can be set as mt_const at init.
+      mt_mutex (send_mutex) bool momentrtmp_proto;
+
     mt_end
 
     // Protects part of receiving state which may be accessed from
@@ -365,13 +369,13 @@ public:
     class MessageDesc;
 
 private:
-    mt_mutex (send_mutex) Uint32 mangleOutTimestamp (Uint32 timestamp);
+    mt_mutex (send_mutex) Uint32 mangleOutTimestamp (MessageDesc const * mt_nonnull mdesc);
 
     mt_mutex (send_mutex) Size fillMessageHeader (MessageDesc const * mt_nonnull mdesc,
                                                   Size               msg_len,
 						  ChunkStream       * mt_nonnull chunk_stream,
 						  Byte              * mt_nonnull header_buf,
-						  Uint32             timestamp,
+						  Uint64             timestamp,
 						  Uint32             prechunk_size);
 
     mt_sync_domain (receiver) void resetChunkRecvState ();
@@ -394,7 +398,7 @@ public:
 				     PagePool               *page_pool,
 				     PagePool::PageListHead *page_list,
 				     Uint32                  chunk_stream_id,
-				     Uint32                  msg_timestamp,
+				     Uint64                  msg_timestamp,
 				     bool                    first_chunk);
 
   // Send methods.
@@ -403,7 +407,7 @@ public:
     class MessageDesc
     {
     public:
-	Uint32 timestamp;
+	Uint64 timestamp;
 	Uint32 msg_type_id;
 	Uint32 msg_stream_id;
 	Size msg_len;
@@ -609,7 +613,8 @@ public:
     mt_const void init (Timers   * mt_nonnull timers,
 			PagePool * mt_nonnull page_pool,
 			Time      send_delay_millisec,
-                        bool      prechunking_enabled);
+                        bool      prechunking_enabled,
+                        bool      momentrtmp_proto = false);
 
     RtmpConnection (Object *coderef_container);
 

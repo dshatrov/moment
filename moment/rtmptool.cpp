@@ -187,7 +187,7 @@ RtmpClient::commandMessage (VideoStream::Message   * const mt_nonnull msg,
                             void                   * const _self)
 {
     if (options.dump_frames)
-        logD (frame_dump, _func, "ts: 0x", fmt_hex, msg->timestamp, " (", fmt_def, msg->timestamp, ")");
+        logD (frame_dump, _func, "ts: 0x", fmt_hex, msg->timestamp_nanosec / 1000000, " (", fmt_def, msg->timestamp_nanosec / 1000000, ")");
 
     RtmpClient * const self = static_cast <RtmpClient*> (_self);
 
@@ -294,14 +294,26 @@ RtmpClient::commandMessage (VideoStream::Message   * const mt_nonnull msg,
     return Result::Success;
 }
 
+// TEST
+Uint64 last_timestamp = 0;
+
 Result
 RtmpClient::audioMessage (VideoStream::AudioMessage * const mt_nonnull msg,
 			  void                      * const /* _self */)
 {
     if (options.dump_frames) {
-        logD (frame_dump, _func, "ts: 0x", fmt_hex, msg->timestamp, " (", fmt_def, msg->timestamp, ") ",
+        logD (frame_dump, _func, "ts: 0x", fmt_hex, msg->timestamp_nanosec / 1000000, " (", fmt_def, msg->timestamp_nanosec / 1000000, ") ",
               msg->codec_id, " ", msg->frame_type, ", rate ", msg->rate, ", ", msg->channels, " channels");
     }
+
+    // TEST
+    if (msg->timestamp_nanosec < last_timestamp) {
+        logLock ();
+        logs->print (".");
+        logs->flush ();
+        logUnlock ();
+    }
+    last_timestamp = msg->timestamp_nanosec;
 
     return Result::Success;
 }
@@ -311,7 +323,7 @@ RtmpClient::videoMessage (VideoStream::VideoMessage * const mt_nonnull msg,
 			  void                      * const _self)
 {
     if (options.dump_frames) {
-        logD (frame_dump, _func, "ts: 0x", fmt_hex, msg->timestamp, " (", fmt_def, msg->timestamp, ") ",
+        logD (frame_dump, _func, "ts: 0x", fmt_hex, msg->timestamp_nanosec / 1000000, " (", fmt_def, msg->timestamp_nanosec / 1000000, ") ",
               msg->codec_id, " ", msg->frame_type);
     }
 
@@ -329,6 +341,15 @@ RtmpClient::videoMessage (VideoStream::VideoMessage * const mt_nonnull msg,
             logUnlock ();
 	}
     }
+
+    // TEST
+    if (msg->timestamp_nanosec < last_timestamp) {
+        logLock ();
+        logs->print (".");
+        logs->flush ();
+        logUnlock ();
+    }
+    last_timestamp = msg->timestamp_nanosec;
 
     return Result::Success;
 }
@@ -544,6 +565,7 @@ printUsage ()
 		 "  -a --app <string>              Application name. Default: app\n"
 		 "  -c --channel <string>          Name of the channel to subscribe to. Default: video\n"
 		 "  -t --num-threads <number>      Number of threads to spawn. Default: 0, use a single thread.\n"
+                 "  -d --dump-frames               Dump incoming messages.\n"
 		 "  -r --report-interval <number>  Interval between video frame reports. Default: 0, no reports.\n"
 		 "  --nonfatal-errors              Do not exit on the first error.\n"
 		 "  -h --help                      Show this help message.\n"

@@ -241,8 +241,8 @@ Result httpRequest (HttpRequest   * const mt_nonnull req,
     }
 //    logD_ (_func, "try_template: ", try_template);
 
-    Ref<String> const filename = makeString (path_entry->path->mem(), !path_entry->path->isNull() ? "/" : "", file_path);
-    logD_ (_func, "path_entry->path: ", path_entry->path, ", filename: ", filename->mem());
+    Ref<String> const filename =
+            makeString (path_entry->path->mem(), !path_entry->path->isNull() ? "/" : "", file_path);
 //    logD_ (_func, "Opening ", filename);
 #if 0
 // Deprecated form.

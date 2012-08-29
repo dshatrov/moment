@@ -131,7 +131,7 @@ RtmpConnection::releaseChunkStream (ChunkStream * const mt_nonnull chunk_stream)
 }
 
 mt_mutex (send_mutex) Uint32
-RtmpConnection::mangleOutTimestamp (Uint32 const timestamp)
+RtmpConnection::mangleOutTimestamp (MessageDesc const * const mt_nonnull mdesc)
 {
 //    logD_ (_func, "timestamp: 0x", fmt_hex, timestamp);
 
@@ -141,16 +141,29 @@ RtmpConnection::mangleOutTimestamp (Uint32 const timestamp)
 //    return timestamp;
 
     if (!out_got_first_timestamp) {
-        out_first_timestamp = timestamp;
-        out_got_first_timestamp = true;
+        if (mdesc->adjustable_timestamp) {
+            out_first_timestamp = mdesc->timestamp;
+            out_got_first_timestamp = true;
+        }
+
         return 0;
     }
 
-    Uint32 mangled_timestamp = timestamp - out_first_timestamp;
+    Uint64 mangled_timestamp = mdesc->timestamp - out_first_timestamp;
 
+    // TODO What's this?
+    //      ^^^ This is likely avoiding sending negative timestamps at the beginning of the stream.
+    //          A dirty hack, actually. Timestamps shouldn't wrap this way at the beginning
+    //          of a stream. This should be dealt with in VideoStream's bindind logics and alike.
     if (out_first_frames_counter < 1000 /* Artificial limit */) {
-        if (mangled_timestamp > (Uint32) - 60000 /* 1 minute */)
+//        logD_ (_func, "mangled_timestamp: ", mangled_timestamp);
+
+        if (mangled_timestamp >
+                    (momentrtmp_proto ? (( (Uint64) -60000000000 /* 1 minute */) / 1000) :
+                                        ((((Uint64) -60000000000 /* 1 minute */) / 1000000) & 0xffffffff)))
+        {
             mangled_timestamp = 0;
+        }
 
         ++out_first_frames_counter;
     }
@@ -186,11 +199,11 @@ RtmpConnection::fillMessageHeader (MessageDesc const * const mt_nonnull mdesc,
                                    Size                const mt_nonnull msg_len,
 				   ChunkStream       * const mt_nonnull chunk_stream,
 				   Byte              * const mt_nonnull header_buf,
-				   Uint32              const timestamp,
+				   Uint64              const timestamp,
 				   Uint32              const prechunk_size)
 {
     bool has_extended_timestamp = false;
-    Uint32 extended_timestamp = 0;
+    Uint64 extended_timestamp = 0;
 
     Size offs = 0;
 
@@ -239,9 +252,10 @@ RtmpConnection::fillMessageHeader (MessageDesc const * const mt_nonnull mdesc,
 	if (!force_type0 &&
 	    chunk_stream->out_msg_stream_id == mdesc->msg_stream_id)
 	do {
-	    Uint32 const timestamp_delta = timestamp - chunk_stream->out_msg_timestamp;
+	    Uint64 const timestamp_delta = timestamp - chunk_stream->out_msg_timestamp;
 
-	    if (timestamp_delta >= 0x00ffffff &&
+            // TODO momentrtmp_proto => 7-byte timestamps in microseconds
+	    if ((Uint32) timestamp_delta >= 0x00ffffff &&
 		prechunk_size &&
 		msg_len > prechunk_size)
 	    {
@@ -264,7 +278,7 @@ RtmpConnection::fillMessageHeader (MessageDesc const * const mt_nonnull mdesc,
 		if (chunk_stream->out_msg_timestamp_delta == timestamp_delta &&
 		    // We don't want to mix type 3 chunks and extended timestamps.
 		    // (There's no well-formulated reason for this.)
-		    chunk_stream->out_msg_timestamp < 0x00ffffff)
+		    (Uint32) chunk_stream->out_msg_timestamp < 0x00ffffff)
 		{
 		  // Type 3 header
 
@@ -288,7 +302,7 @@ RtmpConnection::fillMessageHeader (MessageDesc const * const mt_nonnull mdesc,
 		    chunk_stream->out_msg_timestamp = timestamp;
 		    chunk_stream->out_msg_timestamp_delta = timestamp_delta;
 
-		    if (timestamp_delta >= 0x00ffffff) {
+		    if (!momentrtmp_proto && (Uint32) timestamp_delta >= 0x00ffffff) {
 			header_buf [offs + 0] = 0xff;
 			header_buf [offs + 1] = 0xff;
 			header_buf [offs + 2] = 0xff;
@@ -299,6 +313,11 @@ RtmpConnection::fillMessageHeader (MessageDesc const * const mt_nonnull mdesc,
 			header_buf [offs + 0] = (timestamp_delta >> 16) & 0xff;
 			header_buf [offs + 1] = (timestamp_delta >>  8) & 0xff;
 			header_buf [offs + 2] = (timestamp_delta >>  0) & 0xff;
+
+                        if (momentrtmp_proto) {
+                            has_extended_timestamp = true;
+                            extended_timestamp = timestamp_delta;
+                        }
 		    }
 
 		    header_type = 2;
@@ -321,7 +340,7 @@ RtmpConnection::fillMessageHeader (MessageDesc const * const mt_nonnull mdesc,
 
 		logD (time, _func, "snd timestamp_delta: 0x", fmt_hex, timestamp_delta);
 
-		if (timestamp_delta >= 0x00ffffff) {
+		if (!momentrtmp_proto && (Uint32) timestamp_delta >= 0x00ffffff) {
 		    header_buf [offs + 0] = 0xff;
 		    header_buf [offs + 1] = 0xff;
 		    header_buf [offs + 2] = 0xff;
@@ -332,6 +351,11 @@ RtmpConnection::fillMessageHeader (MessageDesc const * const mt_nonnull mdesc,
 		    header_buf [offs + 0] = (timestamp_delta >> 16) & 0xff;
 		    header_buf [offs + 1] = (timestamp_delta >>  8) & 0xff;
 		    header_buf [offs + 2] = (timestamp_delta >>  0) & 0xff;
+
+                    if (momentrtmp_proto) {
+                        has_extended_timestamp = true;
+                        extended_timestamp = timestamp_delta;
+                    }
 		}
 
 		header_buf [offs + 3] = (msg_len >> 16) & 0xff;
@@ -361,16 +385,22 @@ RtmpConnection::fillMessageHeader (MessageDesc const * const mt_nonnull mdesc,
 
 	logD (time, _func, "snd timestamp: 0x", fmt_hex, timestamp);
 
-	if (timestamp >= 0x00ffffff) {
+	if ((Uint32) timestamp >= 0x00ffffff || momentrtmp_proto) {
 	    if (prechunk_size &&
 		msg_len > prechunk_size)
 	    {
 		fix_header = true;
 	    }
 
-	    header_buf [offs + 0] = 0xff;
-	    header_buf [offs + 1] = 0xff;
-	    header_buf [offs + 2] = 0xff;
+            if (!momentrtmp_proto) {
+                header_buf [offs + 0] = 0xff;
+                header_buf [offs + 1] = 0xff;
+                header_buf [offs + 2] = 0xff;
+            } else {
+                header_buf [offs + 0] = (timestamp >> 16) & 0xff;
+                header_buf [offs + 1] = (timestamp >>  8) & 0xff;
+                header_buf [offs + 2] = (timestamp >>  0) & 0xff;
+            }
 
 	    has_extended_timestamp = true;
 	    extended_timestamp = timestamp;
@@ -393,8 +423,6 @@ RtmpConnection::fillMessageHeader (MessageDesc const * const mt_nonnull mdesc,
 
 	    header_buf [offs + 6] = RtmpMessageType::Data_AMF0;
 
-// Wrong? Why change out_msg_type_id?
-//	    chunk_stream->out_msg_type_id = RtmpMessageType::AudioMessage;
 	    chunk_stream->out_msg_timestamp_delta = 0;
 	}
 
@@ -412,10 +440,17 @@ RtmpConnection::fillMessageHeader (MessageDesc const * const mt_nonnull mdesc,
     if (has_extended_timestamp) {
 //	logD_ (_func, "extended timestamp");
 
-	header_buf [offs + 0] = (extended_timestamp >> 24) & 0xff;
-	header_buf [offs + 1] = (extended_timestamp >> 16) & 0xff;
-	header_buf [offs + 2] = (extended_timestamp >>  8) & 0xff;
-	header_buf [offs + 3] = (extended_timestamp >>  0) & 0xff;
+        if (!momentrtmp_proto) {
+            header_buf [offs + 0] = (extended_timestamp >> 24) & 0xff;
+            header_buf [offs + 1] = (extended_timestamp >> 16) & 0xff;
+            header_buf [offs + 2] = (extended_timestamp >>  8) & 0xff;
+            header_buf [offs + 3] = (extended_timestamp >>  0) & 0xff;
+        } else {
+            header_buf [offs + 0] = (extended_timestamp >> 48) & 0xff;
+            header_buf [offs + 1] = (extended_timestamp >> 40) & 0xff;
+            header_buf [offs + 2] = (extended_timestamp >> 32) & 0xff;
+            header_buf [offs + 3] = (extended_timestamp >> 24) & 0xff;
+        }
 
 	offs += 4;
     }
@@ -464,7 +499,7 @@ RtmpConnection::fillPrechunkedPages (PrechunkContext        * const  prechunk_ct
 				     PagePool               * const  page_pool,
 				     PagePool::PageListHead * const  page_list,
 				     Uint32                   const  chunk_stream_id,
-				     Uint32                   const  /* msg_timestamp */,
+				     Uint64                   const  /* msg_timestamp */,
 				     bool                     const  first_chunk)
 {
 //    logD_ (_func, "len: ", mem.len(), ", timestamp: 0x", fmt_hex, (UintPtr) msg_timestamp);
@@ -538,7 +573,7 @@ RtmpConnection::sendMessage (MessageDesc const * const mt_nonnull mdesc,
 #if 0
 	logD (chunk, _func, "prechunked 1st page:");
 	if (page_list.first)
-	    hexdump (ConstMemory (page_list.first->getData(), page_list.first->data_len));
+	    hexdump (logs, ConstMemory (page_list.first->getData(), page_list.first->data_len));
 #endif
     }
 
@@ -593,8 +628,9 @@ RtmpConnection::sendMessagePages (MessageDesc const      * const mt_nonnull mdes
     if (!unlocked)
 	send_mutex.lock ();
 
-    Uint32 const timestamp =
-            (mdesc->adjustable_timestamp ? mangleOutTimestamp (mdesc->timestamp) : mdesc->timestamp);
+    Uint64 const timestamp =
+//            (mdesc->adjustable_timestamp ? mangleOutTimestamp (mdesc->timestamp) : mdesc->timestamp);
+            mangleOutTimestamp (mdesc);
 
     logD (proto_out, _func, "ts 0x", fmt_hex, timestamp, " (orig 0x", mdesc->timestamp, "), "
 	  "tid ", fmt_def, mdesc->msg_type_id,
@@ -1059,8 +1095,10 @@ RtmpConnection::sendVideoMessage (VideoStream::VideoMessage * const mt_nonnull m
 	return;
 
     MessageDesc mdesc;
-    mdesc.timestamp = msg->timestamp;
-//    logD_ (_func, "timestamp: 0x", fmt_hex, msg->timestamp);
+    if (!momentrtmp_proto)
+        mdesc.timestamp = (Uint64) msg->timestamp_nanosec / 1000000;
+    else
+        mdesc.timestamp = (Uint64) msg->timestamp_nanosec / 1000;
 
     Byte flv_video_header [FlvVideoHeader_MaxLen];
     unsigned flv_video_header_len = 0;
@@ -1112,7 +1150,11 @@ RtmpConnection::sendAudioMessage (VideoStream::AudioMessage * const mt_nonnull m
     unsigned const flv_audio_header_len = fillFlvAudioHeader (msg, Memory::forObject (flv_audio_header));
 
     MessageDesc mdesc;
-    mdesc.timestamp = msg->timestamp;
+    if (!momentrtmp_proto)
+        mdesc.timestamp = msg->timestamp_nanosec / 1000000;
+    else
+        mdesc.timestamp = msg->timestamp_nanosec / 1000;
+
     mdesc.msg_type_id = RtmpMessageType::AudioMessage;
     mdesc.msg_stream_id = DefaultMessageStreamId;
     mdesc.msg_len = msg->msg_len;
@@ -1214,7 +1256,7 @@ RtmpConnection::sendConnect (ConstMemory const &app_name)
     sendCommandMessage_AMF0 (CommandMessageStreamId, ConstMemory (msg_buf, msg_len));
     logD (send, _func, "msg_len: ", msg_len);
     if (logLevelOn (send, LogLevel::Debug))
-	hexdump (ConstMemory (msg_buf, msg_len));
+	hexdump (logs, ConstMemory (msg_buf, msg_len));
 }
 
 void
@@ -1367,12 +1409,7 @@ RtmpConnection::processMessage (ChunkStream * const chunk_stream)
 #if 0
     {
       // DEBUG
-	PagePool::Page * const page = chunk_stream->page_list.first;
-	if (page) {
-            logLock ();
-	    hexdump (logs, page->mem());
-            logUnlock ();
-        }
+        PagePool::dumpPages (logs, &chunk_stream->page_list);
     }
 #endif
 
@@ -1528,7 +1565,10 @@ RtmpConnection::processMessage (ChunkStream * const chunk_stream)
 		    }
 		}
 
-		audio_msg.timestamp = chunk_stream->in_msg_timestamp;
+                if (!momentrtmp_proto)
+                    audio_msg.timestamp_nanosec = (Uint64) chunk_stream->in_msg_timestamp * 1000000;
+                else
+                    audio_msg.timestamp_nanosec = chunk_stream->in_msg_timestamp * 1000;
 
 		audio_msg.page_pool = page_pool;
 		audio_msg.page_list = chunk_stream->page_list;
@@ -1593,7 +1633,10 @@ RtmpConnection::processMessage (ChunkStream * const chunk_stream)
 
 		logD (codec, _func, video_msg.codec_id, ", ", video_msg.frame_type);
 
-		video_msg.timestamp = chunk_stream->in_msg_timestamp;
+                if (!momentrtmp_proto)
+                    video_msg.timestamp_nanosec = (Uint64) chunk_stream->in_msg_timestamp * 1000000;
+                else
+                    video_msg.timestamp_nanosec = (Uint64) chunk_stream->in_msg_timestamp * 1000;
 
 		video_msg.page_pool = page_pool;
 		video_msg.page_list = chunk_stream->page_list;
@@ -1654,14 +1697,17 @@ RtmpConnection::callCommandMessage (ChunkStream * const chunk_stream,
     if (logLevelOn (proto_in, LogLevel::Debug)) {
 	if (chunk_stream->page_list.first) {
 	    logD (proto_in, _func_);
-	    hexdump (ConstMemory (chunk_stream->page_list.first->getData(),
-				  chunk_stream->page_list.first->data_len));
+	    hexdump (logs, ConstMemory (chunk_stream->page_list.first->getData(),
+                                        chunk_stream->page_list.first->data_len));
 	}
     }
 
     if (frontend && frontend->commandMessage) {
 	VideoStream::Message msg;
-	msg.timestamp = chunk_stream->in_msg_timestamp;
+        if (!momentrtmp_proto)
+            msg.timestamp_nanosec = (Uint64) chunk_stream->in_msg_timestamp * 1000000;
+        else
+            msg.timestamp_nanosec = (Uint64) chunk_stream->in_msg_timestamp * 1000;
 
 	msg.page_pool = page_pool;
 	msg.page_list = chunk_stream->page_list;
@@ -1740,9 +1786,6 @@ RtmpConnection::senderStateChanged (Sender::SendState   const send_state,
 				    void              * const _self)
 {
     RtmpConnection * const self = static_cast <RtmpConnection*> (_self);
-
-  // Note that we're not allowed to call Sender's methods while in this callback.
-
     self->frontend.call (self->frontend->sendStateChanged, /* ( */ send_state /* ) */);
 }
 
@@ -1813,7 +1856,7 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 {
     logD (msg, _func, "mem.len(): ", mem.len());
     if (logLevelOn (msg, LogLevel::Debug))
-	hexdump (mem);
+	hexdump (logs, mem);
 
     *ret_accepted = 0;
 
@@ -1933,12 +1976,20 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 		}
 
 		Byte const client_version = data [0];
-		if (client_version < 3) {
-		  // Deprecated protocols.
-		    logE_ (_func, "ServerWaitC0: old protocol version: ", client_version);
-		    ret_res = Receiver::ProcessInputResult::Error;
-		    goto _return;
-		}
+                if (client_version == 0xff) {
+                    logD_ (_func, "momentrtmp proto");
+                    if (!momentrtmp_proto) {
+                        send_mutex.lock ();
+                        momentrtmp_proto = true;
+                        send_mutex.unlock ();
+                    }
+                } else
+                if (client_version < 3) {
+                  // Deprecated protocols.
+                    logE_ (_func, "ServerWaitC0: old protocol version: ", client_version);
+                    ret_res = Receiver::ProcessInputResult::Error;
+                    goto _return;
+                }
 
 		{
 		    data += 1;
@@ -2041,7 +2092,7 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 
 		    {
 		      // Generating some "random" data.
-			unsigned n = rand() % 3072;
+			unsigned n = randomUint32() % 3072;
 			for (unsigned i = 8; i < 3072 - 8; ++i) {
 			    n = (3072 + i + n) % 317;
 			    msg [i] = n;
@@ -2236,16 +2287,20 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 		    goto _return;
 		}
 
-		Uint32 const timestamp = (data [2] <<  0) |
+		Uint64 const timestamp = (data [2] <<  0) |
 					 (data [1] <<  8) |
 					 (data [0] << 16);
 
 		logD (time, _func, "rcv Type0 timestamp: 0x", fmt_hex, timestamp);
 
 		bool has_extended_timestamp = false;
-		if (timestamp == 0x00ffffff)
+		if ((Uint32) timestamp == 0x00ffffff)
 		    has_extended_timestamp = true;
-		else
+                else
+                if (momentrtmp_proto) {
+                    recv_chunk_stream->in_msg_timestamp_low = timestamp;
+		    has_extended_timestamp = true;
+                } else
 		    recv_chunk_stream->in_msg_timestamp = timestamp;
 
 		recv_chunk_stream->in_msg_timestamp_delta = timestamp;
@@ -2291,16 +2346,20 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 		    goto _return;
 		}
 
-		Uint32 const timestamp_delta = (data [2] <<  0) |
+		Uint64 const timestamp_delta = (data [2] <<  0) |
 					       (data [1] <<  8) |
 					       (data [0] << 16);
 
 		logD (time, _func, "rcv Type1 timestamp_delta: 0x", fmt_hex, timestamp_delta);
 
 		bool has_extended_timestamp = false;
-		if (timestamp_delta == 0x00ffffff)
+		if ((Uint32) timestamp_delta == 0x00ffffff)
 		    has_extended_timestamp = true;
-		else
+                else
+                if (momentrtmp_proto) {
+                    recv_chunk_stream->in_msg_timestamp_low = timestamp_delta;
+                    has_extended_timestamp = true;
+                } else
 		    recv_chunk_stream->in_msg_timestamp += timestamp_delta;
 
 		recv_chunk_stream->in_msg_timestamp_delta = timestamp_delta;
@@ -2336,16 +2395,20 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 		    goto _return;
 		}
 
-		Uint32 const timestamp_delta = (data [2] <<  0) |
+		Uint64 const timestamp_delta = (data [2] <<  0) |
 					       (data [1] <<  8) |
 					       (data [0] << 16);
 
 		logD (time, _func, "rcv Type2 timestamp_delta: 0x", fmt_hex, timestamp_delta);
 
 		bool has_extended_timestamp = false;
-		if (timestamp_delta == 0x00ffffff)
+		if ((Uint32) timestamp_delta == 0x00ffffff)
 		    has_extended_timestamp = true;
-		else
+                else
+                if (momentrtmp_proto) {
+                    recv_chunk_stream->in_msg_timestamp_low = timestamp_delta;
+                    has_extended_timestamp = true;
+                } else
 		    recv_chunk_stream->in_msg_timestamp += timestamp_delta;
 
 		recv_chunk_stream->in_msg_timestamp_delta = timestamp_delta;
@@ -2376,7 +2439,7 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 		}
 
 		bool has_extended_timestamp = false;
-		if (recv_chunk_stream->in_msg_timestamp_delta >= 0x00ffffff)
+		if ((Uint32) recv_chunk_stream->in_msg_timestamp_delta >= 0x00ffffff && !momentrtmp_proto)
 		    has_extended_timestamp = true;
 
 		if (recv_chunk_stream->in_msg_offset == 0)
@@ -2405,10 +2468,20 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
 		if (recv_chunk_stream->in_msg_offset == 0 &&
 		    !ignore_extended_timestamp)
 		{
-		    Uint32 const extended_timestamp = (data [3] <<  0) |
-						      (data [2] <<  8) |
-						      (data [1] << 16) |
-						      (data [0] << 24);
+		    Uint64 extended_timestamp;
+                    if (!momentrtmp_proto) {
+                        extended_timestamp = ((Uint64) data [3] <<  0) |
+                                             ((Uint64) data [2] <<  8) |
+                                             ((Uint64) data [1] << 16) |
+                                             ((Uint64) data [0] << 24);
+                    } else {
+                        extended_timestamp = recv_chunk_stream->in_msg_timestamp_low |
+                                             ((Uint64) data [3] << 24) |
+                                             ((Uint64) data [2] << 32) |
+                                             ((Uint64) data [1] << 40) |
+                                             ((Uint64) data [0] << 48);
+                    }
+
 		    if (extended_timestamp_is_delta)
 			recv_chunk_stream->in_msg_timestamp += extended_timestamp;
 		    else
@@ -2599,7 +2672,7 @@ RtmpConnection::startClient ()
     page_pool->getPages (&page_list, 1537 /* len */);
     assert (page_list.first->data_len >= 1537);
     Byte * const msg_c1 = page_list.first->getData();
-    msg_c1 [0] = 3;
+    msg_c1 [0] = momentrtmp_proto ? 0xff : 3;
     {
 	Uint32 const time = getTimeMicroseconds ();
 	msg_c1 [1] = (time >>  0) & 0xff;
@@ -2798,12 +2871,14 @@ mt_const void
 RtmpConnection::init (Timers     * const mt_nonnull timers,
 		      PagePool   * const mt_nonnull page_pool,
 		      Time         const send_delay,
-                      bool         const prechunking_enabled)
+                      bool         const prechunking_enabled,
+                      bool         const momentrtmp_proto)
 {
     this->timers = timers;
     this->page_pool = page_pool;
     this->send_delay = send_delay;
     this->prechunking_enabled = prechunking_enabled;
+    this->momentrtmp_proto = momentrtmp_proto;
 }
 
 RtmpConnection::RtmpConnection (Object * const coderef_container)

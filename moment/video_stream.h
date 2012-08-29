@@ -174,7 +174,7 @@ public:
 #endif
 
     public:
-	Uint64 timestamp;
+        Uint64 timestamp_nanosec;
 
         PagePool *page_pool;
         PagePool::PageListHead page_list;
@@ -185,7 +185,7 @@ public:
 	Uint32 prechunk_size;
 
 	Message ()
-	    : timestamp (0),
+	    : timestamp_nanosec (0),
 
 	      page_pool (NULL),
 	      msg_len (0),

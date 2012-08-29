@@ -80,7 +80,9 @@ void
 FlvMuxer::doMuxMessage (VideoStream::Message * const mt_nonnull msg,
 			Byte const msg_type)
 {
-//    logD_ (_func, "ts 0x", fmt_hex, msg->timestamp);
+    Uint64 const timestamp_millisec = msg->timestamp_nanosec / 1000000;
+
+//    logD_ (_func, "ts 0x", fmt_hex, msg->timestamp_nanosec);
 
     if (msg->msg_len >= (1 << 24)) {
 	logE (flvmux, _func, "Message is too long (", msg->msg_len, " bytes), dropping it");
@@ -96,12 +98,12 @@ FlvMuxer::doMuxMessage (VideoStream::Message * const mt_nonnull msg,
 	(Byte) ((msg->msg_len >>  0) & 0xff),
 
 	// Timestamp
-	(Byte) ((msg->timestamp >> 16) & 0xff),
-	(Byte) ((msg->timestamp >>  8) & 0xff),
-	(Byte) ((msg->timestamp >>  0) & 0xff),
+	(Byte) ((timestamp_millisec >> 16) & 0xff),
+	(Byte) ((timestamp_millisec >>  8) & 0xff),
+	(Byte) ((timestamp_millisec >>  0) & 0xff),
 
 	// Extended timestamp
-	(Byte) ((msg->timestamp >> 24) & 0xff),
+	(Byte) ((timestamp_millisec >> 24) & 0xff),
 
 	// Stream ID
 	0,
@@ -175,7 +177,7 @@ FlvMuxer::doMuxMessage (VideoStream::Message * const mt_nonnull msg,
 mt_throws Result
 FlvMuxer::muxAudioMessage (VideoStream::AudioMessage * const mt_nonnull msg)
 {
-    logD (flvmux, _func, "ts: 0x", fmt_hex, msg->timestamp);
+    logD (flvmux, _func, "ts: 0x", fmt_hex, msg->timestamp_nanosec / 1000000);
     doMuxMessage (msg, 0x8 /* audio tag */);
     return Result::Success;
 }
@@ -183,7 +185,7 @@ FlvMuxer::muxAudioMessage (VideoStream::AudioMessage * const mt_nonnull msg)
 mt_throws Result
 FlvMuxer::muxVideoMessage (VideoStream::VideoMessage * const mt_nonnull msg)
 {
-    logD (flvmux, _func, "ts: 0x", fmt_hex, msg->timestamp);
+    logD (flvmux, _func, "ts: 0x", fmt_hex, msg->timestamp_nanosec / 1000000);
     doMuxMessage (msg, 0x9 /* video tag */);
     return Result::Success;
 }

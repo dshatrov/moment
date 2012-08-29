@@ -861,6 +861,7 @@ void momentRtmpInit ()
         Ref<RtmpPushProtocol> const rtmp_push_proto = grab (new RtmpPushProtocol);
         rtmp_push_proto->init (moment);
         moment->addPushProtocol ("rtmp", rtmp_push_proto);
+        moment->addPushProtocol ("momentrtmp", rtmp_push_proto);
     }
 
     MomentRtmpModule * const rtmp_module = new MomentRtmpModule;
