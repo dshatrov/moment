@@ -57,6 +57,7 @@ public:
 
 	Result (*startStreaming) (ConstMemory   const &stream_name,
 				  RecordingMode const  rec_mode,
+                                  bool          const  momentrtmp_proto,
 				  void                *cb_data);
 
 	Result (*startWatching) (ConstMemory const &stream_name,
@@ -91,7 +92,8 @@ private:
 	   	    AmfDecoder * mt_nonnull decoder);
 
     Result doPublish (Uint32       msg_stream_id,
-		      AmfDecoder * mt_nonnull decoder);
+		      AmfDecoder * mt_nonnull decoder,
+                      RtmpConnection::ConnectionInfo * mt_nonnull conn_info);
 
   mt_iface (VideoStream::FrameSaver::FrameHandler)
 
@@ -114,7 +116,8 @@ public:
 
     Result commandMessage (VideoStream::Message * mt_nonnull msg,
 			   Uint32                msg_stream_id,
-			   AmfEncoding           amf_encoding);
+			   AmfEncoding           amf_encoding,
+                           RtmpConnection::ConnectionInfo * mt_nonnull conn_info);
 
     void setFrontend (Cb<Frontend> const &frontend)
     {

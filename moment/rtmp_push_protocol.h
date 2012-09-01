@@ -135,6 +135,7 @@ private:
     static Result commandMessage (VideoStream::Message * mt_nonnull msg,
                                   Uint32                msg_stream_id,
                                   AmfEncoding           amf_encoding,
+                                  RtmpConnection::ConnectionInfo * mt_nonnull conn_info,
                                   void                 *_session);
 
     static void closed (Exception *exc_,

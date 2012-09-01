@@ -53,14 +53,20 @@ public:
 	DefaultChunkSize = 128
     };
 
+    struct ConnectionInfo
+    {
+        bool momentrtmp_proto;
+    };
+
     struct Frontend
     {
 	Result (*handshakeComplete) (void *cb_data);
 
 	Result (*commandMessage) (VideoStream::Message * mt_nonnull msg,
 				  Uint32                msg_stream_id,
-				  AmfEncoding           amf_encoding,
-				  void                 * cb_data);
+                                  AmfEncoding           amf_encoding,
+                                  ConnectionInfo       * mt_nonnull conn_info,
+				  void                 *cb_data);
 
 	Result (*audioMessage) (VideoStream::AudioMessage * mt_nonnull msg,
 				void                      *cb_data);

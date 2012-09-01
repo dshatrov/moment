@@ -1716,9 +1716,12 @@ RtmpConnection::callCommandMessage (ChunkStream * const chunk_stream,
 
 	msg.prechunk_size = 0;
 
+        ConnectionInfo conn_info;
+        conn_info.momentrtmp_proto = momentrtmp_proto;
+
 	Result res = Result::Failure;
 	frontend.call_ret<Result> (&res, frontend->commandMessage, /*(*/
-		&msg, chunk_stream->in_msg_stream_id, amf_encoding /*)*/);
+		&msg, chunk_stream->in_msg_stream_id, amf_encoding, &conn_info /*)*/);
 	return res;
     }
 

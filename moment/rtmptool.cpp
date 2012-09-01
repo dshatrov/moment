@@ -108,6 +108,7 @@ private:
     static Result commandMessage (VideoStream::Message * mt_nonnull msg,
                                   Uint32                msg_stream_id,
                                   AmfEncoding           amf_encoding,
+                                  RtmpConnection::ConnectionInfo * mt_nonnull conn_info,
                                   void                 *_self);
 
     static Result audioMessage (VideoStream::AudioMessage * mt_nonnull msg,
@@ -184,6 +185,7 @@ Result
 RtmpClient::commandMessage (VideoStream::Message   * const mt_nonnull msg,
                             Uint32                   const /* msg_stream_id */,
                             AmfEncoding              const /* amf_encoding */,
+                            RtmpConnection::ConnectionInfo * const mt_nonnull /* conn_info */,
                             void                   * const _self)
 {
     if (options.dump_frames)

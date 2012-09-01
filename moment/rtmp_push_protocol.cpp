@@ -273,6 +273,7 @@ Result
 RtmpPushConnection::commandMessage (VideoStream::Message * const mt_nonnull msg,
                                     Uint32                 const /* msg_stream_id */,
                                     AmfEncoding            const /* amf_encoding */,
+                                    RtmpConnection::ConnectionInfo * const mt_nonnull /* conn_info */,
                                     void                 * const _session)
 {
     Session * const session = static_cast <Session*> (_session);

@@ -391,7 +391,8 @@ RtmpServer::doPause (Uint32       const msg_stream_id,
 
 Result
 RtmpServer::doPublish (Uint32       const msg_stream_id,
-		       AmfDecoder * const mt_nonnull decoder)
+		       AmfDecoder * const mt_nonnull decoder,
+                       RtmpConnection::ConnectionInfo * const mt_nonnull conn_info)
 {
     logD (rtmp_server, _func_);
 
@@ -458,7 +459,7 @@ RtmpServer::doPublish (Uint32       const msg_stream_id,
     if (frontend && frontend->startStreaming) {
 	Result res;
 	if (!frontend.call_ret<Result> (&res, frontend->startStreaming,
-		    /*(*/ ConstMemory (vs_name_buf, vs_name_len), rec_mode /*)*/))
+		    /*(*/ ConstMemory (vs_name_buf, vs_name_len), rec_mode, conn_info->momentrtmp_proto /*)*/))
 	{
 	    logE_ (_func, "frontend gone");
 	    return Result::Failure;
@@ -640,7 +641,8 @@ RtmpServer::sendInitialMessages_unlocked (VideoStream::FrameSaver * const mt_non
 Result
 RtmpServer::commandMessage (VideoStream::Message * const mt_nonnull msg,
 			    Uint32                 const msg_stream_id,
-			    AmfEncoding            const /* amf_encoding */)
+			    AmfEncoding            const /* amf_encoding */,
+                            RtmpConnection::ConnectionInfo * const mt_nonnull conn_info)
 {
     logD (rtmp_server, _func_);
 
@@ -699,7 +701,7 @@ RtmpServer::commandMessage (VideoStream::Message * const mt_nonnull msg,
 	return doPause (msg_stream_id, &decoder);
     } else
     if (equal (method_mem, "publish")) {
-	return doPublish (msg_stream_id, &decoder);
+	return doPublish (msg_stream_id, &decoder, conn_info);
     } else
     if (equal (method_mem, "@setDataFrame")) {
 #if 0
