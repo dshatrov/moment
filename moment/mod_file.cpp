@@ -628,6 +628,8 @@ static Result momentFile_sendTemplate (HttpRequest * const http_req,
 				       Sender      * const mt_nonnull sender,
 				       ConstMemory   const mime_type)
 {
+    logD_ (_func, "full_path: ", full_path, ", filename: ", filename);
+
     // TODO There should be a better way.
     ctemplate::mutable_default_template_cache()->ReloadAllIfChanged (ctemplate::TemplateCache::LAZY_RELOAD);
 
