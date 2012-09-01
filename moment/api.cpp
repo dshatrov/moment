@@ -559,9 +559,10 @@ static Ref<VideoStream> client_startWatching (ConstMemory   const stream_name,
     return NULL;
 }
 
-static Ref<VideoStream> client_startStreaming (ConstMemory     const stream_name,
-					       RecordingMode   const rec_mode,
-					       void          * const _api_client_session)
+static Ref<VideoStream> client_startStreaming (ConstMemory        const stream_name,
+                                               StreamParameters * const /* stream_params */,
+					       RecordingMode      const rec_mode,
+					       void             * const _api_client_session)
 {
     MomentClientSession * const api_client_session = static_cast <MomentClientSession*> (_api_client_session);
 

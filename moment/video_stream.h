@@ -32,6 +32,42 @@ using namespace M;
 
 class RtmpConnection;
 
+class StreamParameters : public Referenced
+{
+private:
+    StringHash< Ref<String> > params;
+
+public:
+    bool hasParam (ConstMemory const name)
+    {
+        StringHash< Ref<String> >::EntryKey const key = params.lookup (name);
+        return (bool) key;
+    }
+
+    ConstMemory getParam (ConstMemory   const name,
+                          bool        * const ret_has_param = NULL)
+    {
+        StringHash< Ref<String> >::EntryKey const key = params.lookup (name);
+        if (!key) {
+            if (ret_has_param)
+                *ret_has_param = false;
+
+            return ConstMemory ();
+        }
+
+        if (ret_has_param)
+            *ret_has_param = true;
+
+        return key.getDataPtr()->ptr()->mem();
+    }
+
+    void setParam (ConstMemory const name,
+                   ConstMemory const value)
+    {
+        params.add (name, grab (new String (value)));
+    }
+};
+
 class VideoStream : public Object
 {
 public:
@@ -227,6 +263,7 @@ public:
 
 	VideoFrameType frame_type;
 	VideoCodecId codec_id;
+        // TODO 'is_saved_frame' seems unused and unnecessary now.
         bool is_saved_frame;
 
 	VideoMessage ()
@@ -382,6 +419,8 @@ private:
         {
         }
     };
+
+    mt_const Ref<StreamParameters> stream_params;
 
     mt_mutex (mutex) bool is_closed;
 
@@ -549,6 +588,33 @@ public:
     void unlock ()
     {
 	mutex.unlock ();
+    }
+
+    bool hasParam (ConstMemory const name)
+    {
+        if (!stream_params)
+            return false;
+
+        return stream_params->hasParam (name);
+    }
+
+    ConstMemory getParam (ConstMemory   const name,
+                          bool        * const ret_has_param = NULL)
+    {
+        if (!stream_params) {
+            if (ret_has_param)
+                *ret_has_param = false;
+
+            return ConstMemory ();
+        }
+
+        return stream_params->getParam (name, ret_has_param);
+    }
+
+    mt_const void setStreamParameters (StreamParameters * const stream_params)
+    {
+        assert (!this->stream_params);
+        this->stream_params = stream_params;
     }
 
     VideoStream ();

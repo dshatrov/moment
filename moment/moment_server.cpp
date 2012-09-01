@@ -617,9 +617,10 @@ _not_found:
 }
 
 Ref<VideoStream>
-MomentServer::startStreaming (ClientSession * const mt_nonnull client_session,
-			      ConstMemory     const stream_name,
-			      RecordingMode   const rec_mode)
+MomentServer::startStreaming (ClientSession    * const mt_nonnull client_session,
+			      ConstMemory        const stream_name,
+                              StreamParameters * const stream_params,
+			      RecordingMode      const rec_mode)
 {
     Ref<VideoStream> video_stream;
 
@@ -630,7 +631,7 @@ MomentServer::startStreaming (ClientSession * const mt_nonnull client_session,
 	logD (session, _func, "calling backend->startStreaming()");
 	if (!client_session->backend.call_ret< Ref<VideoStream> > (&video_stream,
 								   client_session->backend->startStreaming,
-								   /* ( */ stream_name, rec_mode /* ) */))
+								   /* ( */ stream_name, stream_params, rec_mode /* ) */))
 	{
 	    goto _denied;
 	}
@@ -644,6 +645,7 @@ MomentServer::startStreaming (ClientSession * const mt_nonnull client_session,
 	goto _denied;
 
     video_stream = grab (new VideoStream);
+    video_stream->setStreamParameters (stream_params);
     VideoStreamKey const video_stream_key = addVideoStream (video_stream, stream_name);
 
     client_session->mutex.lock ();
@@ -905,11 +907,14 @@ MomentServer::PageRequestResult
 MomentServer::processPageRequest (PageRequest * const page_req,
 				  ConstMemory   const path)
 {
+    logD_ (_func, "path: ", path);
+
     mutex.lock ();
 
     PageRequestHandlerHash::EntryKey const hash_key = page_handler_hash.lookup (path);
     if (!hash_key) {
 	mutex.unlock ();
+        logD_ (_func, "no page handlers");
 	return PageRequestResult::Success;
     }
 
@@ -917,6 +922,7 @@ MomentServer::processPageRequest (PageRequest * const page_req,
 
     mutex.unlock ();
 
+    logD_ (_func, "firing page request");
     PageRequestResult const res = handler->firePageRequest (page_req,
 							    path,
 							    path /* full_path */);

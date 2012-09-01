@@ -179,9 +179,10 @@ public:
 	    Ref<VideoStream> (*startWatching) (ConstMemory  stream_name,
 					       void        *cb_data);
 
-	    Ref<VideoStream> (*startStreaming) (ConstMemory    stream_name,
-						RecordingMode  rec_mode,
-						void          *cb_data);
+	    Ref<VideoStream> (*startStreaming) (ConstMemory       stream_name,
+                                                StreamParameters *stream_params,
+						RecordingMode     rec_mode,
+						void             *cb_data);
 	};
 
     private:
@@ -460,9 +461,10 @@ public:
     Ref<VideoStream> startWatching (ClientSession * mt_nonnull client_session,
 				    ConstMemory    stream_name);
 
-    Ref<VideoStream> startStreaming (ClientSession * mt_nonnull client_session,
-				     ConstMemory    stream_name,
-				     RecordingMode  rec_mode);
+    Ref<VideoStream> startStreaming (ClientSession    * mt_nonnull client_session,
+				     ConstMemory       stream_name,
+                                     StreamParameters *stream_params,
+				     RecordingMode     rec_mode);
 
     struct ClientHandlerKey
     {
