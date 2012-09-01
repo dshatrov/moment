@@ -1,5 +1,5 @@
 /*  Moment Video Server - High performance media server
-    Copyright (C) 2011 Dmitry Shatrov
+    Copyright (C) 2011, 2012 Dmitry Shatrov
     e-mail: shatrov@gmail.com
 
     This program is free software: you can redistribute it and/or modify
@@ -23,12 +23,6 @@
 #include <moment/rtmp_push_protocol.h>
 
 
-// Needed for "start_paused" as well.
-// TODO This belongs to class RtmpConnection.
-//#define MOMENT_RTMP__WAIT_FOR_KEYFRAME
-
-//#define MOMENT_RTMP__AUDIO_WAITS_VIDEO
-
 // Flow control is disabled until done right.
 //#define MOMENT_RTMP__FLOW_CONTROL
 
@@ -48,9 +42,6 @@ public:
     RtmptService rtmpt_service;
 
     MomentRtmpModule ()
-          // TODO Is it possible to pass NULL as coderef_container?
-          //      That would make sense since MomentRtmpModule is effectively
-          //      a global object.
         : rtmp_service  (this /* coderef_container */),
           rtmpt_service (this /* coderef_container */)
     {
@@ -58,15 +49,15 @@ public:
 };
 
 mt_const bool audio_waits_video = false;
+mt_const bool wait_for_keyframe = false;
 mt_const bool default_start_paused = false;
+mt_const Uint64 paused_avc_interframes = 3;
 
 mt_const bool record_all = false;
 mt_const ConstMemory record_path = "/opt/moment/records";
 mt_const Uint64 recording_limit = 1 << 24 /* 16 Mb */;
 
-#ifdef MOMENT_RTMP__WAIT_FOR_KEYFRAME
 mt_const Count no_keyframe_limit = 250; // 25 fps * 10 seconds
-#endif
 
 class WatchingParams
 {
@@ -115,14 +106,15 @@ public:
     mt_mutex (mutex) bool overloaded;
 #endif
 
-#ifdef MOMENT_RTMP__WAIT_FOR_KEYFRAME
-    // Used from streamVideoMessage() only.
     mt_mutex (mutex) Count no_keyframe_counter;
     mt_mutex (mutex) bool keyframe_sent;
     mt_mutex (mutex) bool first_keyframe_sent;
-#endif
+    mt_mutex (mutex) Uint64 first_interframes_sent;
 
     mt_mutex (mutex) bool resumed;
+
+    mt_mutex (mutex) PagePool *paused_keyframe_page_pool;
+    mt_mutex (mutex) PagePool::Page *paused_keyframe_page;
 
     // Synchronized by rtmp_server.
     bool streaming;
@@ -138,6 +130,8 @@ public:
 	return ret_valid;
     }
 #endif
+
+    void doResume ();
 
     // Secures a reference to rtmp_conn so that it is safe to call rtmp_server's
     // methods.
@@ -160,14 +154,15 @@ public:
 #ifdef MOMENT_RTMP__FLOW_CONTROL
 	  overloaded (false),
 #endif
-#ifdef MOMENT_RTMP__WAIT_FOR_KEYFRAME
 	  no_keyframe_counter (0),
-	  keyframe_sent (false),
+	  keyframe_sent       (false),
 	  first_keyframe_sent (false),
-#endif
-	  resumed (false),
+          first_interframes_sent (0),
+	  resumed   (false),
+          paused_keyframe_page_pool (NULL),
+          paused_keyframe_page      (NULL),
 	  streaming (false),
-	  watching (false)
+	  watching  (false)
     {
 	logD (session, _func, "0x", fmt_hex, (UintPtr) this);
     }
@@ -182,8 +177,50 @@ public:
 	    moment->getRecorderThreadPool()->releaseThreadContext (recorder_thread_ctx);
 	    recorder_thread_ctx = NULL;
 	}
+
+        mutex.lock ();
+        if (paused_keyframe_page) {
+            assert (paused_keyframe_page_pool);
+            paused_keyframe_page_pool->pageUnref (paused_keyframe_page);
+            paused_keyframe_page = NULL;
+            paused_keyframe_page_pool = NULL;
+        }
+        mutex.unlock ();
     }
 };
+
+static mt_mutex (client_session) Result savedAudioFrame (VideoStream::AudioMessage * mt_nonnull audio_msg,
+                                                         void                      *_client_session);
+
+static mt_mutex (client_session) Result savedVideoFrame (VideoStream::VideoMessage * mt_nonnull video_msg,
+                                                         void                      *_client_session);
+
+static VideoStream::FrameSaver::FrameHandler const saved_frame_handler = {
+    savedAudioFrame,
+    savedVideoFrame
+};
+
+void
+ClientSession::doResume ()
+{
+    mutex.lock ();
+    if (!resumed) {
+        resumed = true;
+        if (video_stream) {
+            video_stream->lock ();
+            video_stream->getFrameSaver()->reportSavedFrames (&saved_frame_handler, this);
+            video_stream->unlock ();
+
+            if (paused_keyframe_page) {
+                assert (paused_keyframe_page_pool);
+                paused_keyframe_page_pool->pageUnref (paused_keyframe_page);
+                paused_keyframe_page_pool = NULL;
+                paused_keyframe_page = NULL;
+            }
+        }
+    }
+    mutex.unlock ();
+}
 
 void destroyClientSession (ClientSession * const client_session)
 {
@@ -239,16 +276,19 @@ void streamAudioMessage (VideoStream::AudioMessage * const mt_nonnull msg,
 
     client_session->mutex.lock ();
 
-#ifdef MOMENT_RTMP__AUDIO_WAITS_VIDEO
-    if (audio_waits_video
-	&& msg->frame_type == VideoStream::AudioFrameType::RawData)
-    {
-	if (!client_session->first_keyframe_sent) {
-	    client_session->mutex.unlock ();
-	    return;
-	}
+    if (msg->frame_type == VideoStream::AudioFrameType::RawData) {
+        if (!client_session->resumed) {
+            client_session->mutex.unlock ();
+            return;
+        }
+
+        if (audio_waits_video) {
+            if (!client_session->first_keyframe_sent) {
+                client_session->mutex.unlock ();
+                return;
+            }
+        }
     }
-#endif
 
 #ifdef MOMENT_RTMP__FLOW_CONTROL
     if (client_session->overloaded
@@ -269,7 +309,7 @@ void streamAudioMessage (VideoStream::AudioMessage * const mt_nonnull msg,
 void streamVideoMessage (VideoStream::VideoMessage * const mt_nonnull msg,
 			 void                      * const _session)
 {
-//    logD_ (_func, "ts 0x", fmt_hex, msg->timestamp, " ", msg->frame_type, (msg->is_saved_frame ? " SAVED" : ""));
+//    logD_ (_func, "ts ", msg->timestamp_nanosec, " ", msg->frame_type, (msg->is_saved_frame ? " SAVED" : ""));
 
     ClientSession * const client_session = static_cast <ClientSession*> (_session);
 
@@ -295,29 +335,24 @@ void streamVideoMessage (VideoStream::VideoMessage * const mt_nonnull msg,
 
 	logD (framedrop, _func, "Connection overloaded, dropping video frame");
 
-#ifdef MOMENT_RTMP__WAIT_FOR_KEYFRAME
 	client_session->no_keyframe_counter = 0;
 	client_session->keyframe_sent = false;
-#endif
 
 	client_session->mutex.unlock ();
 	return;
     }
 #endif // MOMENT_RTMP__FLOW_CONTROL
 
-#ifdef MOMENT_RTMP__WAIT_FOR_KEYFRAME
     bool got_keyframe = false;
-    if (!msg->is_saved_frame
-        && (msg->frame_type == VideoStream::VideoFrameType::KeyFrame ||
+    if (/* TODO WRONG? !msg->is_saved_frame
+        && */ (msg->frame_type == VideoStream::VideoFrameType::KeyFrame ||
 	    msg->frame_type == VideoStream::VideoFrameType::GeneratedKeyFrame))
     {
-//        logD_ (_func, "KEYFRAME");
 	got_keyframe = true;
     } else
     if (msg->frame_type == VideoStream::VideoFrameType::AvcSequenceHeader ||
         msg->frame_type == VideoStream::VideoFrameType::AvcEndOfSequence)
     {
-//        logD_ (_func, "KEYFRAME NOT SENT");
         client_session->keyframe_sent = false;
     } else
     if (!client_session->keyframe_sent
@@ -328,10 +363,11 @@ void streamVideoMessage (VideoStream::VideoMessage * const mt_nonnull msg,
 	if (client_session->no_keyframe_counter >= no_keyframe_limit) {
             logD_ (_func, "no_keyframe_limit hit: ", client_session->no_keyframe_counter);
 	    got_keyframe = true;
-	} else {
+	} else
+        if (wait_for_keyframe) {
 	  // Waiting for a keyframe, dropping current video frame.
+//            logD_ (_func, "--- wait_for_keyframe, dropping");
 	    client_session->mutex.unlock ();
-//            logD_ (_func, "DROPPING FRAME");
 	    return;
 	}
     }
@@ -339,32 +375,48 @@ void streamVideoMessage (VideoStream::VideoMessage * const mt_nonnull msg,
     if (got_keyframe)
 	client_session->no_keyframe_counter = 0;
 
-    if (client_session->watching_params.start_paused &&
-	!client_session->resumed &&
+    if (!client_session->resumed &&
         msg->frame_type.isVideoData())
     {
-	bool match = client_session->first_keyframe_sent;
-	if (!match) {
-	    if (client_session->watching_video_stream) {
-		// TODO No lock inversion?
-		client_session->watching_video_stream->lock ();
-		match = client_session->watching_video_stream->getFrameSaver()->getSavedKeyframe (NULL);
-		client_session->watching_video_stream->unlock ();
-	    }
-	}
+        if (msg->frame_type.isInterFrame())
+        {
+            if (msg->codec_id != VideoStream::VideoCodecId::AVC
+                || client_session->first_interframes_sent >= paused_avc_interframes
+                || !client_session->first_keyframe_sent)
+            {
+                client_session->mutex.unlock ();
+//                logD_ (_func, "--- !resumed, interframe, dropping");
+                return;
+            }
+            ++client_session->first_interframes_sent;
+        } else {
+            assert (msg->frame_type.isKeyFrame());
 
-	if (match) {
-	    client_session->mutex.unlock ();
-//            logD_ (_func, "START PAUSED, DROPPING");
-	    return;
-	}
+            if (client_session->first_keyframe_sent) {
+//                logD_ (_func, "--- !resumed, first_keyframe_sent, dropping");
+                client_session->keyframe_sent = false;
+                client_session->mutex.unlock ();
+                return;
+            }
+
+            if (client_session->paused_keyframe_page) {
+                assert (client_session->paused_keyframe_page_pool);
+                client_session->paused_keyframe_page_pool->pageUnref (client_session->paused_keyframe_page);
+                client_session->paused_keyframe_page = NULL;
+                client_session->paused_keyframe_page_pool = NULL;
+            }
+
+            client_session->paused_keyframe_page_pool = msg->page_pool;
+            client_session->paused_keyframe_page = msg->page_list.first;
+            msg->page_pool->pageRef (msg->page_list.first);
+        }
     }
 
     if (got_keyframe) {
-	client_session->keyframe_sent = true;
+//        logD_ (_func, "first_keyframe_sent = true");
 	client_session->first_keyframe_sent = true;
+	client_session->keyframe_sent = true;
     }
-#endif
 
     client_session->mutex.unlock ();
 
@@ -461,9 +513,9 @@ static void parseParameters (ConstMemory         const mem,
     }
 }
 
-
 Result startStreaming (ConstMemory     const &_stream_name,
 		       RecordingMode   const rec_mode,
+                       bool            const momentrtmp_proto,
 		       void          * const _client_session)
 {
     logD (session, _func, "stream_name: ", _stream_name);
@@ -490,8 +542,11 @@ Result startStreaming (ConstMemory     const &_stream_name,
 
     // 'srv_session' is created in connect(), which is synchronized with
     // startStreaming(). No locking needed.
+    Ref<StreamParameters> const stream_params = grab (new StreamParameters);
+    stream_params->setParam ("source", momentrtmp_proto ? ConstMemory ("momentrtmp") : ConstMemory ("rtmp"));
+
     Ref<VideoStream> const video_stream =
-	    moment->startStreaming (client_session->srv_session, stream_name, rec_mode);
+	    moment->startStreaming (client_session->srv_session, stream_name, stream_params, rec_mode);
     if (!video_stream)
 	return Result::Failure;
 
@@ -531,8 +586,10 @@ void startWatching_paramCallback (ConstMemory   const name,
 {
     WatchingParams * const watching_params = static_cast <WatchingParams*> (_watching_params);
 
-    if (equal (name, "paused"))
+    if (equal (name, "paused")) {
+//        logD_ (_func, "start_paused");
 	watching_params->start_paused = true;
+    }
 }
 
 static mt_mutex (client_session) Result
@@ -540,7 +597,15 @@ savedAudioFrame (VideoStream::AudioMessage * const mt_nonnull audio_msg,
                  void                      * const _client_session)
 {
     ClientSession * const client_session = static_cast <ClientSession*> (_client_session);
+
+    if (!client_session->resumed
+	&& audio_msg->frame_type == VideoStream::AudioFrameType::RawData)
+    {
+        return Result::Success;
+    }
+
     client_session->rtmp_conn->sendAudioMessage (audio_msg);
+
     return Result::Success;
 }
 
@@ -549,14 +614,53 @@ savedVideoFrame (VideoStream::VideoMessage * const mt_nonnull video_msg,
                  void                      * const _client_session)
 {
     ClientSession * const client_session = static_cast <ClientSession*> (_client_session);
+
+    if (!client_session->resumed
+        && video_msg->frame_type.isInterFrame())
+    {
+//        logD_ (_func, "!resumed, interframe, dropping");
+        if (video_msg->codec_id != VideoStream::VideoCodecId::AVC
+            || client_session->first_interframes_sent >= paused_avc_interframes
+            || !client_session->first_keyframe_sent)
+        {
+            return Result::Success;
+        }
+        ++client_session->first_interframes_sent;
+    }
+
+    if (video_msg->frame_type.isKeyFrame()) {
+        if (video_msg->page_list.first == client_session->paused_keyframe_page) {
+//            logD_ (_func, "same as paused keyframe, dropping");
+            return Result::Success;
+        }
+
+        if (!client_session->resumed) {
+            if (client_session->paused_keyframe_page) {
+                assert (client_session->paused_keyframe_page_pool);
+                client_session->paused_keyframe_page_pool->pageUnref (client_session->paused_keyframe_page);
+                client_session->paused_keyframe_page = NULL;
+                client_session->paused_keyframe_page_pool = NULL;
+            }
+
+            client_session->paused_keyframe_page_pool = video_msg->page_pool;
+            client_session->paused_keyframe_page = video_msg->page_list.first;
+            video_msg->page_pool->pageRef (video_msg->page_list.first);
+        }
+
+//        logD_ (_func, "first_keyframe_sent = true");
+        client_session->first_keyframe_sent = true;
+        client_session->keyframe_sent = true;
+        client_session->no_keyframe_counter = 0;
+    }
+
+// TODO Set the same timestamp for prepush video messages (last video msg timestamp?).
+//    VideoStream::VideoMessage tmp_video_msg = *video_msg;
+//    tmp_video_msg.timestamp_nanosec = 0;
+
+//    client_session->rtmp_conn->sendVideoMessage (&tmp_video_msg);
     client_session->rtmp_conn->sendVideoMessage (video_msg);
     return Result::Success;
 }
-
-static VideoStream::FrameSaver::FrameHandler const saved_frame_handler = {
-    savedAudioFrame,
-    savedVideoFrame
-};
 
 Result startWatching (ConstMemory const &_stream_name,
 		      void * const _client_session)
@@ -579,7 +683,6 @@ Result startWatching (ConstMemory const &_stream_name,
 
     client_session->mutex.lock ();
     client_session->watching_params.reset ();
-    client_session->resumed = false;
     {
 	Byte const * const name_sep = (Byte const *) memchr (stream_name.mem(), '?', stream_name.len());
 	if (name_sep) {
@@ -587,6 +690,7 @@ Result startWatching (ConstMemory const &_stream_name,
 	    stream_name = stream_name.region (0, name_sep - stream_name.mem());
 	}
     }
+    client_session->resumed = !client_session->watching_params.start_paused;
     client_session->mutex.unlock ();
 
     Ref<VideoStream> video_stream;
@@ -643,12 +747,8 @@ RtmpServer::CommandResult server_commandMessage (RtmpConnection       * const mt
     ClientSession * const client_session = static_cast <ClientSession*> (_client_session);
 
     if (equal (method_name, "resume")) {
-	// TODO Unused, we never get here.
-
-	client_session->mutex.lock ();
-	client_session->resumed = true;
-	client_session->mutex.unlock ();
-
+      // TODO Unused, we never get here.
+        client_session->doResume ();
 	conn->doBasicMessage (msg_stream_id, amf_decoder);
     } else {
 	client_session->mutex.lock ();
@@ -675,14 +775,10 @@ static Result pauseCmd (void * const /* _client_session */)
 
 static Result resumeCmd (void * const _client_session)
 {
-    logD_ (_func_);
+//    logD_ (_func_);
 
     ClientSession * const client_session = static_cast <ClientSession*> (_client_session);
-
-    client_session->mutex.lock ();
-    client_session->resumed = true;
-    client_session->mutex.unlock ();
-
+    client_session->doResume ();
     return Result::Success;
 }
 
@@ -724,13 +820,14 @@ Result videoMessage (VideoStream::VideoMessage * const mt_nonnull msg,
 Result commandMessage (VideoStream::Message * const mt_nonnull msg,
 		       Uint32                 const msg_stream_id,
 		       AmfEncoding            const amf_encoding,
+                       RtmpConnection::ConnectionInfo * const mt_nonnull conn_info,
 		       void                 * const _client_session)
 {
     logD (mod_rtmp, _func_);
 
     ClientSession * const client_session = static_cast <ClientSession*> (_client_session);
     // No need to call takeRtmpConnRef(), because this is rtmp_conn's callback.
-    return client_session->rtmp_server.commandMessage (msg, msg_stream_id, amf_encoding);
+    return client_session->rtmp_server.commandMessage (msg, msg_stream_id, amf_encoding, conn_info);
 }
 
 void sendStateChanged (Sender::SendState   const send_state,
@@ -1082,6 +1179,22 @@ void momentRtmpInit ()
 	    audio_waits_video = true;
 	else
 	    audio_waits_video = false;
+
+        logI_ (_func, opt_name, ": ", audio_waits_video);
+    }
+
+    {
+	ConstMemory const opt_name = "mod_rtmp/wait_for_keyframe";
+	MConfig::BooleanValue const opt_val = config->getBoolean (opt_name);
+	if (opt_val == MConfig::Boolean_Invalid)
+	    logE_ (_func, "Invalid value for config option ", opt_name);
+	else
+	if (opt_val == MConfig::Boolean_True)
+	    wait_for_keyframe = true;
+	else
+	    wait_for_keyframe = false;
+
+        logI_ (_func, opt_name, ": ", wait_for_keyframe);
     }
 
     {
@@ -1095,7 +1208,17 @@ void momentRtmpInit ()
 	else
 	    default_start_paused = false;
 
-	logD_ (_func, "default_start_paused: ", default_start_paused);
+	logI_ (_func, opt_name, ": ", default_start_paused);
+    }
+
+    {
+	ConstMemory const opt_name = "mod_rtmp/paused_avc_interframes";
+	MConfig::GetResult const res = config->getUint64_default (
+		opt_name, &paused_avc_interframes, paused_avc_interframes);
+	if (!res)
+	    logE_ (_func, "bad value for ", opt_name);
+
+	logI_ (_func, opt_name, ": ", paused_avc_interframes);
     }
 }
 
