@@ -138,34 +138,6 @@ public class BasicPlayer extends Sprite
 	msg.y = (stage_height - msg.height) * (4.0 / 5.0);
     }
 
-    /* Unused
-    private function loaderComplete (loader : Loader) : Boolean
-    {
-        if (loader.contentLoaderInfo
-            && loader.contentLoaderInfo.bytesTotal > 0
-            && loader.contentLoaderInfo.bytesTotal == loader.contentLoaderInfo.bytesLoaded)
-        {
-            return true;
-        }
-
-        return false;
-    }
-
-    private function doLoaderLoadComplete (loaded_element : LoadedElement) : void
-    {
-        repositionButtons ();
-
-	loaded_element.allowVisible ();
-    }
-
-    private function loaderLoadCompleteHandler (loaded_element : LoadedElement) : Function
-    {
-	return function (event : Event) : void {
-	    doLoaderLoadComplete (loaded_element);
-	};
-    }
-    */
-
     private function showVideo () : void
     {
 	video.visible = true;
@@ -401,32 +373,6 @@ public class BasicPlayer extends Sprite
         }
     }
 
-    /* Unused
-    private function createLoadedElement (img_url  : String,
-					  visible_ : Boolean) : LoadedElement
-    {
-	var loaded_element : LoadedElement;
-	var loader : Loader;
-
-	loader = new Loader ();
-
-        loaded_element = new LoadedElement (visible_);
-	loaded_element.obj = loader;
-
-        loader.load (new URLRequest (img_url));
-        loader.visible = false;
-
-        addChild (loaded_element.obj);
-
-        if (loader.contentLoaderInfo)
-	    loader.contentLoaderInfo.addEventListener (Event.COMPLETE, loaderLoadCompleteHandler (loaded_element));
-        if (loaderComplete (loader))
-            doLoaderLoadComplete (loaded_element);
-
-	return loaded_element;
-    }
-    */
-
     public function BasicPlayer ()
     {
 	initial_pause = false;
@@ -526,38 +472,4 @@ public class BasicPlayer extends Sprite
 }
 
 }
-
-/* Unused
-internal class LoadedElement
-{
-    private var visible_allowed : Boolean;
-    private var visible : Boolean;
-
-    public var obj : flash.display.Loader;
-
-    public function applyVisible () : void
-    {
-	obj.visible = visible;
-    }
-
-    public function allowVisible () : void
-    {
-	visible_allowed = true;
-	applyVisible ();
-    }
-
-    public function setVisible (visible_ : Boolean) : void
-    {
-	visible = visible_;
-	if (visible_allowed)
-	    applyVisible ();
-    }
-
-    public function LoadedElement (visible_ : Boolean)
-    {
-	visible = visible_;
-	visible_allowed = false;
-    }
-}
-*/
 
