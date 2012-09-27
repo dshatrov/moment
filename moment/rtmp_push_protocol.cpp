@@ -123,7 +123,8 @@ RtmpPushConnection::setReconnectTimer ()
                                                                        this /* coderef_container */),
                                         // TODO Config parameter for the timeout.
                                         1     /* time_seconds */,
-                                        false /* periodical */);
+                                        false /* periodical */,
+                                        false /* auto_delete */);
 }
 
 mt_mutex (mutex) void

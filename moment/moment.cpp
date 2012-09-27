@@ -62,6 +62,8 @@ const Time  default__http__keepalive_timeout  =  60;
 class MomentInstance : public Object
 {
 private:
+    Mutex mutex;
+
     MConfig::Config config;
 
     PagePool page_pool;
@@ -79,7 +81,6 @@ private:
     MomentServer moment_server;
 
     mt_mutex (mutex) Timers::TimerKey exit_timer_key;
-    Mutex mutex;
 
     static void exitTimerTick (void * const /* cb_data */);
 
@@ -339,7 +340,7 @@ MomentInstance::run ()
 				server_app.getServerContext()->getTimers(),
                                 server_app.getMainThreadContext()->getDeferredProcessor(),
 				&page_pool,
-				http_keepalive_timeout,
+				http_keepalive_timeout * 1000000 /* in microseconds */,
 				no_keepalive_conns))
 	{
 	    logE_ (_func, "http_service.init() failed: ", exc->toString());
@@ -401,7 +402,7 @@ MomentInstance::run ()
 						   server_app.getServerContext()->getTimers(),
                                                    server_app.getMainThreadContext()->getDeferredProcessor(),
 						   &page_pool,
-						   http_keepalive_timeout,
+						   http_keepalive_timeout * 1000000 /* in microseconds */,
 						   no_keepalive_conns))
 	    {
 		logE_ (_func, "admin_http_service.init() failed: ", exc->toString());

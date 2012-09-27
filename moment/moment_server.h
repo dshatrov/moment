@@ -38,9 +38,12 @@ using namespace M;
 
 // Only one MomentServer object may be initialized during program's lifetime.
 // This limitation comes form loadable modules support.
+//
 class MomentServer : public Object
 {
 private:
+    StateMutex mutex;
+
     class VideoStreamEntry
     {
     public:
@@ -145,11 +148,11 @@ private:
 public:
     VideoStreamHandlerKey addVideoStreamHandler (CbDesc<VideoStreamHandler> const &vs_handler);
 
-    VideoStreamHandlerKey addVideoStreamHandler_unlocked (CbDesc<VideoStreamHandler> const &vs_handler);
+    mt_mutex (mutex) VideoStreamHandlerKey addVideoStreamHandler_unlocked (CbDesc<VideoStreamHandler> const &vs_handler);
 
     void removeVideoStreamHandler (VideoStreamHandlerKey vs_handler_key);
 
-    void removeVideoStreamHandler_unlocked (VideoStreamHandlerKey vs_handler_key);
+    mt_mutex (mutex) void removeVideoStreamHandler_unlocked (VideoStreamHandlerKey vs_handler_key);
 
 // _____________________________________________________________________________
 
@@ -408,8 +411,6 @@ private:
 
     mt_mutex (mutex) Namespace root_namespace;
 
-    StateMutex mutex;
-
     mt_mutex (mutex) ClientEntry* getClientEntry_rec (ConstMemory  path,
 						      ConstMemory * mt_nonnull ret_path_tail,
 						      Namespace   * mt_nonnull nsp);
@@ -548,9 +549,9 @@ public:
 
   // Initialization
 
-    void lock ();
+    mt_locks (mutex) void lock ();
 
-    void unlock ();
+    mt_unlocks (mutex) void unlock ();
 
     Result init (ServerApp        * mt_nonnull server_app,
 		 PagePool         * mt_nonnull page_pool,

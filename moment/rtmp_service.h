@@ -36,6 +36,8 @@ class RtmpService : public RtmpVideoService,
 		    public DependentCodeReferenced
 {
 private:
+    StateMutex mutex;
+
     class SessionList_name;
 
     class ClientSession : public Object,
@@ -83,8 +85,6 @@ private:
     TcpServer tcp_server;
 
     mt_mutex (mutex) SessionList session_list;
-
-    StateMutex mutex;
 
     mt_mutex (mutex) void destroySession (ClientSession *session);
 

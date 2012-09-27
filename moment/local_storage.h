@@ -33,6 +33,8 @@ using namespace M;
 class LocalStorage : public Storage
 {
 private:
+    StateMutex mutex;
+
     class FileEntry : public IntrusiveListElement<>,
 		      public Referenced
     {
@@ -44,8 +46,6 @@ private:
     typedef IntrusiveList<FileEntry> FileEntryList;
 
     mt_mutex (mutex) FileEntryList file_list;
-
-    StateMutex mutex;
 
 public:
     FileKey openFile (ConstMemory   filename,

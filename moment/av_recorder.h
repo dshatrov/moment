@@ -33,6 +33,9 @@ using namespace M;
 
 class AvRecorder : public DependentCodeReferenced
 {
+private:
+    Mutex mutex;
+
 public:
     struct Frontend {
 	void (*error) (Exception *exc_,
@@ -95,8 +98,6 @@ private:
 
     mt_const Uint64 recording_limit;
     mt_mutex (mutex) Uint64 total_bytes_recorded;
-
-    Mutex mutex;
 
     mt_const Cb<Frontend> frontend;
 

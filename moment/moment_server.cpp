@@ -139,7 +139,7 @@ MomentServer::addVideoStreamHandler (CbDesc<VideoStreamHandler> const &vs_handle
     return vs_handler_key;
 }
 
-MomentServer::VideoStreamHandlerKey
+mt_mutex (mutex) MomentServer::VideoStreamHandlerKey
 MomentServer::addVideoStreamHandler_unlocked (CbDesc<VideoStreamHandler> const &vs_handler)
 {
     VideoStreamHandlerKey vs_handler_key;
@@ -153,7 +153,7 @@ MomentServer::removeVideoStreamHandler (VideoStreamHandlerKey vs_handler_key)
     video_stream_informer.unsubscribe (vs_handler_key.sbn_key);
 }
 
-void
+mt_mutex (mutex) void
 MomentServer::removeVideoStreamHandler_unlocked (VideoStreamHandlerKey vs_handler_key)
 {
     video_stream_informer.unsubscribe_unlocked (vs_handler_key.sbn_key);
@@ -1005,13 +1005,13 @@ MomentServer::dumpStreamList ()
     log__ (_func_, "done");
 }
 
-void
+mt_locks (mutex) void
 MomentServer::lock ()
 {
     mutex.lock ();
 }
 
-void
+mt_unlocks (mutex) void
 MomentServer::unlock ()
 {
     mutex.unlock ();
@@ -1061,15 +1061,15 @@ MomentServer::init (ServerApp        * const mt_nonnull server_app,
 }
 
 MomentServer::MomentServer ()
-    : event_informer (NULL /* coderef_container */, &mutex),
-      video_stream_informer (NULL /* coderef_container */, &mutex),
-      server_app (NULL),
-      page_pool (NULL),
-      http_service (NULL),
-      config (NULL),
-      recorder_thread_pool (NULL),
-      storage (NULL),
-      publish_all_streams (true)
+    : event_informer        (this /* coderef_container */, &mutex),
+      video_stream_informer (this /* coderef_container */, &mutex),
+      server_app            (NULL),
+      page_pool             (NULL),
+      http_service          (NULL),
+      config                (NULL),
+      recorder_thread_pool  (NULL),
+      storage               (NULL),
+      publish_all_streams   (true)
 {
     instance = this;
 

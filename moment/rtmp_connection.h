@@ -38,6 +38,21 @@ class RtmpConnection_OutputQueue_name;
 class RtmpConnection : public DependentCodeReferenced,
 		       public IntrusiveListElement<RtmpConnection_OutputQueue_name>
 {
+private:
+    // Protects part of receiving state which may be accessed from
+    // ~RtmpConnection() destructor.
+    // A simple release fence would be enough to synchronize with the destructor.
+    // Using a mutex is an overkill. We can switch to using a fence after
+    // an implementation of C++0x atomics comes out.
+    //
+    // It'd be optimal to use a fence just once for each invocation of doProcessInput()
+    // and only if there was a change to the part of the state which the destructor
+    // needs.
+    Mutex in_destr_mutex;
+
+    // Protects sending state.
+    Mutex send_mutex;
+
 public:
     enum {
 	DefaultDataChunkStreamId  = 3,
@@ -338,23 +353,9 @@ private:
 
     mt_end
 
-    // Protects part of receiving state which may be accessed from
-    // ~RtmpConnection() destructor.
-    // A simple release fence would be enough to synchronize with the destructor.
-    // Using a mutex is an overkill. We can switch to using a fence after
-    // an implementation of C++0x atomics comes out.
-    //
-    // It'd be optimal to use a fence just once for each invocation of doProcessInput()
-    // and only if there was a change to the part of the state which the destructor
-    // needs.
-    Mutex in_destr_mutex;
-
   // Sending state
 
     mt_const Uint32 local_wack_size;
-
-    // Protects sending state.
-    Mutex send_mutex;
 
     static bool timestampGreater (Uint32 const left,
 				  Uint32 const right)

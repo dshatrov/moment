@@ -1366,11 +1366,12 @@ RtmpConnection::beginPings ()
 	return;
     }
 
-    ping_send_timer = timers->addTimer (pingTimerTick,
-					this,
-					getCoderefContainer(),
+    ping_send_timer = timers->addTimer (CbDesc<Timers::TimerCallback> (pingTimerTick,
+                                                                       this,
+                                                                       getCoderefContainer()),
 					5 * 60 /* TODO Config parameter for timeout */,
-					true /* periodical */);
+					true  /* periodical */,
+                                        false /* auto_delete */);
     in_destr_mutex.unlock ();
 }
 
@@ -2894,8 +2895,6 @@ RtmpConnection::RtmpConnection (Object * const coderef_container)
 
       prechunking_enabled (true),
       send_delay (0),
-
-      ping_send_timer (NULL),
 
       in_chunk_size  (DefaultChunkSize),
       out_chunk_size (DefaultChunkSize),
