@@ -1,6 +1,7 @@
 COMMON_CFLAGS =					\
 	-ggdb					\
-	-Wno-long-long -Wall -Wextra		\
+	-Wno-long-long -Wall                    \ 
+        -include "local_config.h"               \
 	-DLIBMOMENT_PREFIX="\"$(libdir)\""	\
 	$(THIS_CFLAGS)
 
@@ -19,10 +20,10 @@ endif
 
 COMMON_LDFLAGS =
 
-AM_CFLAGS = -std=gnu99 $(COMMON_CFLAGS)
-AM_CXXFLAGS = -std=gnu++0x $(COMMON_CFLAGS)
+AM_CFLAGS   += -std=gnu99 $(COMMON_CFLAGS)
+AM_CXXFLAGS += $(COMMON_CFLAGS)
 
-INCLUDES = -I$(top_srcdir)
+INCLUDES = -I$(top_srcdir) -I$(top_builddir)
 
 moment_private_headers =
 
@@ -41,6 +42,7 @@ moment_target_headers =		\
 	rtmpt_service.h		\
 				\
 	video_stream.h		\
+        test_stream_generator.h \
 				\
 	av_recorder.h		\
 	av_muxer.h		\
@@ -58,6 +60,8 @@ moment_target_headers =		\
 	api.h			\
 				\
 	module_init.h
+
+#        transcoder.h
 
 #	flv_file_source.h
 
@@ -78,6 +82,7 @@ libmoment_1_0_la_SOURCES =	\
 	rtmpt_service.cpp	\
 				\
 	video_stream.cpp	\
+        test_stream_generator.cpp \
 				\
 	av_recorder.cpp		\
 	flv_muxer.cpp		\
@@ -97,6 +102,8 @@ libmoment_1_0_la_SOURCES =	\
                                 \
         tsmux/tsmux.c           \
         tsmux/tsmuxstream.c
+
+#        transcoder.cpp
 
 #	flv_file_source.cpp
  

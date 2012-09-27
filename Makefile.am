@@ -1,6 +1,7 @@
 SUBDIRS = moment web
 
 EXTRA_DIST = \
+        local_config.h.in       \
 	libmoment-1.0.pc.in
 
 pkgconfigdir = $(libdir)/pkgconfig
