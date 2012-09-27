@@ -1,5 +1,5 @@
 /*  Moment Video Server - High performance media server
-    Copyright (C) 2011 Dmitry Shatrov
+    Copyright (C) 2011, 2012 Dmitry Shatrov
     e-mail: shatrov@gmail.com
 
     This program is free software: you can redistribute it and/or modify
@@ -42,6 +42,10 @@ public:
     bool got_server_addr;
     IpAddress server_addr;
 
+    bool publish;
+    TestStreamGenerator::Options gen_opts;
+    Ref<TestStreamGenerator> test_stream_generator;
+
     bool nonfatal_errors;
 
     Ref<String> app_name;
@@ -57,6 +61,7 @@ public:
 	: help (false),
 	  num_clients (1),
 	  got_server_addr (false),
+          publish (false),
 	  nonfatal_errors (false),
 	  app_name (grab (new String ("app"))),
 	  channel (grab (new String ("video"))),
@@ -83,6 +88,7 @@ private:
     mt_const Byte id_char;
 
     mt_const ServerThreadContext *thread_ctx;
+    mt_const DataDepRef<PagePool> page_pool;
 
     RtmpConnection rtmp_conn;
     TcpConnection tcp_conn;
@@ -91,6 +97,8 @@ private:
 
     // Synchronized by 'rtmp_conn_frontend'.
     ConnectionState conn_state;
+
+    Ref<TestStreamGenerator> test_stream_generator;
 
     static TcpConnection::Frontend const tcp_conn_frontend;
 
@@ -119,6 +127,18 @@ private:
 
     static void closed (Exception *exc_,
 			void      *_self);
+
+  mt_iface (VideoStream::EventHandler)
+
+    static VideoStream::EventHandler const gen_stream_handler;
+
+    static void genAudioMessage (VideoStream::AudioMessage *audio_msg,
+                                 void                      *_self);
+
+    static void genVideoMessage (VideoStream::VideoMessage *video_msg,
+                                 void                      *_self);
+
+  mt_iface_end
 
 public:
     Result start (IpAddress const &addr);
@@ -226,7 +246,24 @@ RtmpClient::commandMessage (VideoStream::Message   * const mt_nonnull msg,
 		    return Result::Failure;
 		}
 
-		self->rtmp_conn.sendPlay (options.channel->mem());
+                if (options.publish) {
+                    self->rtmp_conn.sendPublish (options.channel->mem());
+
+                    Ref<VideoStream> const video_stream = grab (new VideoStream);
+                    video_stream->getEventInformer()->subscribe (
+                            CbDesc<VideoStream::EventHandler> (&gen_stream_handler,
+                                                               self,
+                                                               self->getCoderefContainer()));
+
+                    self->test_stream_generator = grab (new TestStreamGenerator);
+                    self->test_stream_generator->init (self->page_pool,
+                                                       self->thread_ctx->getTimers(),
+                                                       video_stream,
+                                                       &options.gen_opts);
+                    self->test_stream_generator->start ();
+                } else {
+                    self->rtmp_conn.sendPlay (options.channel->mem());
+                }
 
 		self->conn_state = ConnectionState_Streaming;
 	    } break;
@@ -308,6 +345,7 @@ RtmpClient::audioMessage (VideoStream::AudioMessage * const mt_nonnull msg,
               msg->codec_id, " ", msg->frame_type, ", rate ", msg->rate, ", ", msg->channels, " channels");
     }
 
+#if 0
     // TEST
     if (msg->timestamp_nanosec < last_timestamp) {
         logLock ();
@@ -316,6 +354,7 @@ RtmpClient::audioMessage (VideoStream::AudioMessage * const mt_nonnull msg,
         logUnlock ();
     }
     last_timestamp = msg->timestamp_nanosec;
+#endif
 
     return Result::Success;
 }
@@ -344,6 +383,7 @@ RtmpClient::videoMessage (VideoStream::VideoMessage * const mt_nonnull msg,
 	}
     }
 
+#if 0
     // TEST
     if (msg->timestamp_nanosec < last_timestamp) {
         logLock ();
@@ -352,6 +392,7 @@ RtmpClient::videoMessage (VideoStream::VideoMessage * const mt_nonnull msg,
         logUnlock ();
     }
     last_timestamp = msg->timestamp_nanosec;
+#endif
 
     return Result::Success;
 }
@@ -366,6 +407,30 @@ RtmpClient::closed (Exception * const exc_,
 	logD_ (_func_);
 }
 
+VideoStream::EventHandler const RtmpClient::gen_stream_handler = {
+    genAudioMessage,
+    genVideoMessage,
+    NULL /* rtmpCommandMessage */,
+    NULL /* closed */,
+    NULL /* numWatchersChanged */
+};
+
+void
+RtmpClient::genAudioMessage (VideoStream::AudioMessage * const audio_msg,
+                             void                      * const _self)
+{
+    RtmpClient * const self = static_cast <RtmpClient*> (_self);
+    self->rtmp_conn.sendAudioMessage (audio_msg);
+}
+
+void
+RtmpClient::genVideoMessage (VideoStream::VideoMessage * const video_msg,
+                             void                      * const _self)
+{
+    RtmpClient * const self = static_cast <RtmpClient*> (_self);
+    self->rtmp_conn.sendVideoMessage (video_msg);
+}
+
 Result
 RtmpClient::start (IpAddress const &addr)
 {
@@ -373,6 +438,8 @@ RtmpClient::start (IpAddress const &addr)
 	logE_ (_func, "tcp_conn.connect() failed: ", exc->toString());
 	return Result::Failure;
     }
+
+// TODO Race condition on "connected"? (Connected before addPollable() => hang)
 
     thread_ctx->getPollGroup()->addPollable (tcp_conn.getPollable(), NULL /* ret_reg */);
     return Result::Success;
@@ -383,6 +450,7 @@ RtmpClient::init (ServerThreadContext * const thread_ctx,
 		  PagePool            * const page_pool)
 {
     this->thread_ctx = thread_ctx;
+    this->page_pool = page_pool;
 
     conn_sender.setQueue (thread_ctx->getDeferredConnectionSenderQueue());
 
@@ -396,6 +464,7 @@ RtmpClient::RtmpClient (Object * const coderef_container,
 			Byte     const id_char)
     : DependentCodeReferenced (coderef_container),
       id_char (id_char),
+      page_pool     (coderef_container),
       rtmp_conn     (coderef_container),
       tcp_conn      (coderef_container),
       conn_sender   (coderef_container),
@@ -566,6 +635,12 @@ printUsage ()
 		 "  -s --server-addr <address>     Server address, IP:PORT. Default: localhost:1935\n"
 		 "  -a --app <string>              Application name. Default: app\n"
 		 "  -c --channel <string>          Name of the channel to subscribe to. Default: video\n"
+                 "  -p --publish                   Publish a dummy stream instead of playing it.\n"
+                 "  --frame-duration               Duration of a single frame in milliseconds. Default: 40 (25 frames per second)\n"
+                 "  --frame-size                   Frame size in bytes. Default: 2500 bytes.\n"
+                 "  --start-timestamp              Timestamp of the first generated video message. Default: 0\n"
+                 "  --keyframe-interval            Distance between keyframes, in frames. Default: 10 frames.\n"
+                 "  --burst-width                  Number of frames to generate in a single iteration. Default: 1.\n"
 		 "  -t --num-threads <number>      Number of threads to spawn. Default: 0, use a single thread.\n"
                  "  -d --dump-frames               Dump incoming messages.\n"
 		 "  -r --report-interval <number>  Interval between video frame reports. Default: 0, no reports.\n"
@@ -698,6 +773,86 @@ bool cmdline_dump_frames (char const * /* short_name */,
     return true;
 }
 
+bool cmdline_publish (char const * /* short_name */,
+                      char const * /* long_name */,
+                      char const * /* value */,
+                      void       * /* opt_data */,
+                      void       * /* cb_data */)
+{
+    options.publish = true;
+    return true;
+}
+
+bool cmdline_frame_duration (char const * /* short_name */,
+                             char const * const long_name,
+                             char const * const value,
+                             void       * /* opt_data */,
+                             void       * /* cb_data */)
+{
+    if (!strToUint64_safe (value, &options.gen_opts.frame_duration)) {
+ 	logE_ (_func, "Invalid value \"", value, "\" "
+	       "for --", long_name, " (number expected): ", exc->toString());
+	exit (EXIT_FAILURE);
+    }
+    return true;
+}
+
+bool cmdline_frame_size (char const * /* short_name */,
+                         char const * const long_name,
+                         char const * const value,
+                         void       * /* opt_data */,
+                         void       * /* cb_data */)
+{
+    if (!strToUint64_safe (value, &options.gen_opts.frame_size)) {
+ 	logE_ (_func, "Invalid value \"", value, "\" "
+	       "for --", long_name, " (number expected): ", exc->toString());
+	exit (EXIT_FAILURE);
+    }
+    return true;
+}
+
+bool cmdline_start_timestamp (char const * /* short_name */,
+                              char const * const long_name,
+                              char const * const value,
+                              void       * /* opt_data */,
+                              void       * /* cb_data */)
+{
+    if (!strToUint64_safe (value, &options.gen_opts.start_timestamp)) {
+ 	logE_ (_func, "Invalid value \"", value, "\" "
+	       "for --", long_name, " (number expected): ", exc->toString());
+	exit (EXIT_FAILURE);
+    }
+    return true;
+}
+
+bool cmdline_keyframe_interval (char const * /* short_name */,
+                                char const * const long_name,
+                                char const * const value,
+                                void       * /* opt_data */,
+                                void       * /* cb_data */)
+{
+    if (!strToUint64_safe (value, &options.gen_opts.keyframe_interval)) {
+ 	logE_ (_func, "Invalid value \"", value, "\" "
+	       "for --", long_name, " (number expected): ", exc->toString());
+	exit (EXIT_FAILURE);
+    }
+    return true;
+}
+
+bool cmdline_burst_width (char const * /* short_name */,
+                          char const * const long_name,
+                          char const * const value,
+                          void       * /* opt_data */,
+                          void       * /* cb_data */)
+{
+    if (!strToUint64_safe (value, &options.gen_opts.burst_width)) {
+ 	logE_ (_func, "Invalid value \"", value, "\" "
+	       "for --", long_name, " (number expected): ", exc->toString());
+	exit (EXIT_FAILURE);
+    }
+    return true;
+}
+
 } // namespace {}
 
 int main (int argc, char **argv)
@@ -706,7 +861,7 @@ int main (int argc, char **argv)
     libMaryInit ();
 
     {
-	unsigned const num_opts = 10;
+	unsigned const num_opts = 16;
 	MyCpp::CmdlineOption opts [num_opts];
 
 	opts [0].short_name = "h";
@@ -768,6 +923,42 @@ int main (int argc, char **argv)
         opts [9].with_value = false;
         opts [9].opt_data   = NULL;
         opts [9].opt_callback = cmdline_dump_frames;
+
+        opts [10].short_name = "p";
+        opts [10].long_name  = "publish";
+        opts [10].with_value = false;
+        opts [10].opt_data   = NULL;
+        opts [10].opt_callback = cmdline_publish;
+
+        opts [11].short_name = NULL;
+        opts [11].long_name  = "frame-duration";
+        opts [11].with_value = true;
+        opts [11].opt_data   = NULL;
+        opts [11].opt_callback = cmdline_frame_duration;
+
+        opts [12].short_name = NULL;
+        opts [12].long_name  = "frame-size";
+        opts [12].with_value = true;
+        opts [12].opt_data   = NULL;
+        opts [12].opt_callback = cmdline_frame_size;
+
+        opts [13].short_name = NULL;
+        opts [13].long_name  = "start-timestamp";
+        opts [13].with_value = true;
+        opts [13].opt_data   = NULL;
+        opts [13].opt_callback = cmdline_start_timestamp;
+
+        opts [14].short_name = NULL;
+        opts [14].long_name  = "keyframe-interval";
+        opts [14].with_value = true;
+        opts [14].opt_data   = NULL;
+        opts [14].opt_callback = cmdline_keyframe_interval;
+
+        opts [15].short_name = NULL;
+        opts [15].long_name  = "burst-width";
+        opts [15].with_value = true;
+        opts [15].opt_data   = NULL;
+        opts [15].opt_callback = cmdline_burst_width;
 
 	MyCpp::ArrayIterator<MyCpp::CmdlineOption> opts_iter (opts, num_opts);
 	MyCpp::parseCmdline (&argc, &argv, opts_iter, NULL /* callback */, NULL /* callback_data */);
