@@ -70,6 +70,10 @@ public:
 
 class VideoStream : public Object
 {
+private:
+    // Protects from concurrent invocations of bindToSrteam()
+    Mutex bind_mutex;
+
 public:
     class AudioFrameType
     {
@@ -120,6 +124,13 @@ public:
 
     public:
 	static VideoFrameType fromFlvFrameType (Byte flv_frame_type);
+
+        bool hasTimestamp ()
+        {
+            return isVideoData() ||
+                   value == AvcSequenceHeader ||
+                   value == AvcEndOfSequence;
+        }
 
 	bool isVideoData () const
 	{
@@ -274,12 +285,24 @@ public:
 	}
     };
 
+    static bool msgHasTimestamp (Message * const msg,
+                                 bool      const is_audio_msg)
+    {
+        bool has_timestamp = true;
+        if (!is_audio_msg) {
+            VideoMessage * const video_msg = static_cast <VideoMessage*> (msg);
+            has_timestamp = video_msg->frame_type.hasTimestamp ();
+        }
+
+        return has_timestamp;
+    }
+
     struct EventHandler
     {
-	void (*audioMessage) (AudioMessage * mt_nonnull msg,
+	void (*audioMessage) (AudioMessage * mt_nonnull audio_msg,
 			      void         *cb_data);
 
-	void (*videoMessage) (VideoMessage * mt_nonnull msg,
+	void (*videoMessage) (VideoMessage * mt_nonnull video_msg,
 			      void         *cb_data);
 
 	void (*rtmpCommandMessage) (RtmpConnection    * mt_nonnull conn,
@@ -308,6 +331,8 @@ public:
 	VideoStream::AudioMessage msg;
     };
 
+    // TODO Move FrameSaver to frame_saver.h,
+    //      Move VideoCodecId and friends to av_message.h
     mt_unsafe class FrameSaver
     {
     private:
@@ -331,9 +356,10 @@ public:
 
 	void releaseSavedSpeexHeaders ();
 
-        void releaseState ();
-
     public:
+        void releaseState (bool release_audio = true,
+                           bool release_video = true);
+
 	void processAudioFrame (AudioMessage * mt_nonnull msg);
 
 	void processVideoFrame (VideoMessage * mt_nonnull msg);
@@ -437,26 +463,79 @@ private:
         VideoStream *bind_stream;
     };
 
+// TODO make private
+public:
+    class BindInfo
+    {
+    public:
+        Uint64 timestamp_offs;
+        bool   got_timestamp_offs;
+
+        Uint64 pending_timestamp_offs;
+        bool   pending_got_timestamp_offs;
+
+        Ref<BindTicket> cur_bind_ticket;
+        Ref<BindTicket> pending_bind_ticket;
+
+        FrameSaver pending_frame_saver;
+        PendingFrameList pending_frame_list;
+
+        WeakRef<VideoStream> weak_bind_stream;
+        GenericInformer::SubscriptionKey bind_sbn;
+
+        void reset ()
+        {
+            timestamp_offs = 0;
+            got_timestamp_offs = false;
+
+            pending_timestamp_offs = 0;
+            pending_got_timestamp_offs = false;
+
+            cur_bind_ticket = NULL;
+            pending_bind_ticket = NULL;
+
+            pending_frame_saver.releaseState ();
+
+            {
+                PendingFrameList::iter iter (pending_frame_list);
+                while (!pending_frame_list.iter_done (iter)) {
+                    PendingFrame * const pending_frame = pending_frame_list.iter_next (iter);
+                    delete pending_frame;
+                }
+                pending_frame_list.clear ();
+            }
+
+            weak_bind_stream = NULL;
+            bind_sbn = NULL;
+        }
+
+        BindInfo ()
+        {
+            reset ();
+        }
+
+        ~BindInfo ()
+        {
+            reset ();
+        }
+    };
+
+private:
+    // TODO 1. got_stream_timestamp. 'stream_timestamp' may be unknown.
+    //      2. set initial stream timestamp to some shifted value to compensate for possible slight timestamp drift,
+    //         like +10 minutes.
+    mt_mutex (mutex) Uint64 stream_timestamp_nanosec;
+
+    mt_mutex (mutex) BindInfo abind;
+    mt_mutex (mutex) BindInfo vbind;
+
+#if 0
+    // if 'true', then both audio and video are bound to the same stream,
+    // and the binding is described by 'vbind' ('abind' is clear).
+    bool full_bind;
+#endif
+
     mt_mutex (mutex) Count bind_inform_counter;
-
-    mt_mutex (mutex) Uint64 timestamp_offs;
-    mt_mutex (mutex) Uint64 last_adjusted_timestamp;
-    mt_mutex (mutex) bool   got_timestamp_offs;
-
-    mt_mutex (mutex) Uint64 pending_timestamp_offs;
-    mt_mutex (mutex) bool   pending_got_timestamp_offs;
-
-    mt_mutex (mutex) Ref<BindTicket> cur_bind_ticket;
-    mt_mutex (mutex) Ref<BindTicket> pending_bind_ticket;
-
-    mt_mutex (mutex) FrameSaver pending_frame_saver;
-    mt_mutex (mutex) PendingFrameList pending_frame_list;
-
-    mt_mutex (mutex) WeakRef<VideoStream> weak_bind_stream;
-    mt_mutex (mutex) GenericInformer::SubscriptionKey bind_sbn;
-
-    // Protects from concurrent invocations of bindToSrteam()
-    Mutex bind_mutex;
 
   mt_iface (FrameSaver::FrameHandler)
 
@@ -470,10 +549,12 @@ private:
 
   mt_iface_end
 
-    bool bind_messageBegin (Message    * mt_nonnull msg,
-                            BindTicket *bind_ticket,
-                            bool        is_audio_msg,
-                            Uint64     * mt_nonnull ret_timestamp_offs);
+    mt_mutex (mutex) bool bind_messageBegin (BindInfo   * mt_nonnull bind_info,
+                                             Message    * mt_nonnull msg,
+                                             BindTicket *bind_ticket,
+                                             bool        is_audio_msg);
+
+    mt_unlocks_locks (mutex) void bind_doMessageEnd (BindInfo * mt_nonnull bind_info);
 
     mt_unlocks_locks (mutex) void bind_messageEnd ();
 
@@ -554,24 +635,28 @@ public:
 private:
   mt_iface (VideoStream::EventHandler)
 
-    static EventHandler const bind_handler;
+    static EventHandler const abind_handler;
+    static EventHandler const vbind_handler;
 
     static void bind_audioMessage (AudioMessage * mt_nonnull msg,
-                                   void         *_self);
+                                   void         *_bind_ticket);
 
     static void bind_videoMessage (VideoMessage * mt_nonnull msg,
-                                   void         *_self);
+                                   void         *_bind_ticket);
 
     static void bind_rtmpCommandMessage (RtmpConnection    * mt_nonnull conn,
                                          Message           * mt_nonnull msg,
                                          ConstMemory const &method_name,
                                          AmfDecoder        * mt_nonnull amf_decoder,
-                                         void              *_self);
+                                         void              *_bind_ticket);
 
   mt_iface_end
 
 public:
-    void bindToStream (VideoStream *bind_stream);
+    void bindToStream (VideoStream *bind_audio_stream,
+                       VideoStream *bind_video_stream,
+                       bool         bind_audio,
+                       bool         bind_video);
 
     void close ();
 

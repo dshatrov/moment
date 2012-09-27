@@ -27,7 +27,10 @@ namespace Moment {
 void
 PushAgent::doVideoStreamAdded (VideoStream * const video_stream)
 {
-    bound_stream->bindToStream (video_stream);
+    bound_stream->bindToStream (video_stream,
+                                video_stream,
+                                true /* bind_audio */,
+                                true /* bind_video */);
 }
 
 MomentServer::VideoStreamHandler PushAgent::moment_stream_handler = {

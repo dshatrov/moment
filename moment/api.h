@@ -121,7 +121,10 @@ void moment_stream_plus_one_watcher (MomentStream *stream);
 void moment_stream_minus_one_watcher (MomentStream *stream);
 
 void moment_stream_bind_to_stream (MomentStream *stream,
-                                   MomentStream *bind_stream);
+                                   MomentStream *bind_audio_stream,
+                                   MomentStream *bind_video_stream,
+                                   int           bind_audio,
+                                   int           bind_video);
 
 
 // _______________________________ Client events _______________________________
@@ -230,7 +233,7 @@ size_t moment_config_get_option (char   *opt_path,
 				 size_t  opt_path_len,
 				 char   *buf,
 				 size_t  len,
-				 bool   *ret_is_set);
+				 int    *ret_is_set);
 
 
 // __________________________________ Logging __________________________________

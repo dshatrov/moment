@@ -234,11 +234,11 @@ namespace {
 class Api_StreamHandler_Wrapper : public Referenced
 {
 public:
-    MomentStreamHandler stream_handler;
-    GenericInformer::SubscriptionKey subscription_key;
-
     // TODO Make use of cb_mutex
     Mutex cb_mutex;
+
+    MomentStreamHandler stream_handler;
+    GenericInformer::SubscriptionKey subscription_key;
 };
 }
 
@@ -329,9 +329,15 @@ void moment_stream_minus_one_watcher (MomentStream * const stream)
 }
 
 void moment_stream_bind_to_stream (MomentStream * const stream,
-                                   MomentStream * const bind_stream)
+                                   MomentStream * const bind_audio_stream,
+                                   MomentStream * const bind_video_stream,
+                                   int            const bind_audio,
+                                   int            const bind_video)
 {
-    static_cast <VideoStream*> (stream)->bindToStream (static_cast <VideoStream*> (bind_stream));
+    static_cast <VideoStream*> (stream)->bindToStream (static_cast <VideoStream*> (bind_audio_stream),
+                                                       static_cast <VideoStream*> (bind_video_stream),
+                                                       (bool) bind_audio /* bind_audio */,
+                                                       (bool) bind_video /* bind_video */);
 }
 
 
@@ -747,20 +753,20 @@ size_t moment_config_get_option (char   * const opt_path,
 				 size_t   const opt_path_len,
 				 char   * const buf,
 				 size_t   const len,
-				 bool   * const ret_is_set)
+				 int    * const ret_is_set)
 {
     MomentServer * const moment = MomentServer::getInstance ();
     MConfig::Option * const int_option =
 	    moment->getConfig()->getOption (ConstMemory (opt_path, opt_path_len), false /* create */);
     if (!int_option) {
 	if (ret_is_set)
-	    *ret_is_set = false;
+	    *ret_is_set = 0;
 
 	return 0;
     }
 
     if (ret_is_set)
-	*ret_is_set = true;
+	*ret_is_set = 1;
 
     return moment_config_option_get_value (static_cast <MomentConfigOption*> (int_option),
 					   buf, len);
