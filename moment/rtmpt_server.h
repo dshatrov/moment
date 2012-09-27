@@ -32,6 +32,9 @@ using namespace M;
 
 class RtmptServer : public DependentCodeReferenced
 {
+private:
+    StateMutex mutex;
+
 public:
     class Frontend
     {
@@ -52,7 +55,7 @@ private:
 	friend class RtmptServer;
 
     private:
-      mt_mutex (sender_mutex)
+      mt_mutex (mutex)
       // {
 	MessageList nonflushed_msg_list;
 	Size nonflushed_data_len;
@@ -62,8 +65,6 @@ private:
 
 	bool close_after_flush;
       // }
-
-	StateMutex sender_mutex;
 
 	mt_mutex (mutex) void doFlush ();
 
@@ -87,7 +88,7 @@ private:
 
       mt_iface_end
 
-	mt_mutex (sender_mutex) void sendPendingData (Sender * mt_nonnull sender);
+	mt_mutex (mutex) void sendPendingData (Sender * mt_nonnull sender);
 
 	RtmptSender (Object *coderef_container);
 
@@ -189,8 +190,6 @@ private:
     // TODO IdMapper
     Uint32 session_id_counter;
   // }
-
-    StateMutex mutex;
 
     static void sessionKeepaliveTimerTick (void *_session);
 

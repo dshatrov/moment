@@ -80,7 +80,7 @@ RtmptServer::RtmptSender::sendMessage (Sender::MessageEntry * const mt_nonnull m
 {
 //    logD (rtmpt, _func, "<", fmt_hex, (UintPtr) this, "> ", fmt_def, "msg_entry: 0x", fmt_hex, (UintPtr) msg_entry);
 
-    sender_mutex.lock ();
+    mutex.lock ();
 
     nonflushed_msg_list.append (msg_entry);
 
@@ -99,7 +99,7 @@ RtmptServer::RtmptSender::sendMessage (Sender::MessageEntry * const mt_nonnull m
     if (do_flush)
 	doFlush ();
 
-    sender_mutex.unlock ();
+    mutex.unlock ();
 }
 
 mt_mutex (mutex) void
@@ -118,9 +118,9 @@ RtmptServer::RtmptSender::flush ()
 {
     logD (rtmpt, _func, "<", fmt_hex, (UintPtr) this, "> ", fmt_def, "nonflushed_data_len: ", nonflushed_data_len);
 
-    sender_mutex.lock ();
+    mutex.lock ();
     doFlush ();
-    sender_mutex.unlock ();
+    mutex.unlock ();
 }
 
 // RtmptSender may be accessed by 'rtmp_conn' only, which in turn lists
@@ -130,7 +130,7 @@ mt_rev (11.06.18)
 mt_async void
 RtmptServer::RtmptSender::closeAfterFlush ()
 {
-    sender_mutex.lock ();
+    mutex.lock ();
 
     close_after_flush = true;
 
@@ -149,7 +149,7 @@ RtmptServer::RtmptSender::closeAfterFlush ()
     }
 #endif
 
-    sender_mutex.unlock ();
+    mutex.unlock ();
 }
 
 mt_async void
@@ -169,17 +169,17 @@ RtmptServer::RtmptSender::isClosed_unlocked ()
 void
 RtmptServer::RtmptSender::lock ()
 {
-    sender_mutex.lock ();
+    mutex.lock ();
 }
 
 void
 RtmptServer::RtmptSender::unlock ()
 {
-    sender_mutex.unlock ();
+    mutex.unlock ();
 }
 
 mt_rev (11.06.18)
-mt_mutex (sender_mutex) void
+mt_mutex (mutex) void
 RtmptServer::RtmptSender::sendPendingData (Sender * const mt_nonnull sender)
 {
     logD (rtmpt, _func);
@@ -196,7 +196,7 @@ RtmptServer::RtmptSender::sendPendingData (Sender * const mt_nonnull sender)
 }
 
 RtmptServer::RtmptSender::RtmptSender (Object * const coderef_container)
-    : Sender (coderef_container, &sender_mutex),
+    : Sender (coderef_container),
       DependentCodeReferenced (coderef_container),
       nonflushed_data_len (0),
       pending_data_len (0),
@@ -208,7 +208,7 @@ mt_rev (11.06.18)
 mt_async
 RtmptServer::RtmptSender::~RtmptSender ()
 {
-    sender_mutex.lock ();
+    mutex.lock ();
 
     {
 	MessageList::iter iter (nonflushed_msg_list);
@@ -226,7 +226,7 @@ RtmptServer::RtmptSender::~RtmptSender ()
 	}
     }
 
-    sender_mutex.unlock ();
+    mutex.unlock ();
 }
 
 
@@ -386,7 +386,7 @@ RtmptServer::sendDataInReply (Sender       * const mt_nonnull conn_sender,
 {
     logD (rtmpt, _func, "<", fmt_hex, (UintPtr) session, ":", (UintPtr) &session->rtmpt_sender, ">");
 
-    session->rtmpt_sender.sender_mutex.lock ();
+    session->rtmpt_sender.mutex.lock ();
 
     RTMPT_SERVER__HEADERS_DATE
     conn_sender->send (
@@ -406,7 +406,7 @@ RtmptServer::sendDataInReply (Sender       * const mt_nonnull conn_sender,
     if (session->rtmpt_sender.close_after_flush)
 	destroy_session = true;
 
-    session->rtmpt_sender.sender_mutex.unlock ();
+    session->rtmpt_sender.mutex.unlock ();
 
     // If close after flush has been requested for session->rtmpt_sender, then
     // virtual RTMP connection should be closed, hence we're destroying the session.
@@ -443,11 +443,13 @@ RtmptServer::doOpen (Sender * const mt_nonnull conn_sender,
 	Time const timeout = session_keepalive_timeout >= 10 ? 10 : session_keepalive_timeout;
 //	logD_ (_func, "session_keepalive_timer period: ", timeout);
 	// Checking for session timeout at least each 10 seconds.
-	session->session_keepalive_timer = timers->addTimer (sessionKeepaliveTimerTick,
-							     session,
-							     session /* coderef_container */,
-							     timeout,
-							     true /* periodical */);
+	session->session_keepalive_timer =
+                timers->addTimer (CbDesc<Timers::TimerCallback> (sessionKeepaliveTimerTick,
+                                                                 session,
+                                                                 session /* coderef_container */),
+                                  timeout,
+                                  true  /* periodical */,
+                                  false /* auto_delete */);
     }
 
     RTMPT_SERVER__HEADERS_DATE
