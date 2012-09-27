@@ -17,9 +17,6 @@
 */
 
 
-#define MOMENT_FILE__CTEMPLATE
-
-
 #include <libmary/types.h>
 #include <cstring>
 
@@ -27,7 +24,7 @@
 #include <libmary/module_init.h>
 #include <moment/libmoment.h>
 
-#ifdef MOMENT_FILE__CTEMPLATE
+#ifdef MOMENT_CTEMPLATE
 #include <ctemplate/template.h>
 #endif
 
@@ -257,7 +254,7 @@ Result httpRequest (HttpRequest   * const mt_nonnull req,
                            0 /* open_flags */,
                            File::AccessMode::ReadOnly))
     {
-#ifdef MOMENT_FILE__CTEMPLATE
+#ifdef MOMENT_CTEMPLATE
 	if (try_template) {
             logD_ (_func, "Trying .tpl");
 	    if (momentFile_sendTemplate (
@@ -315,7 +312,7 @@ Result httpRequest (HttpRequest   * const mt_nonnull req,
                 }
             }
 
-#ifdef MOMENT_FILE__CTEMPLATE
+#ifdef MOMENT_CTEMPLATE
             if (try_template) {
                 AcceptedLanguageTree::BottomRightIterator iter (tree);
                 while (!iter.done()) {
@@ -578,7 +575,7 @@ Result httpRequest (HttpRequest   * const mt_nonnull req,
     return Result::Success;
 }
 
-#ifdef MOMENT_FILE__CTEMPLATE
+#ifdef MOMENT_CTEMPLATE
 namespace {
     class SendTemplate_PageRequest : public MomentServer::PageRequest
     {
