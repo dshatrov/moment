@@ -26,7 +26,12 @@
 #endif
 #include <errno.h>
 
+#ifdef MOMENT_GPERFTOOLS
+#include <gperftools/profiler.h>
+#endif
+
 #include <moment/libmoment.h>
+#include <moment/moment_control.h>
 
 #include <mycpp/mycpp.h>
 #include <mycpp/cmdline.h>
@@ -74,18 +79,43 @@ private:
     HttpService separate_admin_http_service;
     HttpService *admin_http_service_ptr;
 
+    LinePipe line_pipe;
+
     FixedThreadPool recorder_thread_pool;
 
     LocalStorage storage;
 
     MomentServer moment_server;
 
-    mt_mutex (mutex) Timers::TimerKey exit_timer_key;
+    mt_mutex (mutex) Timers::TimerKey profiler_timer;
+    mt_mutex (mutex) Timers::TimerKey exit_timer;
 
-    static void exitTimerTick (void * const /* cb_data */);
+    void doExit (ConstMemory reason);
+
+    static void profilerTimerTick (void *_self);
+
+    static void exitTimerTick (void *_self);
+
+  mt_iface (MomentControl::Frontend)
+
+public:
+    static MomentControl::Frontend const ctl_frontend;
+
+private:
+    static void ctl_startProfiler (ConstMemory  filename,
+                                   void        * /* _self */);
+
+    static void ctl_stopProfiler (void * /* _self */);
+
+    static void ctl_exit (ConstMemory  reason,
+                          void        * /* _self */);
+
+  mt_iface_end
 
 public:
     int run ();
+
+    void exit (ConstMemory reason);
 
     MomentInstance ()
         : page_pool    (this /* coderef_container */, 4096 /* page_size */, default__page_pool__min_pages),
@@ -93,9 +123,26 @@ public:
           http_service (this /* coderef_container */),
           separate_admin_http_service (this /* coderef_container */),
           admin_http_service_ptr (&separate_admin_http_service),
-          recorder_thread_pool (this /* coderef_container */),
-          exit_timer_key (NULL)
+          line_pipe    (this /* coderef_container */),
+          recorder_thread_pool (this /* coderef_container */)
     {
+    }
+
+    ~MomentInstance ()
+    {
+        mutex.lock ();
+
+        if (profiler_timer) {
+            server_app.getMainThreadContext()->getTimers()->deleteTimer (profiler_timer);
+            profiler_timer = NULL;
+        }
+
+        if (exit_timer) {
+            server_app.getMainThreadContext()->getTimers()->deleteTimer (exit_timer);
+            exit_timer = NULL;
+        }
+
+        mutex.unlock ();
     }
 };
 
@@ -193,18 +240,102 @@ cmdline_exit_after (char const * /* short_nmae */,
 }
 
 void
+MomentInstance::doExit (ConstMemory const reason)
+{
+    logI_ (_func, "exiting: ", reason);
+    server_app.stop ();
+}
+
+// TODO Unused
+void
+MomentInstance::profilerTimerTick (void * const _self)
+{
+    MomentInstance * const self = static_cast <MomentInstance*> (_self);
+
+    logD_ (_func_);
+
+//#error TODO
+}
+
+void
 MomentInstance::exitTimerTick (void * const _self)
 {
     MomentInstance * const self = static_cast <MomentInstance*> (_self);
 
     logI_ (_func, "Exit timer expired (", options.exit_after, " seconds)");
     self->mutex.lock ();
-    self->server_app.getServerContext()->getTimers()->deleteTimer (self->exit_timer_key);
+    if (self->exit_timer) {
+        self->server_app.getMainThreadContext()->getTimers()->deleteTimer (self->exit_timer);
+        self->exit_timer = NULL;
+    }
     self->mutex.unlock ();
 
-//    exit (0);
-    self->server_app.stop ();
+    self->doExit ("exit timer timeout");
 }
+
+MomentControl::Frontend const MomentInstance::ctl_frontend = {
+    ctl_startProfiler,
+    ctl_stopProfiler,
+    ctl_exit
+};
+
+#ifndef MOMENT_GPERFTOOLS
+static char const * const gperftools_errmsg =
+        "gperftools profiler is disabled. "
+        "Configure moment with --enable-gperftools and rebuild to enable.";
+#endif
+
+void
+MomentInstance::ctl_startProfiler (ConstMemory   const filename,
+                                   void        * const /* _self */)
+{
+#ifdef MOMENT_GPERFTOOLS
+    ProfilerStart (String (filename).cstr());
+#else
+    logD_ (_func, gperftools_errmsg);
+#endif
+}
+
+void
+MomentInstance::ctl_stopProfiler (void * const /* _self */)
+{
+#ifdef MOMENT_GPERFTOOLS
+    ProfilerStop ();
+    ProfilerFlush ();
+#else
+    logD_ (_func, gperftools_errmsg);
+#endif
+}
+
+void
+MomentInstance::ctl_exit (ConstMemory   const reason,
+                          void        * const _self)
+{
+    MomentInstance * const self = static_cast <MomentInstance*> (_self);
+    self->doExit (reason);
+}
+
+static void
+serverApp_threadStarted (void * const /* cb_data */)
+{
+#ifdef MOMENT_GPERFTOOLS
+    ProfilerRegisterThread ();
+#endif
+}
+
+static ServerApp::Events const server_app_events = {
+    serverApp_threadStarted
+};
+
+static void ctl_line (ConstMemory   const line,
+                      void        * const /* _cb_data */)
+{
+    logD_ (_func, line);
+}
+
+static LinePipe::Frontend const ctl_pipe_frontend = {
+    ctl_line
+};
 
 int
 MomentInstance::run ()
@@ -252,6 +383,8 @@ MomentInstance::run ()
     logLock ();
     config.dump (logs);
     logUnlock ();
+
+    server_app.getEventInformer()->subscribe (CbDesc<ServerApp::Events> (&server_app_events, NULL, NULL));
 
     if (!server_app.init ()) {
 	logE_ (_func, "server_app.init() failed: ", exc->toString());
@@ -336,8 +469,8 @@ MomentInstance::run ()
 
     ConstMemory http_bind;
     {
-	if (!http_service.init (server_app.getServerContext()->getMainPollGroup(),
-				server_app.getServerContext()->getTimers(),
+	if (!http_service.init (server_app.getMainThreadContext()->getPollGroup(),
+				server_app.getMainThreadContext()->getTimers(),
                                 server_app.getMainThreadContext()->getDeferredProcessor(),
 				&page_pool,
 				http_keepalive_timeout * 1000000 /* in microseconds */,
@@ -398,8 +531,8 @@ MomentInstance::run ()
 		break;
 	    }
 
-	    if (!separate_admin_http_service.init (server_app.getServerContext()->getMainPollGroup(),
-						   server_app.getServerContext()->getTimers(),
+	    if (!separate_admin_http_service.init (server_app.getMainThreadContext()->getPollGroup(),
+						   server_app.getMainThreadContext()->getTimers(),
                                                    server_app.getMainThreadContext()->getDeferredProcessor(),
 						   &page_pool,
 						   http_keepalive_timeout * 1000000 /* in microseconds */,
@@ -454,13 +587,22 @@ MomentInstance::run ()
     if (options.exit_after != (Uint64) -1) {
 	logI_ (_func, "options.exit_after: ", options.exit_after);
 	mutex.lock ();
-	exit_timer_key = server_app.getServerContext()->getTimers()->addTimer (
+	exit_timer = server_app.getMainThreadContext()->getTimers()->addTimer (
                 exitTimerTick,
                 this /* cb_data */,
                 this /* coderef_container */,
                 options.exit_after,
                 false /* periodical */);
 	mutex.unlock ();
+    }
+
+    if (!line_pipe.init ("/opt/moment/moment_ctl" /* TODO config parameter */,
+                         CbDesc<LinePipe::Frontend> (&ctl_pipe_frontend, NULL, NULL),
+                         server_app.getMainThreadContext()->getPollGroup(),
+                         server_app.getMainThreadContext()->getTimers(),
+                         1000 /* reopen_timeout_millisec */ /* TODO config parameter */))
+    {
+        logE_ (_func, "could not initialize ctl pipe: ", exc->toString());
     }
 
     if (!server_app.run ()) {
@@ -483,6 +625,7 @@ int main (int argc, char **argv)
 {
     MyCpp::myCppInit ();
     libMaryInit ();
+    libMomentGstInit ();
 
     {
 	unsigned const num_opts = 6;
@@ -552,6 +695,17 @@ int main (int argc, char **argv)
     }
 
     Ref<MomentInstance> const moment_instance = grab (new MomentInstance);
+
+#if 0
+// FIXME MomentServer is not yet init()'ialized at this point.
+
+    Ref<MomentControl> const moment_control = grab (new MomentControl);
+    moment_control->init (MomentServer::getInstance(),
+                          CbDesc<MomentControl::Frontend> (&MomentInstance::ctl_frontend,
+                                                           moment_instance,
+                                                           moment_instance));
+#endif
+
     return moment_instance->run ();
 }
 

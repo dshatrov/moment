@@ -25,6 +25,16 @@ if test "x$enable_ctemplate" = "xyes"; then
 fi
 AC_SUBST(MOMENT_GSTREAMER_DEP)
 
+AC_ARG_ENABLE([gperftools],
+              AC_HELP_STRING([--enable-gperftools],
+                             [Enable gperftools CPU profiler]),
+              [enable_gperftools=$enable_gperftools],
+              [enable_gperftools="no"])
+AM_CONDITIONAL([MOMENT_GPERFTOOLS], test "x$enable_gperftools" = "xyes")
+if test "x$enable_gperftools" = "xyes"; then
+    AC_DEFINE([MOMENT_GPERFTOOLS], [1], [ ])
+fi
+
 PKG_CHECK_MODULES(THIS, [libmary-1.0 >= 0.1, mconfig-1.0 >= 0.1 $MOMENT_CTEMPLATE_DEP $MOMENT_GSTREAMER_PKGCHECK_DEP])
 AC_SUBST(THIS_CFLAGS)
 AC_SUBST(THIS_LIBS)
@@ -91,7 +101,7 @@ AC_SUBST([AM_CFLAGS])
 AC_SUBST([AM_CXXFLAGS])
 
 
-AC_CONFIG_HEADERS([local_config.h])
+AC_CONFIG_HEADERS([local_config.h moment/libmoment_config.h])
 
 AC_CONFIG_FILES([Makefile
 		 moment/Makefile

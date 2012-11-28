@@ -25,10 +25,13 @@ AM_CXXFLAGS += $(COMMON_CFLAGS)
 
 INCLUDES = -I$(top_srcdir) -I$(top_builddir)
 
-moment_private_headers =
+moment_private_headers =        \
+        moment_control.h
 
 moment_target_headers =		\
+        libmoment_config.h      \
 	libmoment.h		\
+        libmoment_gst.h         \
 				\
 	moment_types.h		\
         flv_util.h              \
@@ -59,11 +62,13 @@ moment_target_headers =		\
 				\
 	api.h			\
 				\
-	module_init.h
-
-#        transcoder.h
+	module_init.h           \
+                                \
+        transcoder.h
 
 #	flv_file_source.h
+
+DISTCLEANFILES = libmoment_config.h.in
 
 libmomentincludedir = $(includedir)/moment-1.0/moment
 libmomentinclude_HEADERS = $(moment_target_headers)
@@ -101,13 +106,19 @@ libmoment_1_0_la_SOURCES =	\
 	hmac/hmac_sha2.c        \
                                 \
         tsmux/tsmux.c           \
-        tsmux/tsmuxstream.c
-
-#        transcoder.cpp
+        tsmux/tsmuxstream.c     \
+                                \
+        transcoder.cpp
 
 #	flv_file_source.cpp
- 
-moment_extra_dist =
+
+moment_extra_dist = libmoment_config.h.in
+
+if MOMENT_GSTREAMER
+libmoment_1_0_la_SOURCES += libmoment_gst.cpp
+else
+moment_extra_dist += libmoment_gst.cpp
+endif
 
 libmoment_1_0_la_LDFLAGS = -no-undefined -version-info "0:0:0" $(COMMON_LDFLAGS)
 libmoment_1_0_la_LIBADD = $(THIS_LIBS)
@@ -116,7 +127,7 @@ libmoment_1_0_la_LIBADD += -lws2_32
 endif
 
 momentdir = $(libdir)/moment-1.0
-moment_LTLIBRARIES = libmoment-file-1.0.la libmoment-rtmp-1.0.la libmoment-test-1.0.la # libmoment-hls-1.0.la # libmoment-archive-1.0.la
+moment_LTLIBRARIES = libmoment-file-1.0.la libmoment-rtmp-1.0.la libmoment-test-1.0.la # libmoment-archive-1.0.la
 
 libmoment_file_1_0_la_DEPENDENCIES = libmoment-1.0.la
 libmoment_file_1_0_la_SOURCES = \
@@ -139,12 +150,6 @@ endif
 #libmoment_archive_1_0_la_LDFLAGS = -no-undefined -version-info "0:0:0" $(COMMON_LDFLAGS)
 #libmoment_archive_1_0_la_LIBADD = $(top_builddir)/moment/libmoment-1.0.la $(THIS_LIBS)
 
-#libmoment_hls_1_0_la_DEPENDENCIES = libmoment-1.0.la
-#libmoment_hls_1_0_la_SOURCES = \
-#	mod_hls.cpp
-#libmoment_hls_1_0_la_LDFLAGS = -no-undefined -version-info "0:0:0" $(COMMON_LDFLAGS)
-#libmoment_hls_1_0_la_LIBADD = $(top_builddir)/moment/libmoment-1.0.la $(THIS_LIBS)
-
 libmoment_test_1_0_la_DEPENDENCIES = libmoment-1.0.la
 libmoment_test_1_0_la_SOURCES =	\
 	mod_test.cpp
@@ -155,8 +160,12 @@ bin_PROGRAMS = moment rtmptool
 
 moment_DEPENDENCIES = libmoment-1.0.la
 moment_SOURCES =	\
-	moment.cpp
+	moment.cpp      \
+        moment_control.cpp
 moment_LDADD = $(top_builddir)/moment/libmoment-1.0.la $(THIS_LIBS)
+if MOMENT_GPERFTOOLS
+moment_LDADD += -lprofiler
+endif
 moment_LDFLAGS = $(COMMON_LDFLAGS)
 
 rtmptool_DEPENDENCIES = libmoment-1.0.la
