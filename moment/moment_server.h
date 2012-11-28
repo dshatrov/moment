@@ -30,6 +30,7 @@
 #include <moment/video_stream.h>
 #include <moment/storage.h>
 #include <moment/push_protocol.h>
+#include <moment/transcoder.h>
 
 
 namespace Moment {
@@ -97,6 +98,40 @@ public:
     {
         return &event_informer;
     }
+
+
+// ____________________________ Transcoder backend _____________________________
+
+public:
+    struct TranscoderBackend
+    {
+        Ref<Transcoder> (*newTranscoder) (void *cb_data);
+    };
+
+private:
+    mt_mutex (mutex) Cb<TranscoderBackend> transcoder_backend;
+
+public:
+    void setTranscoderBackend (CbDesc<TranscoderBackend> const &cb)
+    {
+        mutex.lock ();
+        transcoder_backend = cb;
+        mutex.unlock ();
+    }
+
+    Ref<Transcoder> newTranscoder ()
+    {
+        mutex.lock ();
+        Cb<TranscoderBackend> const cb = transcoder_backend;
+        mutex.unlock ();
+
+        Ref<Transcoder> transcoder;
+        if (cb)
+            cb.call_ret (&transcoder, cb->newTranscoder);
+
+        return transcoder;
+    }
+
 
 // ___________________________ Video stream handlers ___________________________
 

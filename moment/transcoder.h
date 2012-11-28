@@ -30,7 +30,7 @@ namespace Moment {
 
 using namespace M;
 
-class Transcoder : public Object
+class Transcoder : public virtual Object
 {
 public:
     enum TranscodingMode
@@ -45,15 +45,13 @@ public:
     mt_const virtual void addOutputStream (VideoStream     *out_stream,
                                            ConstMemory      chain_str,
                                            TranscodingMode  audio_mode,
-                                           TranscodingMode  video_mode);
+                                           TranscodingMode  video_mode) = 0;
 
     mt_const virtual void init (Timers      * const timers,
                                 PagePool    * const page_pool,
                                 VideoStream * const src_stream,
                                 bool          const transcode_on_demand,
-                                Time          const transcode_on_demand_timeout_millisec);
-
-    Transcoder ();
+                                Time          const transcode_on_demand_timeout_millisec) = 0;
 
     virtual ~Transcoder ();
 };

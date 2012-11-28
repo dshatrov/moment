@@ -24,27 +24,6 @@ using namespace M;
 
 namespace Moment {
 
-mt_const void
-Transcoder::addOutputStream (VideoStream     * const out_stream,
-                             ConstMemory       const chain_str,
-                             TranscodingMode   const audio_mode,
-                             TranscodingMode   const video_mode)
-{
-}
-
-mt_const void
-Transcoder::init (Timers      * const timers,
-                  PagePool    * const page_pool,
-                  VideoStream * const src_stream,
-                  bool          const transcode_on_demand,
-                  Time          const transcode_on_demand_timeout_millisec)
-{
-}
-
-Transcoder::Transcoder ()
-{
-}
-
 Transcoder::~Transcoder ()
 {
 }

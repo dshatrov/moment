@@ -290,7 +290,12 @@ startTranscoder (ClientSession * const client_session)
 
     Ref<Transcoder> transcoder;
     if (!transcode_list.isEmpty()) {
-        transcoder = grab (new Transcoder);
+        transcoder = moment->newTranscoder();
+        if (!transcoder) {
+            logD_ (_func, "transcoder module is missing");
+            return;
+        }
+
         transcoder->init (timers,
                           moment->getPagePool(),
                           client_session->video_stream,
