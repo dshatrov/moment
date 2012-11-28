@@ -1296,6 +1296,10 @@ VideoStream::bind_doMessageEnd (BindInfo * const mt_nonnull bind_info)
     bind_info->pending_frame_list.clear ();
 
     bool timestamp_set = false;
+#if 0
+// WRONG: this breaks bindToStream (stream, stream, true, true);
+// TODO Do this properly.
+
     {
         Ref<VideoStream> const abind_stream = abind.weak_bind_stream.getRef();
         Ref<VideoStream> const vbind_stream = vbind.weak_bind_stream.getRef();
@@ -1319,6 +1323,7 @@ VideoStream::bind_doMessageEnd (BindInfo * const mt_nonnull bind_info)
             }
         }
     }
+#endif
 
     if (!timestamp_set) {
         bind_info->timestamp_offs = bind_info->pending_timestamp_offs;
@@ -1434,6 +1439,8 @@ VideoStream::bind_audioMessage (AudioMessage * const mt_nonnull audio_msg,
     tmp_audio_msg.timestamp_nanosec += self->abind.timestamp_offs;
 //    logD_ (_func, "timestamp: ", tmp_audio_msg.timestamp_nanosec);
 
+    logD_ (_self_func, "ts: ", tmp_audio_msg.timestamp_nanosec, " (", audio_msg->timestamp_nanosec, " + ", self->vbind.timestamp_offs, ") ", audio_msg->frame_type);
+
     InformAudioMessage_Data inform_data (&tmp_audio_msg);
     mt_unlocks_locks (mutex) self->event_informer.informAll_unlocked (informAudioMessage, &inform_data);
 
@@ -1463,7 +1470,7 @@ VideoStream::bind_videoMessage (VideoMessage * const mt_nonnull video_msg,
     tmp_video_msg.timestamp_nanosec += self->vbind.timestamp_offs;
 //    logD_ (_func, "timestamp: ", tmp_video_msg.timestamp_nanosec);
 
-    logD_ (_self_func, "ts: ", tmp_video_msg.timestamp_nanosec, " (", video_msg->timestamp_nanosec, ") ", video_msg->frame_type);
+    logD_ (_self_func, "ts: ", tmp_video_msg.timestamp_nanosec, " (", video_msg->timestamp_nanosec, " + ", self->vbind.timestamp_offs, ") ", video_msg->frame_type);
 
     InformVideoMessage_Data inform_data (&tmp_video_msg);
     mt_unlocks_locks (mutex) self->event_informer.informAll_unlocked (informVideoMessage, &inform_data);
@@ -1706,11 +1713,12 @@ VideoStream::VideoStream ()
 
       event_informer (this, &mutex)
 {
+    logD_ (_this_func_);
 }
 
 VideoStream::~VideoStream ()
 {
-    logD_ (_this_func);
+    logD_ (_this_func_);
 
   // This lock ensures data consistency for 'frame_saver's destructor.
   // TODO ^^^ Does it? A single mutex lock/unlock pair does not (ideally) constitute

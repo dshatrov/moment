@@ -231,6 +231,15 @@ public:
 	// Greater than zero for prechunked messages.
 	Uint32 prechunk_size;
 
+        void release ()
+        {
+            if (page_pool)
+                page_pool->msgUnref (page_list.first);
+
+            page_pool = NULL;
+            page_list.reset ();
+        }
+
 	Message ()
 	    : timestamp_nanosec (0),
 
