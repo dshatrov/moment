@@ -24,7 +24,7 @@
 
 
 // Flow control is disabled until done right.
-//#define MOMENT_RTMP__FLOW_CONTROL
+#define MOMENT_RTMP__FLOW_CONTROL
 
 
 namespace Moment {
@@ -59,6 +59,40 @@ mt_const Uint64 recording_limit = 1 << 24 /* 16 Mb */;
 
 mt_const Count no_keyframe_limit = 250; // 25 fps * 10 seconds
 
+mt_const DataDepRef<MomentServer> moment (NULL /* coderef_container */);
+mt_const DataDepRef<Timers> timers (NULL /* coderef_container */);
+
+class TranscodeEntry : public Referenced
+{
+public:
+    Ref<String> suffix;
+    Ref<String> chain;
+    Transcoder::TranscodingMode audio_mode;
+    Transcoder::TranscodingMode video_mode;
+};
+
+typedef List< Ref<TranscodeEntry> > TranscodeList;
+
+mt_const TranscodeList transcode_list;
+mt_const bool transcode_on_demand = true;
+mt_const Uint64 transcode_on_demand_timeout_millisec = 5000;
+
+class StreamingParams
+{
+public:
+    bool transcode;
+
+    void reset ()
+    {
+        transcode = false;
+    }
+
+    StreamingParams ()
+    {
+        reset ();
+    }
+};
+
 class WatchingParams
 {
 public:
@@ -82,24 +116,26 @@ public:
 
     IpAddress client_addr;
 
-    mt_const RtmpConnection *rtmp_conn;
+    mt_const DataDepRef<RtmpConnection> rtmp_conn;
     // Remember that RtmpConnection must be available when we're calling
-    // RtmpServer's methods. We must take special care to ensure that this
-    // holds. See takeRtmpConnRef().
+    // RtmpServer's methods.
     RtmpServer rtmp_server;
 
     ServerThreadContext *recorder_thread_ctx;
     AvRecorder recorder;
     FlvMuxer flv_muxer;
 
+    mt_const Ref<String> stream_name;
+
     mt_mutex (mutex) Ref<MomentServer::ClientSession> srv_session;
 
     mt_mutex (mutex) Ref<VideoStream> video_stream;
-    // TODO Deprecated field
-    mt_mutex (mutex) MomentServer::VideoStreamKey video_stream_key;
+    mt_mutex (mutex) Ref<Transcoder> transcoder;
+    mt_mutex (mutex) List<MomentServer::VideoStreamKey> out_stream_keys;
 
     mt_mutex (mutex) Ref<VideoStream> watching_video_stream;
 
+    mt_mutex (mutex) StreamingParams streaming_params;
     mt_mutex (mutex) WatchingParams watching_params;
 
 #ifdef MOMENT_RTMP__FLOW_CONTROL
@@ -120,35 +156,11 @@ public:
     bool streaming;
     bool watching;
 
-#if 0
-    // Returns 'false' if ClientSession is invalid already.
-    bool invalidate ()
-    {
-      StateMutexLock l (&mutex);
-        bool const ret_valid = valid;
-	valid = false;
-	return ret_valid;
-    }
-#endif
-
     void doResume ();
-
-    // Secures a reference to rtmp_conn so that it is safe to call rtmp_server's
-    // methods.
-    void takeRtmpConnRef (Ref<Object> * const mt_nonnull ret_ref)
-    {
-	mutex.lock ();
-
-	if (valid)
-	    *ret_ref = rtmp_conn->getCoderefContainer();
-	else
-	    *ret_ref = NULL;
-
-	mutex.unlock ();
-    }
 
     ClientSession ()
 	: valid (true),
+          rtmp_conn (this /* coderef_container */),
 	  recorder_thread_ctx (NULL),
 	  recorder (this),
 #ifdef MOMENT_RTMP__FLOW_CONTROL
@@ -235,8 +247,16 @@ void destroyClientSession (ClientSession * const client_session)
     }
     client_session->valid = false;
 
+    {
+        List<MomentServer::VideoStreamKey>::iter iter (client_session->out_stream_keys);
+        while (!client_session->out_stream_keys.iter_done (iter)) {
+            MomentServer::VideoStreamKey &stream_key = client_session->out_stream_keys.iter_next (iter)->data;
+            moment->removeVideoStream (stream_key);
+        }
+        client_session->out_stream_keys.clear ();
+    }
+
     Ref<VideoStream> const video_stream = client_session->video_stream;
-    MomentServer::VideoStreamKey const video_stream_key = client_session->video_stream_key;
 
     Ref<MomentServer::ClientSession> const srv_session = client_session->srv_session;
     client_session->srv_session = NULL;
@@ -249,9 +269,6 @@ void destroyClientSession (ClientSession * const client_session)
     if (srv_session)
 	moment->clientDisconnected (srv_session);
 
-    if (video_stream_key)
-	moment->removeVideoStream (video_stream_key);
-
     // Closing video stream *after* firing clientDisconnected() to avoid
     // premature closing of client connections in streamClosed().
     if (video_stream)
@@ -260,19 +277,65 @@ void destroyClientSession (ClientSession * const client_session)
     client_session->unref ();
 }
 
+static mt_mutex (client_session->mutex) void
+startTranscoder (ClientSession * const client_session)
+{
+    if (!client_session->streaming_params.transcode ||
+        !client_session->video_stream ||
+        client_session->transcoder)
+    {
+        logD_ (_func, "no transcoding for stream \"", client_session->stream_name, "\"");
+        return;
+    }
+
+    Ref<Transcoder> transcoder;
+    if (!transcode_list.isEmpty()) {
+        transcoder = grab (new Transcoder);
+        transcoder->init (timers,
+                          moment->getPagePool(),
+                          client_session->video_stream,
+                          transcode_on_demand,
+                          transcode_on_demand_timeout_millisec);
+
+        TranscodeList::iter iter (transcode_list);
+        while (!transcode_list.iter_done (iter)) {
+            Ref<TranscodeEntry> &transcode_entry = transcode_list.iter_next (iter)->data;
+
+            Ref<String> const out_stream_name =
+                    makeString (client_session->stream_name ?
+                                        client_session->stream_name->mem() : ConstMemory(),
+                                transcode_entry->suffix->mem());
+            Ref<VideoStream> const out_stream = grab (new VideoStream);
+            {
+                Ref<StreamParameters> const stream_params = grab (new StreamParameters);
+                if (transcode_entry->audio_mode == Transcoder::TranscodingMode_Off)
+                    stream_params->setParam ("no_audio", "true");
+                if (transcode_entry->video_mode == Transcoder::TranscodingMode_Off)
+                    stream_params->setParam ("no_video", "true");
+
+                out_stream->setStreamParameters (stream_params);
+            }
+
+            transcoder->addOutputStream (out_stream,
+                                         transcode_entry->chain->mem(),
+                                         transcode_entry->audio_mode,
+                                         transcode_entry->video_mode);
+
+            MomentServer::VideoStreamKey const out_stream_key =
+                    moment->addVideoStream (out_stream, out_stream_name->mem());
+            client_session->out_stream_keys.append (out_stream_key);
+        }
+    }
+
+    client_session->transcoder = transcoder;
+}
+
 void streamAudioMessage (VideoStream::AudioMessage * const mt_nonnull msg,
 			 void                      * const _session)
 {
-//    logD_ (_func_);
+//    logD_ (_func, "ts: ", msg->timestamp_nanosec);
 
     ClientSession * const client_session = static_cast <ClientSession*> (_session);
-
-    Ref<Object> rtmp_conn_ref;
-    // TODO client_session->mutex is locked/unlocked here, and then we lock it again
-    //      in the likely path. That's not effective.
-    client_session->takeRtmpConnRef (&rtmp_conn_ref);
-    if (!rtmp_conn_ref)
-	return;
 
     client_session->mutex.lock ();
 
@@ -312,13 +375,6 @@ void streamVideoMessage (VideoStream::VideoMessage * const mt_nonnull msg,
 //    logD_ (_func, "ts ", msg->timestamp_nanosec, " ", msg->frame_type, (msg->is_saved_frame ? " SAVED" : ""));
 
     ClientSession * const client_session = static_cast <ClientSession*> (_session);
-
-    Ref<Object> rtmp_conn_ref;
-    // TODO client_session->mutex is locked/unlocked here, and then we lock it again
-    //      in the likely path. That's not effective.
-    client_session->takeRtmpConnRef (&rtmp_conn_ref);
-    if (!rtmp_conn_ref)
-	return;
 
     client_session->mutex.lock ();
 
@@ -513,6 +569,26 @@ static void parseParameters (ConstMemory         const mem,
     }
 }
 
+static void startStreaming_paramCallback (ConstMemory   const name,
+                                          ConstMemory   const /* value */,
+                                          void        * const _streaming_params)
+{
+    StreamingParams * const streaming_params = static_cast <StreamingParams*> (_streaming_params);
+
+    if (equal (name, "transcode"))
+	streaming_params->transcode = true;
+}
+
+static void startWatching_paramCallback (ConstMemory   const name,
+                                         ConstMemory   const /* value */,
+                                         void        * const _watching_params)
+{
+    WatchingParams * const watching_params = static_cast <WatchingParams*> (_watching_params);
+
+    if (equal (name, "paused"))
+	watching_params->start_paused = true;
+}
+
 Result startStreaming (ConstMemory     const &_stream_name,
 		       RecordingMode   const rec_mode,
                        bool            const momentrtmp_proto,
@@ -532,22 +608,34 @@ Result startStreaming (ConstMemory     const &_stream_name,
     client_session->streaming = true;
 
     ConstMemory stream_name = _stream_name;
+
+    client_session->mutex.lock ();
+    client_session->streaming_params.reset ();
     {
-      // This will be unnecessary after parameter parsing is implemented in HttpServer.
-      // 12.01.17 ^^ ? How's this related?
 	Byte const * const name_sep = (Byte const *) memchr (stream_name.mem(), '?', stream_name.len());
-	if (name_sep)
+	if (name_sep) {
+	    parseParameters (stream_name.region (name_sep + 1 - stream_name.mem()),
+                             startStreaming_paramCallback,
+                             &client_session->streaming_params);
 	    stream_name = stream_name.region (0, name_sep - stream_name.mem());
+	}
     }
+    client_session->stream_name = grab (new String (stream_name));
+    client_session->mutex.unlock ();
 
     // 'srv_session' is created in connect(), which is synchronized with
     // startStreaming(). No locking needed.
     Ref<StreamParameters> const stream_params = grab (new StreamParameters);
     stream_params->setParam ("source", momentrtmp_proto ? ConstMemory ("momentrtmp") : ConstMemory ("rtmp"));
+    if (!momentrtmp_proto) {
+        // TODO nellymoser? Use "source" param from above instead.
+        stream_params->setParam ("audio_codec", "speex");
+    }
 
-    Ref<VideoStream> const video_stream =
-	    moment->startStreaming (client_session->srv_session, stream_name, stream_params, rec_mode);
-    if (!video_stream)
+    Ref<VideoStream> const video_stream = grab (new VideoStream);
+    video_stream->setStreamParameters (stream_params);
+
+    if (!moment->startStreaming (client_session->srv_session, stream_name, video_stream, rec_mode))
 	return Result::Failure;
 
     if (record_all) {
@@ -564,32 +652,16 @@ Result startStreaming (ConstMemory     const &_stream_name,
     }
 
     client_session->mutex.lock ();
+
     client_session->video_stream = video_stream;
-    client_session->mutex.unlock ();
 
-#if 0
-// Deprecated
-    MomentServer::VideoStreamKey const video_stream_key =
-	    moment->addVideoStream (client_session->video_stream, stream_name);
+    logD_ (_func, "client_session: ", (UintPtr) client_session, ", video_stream: ", (UintPtr) video_stream.ptr());
 
-    client_session->mutex.lock ();
-    client_session->video_stream_key = video_stream_key;
+    startTranscoder (client_session);
+
     client_session->mutex.unlock ();
-#endif
 
     return Result::Success;
-}
-
-void startWatching_paramCallback (ConstMemory   const name,
-				  ConstMemory   const /* value */,
-				  void        * const _watching_params)
-{
-    WatchingParams * const watching_params = static_cast <WatchingParams*> (_watching_params);
-
-    if (equal (name, "paused")) {
-//        logD_ (_func, "start_paused");
-	watching_params->start_paused = true;
-    }
 }
 
 static mt_mutex (client_session) Result
@@ -686,7 +758,9 @@ Result startWatching (ConstMemory const &_stream_name,
     {
 	Byte const * const name_sep = (Byte const *) memchr (stream_name.mem(), '?', stream_name.len());
 	if (name_sep) {
-	    parseParameters (stream_name.region (name_sep + 1 - stream_name.mem()), startWatching_paramCallback, &client_session->watching_params);
+	    parseParameters (stream_name.region (name_sep + 1 - stream_name.mem()),
+                             startWatching_paramCallback,
+                             &client_session->watching_params);
 	    stream_name = stream_name.region (0, name_sep - stream_name.mem());
 	}
     }
@@ -717,6 +791,8 @@ Result startWatching (ConstMemory const &_stream_name,
 
         video_stream->getFrameSaver()->reportSavedFrames (&saved_frame_handler, client_session);
         client_session->mutex.unlock ();
+
+#warning TODO Proxy video stream events through mod_rtmp to prechunk all non-prechunked data before informAll() to avoid loosing lots of memory and wasting CPU when chunking for each client individually.
 
         video_stream->getEventInformer()->subscribe_unlocked (&video_event_handler,
                                                               client_session,
@@ -826,7 +902,6 @@ Result commandMessage (VideoStream::Message * const mt_nonnull msg,
     logD (mod_rtmp, _func_);
 
     ClientSession * const client_session = static_cast <ClientSession*> (_client_session);
-    // No need to call takeRtmpConnRef(), because this is rtmp_conn's callback.
     return client_session->rtmp_server.commandMessage (msg, msg_stream_id, amf_encoding, conn_info);
 }
 
@@ -950,8 +1025,10 @@ static MomentServer::Events const server_events = {
 
 void momentRtmpInit ()
 {
-    MomentServer * const moment = MomentServer::getInstance();
-    ServerApp * const server_app = moment->getServerApp();
+    moment = MomentServer::getInstance();
+    CodeDepRef<ServerApp> const server_app = moment->getServerApp();
+    timers = server_app->getMainThreadContext()->getTimers();
+
     MConfig::Config * const config = moment->getConfig();
 
     {
@@ -1063,103 +1140,6 @@ void momentRtmpInit ()
     }
 
     {
-	rtmp_module->rtmp_service.setFrontend (Cb<RtmpVideoService::Frontend> (
-		&rtmp_video_service_frontend, NULL, NULL));
-
-	rtmp_module->rtmp_service.setServerContext (server_app->getServerContext());
-	rtmp_module->rtmp_service.setPagePool (moment->getPagePool());
-
-	if (!rtmp_module->rtmp_service.init (prechunking_enabled)) {
-	    logE_ (_func, "rtmp_service.init() failed: ", exc->toString());
-	    return;
-	}
-
-	do {
-	    ConstMemory const opt_name = "mod_rtmp/rtmp_bind";
-	    ConstMemory rtmp_bind = config->getString_default (opt_name, ":1935");
-
-	    logI_ (_func, opt_name, ": ", rtmp_bind);
-	    if (!rtmp_bind.isNull ()) {
-		IpAddress addr;
-		if (!setIpAddress_default (rtmp_bind,
-					   ConstMemory() /* default_host */,
-					   1935          /* default_port */,
-					   true          /* allow_any_host */,
-					   &addr))
-		{
-		    logE_ (_func, "setIpAddress_default() failed (rtmp)");
-		    return;
-		}
-
-		if (!rtmp_module->rtmp_service.bind (addr)) {
-		    logE_ (_func, "rtmp_service.bind() failed: ", exc->toString());
-		    break;
-		}
-
-		if (!rtmp_module->rtmp_service.start ()) {
-		    logE_ (_func, "rtmp_service.start() failed: ", exc->toString());
-		    return;
-		}
-	    } else {
-		logI_ (_func, "RTMP service is not bound to any port "
-		       "and won't accept any connections. "
-		       "Set \"", opt_name, "\" option to bind the service.");
-	    }
-	} while (0);
-    }
-
-    {
-	rtmp_module->rtmpt_service.setFrontend (Cb<RtmpVideoService::Frontend> (
-		&rtmp_video_service_frontend, NULL, NULL));
-
-	if (!rtmp_module->rtmpt_service.init (server_app->getServerContext()->getTimers(),
-                                 moment->getPagePool(),
-                                 // TODO setServerContext()
-                                 // TODO Pick a server thread context and pass it here.
-                                 server_app->getServerContext()->getMainPollGroup(),
-                                 server_app->getMainThreadContext()->getDeferredProcessor(),
-                                 rtmpt_session_timeout,
-                                 rtmpt_no_keepalive_conns,
-                                 prechunking_enabled))
-        {
-	    logE_ (_func, "rtmpt_service.init() failed: ", exc->toString());
-	    return;
-	}
-
-	do {
-	    ConstMemory const opt_name = "mod_rtmp/rtmpt_bind";
-	    ConstMemory const rtmpt_bind = config->getString_default (opt_name, ":8081");
-	    logI_ (_func, opt_name, ": ", rtmpt_bind);
-	    if (!rtmpt_bind.isNull ()) {
-		IpAddress addr;
-		if (!setIpAddress_default (rtmpt_bind,
-					   ConstMemory() /* default_host */,
-					   8081          /* default_port */,
-					   true          /* allow_any_host */,
-					   &addr))
-		{
-		    logE_ (_func, "setIpAddress_default() failed (rtmpt)");
-		    return;
-		}
-
-		if (!rtmp_module->rtmpt_service.bind (addr)) {
-		    logE_ (_func, "rtmpt_service.bind() failed: ", exc->toString());
-		    break;
-		}
-
-		if (!rtmp_module->rtmpt_service.start ()) {
-		    logE_ (_func, "rtmpt_service.start() failed: ", exc->toString());
-		    return;
-		}
-	    } else {
-		logI_ (_func, "RTMPT service is not bound to any port "
-		       "and won't accept any connections. "
-		       "Set \"", opt_name, "\" option to \"y\" to bind the service.");
-	    }
-	} while (0);
-    }
-
-    {
 	ConstMemory const opt_name = "mod_rtmp/rtmpt_from_http";
 	MConfig::BooleanValue const opt_val = config->getBoolean (opt_name);
 	if (opt_val == MConfig::Boolean_Invalid)
@@ -1219,6 +1199,197 @@ void momentRtmpInit ()
 	    logE_ (_func, "bad value for ", opt_name);
 
 	logI_ (_func, opt_name, ": ", paused_avc_interframes);
+    }
+
+    if (MConfig::Section * const modrtmp_section = config->getSection ("mod_rtmp")) {
+        MConfig::Section::iter iter (*modrtmp_section);
+        while (!modrtmp_section->iter_done (iter)) {
+            MConfig::SectionEntry * const sect_entry = modrtmp_section->iter_next (iter);
+            if (sect_entry->getType() == MConfig::SectionEntry::Type_Section
+                && equal (sect_entry->getName(), "transcode"))
+            {
+                MConfig::Section * const transcode_section = static_cast <MConfig::Section*> (sect_entry);
+
+                ConstMemory suffix;
+                if (MConfig::Option * const opt = transcode_section->getOption ("suffix"))
+                    if (MConfig::Value * const val = opt->getValue())
+                        suffix = val->mem();
+
+                ConstMemory chain;
+                if (MConfig::Option * const opt = transcode_section->getOption ("chain"))
+                    if (MConfig::Value * const val = opt->getValue())
+                        chain = val->mem();
+
+                Transcoder::TranscodingMode audio_mode = Transcoder::TranscodingMode_On;
+                Transcoder::TranscodingMode video_mode = Transcoder::TranscodingMode_On;
+
+                if (MConfig::Option * const opt = transcode_section->getOption ("direct_audio")) {
+                    MConfig::BooleanValue const opt_val = opt->getBoolean();
+                    if (opt_val == MConfig::Boolean_Invalid)
+                        logE_ (_func, "Invalid value for config option direct_audio");
+                    else
+                    if (opt_val == MConfig::Boolean_True)
+                        audio_mode = Transcoder::TranscodingMode_Direct;
+                }
+
+                if (MConfig::Option * const opt = transcode_section->getOption ("direct_video")) {
+                    MConfig::BooleanValue const opt_val = opt->getBoolean();
+                    if (opt_val == MConfig::Boolean_Invalid)
+                        logE_ (_func, "Invalid value for config option direct_video");
+                    else
+                    if (opt_val == MConfig::Boolean_True)
+                        video_mode = Transcoder::TranscodingMode_Direct;
+                }
+
+                if (MConfig::Option * const opt = transcode_section->getOption ("no_audio")) {
+                    MConfig::BooleanValue const opt_val = opt->getBoolean();
+                    if (opt_val == MConfig::Boolean_Invalid)
+                        logE_ (_func, "Invalid value for config option no_audio");
+                    else
+                    if (opt_val == MConfig::Boolean_True)
+                        audio_mode = Transcoder::TranscodingMode_Off;
+                }
+
+                if (MConfig::Option * const opt = transcode_section->getOption ("no_video")) {
+                    MConfig::BooleanValue const opt_val = opt->getBoolean();
+                    if (opt_val == MConfig::Boolean_Invalid)
+                        logE_ (_func, "Invalid value for config option no_video");
+                    else
+                    if (opt_val == MConfig::Boolean_True)
+                        video_mode = Transcoder::TranscodingMode_Off;
+                }
+
+                Ref<TranscodeEntry> const transcode_entry = grab (new TranscodeEntry);
+                transcode_entry->suffix = grab (new String (suffix));
+                transcode_entry->chain  = grab (new String (chain));
+                transcode_entry->audio_mode = audio_mode;
+                transcode_entry->video_mode = video_mode;
+
+                transcode_list.append (transcode_entry);
+            }
+        }
+    }
+
+    {
+	ConstMemory const opt_name = "mod_rtmp/transcode_on_demand";
+	MConfig::BooleanValue const opt_val = config->getBoolean (opt_name);
+	if (opt_val == MConfig::Boolean_Invalid)
+	    logE_ (_func, "Invalid value for config option ", opt_name);
+	else
+	if (opt_val == MConfig::Boolean_False)
+	    transcode_on_demand = false;
+	else
+	    transcode_on_demand = true;
+
+        logI_ (_func, opt_name, ": ", transcode_on_demand);
+    }
+
+    {
+	ConstMemory const opt_name = "mod_rtmp/transcode_on_demand_timeout";
+	MConfig::GetResult const res = config->getUint64_default (
+		opt_name, &transcode_on_demand_timeout_millisec, transcode_on_demand_timeout_millisec);
+	if (!res)
+	    logE_ (_func, "bad value for ", opt_name);
+
+	logI_ (_func, opt_name, ": ", transcode_on_demand_timeout_millisec);
+    }
+
+    {
+	rtmp_module->rtmp_service.setFrontend (Cb<RtmpVideoService::Frontend> (
+		&rtmp_video_service_frontend, NULL, NULL));
+
+	rtmp_module->rtmp_service.setServerContext (server_app->getServerContext());
+	rtmp_module->rtmp_service.setPagePool (moment->getPagePool());
+
+	if (!rtmp_module->rtmp_service.init (prechunking_enabled)) {
+	    logE_ (_func, "rtmp_service.init() failed: ", exc->toString());
+	    return;
+	}
+
+	do {
+	    ConstMemory const opt_name = "mod_rtmp/rtmp_bind";
+	    ConstMemory rtmp_bind = config->getString_default (opt_name, ":1935");
+
+	    logI_ (_func, opt_name, ": ", rtmp_bind);
+	    if (!rtmp_bind.isNull ()) {
+		IpAddress addr;
+		if (!setIpAddress_default (rtmp_bind,
+					   ConstMemory() /* default_host */,
+					   1935          /* default_port */,
+					   true          /* allow_any_host */,
+					   &addr))
+		{
+		    logE_ (_func, "setIpAddress_default() failed (rtmp)");
+		    return;
+		}
+
+		if (!rtmp_module->rtmp_service.bind (addr)) {
+		    logE_ (_func, "rtmp_service.bind() failed: ", exc->toString());
+		    break;
+		}
+
+		if (!rtmp_module->rtmp_service.start ()) {
+		    logE_ (_func, "rtmp_service.start() failed: ", exc->toString());
+		    return;
+		}
+	    } else {
+		logI_ (_func, "RTMP service is not bound to any port "
+		       "and won't accept any connections. "
+		       "Set \"", opt_name, "\" option to bind the service.");
+	    }
+	} while (0);
+    }
+
+    {
+	rtmp_module->rtmpt_service.setFrontend (Cb<RtmpVideoService::Frontend> (
+		&rtmp_video_service_frontend, NULL, NULL));
+
+	if (!rtmp_module->rtmpt_service.init (
+                                 server_app->getServerContext()->getTimers(),
+                                 moment->getPagePool(),
+                                 // TODO setServerContext()
+                                 // TODO Pick a server thread context and pass it here.
+                                 server_app->getServerContext()->getMainPollGroup(),
+                                 server_app->getMainThreadContext()->getDeferredProcessor(),
+                                 rtmpt_session_timeout,
+                                 rtmpt_no_keepalive_conns,
+                                 prechunking_enabled))
+        {
+	    logE_ (_func, "rtmpt_service.init() failed: ", exc->toString());
+	    return;
+	}
+
+	do {
+	    ConstMemory const opt_name = "mod_rtmp/rtmpt_bind";
+	    ConstMemory const rtmpt_bind = config->getString_default (opt_name, ":8081");
+	    logI_ (_func, opt_name, ": ", rtmpt_bind);
+	    if (!rtmpt_bind.isNull ()) {
+		IpAddress addr;
+		if (!setIpAddress_default (rtmpt_bind,
+					   ConstMemory() /* default_host */,
+					   8081          /* default_port */,
+					   true          /* allow_any_host */,
+					   &addr))
+		{
+		    logE_ (_func, "setIpAddress_default() failed (rtmpt)");
+		    return;
+		}
+
+		if (!rtmp_module->rtmpt_service.bind (addr)) {
+		    logE_ (_func, "rtmpt_service.bind() failed: ", exc->toString());
+		    break;
+		}
+
+		if (!rtmp_module->rtmpt_service.start ()) {
+		    logE_ (_func, "rtmpt_service.start() failed: ", exc->toString());
+		    return;
+		}
+	    } else {
+		logI_ (_func, "RTMPT service is not bound to any port "
+		       "and won't accept any connections. "
+		       "Set \"", opt_name, "\" option to \"y\" to bind the service.");
+	    }
+	} while (0);
     }
 }
 
