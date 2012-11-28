@@ -110,7 +110,11 @@ unsigned fillFlvAudioHeader (VideoStream::AudioMessage * const mt_nonnull audio_
         channels = 1;
     }
 
-    audio_hdr |= 0x02; // 16-bit samples
+//    if (audio_msg->codec_id != VideoStream::AudioCodecId::G711ALaw &&
+//        audio_msg->codec_id != VideoStream::AudioCodecId::G711MuLaw)
+    {
+        audio_hdr |= 0x02; // 16-bit samples
+    }
 
     if (channels > 1)
         audio_hdr |= 1; // stereo
