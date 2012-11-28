@@ -31,7 +31,6 @@
 #endif
 
 #include <moment/libmoment.h>
-#include <moment/moment_control.h>
 
 #include <mycpp/mycpp.h>
 #include <mycpp/cmdline.h>
@@ -96,21 +95,11 @@ private:
 
     static void exitTimerTick (void *_self);
 
-  mt_iface (MomentControl::Frontend)
+    void ctl_startProfiler (ConstMemory filename);
 
-public:
-    static MomentControl::Frontend const ctl_frontend;
+    void ctl_stopProfiler ();
 
-private:
-    static void ctl_startProfiler (ConstMemory  filename,
-                                   void        * /* _self */);
-
-    static void ctl_stopProfiler (void * /* _self */);
-
-    static void ctl_exit (ConstMemory  reason,
-                          void        * /* _self */);
-
-  mt_iface_end
+    void ctl_exit (ConstMemory reason);
 
 public:
     int run ();
@@ -273,12 +262,6 @@ MomentInstance::exitTimerTick (void * const _self)
     self->doExit ("exit timer timeout");
 }
 
-MomentControl::Frontend const MomentInstance::ctl_frontend = {
-    ctl_startProfiler,
-    ctl_stopProfiler,
-    ctl_exit
-};
-
 #ifndef MOMENT_GPERFTOOLS
 static char const * const gperftools_errmsg =
         "gperftools profiler is disabled. "
@@ -286,8 +269,7 @@ static char const * const gperftools_errmsg =
 #endif
 
 void
-MomentInstance::ctl_startProfiler (ConstMemory   const filename,
-                                   void        * const /* _self */)
+MomentInstance::ctl_startProfiler (ConstMemory const filename)
 {
 #ifdef MOMENT_GPERFTOOLS
     ProfilerStart (String (filename).cstr());
@@ -297,7 +279,7 @@ MomentInstance::ctl_startProfiler (ConstMemory   const filename,
 }
 
 void
-MomentInstance::ctl_stopProfiler (void * const /* _self */)
+MomentInstance::ctl_stopProfiler ()
 {
 #ifdef MOMENT_GPERFTOOLS
     ProfilerStop ();
@@ -308,11 +290,9 @@ MomentInstance::ctl_stopProfiler (void * const /* _self */)
 }
 
 void
-MomentInstance::ctl_exit (ConstMemory   const reason,
-                          void        * const _self)
+MomentInstance::ctl_exit (ConstMemory const reason)
 {
-    MomentInstance * const self = static_cast <MomentInstance*> (_self);
-    self->doExit (reason);
+    doExit (reason);
 }
 
 static void
@@ -695,17 +675,6 @@ int main (int argc, char **argv)
     }
 
     Ref<MomentInstance> const moment_instance = grab (new MomentInstance);
-
-#if 0
-// FIXME MomentServer is not yet init()'ialized at this point.
-
-    Ref<MomentControl> const moment_control = grab (new MomentControl);
-    moment_control->init (MomentServer::getInstance(),
-                          CbDesc<MomentControl::Frontend> (&MomentInstance::ctl_frontend,
-                                                           moment_instance,
-                                                           moment_instance));
-#endif
-
     return moment_instance->run ();
 }
 

@@ -25,8 +25,7 @@ AM_CXXFLAGS += $(COMMON_CFLAGS)
 
 INCLUDES = -I$(top_srcdir) -I$(top_builddir)
 
-moment_private_headers =        \
-        moment_control.h
+moment_private_headers =
 
 moment_target_headers =		\
         libmoment_config.h      \
@@ -160,8 +159,7 @@ bin_PROGRAMS = moment rtmptool
 
 moment_DEPENDENCIES = libmoment-1.0.la
 moment_SOURCES =	\
-	moment.cpp      \
-        moment_control.cpp
+	moment.cpp
 moment_LDADD = $(top_builddir)/moment/libmoment-1.0.la $(THIS_LIBS)
 if MOMENT_GPERFTOOLS
 moment_LDADD += -lprofiler
