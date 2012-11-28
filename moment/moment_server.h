@@ -182,10 +182,10 @@ public:
 	    Ref<VideoStream> (*startWatching) (ConstMemory  stream_name,
 					       void        *cb_data);
 
-	    Ref<VideoStream> (*startStreaming) (ConstMemory       stream_name,
-                                                StreamParameters *stream_params,
-						RecordingMode     rec_mode,
-						void             *cb_data);
+	    Result (*startStreaming) (ConstMemory       stream_name,
+                                      VideoStream      * mt_nonnull video_stream,
+                                      RecordingMode     rec_mode,
+                                      void             *cb_data);
 	};
 
     private:
@@ -462,10 +462,10 @@ public:
     Ref<VideoStream> startWatching (ClientSession * mt_nonnull client_session,
 				    ConstMemory    stream_name);
 
-    Ref<VideoStream> startStreaming (ClientSession    * mt_nonnull client_session,
-				     ConstMemory       stream_name,
-                                     StreamParameters *stream_params,
-				     RecordingMode     rec_mode);
+    Result startStreaming (ClientSession    * mt_nonnull client_session,
+                           ConstMemory       stream_name,
+                           VideoStream      * mt_nonnull video_stream,
+                           RecordingMode     rec_mode);
 
     struct ClientHandlerKey
     {
@@ -538,12 +538,6 @@ public:
                                               ConstMemory  password);
 
   // Utility
-
-    // Unimplemented?
-    void toAccessLog (ConstMemory addr,
-		      ConstMemory request_line,
-		      unsigned    status_code,
-		      Size        data_length);
 
     void dumpStreamList ();
 

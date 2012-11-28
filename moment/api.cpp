@@ -495,6 +495,7 @@ static void client_rtmpCommandMessage (RtmpConnection       * const mt_nonnull c
     bool unref_normalized_pages;
     if (int_msg->prechunk_size == 0) {
 	normalized_pages = int_msg->page_list;
+        normalized_offset = int_msg->msg_offset;
 	unref_normalized_pages = false;
     } else {
 	unref_normalized_pages = true;
@@ -565,26 +566,27 @@ static Ref<VideoStream> client_startWatching (ConstMemory   const stream_name,
     return NULL;
 }
 
-static Ref<VideoStream> client_startStreaming (ConstMemory        const stream_name,
-                                               StreamParameters * const /* stream_params */,
-					       RecordingMode      const rec_mode,
-					       void             * const _api_client_session)
+static Result client_startStreaming (ConstMemory        const stream_name,
+                                     VideoStream      * const mt_nonnull video_stream,
+                                     RecordingMode      const rec_mode,
+                                     void             * const _api_client_session)
 {
     MomentClientSession * const api_client_session = static_cast <MomentClientSession*> (_api_client_session);
 
     if (api_client_session->api_client_handler_wrapper->ext_client_handler.start_streaming_cb) {
-	MomentStream * const ext_stream =
+        MomentResult const res =
 		api_client_session->api_client_handler_wrapper->ext_client_handler.start_streaming_cb (
 			(char const *) stream_name.mem(),
 			stream_name.len(),
+                        static_cast <MomentStream*> (video_stream),
 			(MomentRecordingMode) (Uint32) rec_mode,
 			api_client_session->client_cb_data,
 			api_client_session->api_client_handler_wrapper->ext_client_handler.start_streaming_cb_data);
 
-	return static_cast <VideoStream*> (ext_stream);
+	return (res == MomentResult_Success ? Result::Success : Result::Failure);
     }
 
-    return NULL;
+    return Result::Failure;
 }
 
 static MomentServer::ClientSession::Backend const client_session_backend = {

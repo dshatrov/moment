@@ -39,6 +39,11 @@ enum MomentRecordingMode {
     MomentRecordingMode_Append
 };
 
+enum MomentResult {
+    MomentResult_Success = 0,
+    MomentResult_Failure
+};
+
 
 // _________________________________ Messages __________________________________
 
@@ -153,11 +158,12 @@ typedef MomentStream* (*MomentStartWatchingCallback) (char const *stream_name_bu
 						      void       *client_user_data,
 						      void       *user_data);
 
-typedef MomentStream* (*MomentStartStreamingCallback) (char const          *stream_name_buf,
-						       size_t               stream_name_len,
-						       MomentRecordingMode  rec_mode,
-						       void                *client_user_data,
-						       void                *user_data);
+typedef MomentResult (*MomentStartStreamingCallback) (char const          *stream_name_buf,
+                                                      size_t               stream_name_len,
+                                                      MomentStream        *stream,
+                                                      MomentRecordingMode  rec_mode,
+                                                      void                *client_user_data,
+                                                      void                *user_data);
 
 typedef void (*MomentRtmpCommandMessageCallback) (MomentMessage *msg,
 						  void          *client_user_data,

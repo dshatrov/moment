@@ -378,8 +378,8 @@ MomentServer::loadModules ()
 	Ref<String> const stat_path = makeString (module_path, "/", dir_entry->mem());
 	ConstMemory const entry_name = stat_path->mem();
 
-	Ref<Vfs::FileStat> const stat_data = vfs->stat (dir_entry->mem());
-	if (!stat_data) {
+        Vfs::FileStat stat_data;
+	if (!vfs->stat (dir_entry->mem(), &stat_data)) {
 	    logE_ (_func, "Could not stat ", stat_path);
 	    continue;
 	}
@@ -409,7 +409,7 @@ MomentServer::loadModules ()
         if (equal (module_name, mod_gst_name->mem()))
             continue;
 
-	if (stat_data->file_type == Vfs::FileType::RegularFile &&
+	if (stat_data.file_type == Vfs::FileType::RegularFile &&
 	    !loaded_names.lookup (module_name))
 	{
 	    loaded_names.add (module_name, EmptyBase());
@@ -616,25 +616,27 @@ _not_found:
     return NULL;
 }
 
-Ref<VideoStream>
+Result
 MomentServer::startStreaming (ClientSession    * const mt_nonnull client_session,
 			      ConstMemory        const stream_name,
-                              StreamParameters * const stream_params,
+                              VideoStream      * const mt_nonnull video_stream,
 			      RecordingMode      const rec_mode)
 {
-    Ref<VideoStream> video_stream;
-
   {
     if (client_session->backend
 	&& client_session->backend->startStreaming)
     {
 	logD (session, _func, "calling backend->startStreaming()");
-	if (!client_session->backend.call_ret< Ref<VideoStream> > (&video_stream,
-								   client_session->backend->startStreaming,
-								   /* ( */ stream_name, stream_params, rec_mode /* ) */))
+        Result res;
+	if (!client_session->backend.call_ret<Result> (&res,
+                                                       client_session->backend->startStreaming,
+                                                       /* ( */ stream_name, video_stream, rec_mode /* ) */))
 	{
 	    goto _denied;
 	}
+
+        if (!res)
+            goto _denied;
 
 	goto _return;
     }
@@ -644,8 +646,6 @@ MomentServer::startStreaming (ClientSession    * const mt_nonnull client_session
     if (!publish_all_streams)
 	goto _denied;
 
-    video_stream = grab (new VideoStream);
-    video_stream->setStreamParameters (stream_params);
     VideoStreamKey const video_stream_key = addVideoStream (video_stream, stream_name);
 
     client_session->mutex.lock ();
@@ -660,11 +660,11 @@ MomentServer::startStreaming (ClientSession    * const mt_nonnull client_session
 
 _return:
     logA_ ("moment OK ", client_session->client_addr, " stream ", stream_name);
-    return video_stream;
+    return Result::Success;
 
 _denied:
     logA_ ("moment DENIED ", client_session->client_addr, " stream ", stream_name);
-    return NULL;
+    return Result::Failure;
 }
 
 mt_mutex (mutex) MomentServer::ClientHandlerKey
