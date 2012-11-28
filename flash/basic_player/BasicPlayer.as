@@ -76,6 +76,7 @@ public class BasicPlayer extends Sprite
     private var reconnecting : Boolean;
 
     private var buffer_time : Number;
+    private var start_paused : Boolean;
 
     private var buffering_complete : Boolean;
     private var frame_no : uint;
@@ -319,6 +320,11 @@ public class BasicPlayer extends Sprite
 
     private function playButtonClick (event : MouseEvent) : void
     {
+        doPlay ();
+    }
+
+    private function doPlay () : void
+    {
 	playing = true;
 
 	play_button.visible = false;
@@ -380,10 +386,16 @@ public class BasicPlayer extends Sprite
 	playing = false;
 	reconnecting = false;
 
-	if (loaderInfo.parameters ["buffer"])
+	if (loaderInfo.parameters ["buffer"]) {
 	    buffer_time = loaderInfo.parameters ["buffer"];
-	else
+        } else {
 	    buffer_time = 1.0;
+        }
+
+        if (loaderInfo.parameters ["autoplay"])
+            start_paused = false;
+        else
+            start_paused = true;
 
 	buffering_complete = false;
 	frame_no = 0;
@@ -468,6 +480,9 @@ public class BasicPlayer extends Sprite
 	var stream_name : String = loaderInfo.parameters ["stream"];
 
 	setChannel (server_uri, stream_name);
+
+        if (!start_paused)
+            doPlay ();
     }
 }
 
