@@ -23,6 +23,8 @@
 
 #include <libmary/libmary.h>
 
+#include <moment/libmoment_config.h>
+
 #include <moment/moment_types.h>
 
 #include <moment/flv_util.h>
@@ -36,7 +38,7 @@
 #include <moment/rtmpt_service.h>
 
 #include <moment/video_stream.h>
-//#include <moment/transcoder.h>
+#include <moment/transcoder.h>
 #include <moment/test_stream_generator.h>
 
 #include <moment/av_recorder.h>
@@ -50,6 +52,10 @@
 #include <moment/push_agent.h>
 
 #include <moment/moment_server.h>
+
+#ifdef MOMENT_GSTREAMER
+#include <moment/libmoment_gst.h>
+#endif
 
 
 namespace Moment {
