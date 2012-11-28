@@ -343,6 +343,12 @@ RtmpClient::audioMessage (VideoStream::AudioMessage * const mt_nonnull msg,
     if (options.dump_frames) {
         logD (frame_dump, _func, "ts: 0x", fmt_hex, msg->timestamp_nanosec / 1000000, " (", fmt_def, msg->timestamp_nanosec / 1000000, ") ",
               msg->codec_id, " ", msg->frame_type, ", rate ", msg->rate, ", ", msg->channels, " channels");
+
+#if 0
+        logLock ();
+        PagePool::dumpPages (logs, &msg->page_list, msg->msg_offset);
+        logUnlock ();
+#endif
     }
 
 #if 0
@@ -457,6 +463,7 @@ RtmpClient::init (ServerThreadContext * const thread_ctx,
     rtmp_conn.init (thread_ctx->getTimers(),
                     page_pool,
                     0    /* send_delay_millisec */,
+                    // Note: Set to "false" for hexdumps.
                     true /* prechunking_enabled */);
 }
 
