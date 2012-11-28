@@ -101,6 +101,15 @@ private:
 
     void ctl_exit (ConstMemory reason);
 
+  mt_iface (LinePipe::Frontend)
+
+    static LinePipe::Frontend const ctl_pipe_frontend;
+
+    static void ctl_line (ConstMemory  line,
+                          void        *_self);
+
+  mt_iface_end
+
 public:
     int run ();
 
@@ -272,6 +281,7 @@ void
 MomentInstance::ctl_startProfiler (ConstMemory const filename)
 {
 #ifdef MOMENT_GPERFTOOLS
+    logD_ (_func, "calling ProfilerStart()");
     ProfilerStart (String (filename).cstr());
 #else
     logD_ (_func, gperftools_errmsg);
@@ -282,6 +292,7 @@ void
 MomentInstance::ctl_stopProfiler ()
 {
 #ifdef MOMENT_GPERFTOOLS
+    logD_ (_func, "calling ProfilerStop()");
     ProfilerStop ();
     ProfilerFlush ();
 #else
@@ -295,26 +306,56 @@ MomentInstance::ctl_exit (ConstMemory const reason)
     doExit (reason);
 }
 
+LinePipe::Frontend const MomentInstance::ctl_pipe_frontend = {
+    ctl_line
+};
+
+void MomentInstance::ctl_line (ConstMemory   const line,
+                               void        * const _self)
+{
+    MomentInstance * const self = static_cast <MomentInstance*> (_self);
+
+    logD_ (_func, line);
+
+    {
+        ConstMemory const str = "profiler_start";
+        if (line.len() >= str.len()) {
+            if (equal (line.region (0, str.len()), str)) {
+                /* TODO Config parameter for default profile filename */
+                ConstMemory profile_filename = "/opt/moment/moment_profile";
+                if (line.len() > str.len() + 1)
+                    profile_filename = line.region (str.len() + 1);
+
+                self->ctl_startProfiler (profile_filename);
+                return;
+            }
+        }
+    }
+
+    if (equal (line, "profiler_stop")) {
+        self->ctl_stopProfiler ();
+        return;
+    }
+
+    if (equal (line, "exit")) {
+        self->ctl_exit ("ctl");
+        return;
+    }
+
+    logW_ (_func, "WARNING: Unknown control command: ", line);
+}
+
 static void
 serverApp_threadStarted (void * const /* cb_data */)
 {
 #ifdef MOMENT_GPERFTOOLS
+    logD_ (_func, "calling ProfilerRegisterThread()");
     ProfilerRegisterThread ();
 #endif
 }
 
 static ServerApp::Events const server_app_events = {
     serverApp_threadStarted
-};
-
-static void ctl_line (ConstMemory   const line,
-                      void        * const /* _cb_data */)
-{
-    logD_ (_func, line);
-}
-
-static LinePipe::Frontend const ctl_pipe_frontend = {
-    ctl_line
 };
 
 int
@@ -577,7 +618,7 @@ MomentInstance::run ()
     }
 
     if (!line_pipe.init ("/opt/moment/moment_ctl" /* TODO config parameter */,
-                         CbDesc<LinePipe::Frontend> (&ctl_pipe_frontend, NULL, NULL),
+                         CbDesc<LinePipe::Frontend> (&ctl_pipe_frontend, this, this),
                          server_app.getMainThreadContext()->getPollGroup(),
                          server_app.getMainThreadContext()->getTimers(),
                          1000 /* reopen_timeout_millisec */ /* TODO config parameter */))
