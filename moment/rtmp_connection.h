@@ -184,12 +184,12 @@ public:
 	    Command_AMF0      = 20,
 	    Aggregate         = 22
 	};
-	operator Value () const { return value; }
-	RtmpMessageType (Value const value) : value (value) {}
+	operator Uint32 () const { return value; }
+	RtmpMessageType (Uint32 const value) : value (value) {}
 	RtmpMessageType () {}
 	Size toString_ (Memory const &mem, Format const &fmt);
     private:
-	Value value;
+	Uint32 value;
     };
 
     enum {

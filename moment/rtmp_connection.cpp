@@ -86,6 +86,8 @@ RtmpConnection::RtmpMessageType::toString_ (Memory const &mem,
 	    return toString (mem, "Command_AMF0");
 	case Aggregate:
 	    return toString (mem, "Aggregate");
+        default:
+            return toString (mem, "Unknown");
     }
 
     unreachable ();
@@ -159,8 +161,8 @@ RtmpConnection::mangleOutTimestamp (MessageDesc const * const mt_nonnull mdesc)
 //        logD_ (_func, "mangled_timestamp: ", mangled_timestamp);
 
         if (mangled_timestamp >
-                    (momentrtmp_proto ? (( (Uint64) -60000000000 /* 1 minute */) / 1000) :
-                                        ((((Uint64) -60000000000 /* 1 minute */) / 1000000) & 0xffffffff)))
+                    (momentrtmp_proto ? (( (Uint64) -60000000000ULL /* 1 minute */) / 1000) :
+                                        ((((Uint64) -60000000000ULL /* 1 minute */) / 1000000) & 0xffffffff)))
         {
             mangled_timestamp = 0;
         }
@@ -633,7 +635,7 @@ RtmpConnection::sendMessagePages (MessageDesc const      * const mt_nonnull mdes
             mangleOutTimestamp (mdesc);
 
     logD (proto_out, _func, "ts 0x", fmt_hex, timestamp, " (orig 0x", mdesc->timestamp, "), "
-	  "tid ", fmt_def, mdesc->msg_type_id,
+	  "tid ", fmt_def, mdesc->msg_type_id, ", (", (RtmpMessageType) mdesc->msg_type_id, ")"
 	  ", msid ", mdesc->msg_stream_id, ", csid ", chunk_stream->chunk_stream_id,
 	  ", mlen ", mdesc->msg_len, ", hdrc ", mdesc->cs_hdr_comp ? "true" : "false");
 
@@ -714,8 +716,15 @@ RtmpConnection::sendMessagePages (MessageDesc const      * const mt_nonnull mdes
             msg_pages->header_len += extra_header_len;
         }
 
-	msg_pages->first_page = page_list->first;
-	msg_pages->msg_offset = msg_offset;
+        msg_pages->first_page = page_list->first;
+        msg_pages->msg_offset = msg_offset;
+        if (msg_offset > 0) {
+            assert (page_list->first && page_list->first->data_len >= msg_offset);
+            if (page_list->first->data_len == msg_offset) {
+                msg_pages->first_page = page_list->first->getNextMsgPage();
+                msg_pages->msg_offset = 0;
+            }
+        }
 
 	if (!take_ownership)
 	    page_pool->msgRef (page_list->first);
@@ -769,8 +778,16 @@ RtmpConnection::sendRawPages (PagePool::Page * const first_page,
 	    Sender::MessageEntry_Pages::createNew (0 /* max_header_len */);
     msg_pages->header_len = 0;
     msg_pages->page_pool = page_pool;
+
     msg_pages->first_page = first_page;
     msg_pages->msg_offset = msg_offset;
+    if (msg_offset > 0) {
+        assert (first_page && first_page->data_len >= msg_offset);
+        if (first_page->data_len == msg_offset) {
+            msg_pages->first_page = first_page->getNextMsgPage();
+            msg_pages->msg_offset = 0;
+        }
+    }
 
     sender->sendMessage (msg_pages, true /* do_flush */);
 }
@@ -1403,7 +1420,7 @@ RtmpConnection::processMessage (ChunkStream * const chunk_stream)
 
     logD (proto_in, _func, "ts 0x", fmt_hex, chunk_stream->in_msg_timestamp,
 	  " (", fmt_def, chunk_stream->in_msg_timestamp, "), "
-	  "tid ", fmt_def, chunk_stream->in_msg_type_id,
+	  "tid ", fmt_def, chunk_stream->in_msg_type_id, " (", (RtmpMessageType) chunk_stream->in_msg_type_id, ")"
 	  ", msid ", chunk_stream->in_msg_stream_id, ", csid ", chunk_stream->chunk_stream_id,
 	  ", mlen ", chunk_stream->in_msg_len);
 
@@ -2933,7 +2950,7 @@ RtmpConnection::~RtmpConnection ()
     // closed() event should always be fired for frontend listeners
     // before RtmpConnection is destroyed. This extra call ensures that.
     if (frontend)
-      frontend.call (frontend->closed, /*(*/ (Exception*) NULL /*)*/);
+        frontend.call (frontend->closed, /*(*/ (Exception*) NULL /*)*/);
 
     in_destr_mutex.lock ();
 
