@@ -872,7 +872,9 @@ RtmptServer::addConnection (Connection              * const mt_nonnull conn,
 
     rtmpt_conn->http_server.init (client_addr);
     rtmpt_conn->http_server.setSender (&rtmpt_conn->conn_sender, page_pool);
-    rtmpt_conn->http_server.setFrontend (Cb<HttpServer::Frontend> (&http_frontend, rtmpt_conn, rtmpt_conn /* coderef_container */));
+    rtmpt_conn->http_server.setFrontend (
+            CbDesc<HttpServer::Frontend> (
+                    &http_frontend, rtmpt_conn, rtmpt_conn /* coderef_container */));
 
     mutex.lock ();
     conn_list.append (rtmpt_conn);

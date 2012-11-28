@@ -719,7 +719,6 @@ void momentFile_addPath (ConstMemory const &path,
 void momentFile_addPathForSection (MConfig::Section * const section,
 				   HttpService      * const http_service)
 {
-
     ConstMemory path;
     {
 	MConfig::Option * const opt = section->getOption ("path");

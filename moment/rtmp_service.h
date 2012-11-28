@@ -94,7 +94,7 @@ private:
 
     static RtmpConnection::Backend const rtmp_conn_backend;
 
-    static void closeRtmpConn (void * const _session);
+    static void closeRtmpConn (void *_session);
 
   mt_iface_end
 
@@ -102,7 +102,7 @@ private:
 
     static TcpServer::Frontend const tcp_server_frontend;
 
-    static void accepted (void * const _self);
+    static void accepted (void *_self);
 
   mt_iface_end
 

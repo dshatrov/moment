@@ -473,6 +473,8 @@ RtmpServer::doPublish (Uint32       const msg_stream_id,
 
     // TODO Subscribe for translation stop? (probably not here)
 
+    // TODO The following reply sends are probably unnecessary - needs checking.
+
     rtmp_conn->sendUserControl_StreamBegin (msg_stream_id);
 
     {
