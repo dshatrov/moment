@@ -1306,7 +1306,9 @@ void momentRtmpInit ()
 	rtmp_module->rtmp_service.setServerContext (server_app->getServerContext());
 	rtmp_module->rtmp_service.setPagePool (moment->getPagePool());
 
-	if (!rtmp_module->rtmp_service.init (prechunking_enabled)) {
+	if (!rtmp_module->rtmp_service.init (prechunking_enabled,
+                                             server_app->getServerContext()->getTimers()))
+        {
 	    logE_ (_func, "rtmp_service.init() failed: ", exc->toString());
 	    return;
 	}

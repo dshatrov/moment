@@ -149,7 +149,8 @@ RtmptService::init (Timers    * const mt_nonnull timers,
 
     rtmpt_server.setFrontend (Cb<RtmptServer::Frontend> (&rtmpt_server_frontend, this, getCoderefContainer()));
 
-    tcp_server.setFrontend (Cb<TcpServer::Frontend> (&tcp_server_frontend, this, getCoderefContainer()));
+    tcp_server.init (CbDesc<TcpServer::Frontend> (&tcp_server_frontend, this, getCoderefContainer()),
+                     timers);
 
     return Result::Success;
 }

@@ -175,20 +175,22 @@ RtmpService::accepted (void * const _self)
 }
 
 mt_throws Result
-RtmpService::init (bool const prechunking_enabled)
+RtmpService::init (bool     const prechunking_enabled,
+                   Timers * const timers)
 {
     this->prechunking_enabled = prechunking_enabled;
 
     if (!tcp_server.open ())
 	return Result::Failure;
 
-    tcp_server.setFrontend (Cb<TcpServer::Frontend> (&tcp_server_frontend, this, getCoderefContainer()));
+    tcp_server.init (CbDesc<TcpServer::Frontend> (&tcp_server_frontend, this, getCoderefContainer()),
+                     timers);
 
     return Result::Success;
 }
 
 mt_throws Result
-RtmpService::bind (IpAddress const &addr)
+RtmpService::bind (IpAddress addr)
 {
     if (!tcp_server.bind (addr))
 	return Result::Failure;

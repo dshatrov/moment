@@ -107,9 +107,10 @@ private:
   mt_iface_end
 
 public:
-    mt_throws Result init (bool const prechunking_enabled);
+    mt_throws Result init (bool    prechunking_enabled,
+                           Timers *timers);
 
-    mt_throws Result bind (IpAddress const &addr);
+    mt_throws Result bind (IpAddress addr);
 
     mt_throws Result start ();
 
