@@ -48,7 +48,8 @@ public class Publisher extends Sprite
         camera = Camera.getCamera();
         if (camera) {
             camera.setMode (320, 240, 30);
-            camera.setQuality (500000, 80);
+            camera.setQuality (200000, 80);
+//            camera.setQuality (500000, 80);
             video.attachCamera (camera);
         }
         /**/
