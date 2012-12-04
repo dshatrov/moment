@@ -88,6 +88,16 @@ private:
 
     mt_mutex (mutex) void destroySession (ClientSession *session);
 
+  // ____ Accept watchdog ____
+
+    mt_const Time accept_watchdog_timeout_sec;
+
+    mt_mutex (mutex) Time last_accept_time;
+
+    static void acceptWatchdogTick (void *_self);
+
+  // _________________________
+
     bool acceptOneConnection ();
 
   mt_iface (RtmpConnection::Backend)
@@ -108,7 +118,8 @@ private:
 
 public:
     mt_throws Result init (bool    prechunking_enabled,
-                           Timers *timers);
+                           Timers *timers,
+                           Time    accept_watchdog_timeout_sec);
 
     mt_throws Result bind (IpAddress addr);
 

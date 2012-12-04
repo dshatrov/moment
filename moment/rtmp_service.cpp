@@ -25,7 +25,7 @@ using namespace M;
 namespace Moment {
 
 namespace {
-LogGroup libMary_logGroup_rtmp_service ("rtmp_service", LogLevel::N);
+LogGroup libMary_logGroup_rtmp_service ("rtmp_service", LogLevel::E);
 }
 
 RtmpConnection::Backend const RtmpService::rtmp_conn_backend = {
@@ -59,6 +59,32 @@ RtmpService::destroySession (ClientSession * const session)
     session_list.remove (session);
     logD (rtmp_service, _func, "session refcount: ", session->getRefCount());
     session->unref ();
+}
+
+void
+RtmpService::acceptWatchdogTick (void * const _self)
+{
+    RtmpService * const self = static_cast <RtmpService*> (_self);
+
+    Time const time = getTime ();
+
+    self->mutex.lock ();
+
+    logD_ (_func, "time: ", time, ", last_accept_time: ", self->last_accept_time);
+
+    if (self->last_accept_time == 0) {
+        self->mutex.unlock ();
+        return;
+    }
+
+    if (self->last_accept_time < time
+        && time - self->last_accept_time >= self->accept_watchdog_timeout_sec)
+    {
+        logF_ (_func, "accept watchdog hit, aborting");
+        abort ();
+    }
+
+    self->mutex.unlock ();
 }
 
 bool
@@ -132,6 +158,9 @@ RtmpService::acceptOneConnection ()
 
     session_list.append (session);
     session->ref ();
+
+    last_accept_time = getTime();
+
     mutex.unlock ();
   // The session is fully initialized and should be destroyed with
   // destroySession() when necessary.
@@ -174,17 +203,36 @@ RtmpService::accepted (void * const _self)
     }
 }
 
-mt_throws Result
+mt_const mt_throws Result
 RtmpService::init (bool     const prechunking_enabled,
-                   Timers * const timers)
+                   Timers * const timers,
+                   Time     const accept_watchdog_timeout_sec)
 {
     this->prechunking_enabled = prechunking_enabled;
+    this->accept_watchdog_timeout_sec = accept_watchdog_timeout_sec;
 
     if (!tcp_server.open ())
 	return Result::Failure;
 
     tcp_server.init (CbDesc<TcpServer::Frontend> (&tcp_server_frontend, this, getCoderefContainer()),
                      timers);
+
+    if (accept_watchdog_timeout_sec != 0) {
+        logD_ (_func, "starting accept watchdog timer, timeout: ",
+               accept_watchdog_timeout_sec, " seconds");
+
+        Time timeout = accept_watchdog_timeout_sec / 4;
+        if (timeout == 0)
+            timeout = 1;
+
+        timers->addTimer (CbDesc<Timers::TimerCallback> (
+                                  acceptWatchdogTick,
+                                  this,
+                                  getCoderefContainer()),
+                          timeout,
+                          true /* periodical */,
+                          true /* auto_delete */);
+    }
 
     return Result::Success;
 }
@@ -216,7 +264,9 @@ RtmpService::RtmpService (Object * const coderef_container)
       server_ctx (NULL),
       page_pool (NULL),
       send_delay (0),
-      tcp_server (coderef_container)
+      tcp_server (coderef_container),
+      accept_watchdog_timeout_sec (0),
+      last_accept_time (0)
 {
 }
 

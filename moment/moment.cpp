@@ -101,6 +101,10 @@ private:
 
     void ctl_exit (ConstMemory reason);
 
+    void ctl_abort (ConstMemory reason);
+
+    void ctl_segfault (ConstMemory reason);
+
   mt_iface (LinePipe::Frontend)
 
     static LinePipe::Frontend const ctl_pipe_frontend;
@@ -306,6 +310,22 @@ MomentInstance::ctl_exit (ConstMemory const reason)
     doExit (reason);
 }
 
+void
+MomentInstance::ctl_abort (ConstMemory const reason)
+{
+    logI_ (_func, "aborting: ", reason);
+    abort ();
+}
+
+void
+MomentInstance::ctl_segfault (ConstMemory const reason)
+{
+    logI_ (_func, "segfaulting: ", reason);
+    *(int*)0=0;
+    unreachable ();
+    abort ();
+}
+
 LinePipe::Frontend const MomentInstance::ctl_pipe_frontend = {
     ctl_line
 };
@@ -339,6 +359,16 @@ void MomentInstance::ctl_line (ConstMemory   const line,
 
     if (equal (line, "exit")) {
         self->ctl_exit ("ctl");
+        return;
+    }
+
+    if (equal (line, "abort")) {
+        self->ctl_abort ("ctl");
+        return;
+    }
+
+    if (equal (line, "segfault")) {
+        self->ctl_segfault ("ctl");
         return;
     }
 

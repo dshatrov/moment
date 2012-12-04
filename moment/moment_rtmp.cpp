@@ -1299,6 +1299,17 @@ void momentRtmpInit ()
 	logI_ (_func, opt_name, ": ", transcode_on_demand_timeout_millisec);
     }
 
+    Time rtmp_accept_watchdog_timeout_sec = 0;
+    {
+	ConstMemory const opt_name = "mod_rtmp/rtmp_accept_watchdog_timeout";
+	MConfig::GetResult const res = config->getUint64_default (
+		opt_name, &rtmp_accept_watchdog_timeout_sec, rtmp_accept_watchdog_timeout_sec);
+	if (!res)
+	    logE_ (_func, "bad value for ", opt_name);
+
+	logI_ (_func, opt_name, ": ", rtmp_accept_watchdog_timeout_sec);
+    }
+
     {
 	rtmp_module->rtmp_service.setFrontend (Cb<RtmpVideoService::Frontend> (
 		&rtmp_video_service_frontend, NULL, NULL));
@@ -1307,7 +1318,8 @@ void momentRtmpInit ()
 	rtmp_module->rtmp_service.setPagePool (moment->getPagePool());
 
 	if (!rtmp_module->rtmp_service.init (prechunking_enabled,
-                                             server_app->getServerContext()->getTimers()))
+                                             server_app->getServerContext()->getTimers(),
+                                             rtmp_accept_watchdog_timeout_sec))
         {
 	    logE_ (_func, "rtmp_service.init() failed: ", exc->toString());
 	    return;
