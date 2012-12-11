@@ -62,6 +62,8 @@ mt_const Count no_keyframe_limit = 250; // 25 fps * 10 seconds
 mt_const DataDepRef<MomentServer> moment (NULL /* coderef_container */);
 mt_const DataDepRef<Timers> timers (NULL /* coderef_container */);
 
+mt_const Stat::ParamKey stat_num_sessions;
+
 class TranscodeEntry : public Referenced
 {
 public:
@@ -246,6 +248,8 @@ void destroyClientSession (ClientSession * const client_session)
 	return;
     }
     client_session->valid = false;
+
+    getStat()->addInt (stat_num_sessions, -1);
 
     {
         List<MomentServer::VideoStreamKey>::iter iter (client_session->out_stream_keys);
@@ -937,7 +941,7 @@ void sendStateChanged (Sender::SendState   const send_state,
 	    // TODO Block input from the client.
 	    break;
 	case Sender::QueueHardLimit:
-	    logD (framedrop, _func, "QueueHardLimit");
+	    logE_ (_func, "QueueHardLimit");
 	    destroyClientSession (client_session);
 	    // FIXME Close client connection
 	    break;
@@ -973,6 +977,8 @@ Result clientConnected (RtmpConnection  * const mt_nonnull rtmp_conn,
 {
     logD (mod_rtmp, _func_);
 //    logD_ (_func, "--- client_addr: ", client_addr);
+
+    getStat()->addInt (stat_num_sessions, 1);
 
     Ref<ClientSession> const client_session = grab (new ClientSession);
     client_session->client_addr = client_addr;
@@ -1030,6 +1036,11 @@ static MomentServer::Events const server_events = {
 
 void momentRtmpInit ()
 {
+    stat_num_sessions = getStat()->createParam ("mod_rtmp/num_sessions",
+                                                "Number of active RTMP(T) sessions",
+                                                Stat::ParamType_Int64,
+                                                0, 0.0);
+
     moment = MomentServer::getInstance();
     CodeDepRef<ServerApp> const server_app = moment->getServerApp();
     timers = server_app->getMainThreadContext()->getTimers();

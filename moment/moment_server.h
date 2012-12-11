@@ -133,6 +133,25 @@ public:
     }
 
 
+#if 0
+// ________________________________ Statistics _________________________________
+
+private:
+    mt_const Ref<StatModule> stat;
+
+public:
+    mt_const void setStatModule (StatModule * const stat)
+    {
+        this->stat = stat;
+    }
+
+    Ref<StatModule> getStat () const
+    {
+        return stat;
+    }
+#endif
+
+
 // ___________________________ Video stream handlers ___________________________
 
 public:
@@ -189,9 +208,22 @@ public:
 
     mt_mutex (mutex) void removeVideoStreamHandler_unlocked (VideoStreamHandlerKey vs_handler_key);
 
+
+// ________________________________ Statistics _________________________________
+
+private:
+    static HttpService::HttpHandler const stat_http_handler;
+
+    static Result statHttpRequest (HttpRequest   * mt_nonnull req,
+                                   Sender        * mt_nonnull conn_sender,
+                                   Memory const  & /* msg_body */,
+                                   void         ** mt_nonnull /* ret_msg_data */,
+                                   void          *_self);
+
 // _____________________________________________________________________________
 
 
+public:
     class ClientSessionList_name;
 
     class ClientSession : public Object,

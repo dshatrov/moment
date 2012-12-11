@@ -20,6 +20,23 @@
 #include <moment/moment_server.h>
 
 
+#define MOMENT_SERVER__HEADERS_DATE \
+	Byte date_buf [timeToString_BufSize]; \
+	Size const date_len = timeToString (Memory::forObject (date_buf), getUnixtime());
+
+#define MOMENT_SERVER__COMMON_HEADERS \
+	"Server: Moment/1.0\r\n" \
+	"Date: ", ConstMemory (date_buf, date_len), "\r\n" \
+	"Connection: Keep-Alive\r\n"
+
+#define MOMENT_SERVER__OK_HEADERS(mime_type, content_length) \
+	"HTTP/1.1 200 OK\r\n" \
+	MOMENT_SERVER__COMMON_HEADERS \
+	"Content-Type: ", (mime_type), "\r\n" \
+	"Content-Length: ", (content_length), "\r\n" \
+	"Cache-Control: no-cache\r\n"
+
+
 namespace Moment {
 
 using namespace M;
@@ -366,70 +383,87 @@ MomentServer::loadModules ()
 
     StringHash<EmptyBase> loaded_names;
 
-    Ref<String> const mod_gst_name = makeString (module_path, "/libmoment-gst-1.0");
+    Ref<String> const mod_gst_name  = makeString (module_path, "/libmoment-gst-1.0");
+    Ref<String> const mod_stat_name = makeString (module_path, "/libmoment-stat-1.0");
 
+    bool loading_mod_stat = true;
     for (;;) {
-	Ref<String> dir_entry;
-	if (!dir->getNextEntry (dir_entry))
-	    return Result::Failure;
-	if (!dir_entry)
-	    break;
+        for (;;) {
+            Ref<String> dir_entry;
+            if (!dir->getNextEntry (dir_entry))
+                return Result::Failure;
+            if (!dir_entry)
+                break;
 
-	Ref<String> const stat_path = makeString (module_path, "/", dir_entry->mem());
-	ConstMemory const entry_name = stat_path->mem();
+            Ref<String> const stat_path = makeString (module_path, "/", dir_entry->mem());
+            ConstMemory const entry_name = stat_path->mem();
 
-        Vfs::FileStat stat_data;
-	if (!vfs->stat (dir_entry->mem(), &stat_data)) {
-	    logE_ (_func, "Could not stat ", stat_path);
-	    continue;
-	}
+            Vfs::FileStat stat_data;
+            if (!vfs->stat (dir_entry->mem(), &stat_data)) {
+                logE_ (_func, "Could not stat ", stat_path);
+                continue;
+            }
 
-	// TODO Find rightmost slash, then skip one dot.
-	ConstMemory module_name = entry_name;
-	{
-	    void *dot_ptr = memchr ((void*) entry_name.mem(), '.', entry_name.len());
-	    // XXX Dirty.
-	    // Skipping the first dot (belongs to "moment-1.0" substring).
-	    if (dot_ptr)
-		dot_ptr = memchr ((void*) ((Byte const *) dot_ptr + 1), '.', entry_name.len() - ((Byte const *) dot_ptr - entry_name.mem()) - 1);
-	    // Skipping the second dot (-1.0 in library version).
-	    if (dot_ptr)
-		dot_ptr = memchr ((void*) ((Byte const *) dot_ptr + 1), '.', entry_name.len() - ((Byte const *) dot_ptr - entry_name.mem()) - 1);
+            // TODO Find rightmost slash, then skip one dot.
+            ConstMemory module_name = entry_name;
+            {
+                void *dot_ptr = memchr ((void*) entry_name.mem(), '.', entry_name.len());
+                // XXX Dirty.
+                // Skipping the first dot (belongs to "moment-1.0" substring).
+                if (dot_ptr)
+                    dot_ptr = memchr ((void*) ((Byte const *) dot_ptr + 1), '.', entry_name.len() - ((Byte const *) dot_ptr - entry_name.mem()) - 1);
+                // Skipping the second dot (-1.0 in library version).
+                if (dot_ptr)
+                    dot_ptr = memchr ((void*) ((Byte const *) dot_ptr + 1), '.', entry_name.len() - ((Byte const *) dot_ptr - entry_name.mem()) - 1);
 #ifdef LIBMARY_PLATFORM_WIN32
-// TEST: skipping the third dot.
-// TODO The dots should be skipped from the end of the string!
-	    if (dot_ptr)
-		dot_ptr = memchr ((void*) ((Byte const *) dot_ptr + 1), '.', entry_name.len() - ((Byte const *) dot_ptr - entry_name.mem()) - 1);
+                // TEST: skipping the third dot.
+                // TODO The dots should be skipped from the end of the string!
+                if (dot_ptr)
+                    dot_ptr = memchr ((void*) ((Byte const *) dot_ptr + 1), '.', entry_name.len() - ((Byte const *) dot_ptr - entry_name.mem()) - 1);
 #endif
 
-	    if (dot_ptr)
-		module_name = entry_name.region (0, (Byte const *) dot_ptr - entry_name.mem());
-	}
+                if (dot_ptr)
+                    module_name = entry_name.region (0, (Byte const *) dot_ptr - entry_name.mem());
+            }
 
-        if (equal (module_name, mod_gst_name->mem()))
+            if (equal (module_name, mod_gst_name->mem()))
+                continue;
+
+            if (loading_mod_stat) {
+                if (!equal (module_name, mod_stat_name->mem()))
+                    continue;
+            }
+
+            if (stat_data.file_type == Vfs::FileType::RegularFile &&
+                !loaded_names.lookup (module_name))
+            {
+                loaded_names.add (module_name, EmptyBase());
+
+                logD_ (_func, "loading module ", module_name);
+
+                if (!loadModule (module_name))
+                    logE_ (_func, "Could not load module ", module_name, ": ", exc->toString());
+            }
+        }
+
+        if (loading_mod_stat) {
+            loading_mod_stat = false;
+            dir->rewind ();
             continue;
+        }
 
-	if (stat_data.file_type == Vfs::FileType::RegularFile &&
-	    !loaded_names.lookup (module_name))
-	{
-	    loaded_names.add (module_name, EmptyBase());
-
-	    logD_ (_func, "loading module ", module_name);
-
-	    if (!loadModule (module_name))
-		logE_ (_func, "Could not load module ", module_name, ": ", exc->toString());
-	}
+        break;
     }
 
     {
-      // Loading mod_gst first, so that it deinitializes first.
+      // Loading mod_gst last, so that it deinitializes first.
       // We count on the fact that M::Informer prepends new subscribers
       // to the beginning of subscriber list, which is hacky, because
       // M::Informer has no explicit guarantees for that.
       //
       // This is important for proper deinitialization. Ideally, the order
       // of module deinitialization should not matter.
-      // The process of deinitialization needs extra though.
+      // The process of deinitialization needs extra thought.
 
 	assert (!loaded_names.lookup (mod_gst_name->mem()));
         loaded_names.add (mod_gst_name->mem(), EmptyBase());
@@ -442,14 +476,23 @@ MomentServer::loadModules ()
 
 #ifdef LIBMARY_PLATFORM_WIN32
     {
+        if (!loadModule ("../lib/bin/libmoment-stat-1.0-0.dll"))
+            logE_ (_func, "Could not load mod_stat (win32)");
+
         if (!loadModule ("../lib/bin/libmoment-file-1.0-0.dll"))
             logE_ (_func, "Could not load mod_file (win32)");
+
+        if (!loadModule ("../lib/bin/libmoment-hls-1.0-0.dll"))
+            logE_ (_func, "Could not load mod_hls (win32)");
 
         if (!loadModule ("../lib/bin/libmoment-rtmp-1.0-0.dll"))
             logE_ (_func, "Could not load mod_rtmp (win32)");
 
         if (!loadModule ("../lib/bin/libmoment-gst-1.0-0.dll"))
             logE_ (_func, "Could not load mod_gst (win32)");
+
+        if (!loadModule ("../lib/bin/libmoment-transcoder-1.0-0.dll"))
+            logE_ (_func, "Could not load mod_transcoder (win32)");
 
         if (!loadModule ("../lib/bin/libmoment-mychat-1.0-0.dll"))
             logE_ (_func, "Could not load mychat module (win32)");
@@ -1017,6 +1060,82 @@ MomentServer::unlock ()
     mutex.unlock ();
 }
 
+HttpService::HttpHandler const MomentServer::stat_http_handler = {
+    statHttpRequest,
+    NULL /* httpMessageBody */
+};
+
+Result
+MomentServer::statHttpRequest (HttpRequest   * const mt_nonnull req,
+                               Sender        * const mt_nonnull conn_sender,
+                               Memory const  & /* msg_body */,
+                               void         ** const mt_nonnull /* ret_msg_data */,
+                               void          * const _self)
+{
+    MomentServer * const self = static_cast <MomentServer*> (_self);
+
+    MOMENT_SERVER__HEADERS_DATE;
+
+    PagePool::PageListHead page_list;
+
+    self->page_pool->printToPages (
+            &page_list,
+            "<html>"
+            "<body>"
+            "<p>Stats</p>"
+            "<table>");
+    {
+        List<Stat::StatParam> stat_params;
+        getStat()->getAllParams (&stat_params);
+
+        List<Stat::StatParam>::iter iter (stat_params);
+        while (!stat_params.iter_done (iter)) {
+            Stat::StatParam * const stat_param = &stat_params.iter_next (iter)->data;
+
+            self->page_pool->printToPages (
+                    &page_list,
+                    "<tr>"
+                        "<td>", stat_param->param_name, "</td>");
+
+            if (stat_param->param_type == Stat::ParamType_Int64) {
+                self->page_pool->printToPages (
+                        &page_list,
+                        "<td>", stat_param->int64_value, "</td>");
+            } else {
+                assert (stat_param->param_type == Stat::ParamType_Double);
+                self->page_pool->printToPages (
+                        &page_list,
+                        "<td>", stat_param->double_value, "</td>");
+            }
+
+            self->page_pool->printToPages (
+                    &page_list,
+                        "<td>", stat_param->param_desc, "</td>"
+                    "</tr>");
+        }
+    }
+    self->page_pool->printToPages (
+            &page_list,
+            "</table>"
+            "</body>"
+            "</html>");
+
+    Size const data_len = PagePool::countPageListDataLen (page_list.first, 0 /* msg_offset */);
+
+    conn_sender->send (
+	    self->page_pool,
+	    false /* do_flush */,
+	    MOMENT_SERVER__OK_HEADERS ("text/html", data_len),
+	    "\r\n");
+    conn_sender->sendPages (self->page_pool, &page_list, true /* do_flush */);
+
+    if (!req->getKeepalive())
+	conn_sender->closeAfterFlush();
+
+    logA_ ("file 200 ", req->getClientAddress(), " ", req->getRequestLine());
+    return Result::Success;
+}
+
 Result
 MomentServer::init (ServerApp        * const mt_nonnull server_app,
 		    PagePool         * const mt_nonnull page_pool,
@@ -1053,6 +1172,10 @@ MomentServer::init (ServerApp        * const mt_nonnull server_app,
 	    logD_ (_func, opt_name, ": ", publish_all_streams);
 	}
     }
+
+    admin_http_service->addHttpHandler (
+	    CbDesc<HttpService::HttpHandler> (&stat_http_handler, this, this),
+	    "stat");
 
     if (!loadModules ())
 	logE_ (_func, "Could not load modules");

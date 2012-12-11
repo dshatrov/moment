@@ -26,7 +26,7 @@ using namespace Moment;
 
 static Ref<TestStreamGenerator> test_stream_generator;
 
-static void modTestInit ()
+static void momentTestInit ()
 {
     logD_ (_func, "Initializing mod_test");
 
@@ -125,7 +125,7 @@ static void modTestInit ()
     test_stream_generator->start ();
 }
 
-static void modTestUnload ()
+static void momentTestUnload ()
 {
 }
 
@@ -133,12 +133,12 @@ namespace M {
 
 void libMary_moduleInit ()
 {
-    modTestInit ();
+    momentTestInit ();
 }
 
 void libMary_moduleUnload ()
 {
-    modTestUnload ();
+    momentTestUnload ();
 }
 
 } // namespace M

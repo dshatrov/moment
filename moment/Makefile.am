@@ -136,7 +136,7 @@ libmoment_file_1_0_la_LIBADD = $(top_builddir)/moment/libmoment-1.0.la $(THIS_LI
 
 libmoment_rtmp_1_0_la_DEPENDENCIES = libmoment-1.0.la
 libmoment_rtmp_1_0_la_SOURCES =	\
-	moment_rtmp.cpp
+	mod_rtmp.cpp
 libmoment_rtmp_1_0_la_LDFLAGS = -no-undefined -version-info "0:0:0" $(COMMON_LDFLAGS)
 libmoment_rtmp_1_0_la_LIBADD = $(top_builddir)/moment/libmoment-1.0.la $(THIS_LIBS)
 if PLATFORM_WIN32
