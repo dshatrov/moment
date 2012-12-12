@@ -162,7 +162,8 @@ public:
 
     ClientSession ()
 	: valid (true),
-          rtmp_conn (this /* coderef_container */),
+          rtmp_conn   (this /* coderef_container */),
+          rtmp_server (this /* coderef_container */),
 	  recorder_thread_ctx (NULL),
 	  recorder (this),
 #ifdef MOMENT_RTMP__FLOW_CONTROL
@@ -578,9 +579,9 @@ static void parseParameters (ConstMemory         const mem,
     }
 }
 
-static void startStreaming_paramCallback (ConstMemory   const name,
-                                          ConstMemory   const /* value */,
-                                          void        * const _streaming_params)
+static void startRtmpStreaming_paramCallback (ConstMemory   const name,
+                                              ConstMemory   const /* value */,
+                                              void        * const _streaming_params)
 {
     StreamingParams * const streaming_params = static_cast <StreamingParams*> (_streaming_params);
 
@@ -588,9 +589,9 @@ static void startStreaming_paramCallback (ConstMemory   const name,
 	streaming_params->transcode = true;
 }
 
-static void startWatching_paramCallback (ConstMemory   const name,
-                                         ConstMemory   const /* value */,
-                                         void        * const _watching_params)
+static void startRtmpWatching_paramCallback (ConstMemory   const name,
+                                             ConstMemory   const /* value */,
+                                             void        * const _watching_params)
 {
     WatchingParams * const watching_params = static_cast <WatchingParams*> (_watching_params);
 
@@ -598,11 +599,84 @@ static void startWatching_paramCallback (ConstMemory   const name,
 	watching_params->start_paused = true;
 }
 
-Result startStreaming (ConstMemory     const &_stream_name,
-		       RecordingMode   const rec_mode,
-                       bool            const momentrtmp_proto,
-		       void          * const _client_session)
+class StartStreamingCallback_Data : public Referenced
 {
+public:
+    WeakRef<ClientSession> weak_client_session;
+    Cb<RtmpServer::StartRtmpStreamingCallback> cb;
+    Ref<String> stream_name;
+    RecordingMode rec_mode;
+    Ref<VideoStream> video_stream;
+};
+
+static void completeStartStreaming (ClientSession *client_session,
+                                    ConstMemory    stream_name,
+                                    RecordingMode  rec_mode,
+                                    VideoStream   *video_stream);
+
+static void startStreamingCallback (Result   const res,
+                                    void   * const _data)
+{
+    StartStreamingCallback_Data * const data = static_cast <StartStreamingCallback_Data*> (_data);
+
+    Ref<ClientSession> const client_session = data->weak_client_session.getRef ();
+    if (!client_session) {
+        logD (mod_rtmp, _func, "client session gone");
+        data->cb.call_ (Result::Failure);
+        return;
+    }
+
+    if (!res) {
+        logD (mod_rtmp, _func, "streaming not allowed");
+        data->cb.call_ (Result::Failure);
+        return;
+    }
+
+    completeStartStreaming (client_session,
+                            data->stream_name->mem(),
+                            data->rec_mode,
+                            data->video_stream);
+    data->cb.call_ (Result::Success);
+}
+
+static void completeStartStreaming (ClientSession * const client_session,
+                                    ConstMemory     const stream_name,
+                                    RecordingMode   const rec_mode,
+                                    VideoStream   * const video_stream)
+{
+    if (record_all) {
+	logD_ (_func, "rec_mode: ", (Uint32) rec_mode);
+	if (rec_mode == RecordingMode::Replace ||
+	    rec_mode == RecordingMode::Append)
+	{
+	    logD_ (_func, "recording");
+	    // TODO Support "append" mode.
+	    client_session->recorder.setVideoStream (video_stream);
+	    client_session->recorder.start (
+		    makeString (record_path, stream_name, ".flv")->mem());
+	}
+    }
+
+    client_session->mutex.lock ();
+
+    client_session->video_stream = video_stream;
+
+    logD_ (_func, "client_session: ", (UintPtr) client_session, ", video_stream: ", (UintPtr) video_stream);
+
+    startTranscoder (client_session);
+
+    client_session->mutex.unlock ();
+}
+
+bool startRtmpStreaming (ConstMemory     const _stream_name,
+                         RecordingMode   const rec_mode,
+                         bool            const momentrtmp_proto,
+                         CbDesc<RtmpServer::StartRtmpStreamingCallback> const &cb,
+                         Result        * const mt_nonnull ret_res,
+                         void          * const _client_session)
+{
+    *ret_res = Result::Failure;
+
     logD (session, _func, "stream_name: ", _stream_name);
 
     // TODO class MomentRtmpModule
@@ -612,7 +686,8 @@ Result startStreaming (ConstMemory     const &_stream_name,
 
     if (client_session->streaming) {
 	logE (mod_rtmp, _func, "already streaming another stream");
-	return Result::Success;
+	*ret_res = Result::Success;
+        return true;
     }
     client_session->streaming = true;
 
@@ -624,7 +699,7 @@ Result startStreaming (ConstMemory     const &_stream_name,
 	Byte const * const name_sep = (Byte const *) memchr (stream_name.mem(), '?', stream_name.len());
 	if (name_sep) {
 	    parseParameters (stream_name.region (name_sep + 1 - stream_name.mem()),
-                             startStreaming_paramCallback,
+                             startRtmpStreaming_paramCallback,
                              &client_session->streaming_params);
 	    stream_name = stream_name.region (0, name_sep - stream_name.mem());
 	}
@@ -644,33 +719,37 @@ Result startStreaming (ConstMemory     const &_stream_name,
     Ref<VideoStream> const video_stream = grab (new VideoStream);
     video_stream->setStreamParameters (stream_params);
 
-    if (!moment->startStreaming (client_session->srv_session, stream_name, video_stream, rec_mode))
-	return Result::Failure;
+    Result res = Result::Failure;
+    {
+        Ref<StartStreamingCallback_Data> const data = grab (new StartStreamingCallback_Data);
+        data->weak_client_session = client_session;
+        data->cb = cb;
+        data->stream_name = grab (new String (stream_name));
+        data->rec_mode = rec_mode;
+        data->video_stream = video_stream;
 
-    if (record_all) {
-	logD_ (_func, "rec_mode: ", (Uint32) rec_mode);
-	if (rec_mode == RecordingMode::Replace ||
-	    rec_mode == RecordingMode::Append)
-	{
-	    logD_ (_func, "recording");
-	    // TODO Support "append" mode.
-	    client_session->recorder.setVideoStream (video_stream);
-	    client_session->recorder.start (
-		    makeString (record_path, stream_name, ".flv")->mem());
-	}
+        bool const complete = moment->startStreaming (client_session->srv_session,
+                                                      stream_name,
+                                                      video_stream,
+                                                      rec_mode,
+                                                      CbDesc<MomentServer::StartStreamingCallback> (
+                                                              startStreamingCallback,
+                                                              data,
+                                                              NULL,
+                                                              data),
+                                                      &res);
+        if (!complete)
+            return false;
     }
 
-    client_session->mutex.lock ();
+    if (!res) {
+        *ret_res = Result::Failure;
+        return true;
+    }
 
-    client_session->video_stream = video_stream;
-
-    logD_ (_func, "client_session: ", (UintPtr) client_session, ", video_stream: ", (UintPtr) video_stream.ptr());
-
-    startTranscoder (client_session);
-
-    client_session->mutex.unlock ();
-
-    return Result::Success;
+    completeStartStreaming (client_session, stream_name, rec_mode, video_stream);
+    *ret_res = Result::Success;
+    return true;
 }
 
 static mt_mutex (client_session) Result
@@ -743,9 +822,79 @@ savedVideoFrame (VideoStream::VideoMessage * const mt_nonnull video_msg,
     return Result::Success;
 }
 
-Result startWatching (ConstMemory const &_stream_name,
-		      void * const _client_session)
+class StartWatchingCallback_Data : public Referenced
 {
+public:
+    WeakRef<ClientSession> weak_client_session;
+    Cb<RtmpServer::StartRtmpWatchingCallback> cb;
+    Ref<String> stream_name;
+};
+
+static Result completeStartWatching (VideoStream   *video_stream,
+                                     ClientSession *client_session,
+                                     ConstMemory    stream_name);
+
+static void startWatchingCallback (VideoStream * const video_stream,
+                                   void        * const _data)
+{
+    StartWatchingCallback_Data * const data = static_cast <StartWatchingCallback_Data*> (_data);
+    Ref<ClientSession> const client_session = data->weak_client_session.getRef ();
+
+    if (!client_session) {
+        logD (mod_rtmp, _func, "client session gone");
+        data->cb.call_ (Result::Failure);
+        return;
+    }
+
+    if (!video_stream) {
+        logD (mod_rtmp, _func, "video stream not found: ", data->stream_name);
+        data->cb.call_ (Result::Failure);
+        return;
+    }
+
+    Result const res = completeStartWatching (video_stream, client_session, data->stream_name->mem());
+    data->cb.call_ (res);
+}
+
+static Result completeStartWatching (VideoStream   * const video_stream,
+                                     ClientSession * const client_session,
+                                     ConstMemory     const stream_name)
+{
+    // TODO Repetitive locking of 'client_session' - bad.
+    client_session->mutex.lock ();
+    // TODO Set watching_video_stream to NULL when it's not needed anymore.
+    client_session->watching_video_stream = video_stream;
+
+    video_stream->lock ();
+    if (video_stream->isClosed_unlocked()) {
+        video_stream->unlock ();
+
+        logD (mod_rtmp, _func, "video stream closed: ", stream_name);
+        return Result::Failure;
+    }
+
+    video_stream->getFrameSaver()->reportSavedFrames (&saved_frame_handler, client_session);
+    client_session->mutex.unlock ();
+
+#warning TODO Proxy video stream events through mod_rtmp to prechunk all non-prechunked data before informAll() to avoid loosing lots of memory and wasting CPU when chunking for each client individually.
+
+    video_stream->getEventInformer()->subscribe_unlocked (&video_event_handler,
+                                                          client_session,
+                                                          NULL /* ref_data */,
+                                                          client_session);
+    mt_async mt_unlocks_locks (video_stream->mutex) video_stream->plusOneWatcher_unlocked (client_session /* guard_obj */);
+    video_stream->unlock ();
+
+    return Result::Success;
+}
+
+static bool startRtmpWatching (ConstMemory    const _stream_name,
+                               CbDesc<RtmpServer::StartRtmpWatchingCallback> const &cb,
+                               Result       * const mt_nonnull ret_res,
+                               void         * const _client_session)
+{
+    *ret_res = Result::Failure;
+
     // TODO class MomentRtmpModule
     MomentServer * const moment = MomentServer::getInstance();
 
@@ -756,7 +905,8 @@ Result startWatching (ConstMemory const &_stream_name,
 
     if (client_session->watching) {
 	logE (mod_rtmp, _func, "already watching another stream");
-	return Result::Success;
+        *ret_res = Result::Success;
+        return true;
     }
     client_session->watching = true;
 
@@ -768,7 +918,7 @@ Result startWatching (ConstMemory const &_stream_name,
 	Byte const * const name_sep = (Byte const *) memchr (stream_name.mem(), '?', stream_name.len());
 	if (name_sep) {
 	    parseParameters (stream_name.region (name_sep + 1 - stream_name.mem()),
-                             startWatching_paramCallback,
+                             startRtmpWatching_paramCallback,
                              &client_session->watching_params);
 	    stream_name = stream_name.region (0, name_sep - stream_name.mem());
 	}
@@ -777,46 +927,33 @@ Result startWatching (ConstMemory const &_stream_name,
     client_session->mutex.unlock ();
 
     Ref<VideoStream> video_stream;
-    for (unsigned long watchdog_cnt = 0; watchdog_cnt < 100; ++watchdog_cnt) {
-        video_stream = moment->startWatching (client_session->srv_session, stream_name);
-        if (!video_stream) {
-            logD (mod_rtmp, _func, "video stream not found: ", stream_name);
-            return Result::Failure;
-        }
+    {
+        Ref<StartWatchingCallback_Data> const data = grab (new StartWatchingCallback_Data);
+        data->weak_client_session = client_session;
+        data->cb = cb;
+        data->stream_name = grab (new String (stream_name));
 
-        // TODO Repetitive locking of 'client_session' - bad.
-        client_session->mutex.lock ();
-        // TODO Set watching_video_stream to NULL when it's not needed anymore.
-        client_session->watching_video_stream = video_stream;
-
-        video_stream->lock ();
-        if (video_stream->isClosed_unlocked()) {
-            video_stream->unlock ();
-
-            client_session->watching_video_stream = NULL;
-            client_session->mutex.unlock ();
-            continue;
-        }
-
-        video_stream->getFrameSaver()->reportSavedFrames (&saved_frame_handler, client_session);
-        client_session->mutex.unlock ();
-
-#warning TODO Proxy video stream events through mod_rtmp to prechunk all non-prechunked data before informAll() to avoid loosing lots of memory and wasting CPU when chunking for each client individually.
-
-        video_stream->getEventInformer()->subscribe_unlocked (&video_event_handler,
-                                                              client_session,
-                                                              NULL /* ref_data */,
-                                                              client_session);
-        mt_async mt_unlocks_locks (video_stream->mutex) video_stream->plusOneWatcher_unlocked (client_session /* guard_obj */);
-        video_stream->unlock ();
-        break;
+        bool const complete = moment->startWatching (client_session->srv_session,
+                                                     stream_name,
+                                                     CbDesc<MomentServer::StartWatchingCallback> (
+                                                             startWatchingCallback,
+                                                             data,
+                                                             NULL,
+                                                             data),
+                                                     &video_stream);
+        if (!complete)
+            return false;
     }
+
     if (!video_stream) {
-        logH_ (_func, "startWatching() watchdog counter hit");
-        return Result::Failure;
+        logD (mod_rtmp, _func, "video stream not found: ", stream_name);
+        *ret_res = Result::Failure;
+        return true;
     }
 
-    return Result::Success;
+    Result const res = completeStartWatching (video_stream, client_session, stream_name);
+    *ret_res = res;
+    return true;
 }
 
 RtmpServer::CommandResult server_commandMessage (RtmpConnection       * const mt_nonnull conn,
@@ -869,8 +1006,8 @@ static Result resumeCmd (void * const _client_session)
 
 static RtmpServer::Frontend const rtmp_server_frontend = {
     connect,
-    startStreaming /* startStreaming */,
-    startWatching,
+    startRtmpStreaming,
+    startRtmpWatching,
     server_commandMessage,
     pauseCmd,
     resumeCmd

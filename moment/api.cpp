@@ -547,46 +547,114 @@ static MomentServer::ClientSession::Events client_session_events = {
     client_clientDisconnected
 };
 
-static Ref<VideoStream> client_startWatching (ConstMemory   const stream_name,
-					      void        * const _api_client_session)
+namespace {
+class Client_StartWatchingCallback_Data
 {
+public:
+    Cb<MomentServer::StartWatchingCallback> cb;
+};
+}
+
+static void client_startWatchingCallback (MomentStream * const ext_stream,
+                                          void         * const _data)
+{
+    Client_StartWatchingCallback_Data * const data = static_cast <Client_StartWatchingCallback_Data*> (_data);
+    data->cb.call_ (static_cast <VideoStream*> (ext_stream));
+    delete data;
+}
+
+static bool client_startWatching (ConstMemory        const stream_name,
+                                  IpAddress          const client_addr,
+                                  CbDesc<MomentServer::StartWatchingCallback> const &cb,
+                                  Ref<VideoStream> * const mt_nonnull ret_video_stream,
+                                  void             * const _api_client_session)
+{
+    *ret_video_stream = NULL;
+
     MomentClientSession * const api_client_session = static_cast <MomentClientSession*> (_api_client_session);
 
     if (api_client_session->api_client_handler_wrapper->ext_client_handler.start_watching_cb) {
-	MomentStream * const ext_stream =
-		api_client_session->api_client_handler_wrapper->ext_client_handler.start_watching_cb (
-			(char const *) stream_name.mem(),
-			stream_name.len(),
-			api_client_session->client_cb_data,
-			api_client_session->api_client_handler_wrapper->ext_client_handler.start_watching_cb_data);
+        Client_StartWatchingCallback_Data * const data = new Client_StartWatchingCallback_Data;
+        data->cb = cb;
 
-	return static_cast <VideoStream*> (ext_stream);
+	MomentStream *ext_stream = NULL;
+        bool const complete =
+		(bool) api_client_session->api_client_handler_wrapper->ext_client_handler.start_watching_cb (
+                               (char const *) stream_name.mem(),
+                               stream_name.len(),
+                               api_client_session->client_cb_data,
+                               api_client_session->api_client_handler_wrapper->ext_client_handler.start_watching_cb_data,
+                               client_startWatchingCallback,
+                               data,
+                               &ext_stream);
+        if (!complete)
+            return false;
+        else
+            delete data;
+
+	*ret_video_stream = static_cast <VideoStream*> (ext_stream);
+        return true;
     }
 
-    return NULL;
+    *ret_video_stream = NULL;
+    return true;
 }
 
-static Result client_startStreaming (ConstMemory        const stream_name,
-                                     VideoStream      * const mt_nonnull video_stream,
-                                     RecordingMode      const rec_mode,
-                                     void             * const _api_client_session)
+namespace {
+class Client_StartStreamingCallback_Data
 {
+public:
+    Cb<MomentServer::StartStreamingCallback> cb;
+};
+}
+
+static void client_startStreamingCallback (MomentResult   const res,
+                                           void         * const _data)
+{
+    Client_StartStreamingCallback_Data * const data = static_cast <Client_StartStreamingCallback_Data*> (_data);
+    data->cb.call_ (res == MomentResult_Success ? Result::Success : Result::Failure);
+    delete data;
+}
+
+static bool client_startStreaming (ConstMemory     const stream_name,
+                                   IpAddress       const client_addr,
+                                   VideoStream   * const mt_nonnull video_stream,
+                                   RecordingMode   const rec_mode,
+                                   CbDesc<MomentServer::StartStreamingCallback> const &cb,
+                                   Result        * const mt_nonnull ret_res,
+                                   void          * const _api_client_session)
+{
+    *ret_res = Result::Failure;
+
     MomentClientSession * const api_client_session = static_cast <MomentClientSession*> (_api_client_session);
 
     if (api_client_session->api_client_handler_wrapper->ext_client_handler.start_streaming_cb) {
-        MomentResult const res =
-		api_client_session->api_client_handler_wrapper->ext_client_handler.start_streaming_cb (
-			(char const *) stream_name.mem(),
-			stream_name.len(),
-                        static_cast <MomentStream*> (video_stream),
-			(MomentRecordingMode) (Uint32) rec_mode,
-			api_client_session->client_cb_data,
-			api_client_session->api_client_handler_wrapper->ext_client_handler.start_streaming_cb_data);
+        Client_StartStreamingCallback_Data * const data = new Client_StartStreamingCallback_Data;
+        data->cb = cb;
 
-	return (res == MomentResult_Success ? Result::Success : Result::Failure);
+        MomentResult res = MomentResult_Failure;
+        bool const complete =
+                (bool) api_client_session->api_client_handler_wrapper->ext_client_handler.start_streaming_cb (
+                               (char const *) stream_name.mem(),
+                               stream_name.len(),
+                               static_cast <MomentStream*> (video_stream),
+                               (MomentRecordingMode) (Uint32) rec_mode,
+                               api_client_session->client_cb_data,
+                               api_client_session->api_client_handler_wrapper->ext_client_handler.start_streaming_cb_data,
+                               client_startStreamingCallback,
+                               data,
+                               &res);
+        if (!complete)
+            return false;
+        else
+            delete data;
+
+	*ret_res = (res == MomentResult_Success ? Result::Success : Result::Failure);
+        return true;
     }
 
-    return Result::Failure;
+    *ret_res = Result::Failure;
+    return true;
 }
 
 static MomentServer::ClientSession::Backend const client_session_backend = {

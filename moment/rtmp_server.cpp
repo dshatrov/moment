@@ -171,6 +171,26 @@ RtmpServer::doConnect (Uint32       const msg_stream_id,
     return Result::Success;
 }
 
+void
+RtmpServer::startRtmpWatchingCallback (Result   const res,
+                                       void   * const _self)
+{
+    RtmpServer * const self = static_cast <RtmpServer*> (_self);
+
+    if (!res) {
+        self->rtmp_conn->reportError ();
+        return;
+    }
+
+    self->completePlay ();
+}
+
+void
+RtmpServer::completePlay ()
+{
+  // No-op
+}
+
 Result
 RtmpServer::doPlay (Uint32       const msg_stream_id,
 		    AmfDecoder * const mt_nonnull decoder)
@@ -314,17 +334,33 @@ RtmpServer::doPlay (Uint32       const msg_stream_id,
     }
 
     {
-	Result res;
-	if (!frontend.call_ret<Result> (&res, frontend->startWatching, /*(*/ ConstMemory (vs_name_buf, vs_name_len) /*)*/)) {
+	Result res = Result::Failure;
+        bool complete = false;
+	if (!frontend.call_ret<bool> (
+                    &complete,
+                    frontend->startRtmpWatching,
+                    /*(*/
+                        ConstMemory (vs_name_buf, vs_name_len),
+                        CbDesc<StartRtmpWatchingCallback> (startRtmpWatchingCallback,
+                                                           this,
+                                                           getCoderefContainer()),
+                        &res
+                    /*)*/))
+        {
 	    logE_ (_func, "frontend gone");
 	    return Result::Failure;
 	}
+
+        if (!complete)
+            return Result::Success;
 
 	if (!res) {
 //	    logD_ (_func, "frontend->startWatching() failed");
 	    return Result::Failure;
 	}
     }
+
+    completePlay ();
 
     return Result::Success;
 }
@@ -384,6 +420,177 @@ RtmpServer::doPause (Uint32       const msg_stream_id,
 
 	if (!res)
 	    return Result::Failure;
+    }
+
+    return Result::Success;
+}
+
+class StartRtmpStreamingCallback_Data : public Referenced
+{
+public:
+    WeakDepRef<RtmpServer> weak_rtmp_server;
+    Uint32 msg_stream_id;
+    double transaction_id;
+    Ref<String> vs_name;
+};
+
+void
+RtmpServer::startRtmpStreamingCallback (Result   const res,
+                                        void   * const _data)
+{
+    StartRtmpStreamingCallback_Data * const data = static_cast <StartRtmpStreamingCallback_Data*> (_data);
+    CodeDepRef<RtmpServer> const self = data->weak_rtmp_server;
+    if (!self)
+        return;
+
+    if (!res) {
+        self->rtmp_conn->reportError ();
+        return;
+    }
+
+    if (!self->completePublish (data->msg_stream_id,
+                                data->transaction_id,
+                                data->vs_name->mem()))
+    {
+        self->rtmp_conn->reportError ();
+        return;
+    }
+}
+
+Result
+RtmpServer::completePublish (Uint32      const msg_stream_id,
+                             double      const transaction_id,
+                             ConstMemory const vs_name)
+{
+    // TODO Subscribe for translation stop? (probably not here)
+
+    // TODO The following reply sends are probably unnecessary - needs checking.
+
+    rtmp_conn->sendUserControl_StreamBegin (msg_stream_id);
+
+    {
+      // TODO sendSimpleResult
+
+	AmfAtom atoms [4];
+	AmfEncoder encoder (atoms);
+
+	encoder.addString ("_result");
+	encoder.addNumber (transaction_id);
+	encoder.addNullObject ();
+	encoder.addNullObject ();
+
+	Byte msg_buf [512];
+	Size msg_len;
+	if (!encoder.encode (Memory::forObject (msg_buf), AmfEncoding::AMF0, &msg_len)) {
+	    logE_ (_func, "could not encode reply");
+	    return Result::Failure;
+	}
+
+	rtmp_conn->sendCommandMessage_AMF0 (msg_stream_id, ConstMemory (msg_buf, msg_len));
+    }
+
+#if 0
+    {
+      // Sending onStatus reply.
+
+	AmfAtom atoms [5];
+	AmfEncoder encoder (atoms);
+
+	encoder.addString ("onStatus");
+	encoder.addNumber (0.0 /* transaction_id */);
+	encoder.addNullObject ();
+	encoder.addString (vs_name);
+	encoder.addString ("live");
+
+	Byte msg_buf [512];
+	Size msg_len;
+	if (!encoder.encode (Memory::forObject (msg_buf), AmfEncoding::AMF0, &msg_len)) {
+	    logE_ (_func, "could not encode onStatus message");
+	    return Result::Failure;
+	}
+
+	rtmp_conn->sendCommandMessage_AMF0 (msg_stream_id, ConstMemory (msg_buf, msg_len));
+    }
+#endif
+
+    {
+      // Sending onStatus reply "Reset".
+
+	AmfAtom atoms [15];
+	AmfEncoder encoder (atoms);
+
+	encoder.addString ("onStatus");
+	encoder.addNumber (0.0 /* transaction_id */);
+	encoder.addNullObject ();
+
+	encoder.beginObject ();
+
+	encoder.addFieldName ("level");
+	encoder.addString ("status");
+
+	encoder.addFieldName ("code");
+	encoder.addString ("NetStream.Play.Reset");
+
+	Ref<String> description_str = makeString ("Playing and resetting ", vs_name, ".");
+	encoder.addFieldName ("description");
+	encoder.addString (description_str->mem());
+
+	encoder.addFieldName ("details");
+	encoder.addString (vs_name);
+
+	encoder.addFieldName ("clientid");
+	encoder.addNumber (1.0);
+
+	encoder.endObject ();
+
+	Byte msg_buf [4096];
+	Size msg_len;
+	if (!encoder.encode (Memory::forObject (msg_buf), AmfEncoding::AMF0, &msg_len)) {
+	    logE_ (_func, "could not encode onStatus message");
+	    return Result::Failure;
+	}
+
+	rtmp_conn->sendCommandMessage_AMF0 (msg_stream_id, ConstMemory (msg_buf, msg_len));
+    }
+
+    {
+      // Sending onStatus reply "Start".
+
+	AmfAtom atoms [15];
+	AmfEncoder encoder (atoms);
+
+	encoder.addString ("onStatus");
+	encoder.addNumber (0.0 /* transaction_id */);
+	encoder.addNullObject ();
+
+	encoder.beginObject ();
+
+	encoder.addFieldName ("level");
+	encoder.addString ("status");
+
+	encoder.addFieldName ("code");
+	encoder.addString ("NetStream.Play.Start");
+
+	Ref<String> description_str = makeString ("Started playing ", vs_name, ".");
+	encoder.addFieldName ("description");
+	encoder.addString (description_str->mem());
+
+	encoder.addFieldName ("details");
+	encoder.addString (vs_name);
+
+	encoder.addFieldName ("clientid");
+	encoder.addNumber (1.0);
+
+	encoder.endObject ();
+
+	Byte msg_buf [4096];
+	Size msg_len;
+	if (!encoder.encode (Memory::forObject (msg_buf), AmfEncoding::AMF0, &msg_len)) {
+	    logE_ (_func, "could not encode onStatus message");
+	    return Result::Failure;
+	}
+
+	rtmp_conn->sendCommandMessage_AMF0 (msg_stream_id, ConstMemory (msg_buf, msg_len));
     }
 
     return Result::Success;
@@ -456,14 +663,35 @@ RtmpServer::doPublish (Uint32       const msg_stream_id,
 	}
     }
 
-    if (frontend && frontend->startStreaming) {
-	Result res;
-	if (!frontend.call_ret<Result> (&res, frontend->startStreaming,
-		    /*(*/ ConstMemory (vs_name_buf, vs_name_len), rec_mode, conn_info->momentrtmp_proto /*)*/))
+    if (frontend && frontend->startRtmpStreaming) {
+        Ref<StartRtmpStreamingCallback_Data> const data = grab (new StartRtmpStreamingCallback_Data);
+        data->weak_rtmp_server = this;
+        data->msg_stream_id = msg_stream_id;
+        data->transaction_id = transaction_id;
+        data->vs_name = grab (new String (ConstMemory (vs_name_buf, vs_name_len)));
+
+	Result res = Result::Failure;
+        bool complete = false;
+	if (!frontend.call_ret<bool> (
+                    &complete,
+                    frontend->startRtmpStreaming,
+		    /*(*/
+                        ConstMemory (vs_name_buf, vs_name_len),
+                        rec_mode,
+                        conn_info->momentrtmp_proto,
+                        CbDesc<StartRtmpStreamingCallback> (startRtmpStreamingCallback,
+                                                            data,
+                                                            NULL,
+                                                            data),
+                        &res
+                    /*)*/))
 	{
 	    logE_ (_func, "frontend gone");
 	    return Result::Failure;
 	}
+
+        if (!complete)
+            return Result::Success;
 
 	if (!res) {
 	    logE_ (_func, "frontend->startStreaming() failed");
@@ -471,138 +699,9 @@ RtmpServer::doPublish (Uint32       const msg_stream_id,
 	}
     }
 
-    // TODO Subscribe for translation stop? (probably not here)
-
-    // TODO The following reply sends are probably unnecessary - needs checking.
-
-    rtmp_conn->sendUserControl_StreamBegin (msg_stream_id);
-
-    {
-      // TODO sendSimpleResult
-
-	AmfAtom atoms [4];
-	AmfEncoder encoder (atoms);
-
-	encoder.addString ("_result");
-	encoder.addNumber (transaction_id);
-	encoder.addNullObject ();
-	encoder.addNullObject ();
-
-	Byte msg_buf [512];
-	Size msg_len;
-	if (!encoder.encode (Memory::forObject (msg_buf), AmfEncoding::AMF0, &msg_len)) {
-	    logE_ (_func, "could not encode reply");
-	    return Result::Failure;
-	}
-
-	rtmp_conn->sendCommandMessage_AMF0 (msg_stream_id, ConstMemory (msg_buf, msg_len));
-    }
-
-#if 0
-    {
-      // Sending onStatus reply.
-
-	AmfAtom atoms [5];
-	AmfEncoder encoder (atoms);
-
-	encoder.addString ("onStatus");
-	encoder.addNumber (0.0 /* transaction_id */);
-	encoder.addNullObject ();
-	encoder.addString (ConstMemory (vs_name_buf, vs_name_len));
-	encoder.addString ("live");
-
-	Byte msg_buf [512];
-	Size msg_len;
-	if (!encoder.encode (Memory::forObject (msg_buf), AmfEncoding::AMF0, &msg_len)) {
-	    logE_ (_func, "could not encode onStatus message");
-	    return Result::Failure;
-	}
-
-	rtmp_conn->sendCommandMessage_AMF0 (msg_stream_id, ConstMemory (msg_buf, msg_len));
-    }
-#endif
-
-    {
-      // Sending onStatus reply "Reset".
-
-	AmfAtom atoms [15];
-	AmfEncoder encoder (atoms);
-
-	encoder.addString ("onStatus");
-	encoder.addNumber (0.0 /* transaction_id */);
-	encoder.addNullObject ();
-
-	encoder.beginObject ();
-
-	encoder.addFieldName ("level");
-	encoder.addString ("status");
-
-	encoder.addFieldName ("code");
-	encoder.addString ("NetStream.Play.Reset");
-
-	Ref<String> description_str = makeString ("Playing and resetting ", ConstMemory (vs_name_buf, vs_name_len), ".");
-	encoder.addFieldName ("description");
-	encoder.addString (description_str->mem());
-
-	encoder.addFieldName ("details");
-	encoder.addString (ConstMemory (vs_name_buf, vs_name_len));
-
-	encoder.addFieldName ("clientid");
-	encoder.addNumber (1.0);
-
-	encoder.endObject ();
-
-	Byte msg_buf [4096];
-	Size msg_len;
-	if (!encoder.encode (Memory::forObject (msg_buf), AmfEncoding::AMF0, &msg_len)) {
-	    logE_ (_func, "could not encode onStatus message");
-	    return Result::Failure;
-	}
-
-	rtmp_conn->sendCommandMessage_AMF0 (msg_stream_id, ConstMemory (msg_buf, msg_len));
-    }
-
-    {
-      // Sending onStatus reply "Start".
-
-	AmfAtom atoms [15];
-	AmfEncoder encoder (atoms);
-
-	encoder.addString ("onStatus");
-	encoder.addNumber (0.0 /* transaction_id */);
-	encoder.addNullObject ();
-
-	encoder.beginObject ();
-
-	encoder.addFieldName ("level");
-	encoder.addString ("status");
-
-	encoder.addFieldName ("code");
-	encoder.addString ("NetStream.Play.Start");
-
-	Ref<String> description_str = makeString ("Started playing ", ConstMemory (vs_name_buf, vs_name_len), ".");
-	encoder.addFieldName ("description");
-	encoder.addString (description_str->mem());
-
-	encoder.addFieldName ("details");
-	encoder.addString (ConstMemory (vs_name_buf, vs_name_len));
-
-	encoder.addFieldName ("clientid");
-	encoder.addNumber (1.0);
-
-	encoder.endObject ();
-
-	Byte msg_buf [4096];
-	Size msg_len;
-	if (!encoder.encode (Memory::forObject (msg_buf), AmfEncoding::AMF0, &msg_len)) {
-	    logE_ (_func, "could not encode onStatus message");
-	    return Result::Failure;
-	}
-
-	rtmp_conn->sendCommandMessage_AMF0 (msg_stream_id, ConstMemory (msg_buf, msg_len));
-    }
-
-    return Result::Success;
+    return completePublish (msg_stream_id,
+                            transaction_id,
+                            ConstMemory (vs_name_buf, vs_name_len));
 }
 
 VideoStream::FrameSaver::FrameHandler const RtmpServer::saved_frame_handler = {

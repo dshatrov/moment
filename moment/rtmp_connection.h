@@ -558,6 +558,8 @@ private:
       mt_end
     mt_end
 
+    void doError (Exception *exc_);
+
 public:
     // TODO setReceiver
     Cb<Receiver::Frontend> getReceiverFrontend ()
@@ -616,6 +618,8 @@ public:
 	    		   AmfDecoder * mt_nonnull amf_decoder);
 
     Result fireVideoMessage (VideoStream::VideoMessage * mt_nonnull video_msg);
+
+    void reportError ();
 
     mt_const void init (Timers   * mt_nonnull timers,
 			PagePool * mt_nonnull page_pool,

@@ -133,23 +133,16 @@ public:
     }
 
 
-#if 0
 // ________________________________ Statistics _________________________________
 
 private:
-    mt_const Ref<StatModule> stat;
+    static HttpService::HttpHandler const stat_http_handler;
 
-public:
-    mt_const void setStatModule (StatModule * const stat)
-    {
-        this->stat = stat;
-    }
-
-    Ref<StatModule> getStat () const
-    {
-        return stat;
-    }
-#endif
+    static Result statHttpRequest (HttpRequest   * mt_nonnull req,
+                                   Sender        * mt_nonnull conn_sender,
+                                   Memory const  & /* msg_body */,
+                                   void         ** mt_nonnull /* ret_msg_data */,
+                                   void          *_self);
 
 
 // ___________________________ Video stream handlers ___________________________
@@ -208,22 +201,16 @@ public:
 
     mt_mutex (mutex) void removeVideoStreamHandler_unlocked (VideoStreamHandlerKey vs_handler_key);
 
-
-// ________________________________ Statistics _________________________________
-
-private:
-    static HttpService::HttpHandler const stat_http_handler;
-
-    static Result statHttpRequest (HttpRequest   * mt_nonnull req,
-                                   Sender        * mt_nonnull conn_sender,
-                                   Memory const  & /* msg_body */,
-                                   void         ** mt_nonnull /* ret_msg_data */,
-                                   void          *_self);
-
 // _____________________________________________________________________________
 
 
 public:
+    typedef void StartWatchingCallback (VideoStream *video_stream,
+                                        void        *cb_data);
+
+    typedef void StartStreamingCallback (Result  result,
+                                         void   *cb_data);
+
     class ClientSessionList_name;
 
     class ClientSession : public Object,
@@ -246,13 +233,19 @@ public:
 
 	struct Backend
 	{
-	    Ref<VideoStream> (*startWatching) (ConstMemory  stream_name,
-					       void        *cb_data);
+	    bool (*startWatching) (ConstMemory       stream_name,
+                                   IpAddress         client_addr,
+                                   CbDesc<StartWatchingCallback> const &cb,
+                                   Ref<VideoStream> * mt_nonnull ret_video_stream,
+                                   void             *cb_data);
 
-	    Result (*startStreaming) (ConstMemory       stream_name,
-                                      VideoStream      * mt_nonnull video_stream,
-                                      RecordingMode     rec_mode,
-                                      void             *cb_data);
+	    bool (*startStreaming) (ConstMemory    stream_name,
+                                    IpAddress      client_addr,
+                                    VideoStream   * mt_nonnull video_stream,
+                                    RecordingMode  rec_mode,
+                                    CbDesc<StartStreamingCallback> const &cb,
+                                    Result        * mt_nonnull ret_res,
+                                    void          *cb_data);
 	};
 
     private:
@@ -526,13 +519,17 @@ public:
 
     void disconnect (ClientSession * mt_nonnull client_session);
 
-    Ref<VideoStream> startWatching (ClientSession * mt_nonnull client_session,
-				    ConstMemory    stream_name);
+    bool startWatching (ClientSession    * mt_nonnull client_session,
+                        ConstMemory       stream_name,
+                        CbDesc<StartWatchingCallback> const &cb,
+                        Ref<VideoStream> * mt_nonnull ret_video_stream);
 
-    Result startStreaming (ClientSession    * mt_nonnull client_session,
-                           ConstMemory       stream_name,
-                           VideoStream      * mt_nonnull video_stream,
-                           RecordingMode     rec_mode);
+    bool startStreaming (ClientSession * mt_nonnull client_session,
+                         ConstMemory    stream_name,
+                         VideoStream   * mt_nonnull video_stream,
+                         RecordingMode  rec_mode,
+                         CbDesc<StartStreamingCallback> const &cb,
+                         Result        * mt_nonnull ret_res);
 
     struct ClientHandlerKey
     {

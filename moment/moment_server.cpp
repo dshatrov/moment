@@ -624,22 +624,68 @@ MomentServer::disconnect (ClientSession * const mt_nonnull client_session)
     rtmp_conn->closeAfterFlush ();
 }
 
-Ref<VideoStream>
-MomentServer::startWatching (ClientSession * const mt_nonnull client_session,
-			     ConstMemory     const stream_name)
+namespace {
+struct StartWatchingCallback_Data : public Referenced
 {
+    Ref<String> stream_name;
+    IpAddress client_addr;
+
+    Cb<MomentServer::StartWatchingCallback> cb;
+};
+}
+
+static void startWatchingCallback (VideoStream * const video_stream,
+                                   void        * const _data)
+{
+    StartWatchingCallback_Data * const data = static_cast <StartWatchingCallback_Data*> (_data);
+
+    if (video_stream)
+        logA_ ("moment OK ", data->client_addr, " watch ", data->stream_name);
+    else
+        logA_ ("moment NOT_FOUND ", data->client_addr, " watch ", data->stream_name);
+
+    data->cb.call_ (video_stream);
+}
+
+bool
+MomentServer::startWatching (ClientSession    * const mt_nonnull client_session,
+			     ConstMemory        const stream_name,
+                             CbDesc<StartWatchingCallback> const &cb,
+                             Ref<VideoStream> * const mt_nonnull ret_video_stream)
+{
+    *ret_video_stream = NULL;
+
     Ref<VideoStream> video_stream;
 
     if (client_session->backend
 	&& client_session->backend->startWatching)
     {
 	logD (session, _func, "calling backend->startWatching()");
-	if (!client_session->backend.call_ret< Ref<VideoStream> > (&video_stream,
-								   client_session->backend->startWatching,
-								   /* ( */ stream_name /* ) */))
+        bool complete = false;
+
+        Ref<StartWatchingCallback_Data> const data = grab (new StartWatchingCallback_Data);
+        data->stream_name = grab (new String (stream_name));
+        data->client_addr = client_session->client_addr;
+        data->cb = cb;
+
+	if (!client_session->backend.call_ret<bool> (
+                    &complete,
+                    client_session->backend->startWatching,
+                    /*(*/
+                        stream_name,
+                        client_session->client_addr,
+                        CbDesc<StartWatchingCallback> (startWatchingCallback,
+                                                       data,
+                                                       NULL,
+                                                       data),
+                        &video_stream
+                    /*)*/))
 	{
 	    goto _not_found;
 	}
+
+        if (!complete)
+            return false;
 
 	goto _return;
     }
@@ -652,31 +698,82 @@ MomentServer::startWatching (ClientSession * const mt_nonnull client_session,
 
 _return:
     logA_ ("moment OK ", client_session->client_addr, " watch ", stream_name);
-    return video_stream;
+    *ret_video_stream = video_stream;
+    return true;
 
 _not_found:
     logA_ ("moment NOT_FOUND ", client_session->client_addr, " watch ", stream_name);
-    return NULL;
+    *ret_video_stream = NULL;
+    return true;
 }
 
-Result
+namespace {
+struct StartStreamingCallback_Data : public Referenced
+{
+    Ref<String> stream_name;
+    IpAddress client_addr;
+
+    Cb<MomentServer::StartStreamingCallback> cb;
+};
+}
+
+static void startStreamingCallback (Result   const res,
+                                    void   * const _data)
+{
+    StartStreamingCallback_Data * const data = static_cast <StartStreamingCallback_Data*> (_data);
+
+    if (res)
+        logA_ ("moment OK ", data->client_addr, " stream ", data->stream_name);
+    else
+        logA_ ("moment DENIED ", data->client_addr, " stream ", data->stream_name);
+
+    data->cb.call_ (res);
+}
+
+bool
 MomentServer::startStreaming (ClientSession    * const mt_nonnull client_session,
 			      ConstMemory        const stream_name,
                               VideoStream      * const mt_nonnull video_stream,
-			      RecordingMode      const rec_mode)
+			      RecordingMode      const rec_mode,
+                              CbDesc<StartStreamingCallback> const &cb,
+                              Result           * const mt_nonnull ret_res)
 {
+    *ret_res = Result::Failure;
+
   {
     if (client_session->backend
 	&& client_session->backend->startStreaming)
     {
 	logD (session, _func, "calling backend->startStreaming()");
+
         Result res;
-	if (!client_session->backend.call_ret<Result> (&res,
-                                                       client_session->backend->startStreaming,
-                                                       /* ( */ stream_name, video_stream, rec_mode /* ) */))
+        bool complete = false;
+
+        Ref<StartStreamingCallback_Data> const data = grab (new StartStreamingCallback_Data);
+        data->stream_name = grab (new String (stream_name));
+        data->client_addr = client_session->client_addr;
+        data->cb = cb;
+
+	if (!client_session->backend.call_ret<bool> (
+                    &complete,
+                    client_session->backend->startStreaming,
+                    /*(*/
+                        stream_name,
+                        client_session->client_addr,
+                        video_stream,
+                        rec_mode,
+                        CbDesc<StartStreamingCallback> (startStreamingCallback,
+                                                       data,
+                                                       NULL,
+                                                       data),
+                        &res
+                    /*)*/))
 	{
 	    goto _denied;
 	}
+
+        if (!complete)
+            return false;
 
         if (!res)
             goto _denied;
@@ -703,11 +800,13 @@ MomentServer::startStreaming (ClientSession    * const mt_nonnull client_session
 
 _return:
     logA_ ("moment OK ", client_session->client_addr, " stream ", stream_name);
-    return Result::Success;
+    *ret_res = Result::Success;
+    return true;
 
 _denied:
     logA_ ("moment DENIED ", client_session->client_addr, " stream ", stream_name);
-    return Result::Failure;
+    *ret_res = Result::Failure;
+    return true;
 }
 
 mt_mutex (mutex) MomentServer::ClientHandlerKey

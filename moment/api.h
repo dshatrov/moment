@@ -153,17 +153,29 @@ typedef void (*MomentClientConnectedCallback) (MomentClientSession  *client_sess
 typedef void (*MomentClientDisconnectedCallback) (void *client_user_data,
 						  void *user_data);
 
-typedef MomentStream* (*MomentStartWatchingCallback) (char const *stream_name_buf,
-						      size_t      stream_name_len,
-						      void       *client_user_data,
-						      void       *user_data);
+typedef void (*MomentStartWatchingResultCallback) (MomentStream *ext_stream,
+                                                   void         *cb_data);
 
-typedef MomentResult (*MomentStartStreamingCallback) (char const          *stream_name_buf,
-                                                      size_t               stream_name_len,
-                                                      MomentStream        *stream,
-                                                      MomentRecordingMode  rec_mode,
-                                                      void                *client_user_data,
-                                                      void                *user_data);
+typedef int (*MomentStartWatchingCallback) (char const    *stream_name_buf,
+                                            size_t         stream_name_len,
+                                            void          *client_user_data,
+                                            void          *user_data,
+                                            MomentStartWatchingResultCallback cb,
+                                            void          *cb_data,
+                                            MomentStream **ret_ext_stream);
+
+typedef void (*MomentStartStreamingResultCallback) (MomentResult  res,
+                                                    void         *cb_data);
+
+typedef int (*MomentStartStreamingCallback) (char const          *stream_name_buf,
+                                             size_t               stream_name_len,
+                                             MomentStream        *stream,
+                                             MomentRecordingMode  rec_mode,
+                                             void                *client_user_data,
+                                             void                *user_data,
+                                             MomentStartStreamingResultCallback cb,
+                                             void                *cb_data,
+                                             MomentResult        *ret_res);
 
 typedef void (*MomentRtmpCommandMessageCallback) (MomentMessage *msg,
 						  void          *client_user_data,

@@ -2677,9 +2677,21 @@ RtmpConnection::processError (Exception * const exc_,
     logD (close, _func, "0x", fmt_hex, (UintPtr) _self);
 
     RtmpConnection * const self = static_cast <RtmpConnection*> (_self);
+    self->doError (exc_);
+}
 
-    self->frontend.call (self->frontend->closed, /*(*/ exc_ /*)*/);
-    self->backend.call (self->backend->close);
+void
+RtmpConnection::doError (Exception * const exc_)
+{
+    frontend.call (frontend->closed, /*(*/ exc_ /*)*/);
+    backend.call (backend->close);
+}
+
+void
+RtmpConnection::reportError ()
+{
+    InternalException internal_exc (InternalException::FrontendError);
+    doError (&internal_exc);
 }
 
 mt_const void

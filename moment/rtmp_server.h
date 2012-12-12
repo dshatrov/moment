@@ -33,7 +33,7 @@ namespace Moment {
 using namespace M;
 
 // TODO BasicRtmpServer
-class RtmpServer
+class RtmpServer : public DependentCodeReferenced
 {
 public:
     class CommandResult
@@ -51,17 +51,27 @@ public:
 	Value value;
     };
 
+    typedef void StartRtmpStreamingCallback (Result  res,
+                                             void   *cb_data);
+
+    typedef void StartRtmpWatchingCallback (Result  res,
+                                            void   *cb_data);
+
     struct Frontend {
 	Result (*connect) (ConstMemory const &app_name,
 			   void *cb_data);
 
-	Result (*startStreaming) (ConstMemory   const &stream_name,
-				  RecordingMode const  rec_mode,
-                                  bool          const  momentrtmp_proto,
-				  void                *cb_data);
+	bool (*startRtmpStreaming) (ConstMemory                               stream_name,
+                                    RecordingMode                             rec_mode,
+                                    bool                                      momentrtmp_proto,
+                                    CbDesc<StartRtmpStreamingCallback> const &cb,
+                                    Result                                   * mt_nonnull ret_res,
+                                    void                                     *cb_data);
 
-	Result (*startWatching) (ConstMemory const &stream_name,
-				 void  *cb_data);
+	bool (*startRtmpWatching) (ConstMemory                              stream_name,
+                                   CbDesc<StartRtmpWatchingCallback> const &cb,
+                                   Result                                  * mt_nonnull ret_res,
+                                   void                                    *cb_data);
 
 	CommandResult (*commandMessage) (RtmpConnection       * mt_nonnull conn,
 					 Uint32                msg_stream_id,
@@ -76,7 +86,7 @@ public:
     };
 
 private:
-    mt_const RtmpConnection *rtmp_conn;
+    mt_const DataDepRef<RtmpConnection> rtmp_conn;
 
     Cb<Frontend> frontend;
 
@@ -85,11 +95,23 @@ private:
     Result doConnect (Uint32      msg_stream_id,
 		      AmfDecoder * mt_nonnull decoder);
 
+    static void startRtmpWatchingCallback (Result  res,
+                                           void   *_self);
+
+    void completePlay ();
+
     Result doPlay (Uint32      msg_stream_id,
 		   AmfDecoder * mt_nonnull decoder);
 
     Result doPause (Uint32      msg_streamd_id,
 	   	    AmfDecoder * mt_nonnull decoder);
+
+    static void startRtmpStreamingCallback (Result  res,
+                                            void   *_self);
+
+    Result completePublish (Uint32      msg_stream_id,
+                            double      transaction_id,
+                            ConstMemory vs_name);
 
     Result doPublish (Uint32       msg_stream_id,
 		      AmfDecoder * mt_nonnull decoder,
@@ -225,15 +247,18 @@ public:
 				  PagePool                  * mt_nonnull page_pool,
 				  VideoStream::VideoMessage *ret_msg);
 
+#if 0
     // TODO Deprecated constructor, delete.
     RtmpServer (RtmpConnection * const rtmp_conn)
 	: rtmp_conn (rtmp_conn),
 	  playing (0)
     {
     }
+#endif
 
-    RtmpServer ()
-	: rtmp_conn (NULL),           // extra initializer
+    RtmpServer (Object * const coderef_container)
+	: DependentCodeReferenced (coderef_container),
+          rtmp_conn (coderef_container),
 	  playing (0)
     {
     }
