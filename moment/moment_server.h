@@ -601,6 +601,48 @@ public:
                                               ConstMemory  username,
                                               ConstMemory  password);
 
+// _______________________________ Authorization _______________________________
+
+public:
+    enum AuthAction
+    {
+        AuthAction_Watch,
+        AuthAction_Stream
+    };
+
+    typedef void CheckAuthorizationCallback (bool  authorized,
+                                             void *cb_data);
+
+    struct AuthBackend
+    {
+        bool (*checkAuthorization) (AuthAction   auth_action,
+                                    ConstMemory  stream_name,
+                                    ConstMemory  auth_key,
+                                    IpAddress    client_addr,
+                                    CbDesc<CheckAuthorizationCallback> const &cb,
+                                    bool        * mt_nonnull ret_authorized,
+                                    void        *cb_data);
+    };
+
+private:
+    mt_mutex (mutex) Cb<AuthBackend> auth_backend;
+
+public:
+    void setAuthBackend (CbDesc<AuthBackend> const &auth_backend)
+    {
+        this->auth_backend = auth_backend;
+    }
+
+    bool checkAuthorization (AuthAction   auth_action,
+                             ConstMemory  stream_name,
+                             ConstMemory  auth_key,
+                             IpAddress    client_addr,
+                             CbDesc<CheckAuthorizationCallback> const &cb,
+                             bool        * mt_nonnull ret_authorized);
+
+// _____________________________________________________________________________
+
+
   // Utility
 
     void dumpStreamList ();
@@ -622,6 +664,16 @@ public:
     MomentServer ();
 
     ~MomentServer ();    
+
+
+// __________________________ Internal public methods __________________________
+
+Result setClientSessionVideoStream (ClientSession *client_session,
+                                    VideoStream   *video_stream,
+                                    ConstMemory    stream_name);
+
+// _____________________________________________________________________________
+
 };
 
 }

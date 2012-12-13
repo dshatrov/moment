@@ -624,32 +624,63 @@ MomentServer::disconnect (ClientSession * const mt_nonnull client_session)
     rtmp_conn->closeAfterFlush ();
 }
 
+
+// ______________________________ startWatching() ______________________________
+
 namespace {
-struct StartWatchingCallback_Data : public Referenced
+struct StartWatching_Data : public Referenced
 {
     Ref<String> stream_name;
     IpAddress client_addr;
+
+    Ref<VideoStream> video_stream;
 
     Cb<MomentServer::StartWatchingCallback> cb;
 };
 }
 
-static void startWatchingCallback (VideoStream * const video_stream,
-                                   void        * const _data)
+static void startWatching_completeOk (StartWatching_Data * const data,
+                                      bool call_cb = true)
 {
-    StartWatchingCallback_Data * const data = static_cast <StartWatchingCallback_Data*> (_data);
-
-    if (video_stream)
-        logA_ ("moment OK ", data->client_addr, " watch ", data->stream_name);
-    else
-        logA_ ("moment NOT_FOUND ", data->client_addr, " watch ", data->stream_name);
-
-    data->cb.call_ (video_stream);
+    logA_ ("moment OK ", data->client_addr, " watch ", data->stream_name);
+    if (call_cb)
+        data->cb.call_ (data->video_stream);
 }
+
+static void startWatching_completeNotFound (StartWatching_Data * const data,
+                                            bool call_cb = true)
+{
+    logA_ ("moment NOT_FOUND ", data->client_addr, " watch ", data->stream_name);
+    if (call_cb)
+        data->cb.call_ ((VideoStream*) NULL);
+}
+
+static void startWatching_completeDenied (StartWatching_Data * const data,
+                                          bool call_cb = true)
+{
+    logA_ ("moment DENIED ", data->client_addr, " watch ", data->stream_name);
+    if (call_cb)
+        data->cb.call_ ((VideoStream*) NULL);
+}
+
+static void startWatching_completeGone (StartWatching_Data * const data,
+                                        bool call_cb = true)
+{
+    logA_ ("moment GONE ", data->client_addr, " watch ", data->stream_name);
+    if (call_cb)
+        data->cb.call_ ((VideoStream*) NULL);
+}
+
+static void startWatching_startWatchingRet (VideoStream *video_stream,
+                                            void        *_data);
+
+static bool startWatching_checkAuthorization (StartWatching_Data *data,
+                                              MomentServer       *moment,
+                                              bool               *ret_authorized);
 
 bool
 MomentServer::startWatching (ClientSession    * const mt_nonnull client_session,
-			     ConstMemory        const stream_name,
+                             ConstMemory        const stream_name,
                              CbDesc<StartWatchingCallback> const &cb,
                              Ref<VideoStream> * const mt_nonnull ret_video_stream)
 {
@@ -657,59 +688,161 @@ MomentServer::startWatching (ClientSession    * const mt_nonnull client_session,
 
     Ref<VideoStream> video_stream;
 
+    Ref<StartWatching_Data> const data = grab (new StartWatching_Data);
+    data->stream_name = grab (new String (stream_name));
+    data->client_addr = client_session->client_addr;
+    data->cb = cb;
+
     if (client_session->backend
-	&& client_session->backend->startWatching)
+        && client_session->backend->startWatching)
     {
-	logD (session, _func, "calling backend->startWatching()");
+        logD (session, _func, "calling backend->startWatching()");
+
         bool complete = false;
-
-        Ref<StartWatchingCallback_Data> const data = grab (new StartWatchingCallback_Data);
-        data->stream_name = grab (new String (stream_name));
-        data->client_addr = client_session->client_addr;
-        data->cb = cb;
-
-	if (!client_session->backend.call_ret<bool> (
+        if (!client_session->backend.call_ret<bool> (
                     &complete,
                     client_session->backend->startWatching,
                     /*(*/
                         stream_name,
                         client_session->client_addr,
-                        CbDesc<StartWatchingCallback> (startWatchingCallback,
+                        CbDesc<StartWatchingCallback> (startWatching_startWatchingRet,
                                                        data,
                                                        NULL,
                                                        data),
                         &video_stream
                     /*)*/))
-	{
-	    goto _not_found;
-	}
+        {
+            startWatching_completeGone (data, false /* call_cb */);
+            *ret_video_stream = NULL;
+            return true;
+        }
 
         if (!complete)
             return false;
 
-	goto _return;
+        if (!video_stream) {
+            startWatching_completeNotFound (data, false /* call_cb */);
+            *ret_video_stream = NULL;
+            return true;
+        }
+
+        startWatching_completeOk (data, false /* call_cb */);
+        *ret_video_stream = video_stream;
+        return true;
     }
 
     logD (session, _func, "default path");
 
     video_stream = getVideoStream (stream_name);
-    if (!video_stream)
-	goto _not_found;
+    if (!video_stream) {
+        startWatching_completeNotFound (data, false /* call_cb */);
+        *ret_video_stream = NULL;
+        return true;
+    }
 
-_return:
-    logA_ ("moment OK ", client_session->client_addr, " watch ", stream_name);
+    bool authorized = false;
+    if (!startWatching_checkAuthorization (data, this, &authorized))
+        return false;
+
+    if (!authorized) {
+        startWatching_completeDenied (data, false /* call_cb */);
+        *ret_video_stream = NULL;
+        return true;
+    }
+
+    startWatching_completeOk (data, false /* call_cb */);
     *ret_video_stream = video_stream;
-    return true;
-
-_not_found:
-    logA_ ("moment NOT_FOUND ", client_session->client_addr, " watch ", stream_name);
-    *ret_video_stream = NULL;
     return true;
 }
 
-namespace {
-struct StartStreamingCallback_Data : public Referenced
+static void startWatching_startWatchingRet (VideoStream * const video_stream,
+                                            void        * const _data)
 {
+    StartWatching_Data * const data = static_cast <StartWatching_Data*> (_data);
+    data->video_stream = video_stream;
+
+    if (!video_stream) {
+        startWatching_completeNotFound (data);
+        return;
+    }
+
+    startWatching_completeOk (data);
+}
+
+static void startWatching_checkAuthorizationRet (bool  authorized,
+                                                 void *_data);
+
+static bool startWatching_checkAuthorization (StartWatching_Data * const data,
+                                              MomentServer       * const moment,
+                                              bool               * const ret_authorized)
+{
+    *ret_authorized = false;
+
+    bool authorized = false;
+    bool const complete = moment->checkAuthorization (MomentServer::AuthAction_Watch,
+                                                      data->stream_name->mem(),
+                                                      "TODO AUTH KEY",
+                                                      data->client_addr,
+                                                      CbDesc<MomentServer::CheckAuthorizationCallback> (startWatching_checkAuthorizationRet,
+                                                                                                        data,
+                                                                                                        NULL,
+                                                                                                        data),
+                                                      &authorized);
+    if (!complete)
+        return false;
+
+    if (!authorized) {
+        *ret_authorized = false;
+        return true;
+    }
+
+    *ret_authorized = true;
+    return true;
+}
+
+static void startWatching_checkAuthorizationRet (bool   const authorized,
+                                                 void * const _data)
+{
+    StartWatching_Data * const data = static_cast <StartWatching_Data*> (_data);
+
+    if (!authorized) {
+        startWatching_completeDenied (data);
+        return;
+    }
+
+    startWatching_completeOk (data);
+}
+
+
+// _____________________________ startStreaming() ______________________________
+
+Result MomentServer::setClientSessionVideoStream (ClientSession * const client_session,
+                                                  VideoStream   * const video_stream,
+                                                  ConstMemory     const stream_name)
+{
+    VideoStreamKey const video_stream_key = addVideoStream (video_stream, stream_name);
+
+    client_session->mutex.lock ();
+    if (client_session->disconnected) {
+	client_session->mutex.unlock ();
+	removeVideoStream (video_stream_key);
+
+        return Result::Failure;
+    }
+    client_session->video_stream_key = video_stream_key;
+    client_session->mutex.unlock ();
+
+    return Result::Success;
+}
+
+namespace {
+struct StartStreaming_Data : public Referenced
+{
+    WeakRef<MomentServer> weak_moment;
+    WeakRef<MomentServer::ClientSession> weak_client_session;
+
+    Ref<VideoStream> video_stream;
+
     Ref<String> stream_name;
     IpAddress client_addr;
 
@@ -717,18 +850,36 @@ struct StartStreamingCallback_Data : public Referenced
 };
 }
 
-static void startStreamingCallback (Result   const res,
-                                    void   * const _data)
+static void startStreaming_completeOk (StartStreaming_Data * const data,
+                                       bool call_cb = true)
 {
-    StartStreamingCallback_Data * const data = static_cast <StartStreamingCallback_Data*> (_data);
-
-    if (res)
-        logA_ ("moment OK ", data->client_addr, " stream ", data->stream_name);
-    else
-        logA_ ("moment DENIED ", data->client_addr, " stream ", data->stream_name);
-
-    data->cb.call_ (res);
+    logA_ ("moment OK ", data->client_addr, " stream ", data->stream_name);
+    if (call_cb)
+        data->cb.call_ (Result::Success);
 }
+
+static void startStreaming_completeDenied (StartStreaming_Data * const data,
+                                           bool call_cb = true)
+{
+    logA_ ("moment DENIED ", data->client_addr, " stream ", data->stream_name);
+    if (call_cb)
+        data->cb.call_ (Result::Failure);
+}
+
+static void startStreaming_completeGone (StartStreaming_Data * const data,
+                                         bool call_cb = true)
+{
+    logA_ ("moment GONE ", data->client_addr, " stream ", data->stream_name);
+    if (call_cb)
+        data->cb.call_ (Result::Failure);
+}
+
+static void startStreaming_startStreamingRet (Result  res,
+                                              void   *_data);
+
+static bool startStreaming_checkAuthorization (StartStreaming_Data *data,
+                                               MomentServer        *moment,
+                                               bool                *ret_authorized);
 
 bool
 MomentServer::startStreaming (ClientSession    * const mt_nonnull client_session,
@@ -740,20 +891,22 @@ MomentServer::startStreaming (ClientSession    * const mt_nonnull client_session
 {
     *ret_res = Result::Failure;
 
-  {
+    Ref<StartStreaming_Data> const data = grab (new StartStreaming_Data);
+    data->weak_moment = this;
+    data->weak_client_session = client_session;
+    data->video_stream = video_stream;
+    data->stream_name = grab (new String (stream_name));
+    data->client_addr = client_session->client_addr;
+    data->cb = cb;
+
     if (client_session->backend
 	&& client_session->backend->startStreaming)
     {
 	logD (session, _func, "calling backend->startStreaming()");
 
         Result res;
+
         bool complete = false;
-
-        Ref<StartStreamingCallback_Data> const data = grab (new StartStreamingCallback_Data);
-        data->stream_name = grab (new String (stream_name));
-        data->client_addr = client_session->client_addr;
-        data->cb = cb;
-
 	if (!client_session->backend.call_ret<bool> (
                     &complete,
                     client_session->backend->startStreaming,
@@ -762,52 +915,139 @@ MomentServer::startStreaming (ClientSession    * const mt_nonnull client_session
                         client_session->client_addr,
                         video_stream,
                         rec_mode,
-                        CbDesc<StartStreamingCallback> (startStreamingCallback,
+                        CbDesc<StartStreamingCallback> (startStreaming_startStreamingRet,
                                                        data,
                                                        NULL,
                                                        data),
                         &res
                     /*)*/))
 	{
-	    goto _denied;
+            startStreaming_completeGone (data, false /* call_cb */);
+            *ret_res = Result::Failure;
+            return true;
 	}
 
         if (!complete)
             return false;
 
-        if (!res)
-            goto _denied;
+        if (!res) {
+            startStreaming_completeDenied (data, false /* call_cb */);
+            *ret_res = Result::Failure;
+            return true;
+        }
 
-	goto _return;
+        startStreaming_completeOk (data, false /* call_cb */);
+        *ret_res = Result::Success;
+        return true;
     }
 
     logD (session, _func, "default path");
 
-    if (!publish_all_streams)
-	goto _denied;
-
-    VideoStreamKey const video_stream_key = addVideoStream (video_stream, stream_name);
-
-    client_session->mutex.lock ();
-    if (client_session->disconnected) {
-	client_session->mutex.unlock ();
-	removeVideoStream (video_stream_key);
-	goto _denied;
+    if (!publish_all_streams) {
+        startStreaming_completeDenied (data, false /* call_cb */);
+        *ret_res = Result::Failure;
+        return true;
     }
-    client_session->video_stream_key = video_stream_key;
-    client_session->mutex.unlock ();
-  }
 
-_return:
-    logA_ ("moment OK ", client_session->client_addr, " stream ", stream_name);
+    bool authorized = false;
+    if (!startStreaming_checkAuthorization (data, this, &authorized))
+        return false;
+
+    if (!authorized) {
+        startStreaming_completeDenied (data, false /* call_cb */);
+        *ret_res = Result::Failure;
+        return true;
+    }
+
+    if (!setClientSessionVideoStream (client_session,
+                                      video_stream,
+                                      stream_name))
+    {
+        startStreaming_completeGone (data, false /* call_cb */);
+        *ret_res = Result::Failure;
+        return true;
+    }
+
+    startStreaming_completeOk (data, false /* call_cb */);
     *ret_res = Result::Success;
     return true;
+}
 
-_denied:
-    logA_ ("moment DENIED ", client_session->client_addr, " stream ", stream_name);
-    *ret_res = Result::Failure;
+static void startStreaming_startStreamingRet (Result   const res,
+                                              void   * const _data)
+{
+    StartStreaming_Data * const data = static_cast <StartStreaming_Data*> (_data);
+
+    if (!res) {
+        startStreaming_completeDenied (data);
+        return;
+    }
+
+    startStreaming_completeOk (data);
+}
+
+static void startStreaming_checkAuthorizationRet (bool  authorized,
+                                                  void *_data);
+
+static bool startStreaming_checkAuthorization (StartStreaming_Data * const data,
+                                               MomentServer        * const moment,
+                                               bool                * const ret_authorized)
+{
+    *ret_authorized = false;
+
+    bool authorized = false;
+    bool const complete = moment->checkAuthorization (MomentServer::AuthAction_Stream,
+                                                      data->stream_name->mem(),
+                                                      "TODO AUTH KEY",
+                                                      data->client_addr,
+                                                      CbDesc<MomentServer::CheckAuthorizationCallback> (startStreaming_checkAuthorizationRet,
+                                                                                                        data,
+                                                                                                        NULL,
+                                                                                                        data),
+                                                      &authorized);
+    if (!complete)
+        return false;
+
+    if (!authorized) {
+        *ret_authorized = false;
+        return true;
+    }
+
+    *ret_authorized = true;
     return true;
 }
+
+static void startStreaming_checkAuthorizationRet (bool   const authorized,
+                                                  void * const _data)
+{
+    StartStreaming_Data * const data = static_cast <StartStreaming_Data*> (_data);
+
+    if (!authorized) {
+        startStreaming_completeDenied (data);
+        return;
+    }
+
+    Ref<MomentServer> const moment = data->weak_moment.getRef ();
+    Ref<MomentServer::ClientSession> const client_session = data->weak_client_session.getRef ();
+
+    if (!moment || !client_session) {
+        startStreaming_completeGone (data);
+        return;
+    }
+
+    if (!moment->setClientSessionVideoStream (client_session,
+                                              data->video_stream,
+                                              data->stream_name->mem()))
+    {
+        startStreaming_completeGone (data);
+        return;
+    }
+
+    startStreaming_completeOk (data);
+}
+
+// _____________________________________________________________________________
+
 
 mt_mutex (mutex) MomentServer::ClientHandlerKey
 MomentServer::addClientHandler_rec (CbDesc<ClientHandler> const &cb,
@@ -1127,6 +1367,50 @@ MomentServer::createPushConnection (VideoStream * const video_stream,
         return NULL;
 
     return push_protocol->connect (video_stream, uri, username, password);
+}
+
+bool
+MomentServer::checkAuthorization (AuthAction    const auth_action,
+                                  ConstMemory   const stream_name,
+                                  ConstMemory   const auth_key,
+                                  IpAddress     const client_addr,
+                                  CbDesc<CheckAuthorizationCallback> const &cb,
+                                  bool        * const mt_nonnull ret_authorized)
+{
+    *ret_authorized = false;
+
+    mutex.lock ();
+    Cb<AuthBackend> const tmp_auth_backend = auth_backend;
+    mutex.unlock ();
+
+    if (!tmp_auth_backend) {
+        *ret_authorized = true;
+        return true;
+    }
+
+    bool complete = false;
+    bool authorized = false;
+    if (!tmp_auth_backend.call_ret<bool> (&complete,
+                                          tmp_auth_backend->checkAuthorization,
+                                          /*(*/
+                                              auth_action,
+                                              stream_name,
+                                              auth_key,
+                                              client_addr,
+                                              cb,
+                                              &authorized
+                                          /*)*/))
+    {
+        logW_ ("authorization backend gone");
+        *ret_authorized = true;
+        return true;
+    }
+
+    if (!complete)
+        return false;
+
+    *ret_authorized = authorized;
+    return true;
 }
 
 void
