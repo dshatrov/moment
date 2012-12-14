@@ -59,6 +59,7 @@ RtmpPushConnection::startNewSession (Session * const old_session)
 
     session->conn_sender.setConnection (&session->tcp_conn);
     session->conn_sender.setQueue (thread_ctx->getDeferredConnectionSenderQueue());
+    // RtmpConnection sets sender frontend.
 
     session->conn_receiver.setConnection (&session->tcp_conn);
     session->conn_receiver.setFrontend (session->rtmp_conn.getReceiverFrontend());
@@ -87,22 +88,27 @@ RtmpPushConnection::startNewSession (Session * const old_session)
                                                                 session /* cb_data */,
                                                                 this /* coderef_container */));
 
-    // TcpConnection::connect() may call 'connected' callback immediately,
-    // which is very inconvenient because it complicates synchronization.
-    mutex.unlock ();
-    if (!session->tcp_conn.connect (server_addr)) {
-        logE_ (_func, "Could not connect to server: ", exc->toString());
+    {
+        TcpConnection::ConnectResult const connect_res = session->tcp_conn.connect (server_addr);
+        if (connect_res == TcpConnection::ConnectResult_Error) {
+            logE_ (_func, "Could not connect to server: ", exc->toString());
 
-        mutex.lock ();
-        destroySession (session);
-        cur_session = NULL;
+            destroySession (session);
+            cur_session = NULL;
 
-        setReconnectTimer ();
-        mutex.unlock ();
-        return;
+            setReconnectTimer ();
+            mutex.unlock ();
+            return;
+        }
+
+        if (connect_res == TcpConnection::ConnectResult_Connected)
+            session->rtmp_conn.startClient ();
+        else
+            assert (connect_res == TcpConnection::ConnectResult_InProgress);
+
+        // TODO Possible "connected" event loss because we do addPollable() too late - ?
     }
 
-    mutex.lock ();
     if (cur_session.ptr() /* TODO Why doesn't plain '==' work? */ == session) {
         session->pollable_key = thread_ctx->getPollGroup()->addPollable (session->tcp_conn.getPollable(),
                                                                          NULL /* ret_reg */);

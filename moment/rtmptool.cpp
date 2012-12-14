@@ -440,14 +440,19 @@ RtmpClient::genVideoMessage (VideoStream::VideoMessage * const video_msg,
 Result
 RtmpClient::start (IpAddress const &addr)
 {
-    if (!tcp_conn.connect (addr)) {
+    TcpConnection::ConnectResult const connect_res = tcp_conn.connect (addr);
+    if (connect_res == TcpConnection::ConnectResult_Error) {
 	logE_ (_func, "tcp_conn.connect() failed: ", exc->toString());
 	return Result::Failure;
     }
 
-// TODO Race condition on "connected"? (Connected before addPollable() => hang)
-
     thread_ctx->getPollGroup()->addPollable (tcp_conn.getPollable(), NULL /* ret_reg */);
+
+    if (connect_res == TcpConnection::ConnectResult_Connected)
+        rtmp_conn.startClient ();
+    else
+        assert (connect_res == TcpConnection::ConnectResult_InProgress);
+
     return Result::Success;
 }
 
