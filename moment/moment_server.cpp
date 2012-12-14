@@ -122,8 +122,6 @@ MomentServer::videoStreamAddedInformTask (void * const _self)
 {
     MomentServer * const self = static_cast <MomentServer*> (_self);
 
-    logD_ (_func_);
-
     self->mutex.lock ();
 
     while (!self->vs_added_notifications.isEmpty()) {
@@ -640,7 +638,7 @@ struct StartWatching_Data : public Referenced
 }
 
 static void startWatching_completeOk (StartWatching_Data * const data,
-                                      bool call_cb = true)
+                                      bool                 const call_cb = true)
 {
     logA_ ("moment OK ", data->client_addr, " watch ", data->stream_name);
     if (call_cb)
@@ -648,7 +646,7 @@ static void startWatching_completeOk (StartWatching_Data * const data,
 }
 
 static void startWatching_completeNotFound (StartWatching_Data * const data,
-                                            bool call_cb = true)
+                                            bool                 const call_cb = true)
 {
     logA_ ("moment NOT_FOUND ", data->client_addr, " watch ", data->stream_name);
     if (call_cb)
@@ -656,7 +654,7 @@ static void startWatching_completeNotFound (StartWatching_Data * const data,
 }
 
 static void startWatching_completeDenied (StartWatching_Data * const data,
-                                          bool call_cb = true)
+                                          bool                 const call_cb = true)
 {
     logA_ ("moment DENIED ", data->client_addr, " watch ", data->stream_name);
     if (call_cb)
@@ -664,7 +662,7 @@ static void startWatching_completeDenied (StartWatching_Data * const data,
 }
 
 static void startWatching_completeGone (StartWatching_Data * const data,
-                                        bool call_cb = true)
+                                        bool                 const call_cb = true)
 {
     logA_ ("moment GONE ", data->client_addr, " watch ", data->stream_name);
     if (call_cb)
@@ -740,6 +738,8 @@ MomentServer::startWatching (ClientSession    * const mt_nonnull client_session,
         return true;
     }
 
+    data->video_stream = video_stream;
+
     bool authorized = false;
     if (!startWatching_checkAuthorization (data, this, &authorized))
         return false;
@@ -779,15 +779,18 @@ static bool startWatching_checkAuthorization (StartWatching_Data * const data,
     *ret_authorized = false;
 
     bool authorized = false;
-    bool const complete = moment->checkAuthorization (MomentServer::AuthAction_Watch,
-                                                      data->stream_name->mem(),
-                                                      "TODO AUTH KEY",
-                                                      data->client_addr,
-                                                      CbDesc<MomentServer::CheckAuthorizationCallback> (startWatching_checkAuthorizationRet,
-                                                                                                        data,
-                                                                                                        NULL,
-                                                                                                        data),
-                                                      &authorized);
+    bool const complete =
+            moment->checkAuthorization (
+                    MomentServer::AuthAction_Watch,
+                    data->stream_name->mem(),
+                    "TODO AUTH KEY",
+                    data->client_addr,
+                    CbDesc<MomentServer::CheckAuthorizationCallback> (
+                            startWatching_checkAuthorizationRet,
+                            data,
+                            NULL,
+                            data),
+                    &authorized);
     if (!complete)
         return false;
 
@@ -851,7 +854,7 @@ struct StartStreaming_Data : public Referenced
 }
 
 static void startStreaming_completeOk (StartStreaming_Data * const data,
-                                       bool call_cb = true)
+                                       bool                  const call_cb = true)
 {
     logA_ ("moment OK ", data->client_addr, " stream ", data->stream_name);
     if (call_cb)
@@ -859,7 +862,7 @@ static void startStreaming_completeOk (StartStreaming_Data * const data,
 }
 
 static void startStreaming_completeDenied (StartStreaming_Data * const data,
-                                           bool call_cb = true)
+                                           bool                  const call_cb = true)
 {
     logA_ ("moment DENIED ", data->client_addr, " stream ", data->stream_name);
     if (call_cb)
@@ -867,7 +870,7 @@ static void startStreaming_completeDenied (StartStreaming_Data * const data,
 }
 
 static void startStreaming_completeGone (StartStreaming_Data * const data,
-                                         bool call_cb = true)
+                                         bool                  const call_cb = true)
 {
     logA_ ("moment GONE ", data->client_addr, " stream ", data->stream_name);
     if (call_cb)

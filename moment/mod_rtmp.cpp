@@ -841,13 +841,13 @@ static void startWatchingCallback (VideoStream * const video_stream,
     Ref<ClientSession> const client_session = data->weak_client_session.getRef ();
 
     if (!client_session) {
-        logD (mod_rtmp, _func, "client session gone");
+        logD_ (_func, "client session gone");
         data->cb.call_ (Result::Failure);
         return;
     }
 
     if (!video_stream) {
-        logD (mod_rtmp, _func, "video stream not found: ", data->stream_name);
+        logD_ (_func, "video stream not found: ", data->stream_name);
         data->cb.call_ (Result::Failure);
         return;
     }
