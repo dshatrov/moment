@@ -211,6 +211,8 @@ public:
     typedef void StartStreamingCallback (Result  result,
                                          void   *cb_data);
 
+    class AuthSession;
+
     class ClientSessionList_name;
 
     class ClientSession : public Object,
@@ -252,10 +254,14 @@ public:
 	mt_mutex (mutex) bool processing_connected_event;
 	mt_mutex (mutex) bool disconnected;
 
+        mt_mutex (mutex) Ref<String> auth_key;
+
 	mt_const WeakCodeRef weak_rtmp_conn;
 	mt_const RtmpConnection *unsafe_rtmp_conn;
 
-	IpAddress client_addr;
+	mt_const IpAddress client_addr;
+
+        mt_const Ref<AuthSession> auth_session;
 
 	Informer_<Events> event_informer;
 	Cb<Backend> backend;
@@ -287,8 +293,6 @@ public:
 				     VideoStream::Message * mt_nonnull msg,
 				     ConstMemory const    &method_name,
 				     AmfDecoder           * mt_nonnull amf_decoder);
-
-	void clientDisconnected ();
 
 	ClientSession ();
 
@@ -521,11 +525,13 @@ public:
 
     bool startWatching (ClientSession    * mt_nonnull client_session,
                         ConstMemory       stream_name,
+                        ConstMemory       auth_key,
                         CbDesc<StartWatchingCallback> const &cb,
                         Ref<VideoStream> * mt_nonnull ret_video_stream);
 
     bool startStreaming (ClientSession * mt_nonnull client_session,
                          ConstMemory    stream_name,
+                         ConstMemory    auth_key,
                          VideoStream   * mt_nonnull video_stream,
                          RecordingMode  rec_mode,
                          CbDesc<StartStreamingCallback> const &cb,
@@ -604,6 +610,10 @@ public:
 // _______________________________ Authorization _______________________________
 
 public:
+    class AuthSession : public virtual Referenced
+    {
+    };
+
     enum AuthAction
     {
         AuthAction_Watch,
@@ -615,13 +625,20 @@ public:
 
     struct AuthBackend
     {
-        bool (*checkAuthorization) (AuthAction   auth_action,
+        Ref<AuthSession> (*newAuthSession) (void *cb_data);
+
+        bool (*checkAuthorization) (AuthSession *auth_session,
+                                    AuthAction   auth_action,
                                     ConstMemory  stream_name,
                                     ConstMemory  auth_key,
                                     IpAddress    client_addr,
                                     CbDesc<CheckAuthorizationCallback> const &cb,
                                     bool        * mt_nonnull ret_authorized,
                                     void        *cb_data);
+
+        void (*authSessionDisconnected) (AuthSession *auth_session,
+                                         ConstMemory  auth_key,
+                                         void        *cb_data);
     };
 
 private:
@@ -633,7 +650,8 @@ public:
         this->auth_backend = auth_backend;
     }
 
-    bool checkAuthorization (AuthAction   auth_action,
+    bool checkAuthorization (AuthSession *auth_session,
+                             AuthAction   auth_action,
                              ConstMemory  stream_name,
                              ConstMemory  auth_key,
                              IpAddress    client_addr,

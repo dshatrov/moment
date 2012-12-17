@@ -1,5 +1,5 @@
 /*  Moment Video Server - High performance media server
-    Copyright (C) 2011 Dmitry Shatrov
+    Copyright (C) 2011, 2012 Dmitry Shatrov
     e-mail: shatrov@gmail.com
 
     This program is free software: you can redistribute it and/or modify
@@ -250,18 +250,6 @@ MomentServer::ClientSession::fireRtmpCommandMessage (RtmpConnection       * cons
 {
     InformRtmpCommandMessage_Data inform_data (conn, msg, method_name, amf_decoder);
     event_informer.informAll (informRtmpCommandMessage, &inform_data);
-}
-
-void
-MomentServer::ClientSession::clientDisconnected ()
-{
-    mutex.lock ();
-    disconnected = true;
-    // To avoid races, we defer invocation of "client disconnected" callbacks
-    // until all "client connected" callbacks are called.
-    if (!processing_connected_event)
-	event_informer.informAll_unlocked (informClientDisconnected, NULL /* inform_data */);
-    mutex.unlock ();
 }
 
 MomentServer::ClientSession::ClientSession ()
@@ -563,6 +551,12 @@ MomentServer::rtmpClientConnected (ConstMemory const &path,
 
     ConstMemory path_tail;
 
+    Ref<AuthSession> auth_session;
+    if (auth_backend) {
+        auth_backend.call_ret< Ref<AuthSession> > (&auth_session,
+                                                   auth_backend->newAuthSession);
+    }
+
     mutex.lock ();
     Ref<ClientEntry> const client_entry = getClientEntry (path, &path_tail, &root_namespace);
 
@@ -570,6 +564,7 @@ MomentServer::rtmpClientConnected (ConstMemory const &path,
     client_session->weak_rtmp_conn = conn;
     client_session->unsafe_rtmp_conn = conn;
     client_session->client_addr = client_addr;
+    client_session->auth_session = auth_session;
     client_session->processing_connected_event = true;
 
     client_session_list.append (client_session);
@@ -598,15 +593,42 @@ MomentServer::clientDisconnected (ClientSession * const mt_nonnull client_sessio
 {
     logD (session, _func, "client_session refcount before: ", client_session->getRefCount());
 
-    client_session->clientDisconnected ();
+    client_session->mutex.lock ();
+
+    client_session->disconnected = true;
+    // To avoid races, we defer invocation of "client disconnected" callbacks
+    // until all "client connected" callbacks are called.
+    if (!client_session->processing_connected_event) {
+	client_session->event_informer.informAll_unlocked (
+                ClientSession::informClientDisconnected, NULL /* inform_data */);
+    }
+
+    Ref<String> const auth_key = client_session->auth_key;
+
+    client_session->mutex.unlock ();
 
     mutex.lock ();
     if (client_session->video_stream_key)
 	removeVideoStream_unlocked (client_session->video_stream_key);
 
     client_session_list.remove (client_session);
+
+    Cb<AuthBackend> const tmp_auth_backend = auth_backend;
     mutex.unlock ();
 
+    if (auth_key && tmp_auth_backend) {
+        if (!tmp_auth_backend.call (tmp_auth_backend->authSessionDisconnected,
+                                    /*(*/
+                                        client_session->auth_session,
+                                        (auth_key ? auth_key->mem() : ConstMemory())
+                                    /*)*/))
+        {
+            logW_ ("authorization backend gone");
+            goto _return;
+        }
+    }
+
+_return:
     logD (session, _func, "client_session refcount after: ", client_session->getRefCount());
     client_session->unref ();
 }
@@ -629,6 +651,7 @@ namespace {
 struct StartWatching_Data : public Referenced
 {
     Ref<String> stream_name;
+    Ref<String> auth_key;
     IpAddress client_addr;
 
     Ref<VideoStream> video_stream;
@@ -672,17 +695,26 @@ static void startWatching_completeGone (StartWatching_Data * const data,
 static void startWatching_startWatchingRet (VideoStream *video_stream,
                                             void        *_data);
 
-static bool startWatching_checkAuthorization (StartWatching_Data *data,
-                                              MomentServer       *moment,
-                                              bool               *ret_authorized);
+static bool startWatching_checkAuthorization (StartWatching_Data        *data,
+                                              MomentServer              *moment,
+                                              MomentServer::AuthSession *auth_session,
+                                              bool                      *ret_authorized);
 
 bool
 MomentServer::startWatching (ClientSession    * const mt_nonnull client_session,
                              ConstMemory        const stream_name,
+                             ConstMemory        const auth_key,
                              CbDesc<StartWatchingCallback> const &cb,
                              Ref<VideoStream> * const mt_nonnull ret_video_stream)
 {
     *ret_video_stream = NULL;
+
+    client_session->mutex.lock ();
+    if (client_session->auth_key && !equal (client_session->auth_key->mem(), auth_key))
+        logW_ (_func, "WARNING: Different auth keys for the same client session");
+
+    client_session->auth_key = grab (new String (auth_key));
+    client_session->mutex.unlock ();
 
     Ref<VideoStream> video_stream;
 
@@ -690,6 +722,9 @@ MomentServer::startWatching (ClientSession    * const mt_nonnull client_session,
     data->stream_name = grab (new String (stream_name));
     data->client_addr = client_session->client_addr;
     data->cb = cb;
+
+    if (auth_key.len() > 0)
+        data->auth_key = grab (new String (auth_key));
 
     if (client_session->backend
         && client_session->backend->startWatching)
@@ -741,7 +776,7 @@ MomentServer::startWatching (ClientSession    * const mt_nonnull client_session,
     data->video_stream = video_stream;
 
     bool authorized = false;
-    if (!startWatching_checkAuthorization (data, this, &authorized))
+    if (!startWatching_checkAuthorization (data, this, client_session->auth_session, &authorized))
         return false;
 
     if (!authorized) {
@@ -772,18 +807,20 @@ static void startWatching_startWatchingRet (VideoStream * const video_stream,
 static void startWatching_checkAuthorizationRet (bool  authorized,
                                                  void *_data);
 
-static bool startWatching_checkAuthorization (StartWatching_Data * const data,
-                                              MomentServer       * const moment,
-                                              bool               * const ret_authorized)
+static bool startWatching_checkAuthorization (StartWatching_Data        * const data,
+                                              MomentServer              * const moment,
+                                              MomentServer::AuthSession * const auth_session,
+                                              bool                      * const ret_authorized)
 {
     *ret_authorized = false;
 
     bool authorized = false;
     bool const complete =
             moment->checkAuthorization (
+                    auth_session,
                     MomentServer::AuthAction_Watch,
                     data->stream_name->mem(),
-                    "TODO AUTH KEY",
+                    (data->auth_key ? data->auth_key->mem() : ConstMemory()),
                     data->client_addr,
                     CbDesc<MomentServer::CheckAuthorizationCallback> (
                             startWatching_checkAuthorizationRet,
@@ -847,6 +884,7 @@ struct StartStreaming_Data : public Referenced
     Ref<VideoStream> video_stream;
 
     Ref<String> stream_name;
+    Ref<String> auth_key;
     IpAddress client_addr;
 
     Cb<MomentServer::StartStreamingCallback> cb;
@@ -880,19 +918,28 @@ static void startStreaming_completeGone (StartStreaming_Data * const data,
 static void startStreaming_startStreamingRet (Result  res,
                                               void   *_data);
 
-static bool startStreaming_checkAuthorization (StartStreaming_Data *data,
-                                               MomentServer        *moment,
-                                               bool                *ret_authorized);
+static bool startStreaming_checkAuthorization (StartStreaming_Data       *data,
+                                               MomentServer              *moment,
+                                               MomentServer::AuthSession *auth_session,
+                                               bool                      *ret_authorized);
 
 bool
 MomentServer::startStreaming (ClientSession    * const mt_nonnull client_session,
 			      ConstMemory        const stream_name,
+                              ConstMemory        const auth_key,
                               VideoStream      * const mt_nonnull video_stream,
 			      RecordingMode      const rec_mode,
                               CbDesc<StartStreamingCallback> const &cb,
                               Result           * const mt_nonnull ret_res)
 {
     *ret_res = Result::Failure;
+
+    client_session->mutex.lock ();
+    if (client_session->auth_key && !equal (client_session->auth_key->mem(), auth_key))
+        logW_ (_func, "WARNING: Different auth keys for the same client session");
+
+    client_session->auth_key = grab (new String (auth_key));
+    client_session->mutex.unlock ();
 
     Ref<StartStreaming_Data> const data = grab (new StartStreaming_Data);
     data->weak_moment = this;
@@ -901,6 +948,9 @@ MomentServer::startStreaming (ClientSession    * const mt_nonnull client_session
     data->stream_name = grab (new String (stream_name));
     data->client_addr = client_session->client_addr;
     data->cb = cb;
+
+    if (auth_key.len() > 0)
+        data->auth_key = grab (new String (auth_key));
 
     if (client_session->backend
 	&& client_session->backend->startStreaming)
@@ -953,7 +1003,7 @@ MomentServer::startStreaming (ClientSession    * const mt_nonnull client_session
     }
 
     bool authorized = false;
-    if (!startStreaming_checkAuthorization (data, this, &authorized))
+    if (!startStreaming_checkAuthorization (data, this, client_session->auth_session, &authorized))
         return false;
 
     if (!authorized) {
@@ -992,16 +1042,18 @@ static void startStreaming_startStreamingRet (Result   const res,
 static void startStreaming_checkAuthorizationRet (bool  authorized,
                                                   void *_data);
 
-static bool startStreaming_checkAuthorization (StartStreaming_Data * const data,
-                                               MomentServer        * const moment,
-                                               bool                * const ret_authorized)
+static bool startStreaming_checkAuthorization (StartStreaming_Data       * const data,
+                                               MomentServer              * const moment,
+                                               MomentServer::AuthSession * const auth_session,
+                                               bool                      * const ret_authorized)
 {
     *ret_authorized = false;
 
     bool authorized = false;
-    bool const complete = moment->checkAuthorization (MomentServer::AuthAction_Stream,
+    bool const complete = moment->checkAuthorization (auth_session,
+                                                      MomentServer::AuthAction_Stream,
                                                       data->stream_name->mem(),
-                                                      "TODO AUTH KEY",
+                                                      (data->auth_key ? data->auth_key->mem() : ConstMemory()),
                                                       data->client_addr,
                                                       CbDesc<MomentServer::CheckAuthorizationCallback> (startStreaming_checkAuthorizationRet,
                                                                                                         data,
@@ -1373,7 +1425,8 @@ MomentServer::createPushConnection (VideoStream * const video_stream,
 }
 
 bool
-MomentServer::checkAuthorization (AuthAction    const auth_action,
+MomentServer::checkAuthorization (AuthSession * const auth_session,
+                                  AuthAction    const auth_action,
                                   ConstMemory   const stream_name,
                                   ConstMemory   const auth_key,
                                   IpAddress     const client_addr,
@@ -1396,6 +1449,7 @@ MomentServer::checkAuthorization (AuthAction    const auth_action,
     if (!tmp_auth_backend.call_ret<bool> (&complete,
                                           tmp_auth_backend->checkAuthorization,
                                           /*(*/
+                                              auth_session,
                                               auth_action,
                                               stream_name,
                                               auth_key,

@@ -83,6 +83,7 @@ class StreamingParams
 {
 public:
     bool transcode;
+    Ref<String> auth_key;
 
     void reset ()
     {
@@ -99,10 +100,12 @@ class WatchingParams
 {
 public:
     bool start_paused;
+    Ref<String> auth_key;
 
     void reset ()
     {
 	start_paused = default_start_paused;
+        auth_key = NULL;
     }
 
     WatchingParams ()
@@ -580,23 +583,28 @@ static void parseParameters (ConstMemory         const mem,
 }
 
 static void startRtmpStreaming_paramCallback (ConstMemory   const name,
-                                              ConstMemory   const /* value */,
+                                              ConstMemory   const value,
                                               void        * const _streaming_params)
 {
     StreamingParams * const streaming_params = static_cast <StreamingParams*> (_streaming_params);
 
     if (equal (name, "transcode"))
 	streaming_params->transcode = true;
+    if (equal (name, "auth"))
+        streaming_params->auth_key = grab (new String (value));
 }
 
 static void startRtmpWatching_paramCallback (ConstMemory   const name,
-                                             ConstMemory   const /* value */,
+                                             ConstMemory   const value,
                                              void        * const _watching_params)
 {
     WatchingParams * const watching_params = static_cast <WatchingParams*> (_watching_params);
 
     if (equal (name, "paused"))
 	watching_params->start_paused = true;
+    else
+    if (equal (name, "auth"))
+        watching_params->auth_key = grab (new String (value));
 }
 
 class StartStreamingCallback_Data : public Referenced
@@ -730,6 +738,8 @@ bool startRtmpStreaming (ConstMemory     const _stream_name,
 
         bool const complete = moment->startStreaming (client_session->srv_session,
                                                       stream_name,
+                                                      (client_session->streaming_params.auth_key ?
+                                                              client_session->streaming_params.auth_key->mem() : ConstMemory()),
                                                       video_stream,
                                                       rec_mode,
                                                       CbDesc<MomentServer::StartStreamingCallback> (
@@ -935,6 +945,8 @@ static bool startRtmpWatching (ConstMemory    const _stream_name,
 
         bool const complete = moment->startWatching (client_session->srv_session,
                                                      stream_name,
+                                                     (client_session->watching_params.auth_key ?
+                                                             client_session->watching_params.auth_key->mem() : ConstMemory()),
                                                      CbDesc<MomentServer::StartWatchingCallback> (
                                                              startWatchingCallback,
                                                              data,
