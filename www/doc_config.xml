@@ -550,7 +550,7 @@ http {
     for video sources specified with an URI. The following parameters have effect for all
     such sources:</eng>
     <rus>Для источников, определяемых через URI, можно задавать ширину/высоту видео на выходе
-    и желаемый битрейт сжатого видеопотока. Следующе параметры применяются ко всем ткаим источникам:</rus>
+    и желаемый битрейт сжатого видеопотока. Следующие параметры применяются ко всем таким источникам:</rus>
   </p>
 
   <moment_params>
@@ -799,7 +799,7 @@ http {
     A playlist is a linear list of playback elements. Each element contains stream source
     description (URI, file path, or a gstreamer pipeline) and can be accompanied with
     "start", "end", "duration", and "seek" attributes.</eng>
-    <rus>С помощью плейлистов можно организвать вещание видео из разных источников по расписанию.
+    <rus>С помощью плейлистов можно организовать вещание видео из разных источников по расписанию.
     Плейлист представляет собой линейный список элементов воспроизведения. Каждый
     элемент содержит описание источника видео (URI, путь к файлу или конвейер gstreamer) и может
     сопровождаться атрибутами "начало", "конец", "длительность" и "начальное положение".</rus>
@@ -913,7 +913,7 @@ mod_gst {
   <p>
     <eng>Moment VS allows to update playlists and change playback positions with administrator's HTTP requests
     (POST or GET). Playlist update request has the following form:</eng>
-    <rus>&laquo;Момент&raquo; поволяет обновлять плейлист и изменять позицию воспроизведения видеопотока
+    <rus>&laquo;Момент&raquo; позволяет обновлять плейлист и изменять позицию воспроизведения видеопотока
     во время работы через административные HTTP-запросы (методы POST или GET).
     Запрос для обновления плейлиста имеет следующий вид:</rus>
   </p>

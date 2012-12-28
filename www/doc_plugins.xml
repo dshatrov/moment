@@ -91,7 +91,7 @@
     videophone flash module connects to the server and tells it the code.
     When another client with the same conversation code shows up, communication session is started.</eng>
     <rus>Плагин видеозвонков работает следующим образом. После того, как пользователь ввёл код разговора,
-    флешка видеозвонков поключается к видеосерверу и сообщает ему этот код. Когда к серверу
+    флешка видеозвонков подключается к видеосерверу и сообщает ему этот код. Когда к серверу
     подключается другой пользователь с таким же кодом разговора, начинается сеанс связи.</rus>
   </p>
 
