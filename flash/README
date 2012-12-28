@@ -1,4 +1,0 @@
-mysubscriber - Basic playback of a video stream. No scrolling, no play controls. Careful reconnects.
-myplayer     - Advanced playback of a video stream. Scrolling, play controls, reconnects.
-mychat       - Video chat application.
-

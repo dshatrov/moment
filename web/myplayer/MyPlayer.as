@@ -20,7 +20,7 @@ import flash.geom.Rectangle;
 
 //[SWF(width='640', height='480')]
 [SWF(backgroundColor=0)]
-public class MySubscriber extends Sprite
+public class MyPlayer extends Sprite
 {
     private function setSource (uri : String, stream_name : String) : void {
 	trace ("--- setSource(): " + uri + ", " + stream_name);
@@ -248,8 +248,8 @@ public class MySubscriber extends Sprite
 
 	// This doesn't filter all spurious EnterFrame events.
 	if (frame_no == 1) {
-	    showBuffering ();
-//	    hideMessages ();
+            showBuffering ();
+//            hideMessages ();
 	}
 
 	++frame_no;
@@ -497,7 +497,7 @@ public class MySubscriber extends Sprite
 	return loaded_element;
     }
 
-    public function MySubscriber ()
+    public function MyPlayer ()
     {
 	buffering_complete = false;
 	frame_no = 0;
