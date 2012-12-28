@@ -17,6 +17,10 @@ import flash.utils.setInterval;
 import flash.utils.clearInterval;
 import flash.geom.Rectangle;
 
+// TEST
+//import flash.display.BitmapData;
+//import flash.display.Bitmap;
+
 [SWF(backgroundColor=0)]
 public class BasicPlayer extends Sprite
 {
@@ -155,6 +159,15 @@ public class BasicPlayer extends Sprite
 
 	    repositionVideo ();
 	    showVideo ();
+
+// RtmpSampleAccess TEST
+//            var bdata : BitmapData = new BitmapData (100, 100, false, 0x11ffff33);
+//            bdata.draw (video);
+//            var bitmap : Bitmap = new Bitmap (bdata);
+//            bitmap.x = 20;
+//            bitmap.y = 20;
+//            addChild (bitmap);
+//            bitmap.visible = true;
 	}
     }
 
