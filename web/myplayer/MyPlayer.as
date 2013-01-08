@@ -22,10 +22,22 @@ import flash.geom.Rectangle;
 [SWF(backgroundColor=0)]
 public class MyPlayer extends Sprite
 {
-    private function setSource (uri : String, stream_name : String) : void {
-	trace ("--- setSource(): " + uri + ", " + stream_name);
-	setChannel (uri, stream_name);
+    private var buffer_time : Number;
+    private var autoplay : Boolean;
+
+    private function setSource (uri : String, stream_name_ : String) : void {
+	trace ("--- setSource(): " + uri + ", " + stream_name_);
+	setChannel (uri, stream_name_);
     }
+
+    private function setFirstUri (uri : String, stream_name_ : String) : void {
+        if (autoplay) {
+            autoplay = false;
+            setChannel (uri, stream_name_);
+        }
+    }
+
+    private var show_playlist_button : Boolean;
 
     private var conn : NetConnection;
     private var video : Video;
@@ -119,10 +131,12 @@ public class MyPlayer extends Sprite
     {
 	horizontal_button.setVisible (buttons_visible && !videoShouldBeHorizontal());
 
-	playlist_button.obj.x = stage_width  - playlist_button.obj.width - 20;
-	playlist_button.obj.y = stage_height - playlist_button.obj.height - 20;
+        if (show_playlist_button) {
+            playlist_button.obj.x = stage_width  - playlist_button.obj.width - 20;
+            playlist_button.obj.y = stage_height - playlist_button.obj.height - 20;
+        }
 
-        if (stage.displayState == "fullScreen") {
+        if (stage.displayState == "fullScreen" || !show_playlist_button) {
           fullscreen_button.obj.x = stage_width - fullscreen_button.obj.width - 20;
 	  horizontal_button.obj.x = stage_width - horizontal_button.obj.width - 90;
 	} else {
@@ -248,8 +262,10 @@ public class MyPlayer extends Sprite
 
 	// This doesn't filter all spurious EnterFrame events.
 	if (frame_no == 1) {
-            showBuffering ();
-//            hideMessages ();
+            if (buffer_time != 0.0)
+                showBuffering ();
+            else
+                hideMessages ();
 	}
 
 	++frame_no;
@@ -286,12 +302,7 @@ public class MyPlayer extends Sprite
 	    }
 
 	    var stream : NetStream = new NetStream (conn);
-//	    stream.bufferTime = 0.0;
-//	    stream.bufferTime = 0.1;
-//	    stream.bufferTime = 0.0;
-	    stream.bufferTime = 1.0;
-//	    stream.bufferTime = 0.5;
-//	    stream.bufferTime = 5.0;
+	    stream.bufferTime = buffer_time;
 	    stream.client = new MyStreamClient();
 
 	    video.attachNetStream (stream);
@@ -409,10 +420,12 @@ public class MyPlayer extends Sprite
     {
         trace ("--- toggleFullscreen");
         if (stage.displayState == "fullScreen") {
-          stage.displayState = "normal";
-          playlist_button.setVisible (true);
+            stage.displayState = "normal";
+            if (show_playlist_button)
+                playlist_button.setVisible (true);
         } else {
-          playlist_button.setVisible (false);
+            if (show_playlist_button)
+                playlist_button.setVisible (false);
 // This toglles hardware scaling, but it's done in some weird way.
 // It looks like flash clip has to be resized to the original size of the video
 // before going to full-screen mode.
@@ -439,7 +452,10 @@ public class MyPlayer extends Sprite
     private function hideButtonsTick () : void
     {
 	buttons_visible = false;
-	playlist_button.setVisible (false);
+
+        if (show_playlist_button)
+            playlist_button.setVisible (false);
+
 	fullscreen_button.setVisible (false);
 	horizontal_button.setVisible (false);
     }
@@ -457,7 +473,10 @@ public class MyPlayer extends Sprite
             stage_height - (event.target.y + event.localY) > 300)
         {
 	    buttons_visible = false;
-	    playlist_button.setVisible (false);
+
+            if (show_playlist_button)
+                playlist_button.setVisible (false);
+
 	    fullscreen_button.setVisible (false);
 	    horizontal_button.setVisible (false);
         } else */ {
@@ -465,8 +484,10 @@ public class MyPlayer extends Sprite
 
 	    buttons_visible = true;
 
-	    if (stage.displayState != "fullScreen")
-	      playlist_button.setVisible (true);
+	    if (stage.displayState != "fullScreen") {
+                if (show_playlist_button)
+                    playlist_button.setVisible (true);
+            }
 
 	    fullscreen_button.setVisible (true);
 	    horizontal_button.setVisible (!videoShouldBeHorizontal());
@@ -502,6 +523,14 @@ public class MyPlayer extends Sprite
 	buffering_complete = false;
 	frame_no = 0;
 
+        if (loaderInfo.parameters ["buffer"])
+            buffer_time = loaderInfo.parameters ["buffer"];
+        else
+            buffer_time = 1.0;
+
+        autoplay = (loaderInfo.parameters ["autoplay"] != 0);
+        show_playlist_button = (loaderInfo.parameters ["playlist"] != 0);
+
 	buttons_visible = true;
 	horizontal_mode = false;
 
@@ -529,6 +558,7 @@ public class MyPlayer extends Sprite
 
 	trace ("--- ExternalInterface.available: " + ExternalInterface.available);
 	ExternalInterface.addCallback ("setSource", setSource);
+        ExternalInterface.addCallback ("setFirstUri", setFirstUri);
 
         /*
         playlist_button = new Sprite();
@@ -538,8 +568,10 @@ public class MyPlayer extends Sprite
         addChild (playlist_button);
         */
 
-	playlist_button = createLoadedElement ("playlist.png", true /* visible */);
-	playlist_button.obj.addEventListener (MouseEvent.CLICK, togglePlaylist);
+        if (show_playlist_button) {
+            playlist_button = createLoadedElement ("playlist.png", true /* visible */);
+            playlist_button.obj.addEventListener (MouseEvent.CLICK, togglePlaylist);
+        }
 
         fullscreen_button = createLoadedElement ("fullscreen.png", true /* visible */);
 	fullscreen_button.obj.addEventListener (MouseEvent.CLICK, toggleFullscreen);
@@ -560,7 +592,16 @@ public class MyPlayer extends Sprite
 
         stage.addEventListener ("mouseMove", onMouseMove);
 
-//	setChannel ("abc");
+        {
+            var autoplay_uri    : String = loaderInfo.parameters ["uri"];
+            var autoplay_stream : String = loaderInfo.parameters ["stream"];
+            if (autoplay && autoplay_uri && autoplay_stream) {
+                autoplay = false;
+                setChannel (autoplay_uri, autoplay_stream);
+            }
+        }
+
+	ExternalInterface.call ("flashInitialized");
     }
 }
 
