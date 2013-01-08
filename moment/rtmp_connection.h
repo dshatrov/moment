@@ -187,7 +187,7 @@ public:
 	operator Uint32 () const { return value; }
 	RtmpMessageType (Uint32 const value) : value (value) {}
 	RtmpMessageType () {}
-	Size toString_ (Memory const &mem, Format const &fmt);
+	Size toString_ (Memory const &mem, Format const &fmt) const;
     private:
 	Uint32 value;
     };
@@ -481,6 +481,15 @@ public:
     void sendUserControl_PingRequest ();
 
     void sendUserControl_PingResponse (Uint32 timestamp);
+
+    void sendDataMessage_AMF0 (Uint32 msg_stream_id,
+                               ConstMemory mem);
+
+    void sendDataMessage_AMF0_Pages (Uint32                  msg_stream_id,
+                                     PagePool::PageListHead * mt_nonnull page_list,
+                                     Size                    msg_offset,
+                                     Size                    msg_len,
+                                     Uint32                  prechunk_size);
 
     void sendCommandMessage_AMF0 (Uint32 msg_stream_id,
 				  ConstMemory const &mem);

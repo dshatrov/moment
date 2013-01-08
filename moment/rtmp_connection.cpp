@@ -53,7 +53,7 @@ Receiver::Frontend const RtmpConnection::receiver_frontend = {
 
 Size
 RtmpConnection::RtmpMessageType::toString_ (Memory const &mem,
-					    Format const & /* fmt */)
+					    Format const & /* fmt */) const
 {
     switch (value) {
 	case SetChunkSize:
@@ -1057,6 +1057,45 @@ RtmpConnection::sendUserControl_PingResponse (Uint32 const timestamp)
 }
 
 void
+RtmpConnection::sendDataMessage_AMF0 (Uint32      const msg_stream_id,
+                                      ConstMemory const mem)
+{
+    MessageDesc mdesc;
+    mdesc.timestamp = 0; // XXX Why not set real non-zero timestamp? - Возможно, при нулевом таймстемпе сообщения не оседают в буфере, а сразу обрабатываются?
+    mdesc.msg_type_id = RtmpMessageType::Data_AMF0;
+    mdesc.msg_stream_id = msg_stream_id;
+    mdesc.msg_len = mem.len();
+    mdesc.cs_hdr_comp = false;
+
+    sendMessage (&mdesc, data_chunk_stream, mem, 0 /* prechunk_size */);
+}
+
+void
+RtmpConnection::sendDataMessage_AMF0_Pages (Uint32                   const msg_stream_id,
+                                            PagePool::PageListHead * const mt_nonnull page_list,
+                                            Size                     const msg_offset,
+                                            Size                     const msg_len,
+                                            Uint32                   const prechunk_size)
+{
+    MessageDesc mdesc;
+    mdesc.timestamp = 0;
+    mdesc.msg_type_id = RtmpMessageType::Data_AMF0;
+    mdesc.msg_stream_id = msg_stream_id;
+    mdesc.msg_len = msg_len;
+    mdesc.cs_hdr_comp = true;
+
+    sendMessagePages (&mdesc,
+                      data_chunk_stream,
+                      page_list,
+                      msg_offset,
+                      prechunk_size,
+                      false /* take_ownership */,
+                      false /* unlocked */,
+                      NULL  /* extra_header_buf */,
+                      0     /* extra_header_len */);
+}
+
+void
 RtmpConnection::sendCommandMessage_AMF0 (Uint32 const msg_stream_id,
 					 ConstMemory const &mem)
 {
@@ -1701,8 +1740,14 @@ RtmpConnection::processMessage (ChunkStream * const chunk_stream)
 	    logD (proto_in, _func, "Aggregate");
 	  // No-op
 	} break;
-	default:
-	    logW_ (_func, "unknown message type: 0x", fmt_hex, chunk_stream->in_msg_type_id);
+	default: {
+            logLock ();
+	    logW_unlocked_ (_func, "unknown message type: 0x", fmt_hex, chunk_stream->in_msg_type_id);
+//            if (logLevelOn (proto_in, LogLevel::Debug)) {
+//                PagePool::dumpPages (logs, &chunk_stream->page_list);
+//            }
+            logUnlock ();
+        }
     }
 
     return Result::Success;
@@ -2745,6 +2790,8 @@ RtmpConnection::doCreateStream (Uint32       const msg_stream_id,
     // TODO Perhaps a unique message stream id should be allocated.
     //      (a simple increment of a counter would do).
     double const reply_msg_stream_id = DefaultMessageStreamId;
+
+    logD_ (_this_func, msg_stream_id, ", ", reply_msg_stream_id);
 
     {
 	AmfAtom atoms [4];
