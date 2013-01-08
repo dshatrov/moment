@@ -1,5 +1,5 @@
 /*  Moment Video Server - High performance media server
-    Copyright (C) 2011 Dmitry Shatrov
+    Copyright (C) 2011, 2012 Dmitry Shatrov
     e-mail: shatrov@gmail.com
 
     This program is free software: you can redistribute it and/or modify
@@ -17,10 +17,9 @@
 */
 
 
-#include <libmary/types.h>
+#include <libmary/libmary.h>
 #include <cstring>
 
-#include <mycpp/list.h>
 #include <libmary/module_init.h>
 #include <moment/libmoment.h>
 
@@ -82,22 +81,31 @@ class PathEntry : public BasicReferenced
 public:
     Ref<String> path;
     Ref<String> prefix;
+
+    MConfig::Varlist varlist;
+    bool enable_varlist_defaults;
 };
 
 static Ref<String> this_http_server_addr;
 static Ref<String> this_rtmp_server_addr;
 static Ref<String> this_rtmpt_server_addr;
 
-static MyCpp::List< Ref<PathEntry> > path_list;
+static List< Ref<PathEntry> > path_list;
+
+static mt_const MConfig::Varlist glob_varlist;
+static mt_const bool glob_enable_varlist_defaults = true;
 
 static MomentServer *moment = NULL;
 static PagePool *page_pool = NULL;
 
 static Result momentFile_sendTemplate (HttpRequest *http_req,
+                                       ConstMemory  path_dir,
 				       ConstMemory  full_path,
 				       ConstMemory  filename,
 				       Sender      * mt_nonnull sender,
-				       ConstMemory  mime_type);
+				       ConstMemory  mime_type,
+                                       MConfig::Varlist *varlist,
+                                       bool         enable_varlist_defaults);
 
 static Result momentFile_sendMemory (ConstMemory  mem,
 				     Sender      * mt_nonnull sender,
@@ -259,11 +267,14 @@ Result httpRequest (HttpRequest   * const mt_nonnull req,
             logD_ (_func, "Trying .tpl");
 	    if (momentFile_sendTemplate (
 			req,
+                        path_entry->path->mem(),
 			req->getFullPath(),
 			makeString (filename->mem().region (0, filename->mem().len() - ext_length),
 				    ".tpl")->mem(),
 			conn_sender,
-			mime_type))
+			mime_type,
+                        &path_entry->varlist,
+                        path_entry->enable_varlist_defaults))
 	    {
 		if (!req->getKeepalive())
 		    conn_sender->closeAfterFlush();
@@ -321,13 +332,16 @@ Result httpRequest (HttpRequest   * const mt_nonnull req,
 
                     if (momentFile_sendTemplate (
                                 req,
+                                path_entry->path->mem(),
                                 req->getFullPath(),
                                 makeString (filename->mem().region (0, filename->mem().len() - ext_length),
                                             ".",
                                             alang->lang->mem(),
                                             ".tpl")->mem(),
                                 conn_sender,
-                                mime_type))
+                                mime_type,
+                                &path_entry->varlist,
+                                path_entry->enable_varlist_defaults))
                     {
                         if (!req->getKeepalive())
                             conn_sender->closeAfterFlush();
@@ -619,21 +633,99 @@ namespace {
     };
 }
 
+static void fillDictionaryFromVarlist (ctemplate::TemplateDictionary * const mt_nonnull dict,
+                                       MConfig::Varlist              * const mt_nonnull varlist)
+{
+    {
+        MConfig::Varlist::VarList::iterator iter (varlist->var_list);
+        while (!iter.done()) {
+            MConfig::Varlist::Var * const var = iter.next ();
+            ConstMemory const name  = var->getName();
+            ConstMemory const value = var->getValue();
+            dict->SetValue (ctemplate::TemplateString ((char const *) name.mem(), name.len()),
+                            ctemplate::TemplateString ((char const *) value.mem(), value.len()));
+        }
+    }
+
+    {
+        MConfig::Varlist::SectionList::iterator iter (varlist->section_list);
+        while (!iter.done()) {
+            MConfig::Varlist::Section * const sect = iter.next ();
+
+            Ref<String> sect_name;
+            if (sect->getEnabled())
+                sect_name = makeString (sect->getName(), "_ON");
+            else
+                sect_name = makeString (sect->getName(), "_OFF");
+
+            dict->ShowSection (ctemplate::TemplateString ((char const *) sect_name->mem().mem(),
+                                                          sect_name->mem().len()));
+        }
+    }
+}
+
+static void loadDefaultsVarlist (ConstMemory        const path,
+                                 MConfig::Varlist * const varlist)
+{
+    Ref<String> const defaults_path = makeString (path, path.len() ? "/" : "", "var.defaults");
+
+    MConfig::VarlistParser varlist_parser;
+    if (!varlist_parser.parseVarlist (defaults_path->mem(), varlist))
+        logE_ (_func, "Could not parse ", defaults_path);
+}
+
 static Result momentFile_sendTemplate (HttpRequest * const http_req,
+                                       ConstMemory   const path_dir,
 				       ConstMemory   const full_path,
 				       ConstMemory   const filename,
 				       Sender      * const mt_nonnull sender,
-				       ConstMemory   const mime_type)
+				       ConstMemory   const mime_type,
+                                       MConfig::Varlist * const varlist,
+                                       bool          const enable_varlist_defaults)
 {
     logD_ (_func, "full_path: ", full_path, ", filename: ", filename);
+
+  // TODO Fill the dictionary only once for consecutive multi-language .tpl attempts.
 
     // TODO There should be a better way.
     ctemplate::mutable_default_template_cache()->ReloadAllIfChanged (ctemplate::TemplateCache::LAZY_RELOAD);
 
     ctemplate::TemplateDictionary dict ("tmpl");
-    dict.SetValue ("ThisHttpServerAddr", this_http_server_addr->cstr());
-    dict.SetValue ("ThisRtmpServerAddr", this_rtmp_server_addr->cstr());
-    dict.SetValue ("ThisRtmptServerAddr", this_rtmpt_server_addr->cstr());
+
+    if (enable_varlist_defaults) {
+        MConfig::Varlist defaults_varlist;
+        loadDefaultsVarlist (path_dir, &defaults_varlist);
+        fillDictionaryFromVarlist (&dict, &defaults_varlist);
+    }
+
+    fillDictionaryFromVarlist (&dict, &glob_varlist);
+    if (varlist)
+        fillDictionaryFromVarlist (&dict, varlist);
+
+    {
+        char const val_name [] = "ThisHttpServerAddr";
+        dict.SetValue (ctemplate::TemplateString (val_name,
+                                                  sizeof (val_name) - 1), 
+                       ctemplate::TemplateString ((char const *) this_http_server_addr->mem().mem(),
+                                                  this_http_server_addr->mem().len()));
+    }
+
+    {
+        char const val_name [] = "ThisRtmpServerAddr";
+        dict.SetValue (ctemplate::TemplateString (val_name,
+                                                  sizeof (val_name) - 1),
+                       ctemplate::TemplateString ((char const *) this_rtmp_server_addr->mem().mem(),
+                                                  this_rtmp_server_addr->mem().len()));
+    }
+
+    {
+        char const val_name [] = "ThisRtmptServerAddr";
+        dict.SetValue (ctemplate::TemplateString (val_name,
+                                                  sizeof (val_name) - 1),
+                       ctemplate::TemplateString ((char const *) this_rtmpt_server_addr->mem().mem(),
+                                                  this_rtmpt_server_addr->mem().len()));
+    }
+
 
 #if 0
     {
@@ -698,15 +790,66 @@ static HttpService::HttpHandler const http_handler = {
     NULL /* httpMessageBody */
 };
 
-void momentFile_addPath (ConstMemory const &path,
-			 ConstMemory const &prefix,
-			 HttpService * const http_service)
+static void parseVarlist (MConfig::Section * const section,
+                          MConfig::Varlist * const varlist)
 {
-    Ref<PathEntry> const path_entry = grab (new PathEntry);
+    logD_ (_func_);
 
-    path_entry->path = grab (new String (path));
-    path_entry->prefix = grab (new String (prefix));
+    MConfig::Section::iterator iter (*section);
+    while (!iter.done()) {
+        MConfig::SectionEntry * const sect_entry = iter.next ();
+        if (sect_entry->getType() == MConfig::SectionEntry::Type_Option) {
+            MConfig::Option * const option = static_cast <MConfig::Option*> (sect_entry);
 
+            ConstMemory var_name = option->getName();
+            ConstMemory var_value;
+
+            bool enable_section = false;
+            {
+                ConstMemory const enable_mem = "enable ";
+                if (var_name.len() > enable_mem.len() &&
+                    equal (var_name.region (0, enable_mem.len()), enable_mem))
+                {
+                    enable_section = true;
+                    var_name = var_name.region (enable_mem.len());
+                }
+            }
+
+            bool disable_section = false;
+            if (!enable_section) {
+                ConstMemory const disable_mem = "disable ";
+                if (var_name.len() > disable_mem.len() &&
+                    equal (var_name.region (0, disable_mem.len()), disable_mem))
+                {
+                    disable_section = true;
+                    var_name = var_name.region (disable_mem.len());
+                }
+            }
+
+            MConfig::Value * const value = option->getValue();
+            bool const with_value = value;
+            if (value)
+                var_value = value->mem();
+
+            logD_ (_func,
+                   "var_name: ", var_name, ", ",
+                   "var_value: ", var_value, ", ",
+                   "with_value: ", with_value, ", ",
+                   "enable_section: ", enable_section, ", ",
+                   "disable_section: ", disable_section);
+
+            varlist->addEntry (var_name,
+                               var_value,
+                               with_value,
+                               enable_section,
+                               disable_section);
+        }
+    }
+}
+
+void momentFile_addPathEntry (PathEntry   * const path_entry,
+                              HttpService * const http_service)
+{
     logD_ (_func, "Adding path \"", path_entry->path, "\", prefix \"", path_entry->prefix, "\"");
 
     http_service->addHttpHandler (
@@ -716,9 +859,23 @@ void momentFile_addPath (ConstMemory const &path,
     path_list.append (path_entry);
 }
 
+void momentFile_addPath (ConstMemory   const path,
+			 ConstMemory   const prefix,
+			 HttpService * const http_service)
+{
+    Ref<PathEntry> const path_entry = grab (new PathEntry);
+    path_entry->path = grab (new String (path));
+    path_entry->prefix = grab (new String (prefix));
+    path_entry->enable_varlist_defaults = glob_enable_varlist_defaults;
+
+    momentFile_addPathEntry (path_entry, http_service);
+}
+
 void momentFile_addPathForSection (MConfig::Section * const section,
 				   HttpService      * const http_service)
 {
+    logD_ (_func_);
+
     ConstMemory path;
     {
 	MConfig::Option * const opt = section->getOption ("path");
@@ -749,7 +906,37 @@ void momentFile_addPathForSection (MConfig::Section * const section,
 	}
     }
 
-    momentFile_addPath (path, prefix, http_service);
+    Ref<PathEntry> const path_entry = grab (new PathEntry);
+    path_entry->path = grab (new String (path));
+    path_entry->prefix = grab (new String (prefix));
+    path_entry->enable_varlist_defaults = glob_enable_varlist_defaults;
+
+    if (MConfig::Section * const vars_section = section->getSection ("vars")) {
+        logD_ (_func, "got \"vars\" section");
+
+        if (MConfig::Attribute * const defaults_attr = vars_section->getAttribute ("defaults")) {
+            switch (MConfig::strToBoolean (defaults_attr->getValue())) {
+                case MConfig::Boolean_True:
+                case MConfig::Boolean_Default:
+                    logD_ (_func, "vars defaults enabled");
+                    path_entry->enable_varlist_defaults = true;
+                    break;
+                case MConfig::Boolean_False:
+                    logD_ (_func, "vars defaults disabled");
+                    path_entry->enable_varlist_defaults = false;
+                    break;
+                case MConfig::Boolean_Invalid:
+                    logE_ (_func, "Invalid value for vars:defaults attribute: ", defaults_attr->getValue());
+                    break;
+            }
+        }
+
+        parseVarlist (vars_section, &path_entry->varlist);
+    } else {
+        logD_ (_func, "no \"vars\" section");
+    }
+
+    momentFile_addPathEntry (path_entry, http_service);
 }
 
 // Multiple file paths can be specified like this:
@@ -829,16 +1016,39 @@ void momentFileInit ()
 	if (!modfile_section)
 	    break;
 
+        // Dealing with "vars" section first to figure out the value of
+        // 'glob_enable_varlist_defaults'.
+        if (MConfig::Section * const vars_section = modfile_section->getSection ("vars")) {
+            if (MConfig::Attribute * const defaults_attr = vars_section->getAttribute ("defaults")) {
+                switch (MConfig::strToBoolean (defaults_attr->getValue())) {
+                    case MConfig::Boolean_True:
+                    case MConfig::Boolean_Default:
+                        logD_ (_func, "glob vars defaults enabled");
+                        glob_enable_varlist_defaults = true;
+                        break;
+                    case MConfig::Boolean_False:
+                        logD_ (_func, "glob vars defaults disabled");
+                        glob_enable_varlist_defaults = false;
+                        break;
+                    case MConfig::Boolean_Invalid:
+                        logE_ (_func, "Invalid value for vars:defaults attribute: ", defaults_attr->getValue());
+                        break;
+                }
+            }
+
+            parseVarlist (vars_section, &glob_varlist);
+        }
+
 	MConfig::Section::iter iter (*modfile_section);
 	while (!modfile_section->iter_done (iter)) {
 	    got_path = true;
 
 	    MConfig::SectionEntry * const sect_entry = modfile_section->iter_next (iter);
-	    if (sect_entry->getType() == MConfig::SectionEntry::Type_Section
-		&& sect_entry->getName().len() == 0)
-	    {
-		momentFile_addPathForSection (static_cast <MConfig::Section*> (sect_entry), http_service);
-	    }
+	    if (sect_entry->getType() == MConfig::SectionEntry::Type_Section) {
+                MConfig::Section * const section = static_cast <MConfig::Section*> (sect_entry);
+		if (sect_entry->getName().len() == 0)
+                    momentFile_addPathForSection (section, http_service);
+            }
 	}
     } while (0);
 
