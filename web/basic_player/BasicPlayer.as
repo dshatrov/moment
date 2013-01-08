@@ -74,8 +74,6 @@ public class BasicPlayer extends Sprite
 
     private var hide_buttons_timer : uint;
 
-    private var initial_pause : Boolean;
-
     private var playing : Boolean;
     private var reconnecting : Boolean;
 
@@ -350,7 +348,8 @@ public class BasicPlayer extends Sprite
 	play_timer = setInterval (playTimerTick, play_duration);
 
 	if (conn) {
-	    stream.resume ();
+            if (stream)
+                stream.resume ();
 	} else {
 	    doSetChannel (channel_uri, stream_name, true /* reconnect */);
 	}
@@ -394,16 +393,13 @@ public class BasicPlayer extends Sprite
 
     public function BasicPlayer ()
     {
-	initial_pause = false;
-
 	playing = false;
 	reconnecting = false;
 
-	if (loaderInfo.parameters ["buffer"]) {
+	if (loaderInfo.parameters ["buffer"])
 	    buffer_time = loaderInfo.parameters ["buffer"];
-        } else {
+        else
 	    buffer_time = 1.0;
-        }
 
         if (loaderInfo.parameters ["autoplay"])
             start_paused = false;
