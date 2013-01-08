@@ -35,6 +35,7 @@
         с сетевыми соединениями, поддержка многопоточности, кроссплатформенность;
       </rus>
     </li>
+    <!--
     <li>
       <b>mycpp</b> &mdash;
       <eng>
@@ -50,6 +51,7 @@
       <eng>library for working with machine languages.</eng>
       <rus>библиотека для работы с машинными языками;</rus>
     </li>
+    -->
     <li>
       <b>pargen</b> &mdash;
       <eng>parser generator.</eng>
