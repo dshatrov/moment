@@ -29,6 +29,32 @@ namespace Moment {
 
 static LogGroup libMary_logGroup_rtmp_server ("rtmp_server", LogLevel::I);
 
+void
+RtmpServer::sendRtmpSampleAccess (Uint32 const msg_stream_id,
+                                  bool   const allow_a,
+                                  bool   const allow_b)
+{
+  // Sending |RtmpSampleAccess
+
+    logD_ (_this_func, " (", msg_stream_id, ", ", allow_a, ", ", allow_b, ")");
+
+    AmfAtom atoms [3];
+    AmfEncoder encoder (atoms);
+
+    encoder.addString ("|RtmpSampleAccess");
+    encoder.addBoolean (allow_a);
+    encoder.addBoolean (allow_b);
+
+    Byte msg_buf [4096];
+    Size msg_len;
+    if (!encoder.encode (Memory::forObject (msg_buf), AmfEncoding::AMF0, &msg_len)) {
+        logE_ (_func, "could not encode |RtmpSampleAccess message");
+        return;
+    }
+
+    rtmp_conn->sendDataMessage_AMF0 (msg_stream_id, ConstMemory (msg_buf, msg_len));
+}
+
 Result
 RtmpServer::doConnect (Uint32       const msg_stream_id,
 		       AmfDecoder * const mt_nonnull decoder)
@@ -84,6 +110,8 @@ RtmpServer::doConnect (Uint32       const msg_stream_id,
     rtmp_conn->sendWindowAckSize (rtmp_conn->getLocalWackSize());
     rtmp_conn->sendSetPeerBandwidth (rtmp_conn->getRemoteWackSize(), 2 /* dynamic limit */);
     rtmp_conn->sendUserControl_StreamBegin (0 /* msg_stream_id */);
+
+    sendRtmpSampleAccess (RtmpConnection::DefaultMessageStreamId, true, true);
 
     {
 	AmfAtom atoms [25];
@@ -171,24 +199,34 @@ RtmpServer::doConnect (Uint32       const msg_stream_id,
     return Result::Success;
 }
 
+namespace {
+class StartRtmpWatchingCallback_Data : public Referenced
+{
+public:
+    RtmpServer *rtmp_server;
+    Uint32 msg_stream_id;
+};
+}
+
 void
 RtmpServer::startRtmpWatchingCallback (Result   const res,
-                                       void   * const _self)
+                                       void   * const _data)
 {
-    RtmpServer * const self = static_cast <RtmpServer*> (_self);
+    StartRtmpWatchingCallback_Data * const data = static_cast <StartRtmpWatchingCallback_Data*> (_data);
+    RtmpServer * const self = data->rtmp_server;
 
     if (!res) {
         self->rtmp_conn->reportError ();
         return;
     }
 
-    self->completePlay ();
+    self->completePlay (data->msg_stream_id);
 }
 
 void
-RtmpServer::completePlay ()
+RtmpServer::completePlay (Uint32 const /* msg_stream_id */)
 {
-  // No-op
+    // sendRtmpSampleAccess (msg_stream_id, true, true);
 }
 
 Result
@@ -293,6 +331,8 @@ RtmpServer::doPlay (Uint32       const msg_stream_id,
 	rtmp_conn->sendUserControl_StreamBegin (msg_stream_id);
 //    }
 
+    sendRtmpSampleAccess (msg_stream_id, true, true);
+
     {
       // Sending onStatus reply "Start".
 
@@ -334,6 +374,10 @@ RtmpServer::doPlay (Uint32       const msg_stream_id,
     }
 
     {
+        Ref<StartRtmpWatchingCallback_Data> const data = grab (new StartRtmpWatchingCallback_Data);
+        data->rtmp_server = this;
+        data->msg_stream_id = msg_stream_id;
+
 	Result res = Result::Failure;
         bool complete = false;
 	if (!frontend.call_ret<bool> (
@@ -342,8 +386,9 @@ RtmpServer::doPlay (Uint32       const msg_stream_id,
                     /*(*/
                         ConstMemory (vs_name_buf, vs_name_len),
                         CbDesc<StartRtmpWatchingCallback> (startRtmpWatchingCallback,
-                                                           this,
-                                                           getCoderefContainer()),
+                                                           data,
+                                                           getCoderefContainer(),
+                                                           data),
                         &res
                     /*)*/))
         {
@@ -360,7 +405,7 @@ RtmpServer::doPlay (Uint32       const msg_stream_id,
 	}
     }
 
-    completePlay ();
+    completePlay (msg_stream_id);
 
     return Result::Success;
 }
@@ -425,23 +470,24 @@ RtmpServer::doPause (Uint32       const msg_stream_id,
     return Result::Success;
 }
 
+namespace {
 class StartRtmpStreamingCallback_Data : public Referenced
 {
 public:
-    WeakDepRef<RtmpServer> weak_rtmp_server;
+    RtmpServer *rtmp_server;
+
     Uint32 msg_stream_id;
     double transaction_id;
     Ref<String> vs_name;
 };
+}
 
 void
 RtmpServer::startRtmpStreamingCallback (Result   const res,
                                         void   * const _data)
 {
     StartRtmpStreamingCallback_Data * const data = static_cast <StartRtmpStreamingCallback_Data*> (_data);
-    CodeDepRef<RtmpServer> const self = data->weak_rtmp_server;
-    if (!self)
-        return;
+    RtmpServer * const self = data->rtmp_server;
 
     if (!res) {
         self->rtmp_conn->reportError ();
@@ -665,7 +711,7 @@ RtmpServer::doPublish (Uint32       const msg_stream_id,
 
     if (frontend && frontend->startRtmpStreaming) {
         Ref<StartRtmpStreamingCallback_Data> const data = grab (new StartRtmpStreamingCallback_Data);
-        data->weak_rtmp_server = this;
+        data->rtmp_server = this;
         data->msg_stream_id = msg_stream_id;
         data->transaction_id = transaction_id;
         data->vs_name = grab (new String (ConstMemory (vs_name_buf, vs_name_len)));
@@ -681,7 +727,7 @@ RtmpServer::doPublish (Uint32       const msg_stream_id,
                         conn_info->momentrtmp_proto,
                         CbDesc<StartRtmpStreamingCallback> (startRtmpStreamingCallback,
                                                             data,
-                                                            NULL,
+                                                            getCoderefContainer(),
                                                             data),
                         &res
                     /*)*/))

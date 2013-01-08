@@ -92,13 +92,17 @@ private:
 
     AtomicInt playing;
 
+    void sendRtmpSampleAccess (Uint32 msg_stream_id,
+                               bool   allow_a,
+                               bool   allow_b);
+
     Result doConnect (Uint32      msg_stream_id,
 		      AmfDecoder * mt_nonnull decoder);
 
     static void startRtmpWatchingCallback (Result  res,
                                            void   *_self);
 
-    void completePlay ();
+    void completePlay (Uint32 msg_stream_id);
 
     Result doPlay (Uint32      msg_stream_id,
 		   AmfDecoder * mt_nonnull decoder);
