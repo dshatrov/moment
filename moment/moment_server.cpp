@@ -46,24 +46,6 @@ static LogGroup libMary_logGroup_session ("MomentServer.session", LogLevel::I);
 MomentServer* MomentServer::instance = NULL;
 
 
-// __________________________________ Events ___________________________________
-
-void
-MomentServer::informDestroy (Events * const events,
-                             void   * const cb_data,
-                             void   * const /* inform_data */)
-{
-    if (events->destroy)
-        events->destroy (cb_data);
-}
-
-void
-MomentServer::fireDestroy ()
-{
-    event_informer.informAll (informDestroy, NULL /* inform_cb_data */);
-}
-
-
 // ___________________________ Video stream handlers ___________________________
 
 namespace {
@@ -518,12 +500,6 @@ MomentServer::getAdminHttpService ()
     return admin_http_service;
 }
 
-MConfig::Config* 
-MomentServer::getConfig ()
-{
-    return config;
-}
-
 ServerThreadPool*
 MomentServer::getRecorderThreadPool ()
 {
@@ -541,6 +517,51 @@ MomentServer::getInstance ()
 {
     return instance;
 }
+
+
+// __________________________________ Config ___________________________________
+
+Ref<MConfig::Config>
+MomentServer::getConfig ()
+{
+    config_mutex.lock ();
+    Ref<MConfig::Config> const tmp_config = config;
+    config_mutex.unlock ();
+    return tmp_config;
+}
+
+mt_mutex (config_mutex) MConfig::Config*
+MomentServer::getConfig_unlocked ()
+{
+    return config;
+}
+
+void
+MomentServer::setConfig (MConfig::Config * mt_nonnull const new_config)
+{
+    config_mutex.lock ();
+    config = new_config;
+// TODO Simplify synchronization: require the client to call getConfig() when handling configReload().
+//      'config_mutex' will then become unnecessary (! _vast_ simplification).
+//      Pass MomentServer pointer arg for convenience.
+    fireConfigReload (new_config);
+    config_mutex.unlock ();
+}
+
+void
+MomentServer::configLock ()
+{
+    config_mutex.lock ();
+}
+
+void
+MomentServer::configUnlock ()
+{
+    config_mutex.unlock ();
+}
+
+// _____________________________________________________________________________
+
 
 Ref<MomentServer::ClientSession>
 MomentServer::rtmpClientConnected (ConstMemory const &path,
@@ -1629,10 +1650,10 @@ MomentServer::MomentServer ()
       server_app            (NULL),
       page_pool             (NULL),
       http_service          (NULL),
-      config                (NULL),
       recorder_thread_pool  (NULL),
       storage               (NULL),
-      publish_all_streams   (true)
+      publish_all_streams   (true),
+      config                (NULL)
 {
     instance = this;
 

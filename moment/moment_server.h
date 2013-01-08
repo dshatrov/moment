@@ -1,5 +1,5 @@
 /*  Moment Video Server - High performance media server
-    Copyright (C) 2011 Dmitry Shatrov
+    Copyright (C) 2011, 2012 Dmitry Shatrov
     e-mail: shatrov@gmail.com
 
     This program is free software: you can redistribute it and/or modify
@@ -76,31 +76,53 @@ public:
     };
 
 
-// __________________________________ Events ___________________________________
+  // _________________________________ Events __________________________________
 
 public:
     struct Events
     {
+        void (*configReload) (MConfig::Config *new_config,
+                              void            *cb_data);
+
         void (*destroy) (void *cb_data);
     };
 
 private:
     Informer_<Events> event_informer;
 
-    static void informDestroy (Events *events,
-                               void   *cb_data,
-                               void   *inform_data);
-
-    void fireDestroy ();
-
-public:
-    Informer_<Events>* getEventInformer ()
+    static void informConfigReload (Events * const events,
+                                    void   * const cb_data,
+                                    void   * const _new_config)
     {
-        return &event_informer;
+        if (events->configReload) {
+            MConfig::Config * const new_config = static_cast <MConfig::Config*> (_new_config);
+            events->configReload (new_config, cb_data);
+        }
     }
 
+    void fireConfigReload (MConfig::Config * const new_config)
+    {
+        event_informer.informAll (informConfigReload, new_config);
+    }
 
-// ____________________________ Transcoder backend _____________________________
+    static void informDestroy (Events * const events,
+                               void   * const cb_data,
+                               void   * const /* inform_data */)
+    {
+        if (events->destroy)
+            events->destroy (cb_data);
+    }
+
+    void fireDestroy ()
+    {
+        event_informer.informAll (informDestroy, NULL /* inform_data */);
+    }
+
+public:
+    Informer_<Events>* getEventInformer () { return &event_informer; }
+
+
+  // ___________________________ Transcoder backend ____________________________
 
 public:
     struct TranscoderBackend
@@ -133,7 +155,7 @@ public:
     }
 
 
-// ________________________________ Statistics _________________________________
+  // _______________________________ Statistics ________________________________
 
 private:
     static HttpService::HttpHandler const stat_http_handler;
@@ -145,7 +167,7 @@ private:
                                    void          *_self);
 
 
-// ___________________________ Video stream handlers ___________________________
+  // __________________________ Video stream handlers __________________________
 
 public:
     // TODO Add a wrapper to api.h
@@ -201,7 +223,7 @@ public:
 
     mt_mutex (mutex) void removeVideoStreamHandler_unlocked (VideoStreamHandlerKey vs_handler_key);
 
-// _____________________________________________________________________________
+  // ___________________________________________________________________________
 
 
 public:
@@ -219,6 +241,9 @@ public:
 			  public IntrusiveListElement<ClientSessionList_name>
     {
 	friend class MomentServer;
+
+    private:
+        StateMutex mutex;
 
     public:
 	struct Events
@@ -328,6 +353,8 @@ private:
 	friend class MomentServer;
 
     private:
+        StateMutex mutex;
+
 	Namespace *parent_nsp;
 	StringHash< Ref<ClientEntry> >::EntryKey client_entry_key;
 
@@ -401,6 +428,8 @@ private:
 	friend class MomentServer;
 
     private:
+        StateMutex mutex;
+
 	Informer_<PageRequestHandler> event_informer;
 
 	typedef StringHash< Ref<PageRequestHandlerEntry> > PageRequestHandlerHash;
@@ -436,7 +465,6 @@ private:
     mt_const PagePool *page_pool;
     mt_const HttpService *http_service;
     mt_const HttpService *admin_http_service;
-    mt_const MConfig::Config *config;
     mt_const ServerThreadPool *recorder_thread_pool;
     mt_const Storage *storage;
 
@@ -496,13 +524,33 @@ public:
 
     HttpService* getAdminHttpService ();
 
-    MConfig::Config* getConfig ();
-
     ServerThreadPool* getRecorderThreadPool ();
 
     Storage* getStorage ();
 
     static MomentServer* getInstance ();
+
+
+  // _________________________________ Config __________________________________
+
+private:
+    Mutex config_mutex;
+
+    mt_mutex (config_mutex) Ref<MConfig::Config> config;
+
+public:
+    Ref<MConfig::Config> getConfig ();
+
+    mt_mutex (config_mutex) MConfig::Config* getConfig_unlocked ();
+
+    void setConfig (MConfig::Config * mt_nonnull new_config);
+
+    void configLock ();
+
+    void configUnlock ();
+
+  // ___________________________________________________________________________
+
 
   // Client events
 
@@ -607,7 +655,8 @@ public:
                                               ConstMemory  username,
                                               ConstMemory  password);
 
-// _______________________________ Authorization _______________________________
+
+  // ______________________________ Authorization ______________________________
 
 public:
     class AuthSession : public virtual Referenced
@@ -658,14 +707,10 @@ public:
                              CbDesc<CheckAuthorizationCallback> const &cb,
                              bool        * mt_nonnull ret_authorized);
 
-// _____________________________________________________________________________
+  // ___________________________________________________________________________
 
-
-  // Utility
 
     void dumpStreamList ();
-
-  // Initialization
 
     mt_locks (mutex) void lock ();
 
@@ -684,13 +729,13 @@ public:
     ~MomentServer ();    
 
 
-// __________________________ Internal public methods __________________________
+  // _________________________ Internal public methods _________________________
 
-Result setClientSessionVideoStream (ClientSession *client_session,
-                                    VideoStream   *video_stream,
-                                    ConstMemory    stream_name);
+    Result setClientSessionVideoStream (ClientSession *client_session,
+                                        VideoStream   *video_stream,
+                                        ConstMemory    stream_name);
 
-// _____________________________________________________________________________
+  // ___________________________________________________________________________
 
 };
 
