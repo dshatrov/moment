@@ -117,6 +117,8 @@ public:
 class ClientSession : public Object
 {
 public:
+    StateMutex mutex;
+
     mt_mutex (mutex) bool valid;
 
     IpAddress client_addr;
@@ -1180,6 +1182,7 @@ static void serverDestroy (void * const _rtmp_module)
 }
 
 static MomentServer::Events const server_events = {
+    NULL /* configReload */,
     serverDestroy
 };
 

@@ -17,7 +17,7 @@
 */
 
 
-#include <libmary/types.h>
+#include <libmary/libmary.h>
 
 #include <cstdio>
 
@@ -31,9 +31,6 @@
 #endif
 
 #include <moment/libmoment.h>
-
-#include <mycpp/mycpp.h>
-#include <mycpp/cmdline.h>
 
 
 using namespace M;
@@ -674,13 +671,12 @@ _stop_recorder:
 
 int main (int argc, char **argv)
 {
-    MyCpp::myCppInit ();
     libMaryInit ();
     libMomentGstInit ();
 
     {
 	unsigned const num_opts = 6;
-	MyCpp::CmdlineOption opts [num_opts];
+	CmdlineOption opts [num_opts];
 
 	opts [0].short_name = "h";
 	opts [0].long_name  = "help";
@@ -718,8 +714,8 @@ int main (int argc, char **argv)
 	opts [5].opt_data = NULL;
 	opts [5].opt_callback = cmdline_exit_after;
 
-	MyCpp::ArrayIterator<MyCpp::CmdlineOption> opts_iter (opts, num_opts);
-	MyCpp::parseCmdline (&argc, &argv, opts_iter, NULL /* callback */, NULL /* callbackData */);
+	ArrayIterator<CmdlineOption> opts_iter (opts, num_opts);
+	parseCmdline (&argc, &argv, opts_iter, NULL /* callback */, NULL /* callbackData */);
     }
 
     if (options.help) {

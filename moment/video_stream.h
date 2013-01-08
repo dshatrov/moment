@@ -71,6 +71,8 @@ public:
 class VideoStream : public Object
 {
 private:
+    StateMutex mutex;
+
     // Protects from concurrent invocations of bindToSrteam()
     Mutex bind_mutex;
 
@@ -87,7 +89,7 @@ public:
 	operator Value () const { return value; }
 	AudioFrameType (Value const value) : value (value) {}
 	AudioFrameType () {}
-	Size toString_ (Memory const &mem, Format const &fmt);
+	Size toString_ (Memory const &mem, Format const &fmt) const;
     private:
 	Value value;
 
@@ -118,7 +120,7 @@ public:
 	operator Value () const { return value; }
 	VideoFrameType (Value const value) : value (value) {}
 	VideoFrameType () {}
-	Size toString_ (Memory const &mem, Format const &fmt);
+	Size toString_ (Memory const &mem, Format const &fmt) const;
     private:
 	Value value;
 
@@ -175,7 +177,7 @@ public:
 	operator Value () const { return value; }
 	AudioCodecId (Value const value) : value (value) {}
 	AudioCodecId () {}
-	Size toString_ (Memory const &mem, Format const &fmt);
+	Size toString_ (Memory const &mem, Format const &fmt) const;
     private:
 	Value value;
 
@@ -200,7 +202,7 @@ public:
 	operator Value () const { return value; }
 	VideoCodecId (Value const value) : value (value) {}
 	VideoCodecId () {}
-	Size toString_ (Memory const &mem, Format const &fmt);
+	Size toString_ (Memory const &mem, Format const &fmt) const;
     private:
 	Value value;
 

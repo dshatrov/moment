@@ -34,9 +34,13 @@ class RtmptService : public RtmpVideoService,
 		     public DependentCodeReferenced
 {
 private:
+    StateMutex mutex;
+
     class ConnectionData : public Object
     {
     public:
+        StateMutex mutex;
+
 	mt_mutex (mutex) PollGroup::PollableKey pollable_key;
     };
 

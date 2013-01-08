@@ -579,7 +579,7 @@ RtmpPushProtocol::connect (VideoStream * const video_stream,
   }
 
 _failure:
-    exc_throw <InternalException> (InternalException::BadInput);
+    exc_throw (InternalException, InternalException::BadInput);
     return NULL;
 }
 

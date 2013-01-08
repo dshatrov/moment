@@ -31,6 +31,8 @@ class RtmpPushConnection : public PushConnection,
                            public virtual Object
 {
 private:
+    StateMutex mutex;
+
     enum ConnectionState {
         ConnectionState_Connect,
         ConnectionState_ConnectSent,

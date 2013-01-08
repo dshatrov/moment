@@ -59,6 +59,8 @@ private:
     class Recording : public Object
     {
     public:
+        StateMutex mutex;
+
 	WeakCodeRef weak_av_recorder;
 	AvRecorder *unsafe_av_recorder;
 

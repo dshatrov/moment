@@ -22,9 +22,6 @@
 
 #include <moment/libmoment.h>
 
-#include <mycpp/mycpp.h>
-#include <mycpp/cmdline.h>
-
 
 using namespace M;
 using namespace Moment;
@@ -316,18 +313,10 @@ RtmpClient::commandMessage (VideoStream::Message   * const mt_nonnull msg,
 	}
 #endif
     } else {
-	logW_ (_func, "unknown method: ", method);
-
-#if 0
-	{
-	    PagePool::Page * const page = msg->page_list->first;
-	    if (page) {
-                logLock ();
-		hexdump (logs, page->mem());
-                logUnlock ();
-            }
-	}
-#endif
+        logLock ();
+	logW_unlocked_ (_func, "unknown method: ", method);
+        PagePool::dumpPages (logs, &msg->page_list);
+        logUnlock ();
     }
 
     return Result::Success;
@@ -869,12 +858,11 @@ bool cmdline_burst_width (char const * /* short_name */,
 
 int main (int argc, char **argv)
 {
-    MyCpp::myCppInit ();
     libMaryInit ();
 
     {
 	unsigned const num_opts = 16;
-	MyCpp::CmdlineOption opts [num_opts];
+	CmdlineOption opts [num_opts];
 
 	opts [0].short_name = "h";
 	opts [0].long_name  = "help";
@@ -972,8 +960,8 @@ int main (int argc, char **argv)
         opts [15].opt_data   = NULL;
         opts [15].opt_callback = cmdline_burst_width;
 
-	MyCpp::ArrayIterator<MyCpp::CmdlineOption> opts_iter (opts, num_opts);
-	MyCpp::parseCmdline (&argc, &argv, opts_iter, NULL /* callback */, NULL /* callback_data */);
+	ArrayIterator<CmdlineOption> opts_iter (opts, num_opts);
+	parseCmdline (&argc, &argv, opts_iter, NULL /* callback */, NULL /* callback_data */);
     }
 
     if (options.help) {

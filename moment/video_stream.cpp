@@ -29,7 +29,7 @@ namespace Moment {
 
 Size
 VideoStream::AudioFrameType::toString_ (Memory const &mem,
-					Format const & /* fmt */)
+					Format const & /* fmt */) const
 {
     switch (value) {
 	case Unknown:
@@ -48,7 +48,7 @@ VideoStream::AudioFrameType::toString_ (Memory const &mem,
 
 Size
 VideoStream::VideoFrameType::toString_ (Memory const &mem,
-					Format const & /* fmt */)
+					Format const & /* fmt */) const
 {
     switch (value) {
 	case Unknown:
@@ -79,7 +79,7 @@ VideoStream::VideoFrameType::toString_ (Memory const &mem,
 
 Size
 VideoStream::AudioCodecId::toString_ (Memory const &mem,
-				      Format const & /* fmt */)
+				      Format const & /* fmt */) const
 {
     switch (value) {
 	case Unknown:
@@ -118,7 +118,7 @@ VideoStream::AudioCodecId::toString_ (Memory const &mem,
 
 Size
 VideoStream::VideoCodecId::toString_ (Memory const &mem,
-				      Format const & /* fmt */)
+				      Format const & /* fmt */) const
 {
     switch (value) {
 	case Unknown:
@@ -321,7 +321,7 @@ VideoStream::FrameSaver::processAudioFrame (AudioMessage * const mt_nonnull msg)
 
 	    logD (frames, _func, "AAC SEQUENCE HEADER");
 
-            logD_ (_this_func, "AacSequenceHeader");
+            logS_ (_this_func, "AacSequenceHeader");
 
 	    if (got_saved_aac_seq_hdr)
 		saved_aac_seq_hdr.msg.page_pool->msgUnref (saved_aac_seq_hdr.msg.page_list.first);
@@ -784,7 +784,7 @@ VideoStream::informClosed (EventHandler * const event_handler,
 void
 VideoStream::fireAudioMessage (AudioMessage * const mt_nonnull msg)
 {
-//    logD_ (_func, "timestamp: 0x", fmt_hex, (UintPtr) msg_info->timestamp);
+    logS_ (_this_func, "ts: ", msg->timestamp_nanosec);
 
     mutex.lock ();
 
@@ -799,7 +799,7 @@ VideoStream::fireAudioMessage (AudioMessage * const mt_nonnull msg)
 void
 VideoStream::fireVideoMessage (VideoMessage * const mt_nonnull msg)
 {
-//    logD_ (_func, "timestamp: 0x", fmt_hex, (UintPtr) msg->timestamp);
+    logS_ (_this_func, "ts: ", msg->timestamp_nanosec);
 
     mutex.lock ();
 
@@ -1080,7 +1080,7 @@ VideoStream::bind_messageBegin (BindInfo   * const mt_nonnull bind_info,
             return false;
         }
 
-        logD_ (_this_func, "pending message");
+        logS_ (_this_func, "pending message");
 
       // The message belongs to the stream that we're about to switch to
       // when the right moment comes.
@@ -1209,10 +1209,10 @@ VideoStream::bind_savedAudioFrame (AudioMessage * const mt_nonnull audio_msg,
     VideoStream * const self = data->self;
     BindInfo * const bind_info = data->bind_info;
 
-    logD_ (_self_func, audio_msg->frame_type);
+    logS_ (_self_func, audio_msg->frame_type);
 
     if (!data->report_audio) {
-        logD_ (_self_func, "ignoring");
+        logS_ (_self_func, "ignoring");
         return Result::Success;
     }
 
@@ -1234,7 +1234,7 @@ VideoStream::bind_savedAudioFrame (AudioMessage * const mt_nonnull audio_msg,
     InformAudioMessage_Data inform_data (&tmp_audio_msg);
     mt_unlocks_locks (mutex) self->event_informer.informAll_unlocked (informAudioMessage, &inform_data);
 
-    logD_ (_self_func, tmp_audio_msg.frame_type, ": to frame saver");
+    logS_ (_self_func, tmp_audio_msg.frame_type, ": to frame saver");
     self->frame_saver.processAudioFrame (&tmp_audio_msg);
 
     return Result::Success;
@@ -1248,10 +1248,10 @@ VideoStream::bind_savedVideoFrame (VideoMessage * const mt_nonnull video_msg,
     VideoStream * const self = data->self;
     BindInfo * const bind_info = data->bind_info;
 
-    logD_ (_self_func, video_msg->frame_type);
+    logS_ (_self_func, video_msg->frame_type);
 
     if (!data->report_video) {
-        logD_ (_self_func, "ignoring");
+        logS_ (_self_func, "ignoring");
         return Result::Success;
     }
 
@@ -1261,9 +1261,9 @@ VideoStream::bind_savedVideoFrame (VideoMessage * const mt_nonnull video_msg,
     {
         bind_info->timestamp_offs = self->stream_timestamp_nanosec - video_msg->timestamp_nanosec;
         bind_info->got_timestamp_offs = true;
-        logD_ (_self_func, "stream_timestamp_nanosec: ", self->stream_timestamp_nanosec);
-        logD_ (_self_func, "video_msg->timestamp_nanosec: ", video_msg->timestamp_nanosec);
-        logD_ (_self_func, "bind_info->timestamp_offs: ", bind_info->timestamp_offs);
+        logS_ (_self_func, "stream_timestamp_nanosec: ", self->stream_timestamp_nanosec);
+        logS_ (_self_func, "video_msg->timestamp_nanosec: ", video_msg->timestamp_nanosec);
+        logS_ (_self_func, "bind_info->timestamp_offs: ", bind_info->timestamp_offs);
     }
 
     if (bind_info->got_timestamp_offs)
@@ -1304,10 +1304,10 @@ VideoStream::bind_doMessageEnd (BindInfo * const mt_nonnull bind_info)
         Ref<VideoStream> const abind_stream = abind.weak_bind_stream.getRef();
         Ref<VideoStream> const vbind_stream = vbind.weak_bind_stream.getRef();
         if (abind_stream.ptr() == vbind_stream.ptr()) {
-            logD_ (_this_func, "restoring timestamp_offs");
+            logS_ (_this_func, "restoring timestamp_offs");
             if (bind_info == &abind) {
                 if (vbind.got_timestamp_offs) {
-                    logD_ (_this_func, "restoring timestamp_offs from vbind");
+                    logS_ (_this_func, "restoring timestamp_offs from vbind");
                     abind.timestamp_offs = vbind.timestamp_offs;
                     abind.got_timestamp_offs = true;
                     timestamp_set = true;
@@ -1315,7 +1315,7 @@ VideoStream::bind_doMessageEnd (BindInfo * const mt_nonnull bind_info)
             } else {
                 assert (bind_info == &vbind);
                 if (abind.got_timestamp_offs) {
-                    logD_ (_this_func, "restoring timestamp_offs from abind");
+                    logS_ (_this_func, "restoring timestamp_offs from abind");
                     vbind.timestamp_offs = abind.timestamp_offs;
                     vbind.got_timestamp_offs = true;
                     timestamp_set = true;
@@ -1342,9 +1342,9 @@ VideoStream::bind_doMessageEnd (BindInfo * const mt_nonnull bind_info)
         bind_handler_data.bind_info = bind_info;
         bind_handler_data.report_audio = (bind_info == &abind);
         bind_handler_data.report_video = (bind_info == &vbind);
-        logD_ (_this_func, "calling reportSavedFrames()");
+        logS_ (_this_func, "calling reportSavedFrames()");
         mt_unlocks_locks (mutex) tmp_frame_saver.reportSavedFrames (&bind_frame_handler, &bind_handler_data);
-        logD_ (_this_func, "reportSavedFrames() returned");
+        logS_ (_this_func, "reportSavedFrames() returned");
     }
 
     {
@@ -1426,7 +1426,7 @@ VideoStream::bind_audioMessage (AudioMessage * const mt_nonnull audio_msg,
     BindTicket * const bind_ticket = static_cast <BindTicket*> (_bind_ticket);
     VideoStream * const self = bind_ticket->video_stream;
 
-//    logD_ (_func, audio_msg->frame_type, ", ts: ", audio_msg->timestamp_nanosec);
+//    logS_ (_func, audio_msg->frame_type, ", ts: ", audio_msg->timestamp_nanosec);
 
     AudioMessage tmp_audio_msg = *audio_msg;
 
@@ -1437,9 +1437,13 @@ VideoStream::bind_audioMessage (AudioMessage * const mt_nonnull audio_msg,
     }
 
     tmp_audio_msg.timestamp_nanosec += self->abind.timestamp_offs;
-//    logD_ (_func, "timestamp: ", tmp_audio_msg.timestamp_nanosec);
+//    logS_ (_func, "timestamp: ", tmp_audio_msg.timestamp_nanosec);
 
-    logD_ (_self_func, "ts: ", tmp_audio_msg.timestamp_nanosec, " (", audio_msg->timestamp_nanosec, " + ", self->vbind.timestamp_offs, ") ", audio_msg->frame_type);
+    logS_ (_self_func,
+           "ts: ", tmp_audio_msg.timestamp_nanosec, " (",
+           audio_msg->timestamp_nanosec, " + ",
+           (Int64) self->abind.timestamp_offs, ") ",
+           audio_msg->frame_type);
 
     InformAudioMessage_Data inform_data (&tmp_audio_msg);
     mt_unlocks_locks (mutex) self->event_informer.informAll_unlocked (informAudioMessage, &inform_data);
@@ -1457,7 +1461,7 @@ VideoStream::bind_videoMessage (VideoMessage * const mt_nonnull video_msg,
     BindTicket * const bind_ticket = static_cast <BindTicket*> (_bind_ticket);
     VideoStream * const self = bind_ticket->video_stream;
 
-//    logD_ (_func, video_msg->frame_type, ", ts: ", video_msg->timestamp_nanosec);
+//    logS_ (_func, video_msg->frame_type, ", ts: ", video_msg->timestamp_nanosec);
 
     VideoMessage tmp_video_msg = *video_msg;
 
@@ -1468,9 +1472,13 @@ VideoStream::bind_videoMessage (VideoMessage * const mt_nonnull video_msg,
     }
 
     tmp_video_msg.timestamp_nanosec += self->vbind.timestamp_offs;
-//    logD_ (_func, "timestamp: ", tmp_video_msg.timestamp_nanosec);
+//    logS_ (_func, "timestamp: ", tmp_video_msg.timestamp_nanosec);
 
-    logD_ (_self_func, "ts: ", tmp_video_msg.timestamp_nanosec, " (", video_msg->timestamp_nanosec, " + ", self->vbind.timestamp_offs, ") ", video_msg->frame_type);
+    logS_ (_self_func, "ts: ",
+           tmp_video_msg.timestamp_nanosec, " (",
+           video_msg->timestamp_nanosec, " + ",
+           (Int64) self->vbind.timestamp_offs, ") ",
+           video_msg->frame_type);
 
     InformVideoMessage_Data inform_data (&tmp_video_msg);
     mt_unlocks_locks (mutex) self->event_informer.informAll_unlocked (informVideoMessage, &inform_data);

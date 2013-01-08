@@ -26,7 +26,7 @@ Storage::FileKey
 LocalStorage::openFile (ConstMemory    const filename,
 			Connection  ** const ret_conn)
 {
-    exc_throw<InternalException> (InternalException::NotImplemented);
+    exc_throw (InternalException, InternalException::NotImplemented);
 
     Ref<FileEntry> file_entry = grab (new FileEntry);
 
