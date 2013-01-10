@@ -1,5 +1,5 @@
 enable MyPlayerPlaylistHeader = Channels
-enable MyPlayerPlaylist = "playlist.json"
+enable MyPlayerPlaylist = "mod_gst/playlist.json"
 // disable MyPlayerAutoplay
 // MyPlayerAutoplayStreamName = "test"
 MyPlayerBuffer = 2.0
