@@ -633,8 +633,28 @@ namespace {
     };
 }
 
+class VarlistSectionHashEntry : public HashEntry<>
+{
+public:
+    StRef<String> sect_name;
+    bool enabled;
+};
+
+typedef Hash< VarlistSectionHashEntry,
+              Memory,
+              MemberExtractor< VarlistSectionHashEntry,
+                               StRef<String>,
+                               &VarlistSectionHashEntry::sect_name,
+                               Memory,
+                               AccessorExtractor< String,
+                                                  Memory,
+                                                  &String::mem > >,
+              MemoryComparator<> >
+        VarlistSectionHash;
+
 static void fillDictionaryFromVarlist (ctemplate::TemplateDictionary * const mt_nonnull dict,
-                                       MConfig::Varlist              * const mt_nonnull varlist)
+                                       MConfig::Varlist              * const mt_nonnull varlist,
+                                       VarlistSectionHash            * const mt_nonnull sect_hash)
 {
     {
         MConfig::Varlist::VarList::iterator iter (varlist->var_list);
@@ -642,6 +662,7 @@ static void fillDictionaryFromVarlist (ctemplate::TemplateDictionary * const mt_
             MConfig::Varlist::Var * const var = iter.next ();
             ConstMemory const name  = var->getName();
             ConstMemory const value = var->getValue();
+            logD_ (_func, "SetValue: ", name, " = ", value);
             dict->SetValue (ctemplate::TemplateString ((char const *) name.mem(), name.len()),
                             ctemplate::TemplateString ((char const *) value.mem(), value.len()));
         }
@@ -652,14 +673,14 @@ static void fillDictionaryFromVarlist (ctemplate::TemplateDictionary * const mt_
         while (!iter.done()) {
             MConfig::Varlist::Section * const sect = iter.next ();
 
-            Ref<String> sect_name;
-            if (sect->getEnabled())
-                sect_name = makeString (sect->getName(), "_ON");
-            else
-                sect_name = makeString (sect->getName(), "_OFF");
-
-            dict->ShowSection (ctemplate::TemplateString ((char const *) sect_name->mem().mem(),
-                                                          sect_name->mem().len()));
+            VarlistSectionHashEntry *entry = sect_hash->lookup (sect->getName());
+            if (!entry) {
+                entry = new (std::nothrow) VarlistSectionHashEntry;
+                assert (entry);
+                entry->sect_name = st_grab (new (std::nothrow) String (sect->getName()));
+                sect_hash->add (entry);
+            }
+            entry->enabled = sect->getEnabled ();
         }
     }
 }
@@ -669,6 +690,7 @@ static void loadDefaultsVarlist (ConstMemory        const path,
 {
     Ref<String> const defaults_path = makeString (path, path.len() ? "/" : "", "var.defaults");
 
+    // TODO Create varlist_parser only once.
     MConfig::VarlistParser varlist_parser;
     if (!varlist_parser.parseVarlist (defaults_path->mem(), varlist))
         logE_ (_func, "Could not parse ", defaults_path);
@@ -691,16 +713,38 @@ static Result momentFile_sendTemplate (HttpRequest * const http_req,
     ctemplate::mutable_default_template_cache()->ReloadAllIfChanged (ctemplate::TemplateCache::LAZY_RELOAD);
 
     ctemplate::TemplateDictionary dict ("tmpl");
+    {
+        // ctemplate has ShowSection(), but doesn't have HideSection() or alike.
+        // We have to filter sections in a separate hash because of this.
+        VarlistSectionHash sect_hash;
 
-    if (enable_varlist_defaults) {
-        MConfig::Varlist defaults_varlist;
-        loadDefaultsVarlist (path_dir, &defaults_varlist);
-        fillDictionaryFromVarlist (&dict, &defaults_varlist);
+        if (enable_varlist_defaults) {
+            MConfig::Varlist defaults_varlist;
+            loadDefaultsVarlist (path_dir, &defaults_varlist);
+            fillDictionaryFromVarlist (&dict, &defaults_varlist, &sect_hash);
+        }
+
+        fillDictionaryFromVarlist (&dict, &glob_varlist, &sect_hash);
+        if (varlist)
+            fillDictionaryFromVarlist (&dict, varlist, &sect_hash);
+
+        VarlistSectionHash::iterator iter (sect_hash);
+        while (!iter.done()) {
+            VarlistSectionHashEntry * const entry = iter.next ();
+
+            StRef<String> sect_name;
+            if (entry->enabled)
+                sect_name = st_makeString (entry->sect_name->mem(), "_ON");
+            else
+                sect_name = st_makeString (entry->sect_name->mem(), "_OFF");
+
+            logD_ (_func, "ShowSection: ", sect_name);
+            dict.ShowSection (ctemplate::TemplateString ((char const *) sect_name->mem().mem(),
+                                                         sect_name->mem().len()));
+
+            delete entry;
+        }
     }
-
-    fillDictionaryFromVarlist (&dict, &glob_varlist);
-    if (varlist)
-        fillDictionaryFromVarlist (&dict, varlist);
 
     {
         char const val_name [] = "ThisHttpServerAddr";
