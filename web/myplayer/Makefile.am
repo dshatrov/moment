@@ -2,11 +2,11 @@ EXTRA_DIST = \
 	myplayer.html
 
 MyPlayer.swf: MyPlayer.as
-	/opt/flex/bin/mxmlc -headless-server=true -static-link-runtime-shared-libraries=true $^
-#	/opt/flex/bin/mxmlc -headless-server=true -static-link-runtime-shared-libraries=true -target-player=10.0 $^
+	/opt/flex/bin/mxmlc -headless-server=true -static-link-runtime-shared-libraries=true -target-player=10.0 $^
+#	/opt/flex/bin/mxmlc -headless-server=true -static-link-runtime-shared-libraries=true $^
 
 myplayerdir = $(datadir)/moment/myplayer
-myplayer_DATA = index.html		\
+myplayer_DATA = index.tpl		\
 		MyPlayer.swf            \
 		playlist.json.tpl	\
 		splash.png		\
