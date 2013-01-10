@@ -1,0 +1,5 @@
+enable MyPlayerPlaylistHeader = Channels
+enable MyPlayerPlaylist = "playlist.json"
+// disable MyPlayerAutoplay
+// MyPlayerAutoplayStreamName = "test"
+MyPlayerBuffer = 2.0
