@@ -24,5 +24,51 @@ using namespace M;
 
 namespace Moment {
 
+Result configGetUint64 (MConfig::Config * const mt_nonnull config,
+                        ConstMemory       const opt_name,
+                        Uint64          * const mt_nonnull ret_val,
+                        Uint64            const default_val)
+{
+    *ret_val = default_val;
+
+    if (!config->getUint64_default (opt_name, ret_val, default_val)) {
+        logE_ (_func, "Invalid value for config option ", opt_name, ": ", config->getString (opt_name));
+        return Result::Failure;
+    } else {
+//        logI_ (_func, opt_name, ": ", *ret_val);
+    }
+
+    return Result::Success;
+}
+
+Result configGetBoolean (MConfig::Config * const mt_nonnull config,
+                         ConstMemory       const opt_name,
+                         bool            * const mt_nonnull ret_val,
+                         bool              const default_val)
+{
+    *ret_val = default_val;
+
+    MConfig::BooleanValue const val = config->getBoolean (opt_name);
+    if (val == MConfig::Boolean_Invalid) {
+        logE_ (_func, "Invalid value for config option ", opt_name, ": ", config->getString (opt_name));
+        return Result::Failure;
+    } else
+    if (val == MConfig::Boolean_True)
+        *ret_val = true;
+    else
+    if (val == MConfig::Boolean_False)
+        *ret_val = false;
+    else
+        assert (val == MConfig::Boolean_Default);
+
+//    logI_ (_func, opt_name, ": ", *ret_val);
+    return Result::Success;
+}
+
+void configWarnNoEffect (ConstMemory const opt_name)
+{
+    logI_ (_func, "Changing ", opt_name, " has no effect until the server is restarted");
+}
+
 }
 

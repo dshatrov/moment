@@ -60,6 +60,18 @@
 
 namespace Moment {
 
+Result configGetUint64 (MConfig::Config * mt_nonnull config,
+                        ConstMemory      opt_name,
+                        Uint64          * mt_nonnull ret_val,
+                        Uint64           default_val);
+
+Result configGetBoolean (MConfig::Config * mt_nonnull config,
+                         ConstMemory      opt_name,
+                         bool            * mt_nonnull ret_val,
+                         bool             default_val);
+
+void configWarnNoEffect (ConstMemory opt_name);
+
 }
 
 
