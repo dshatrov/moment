@@ -63,9 +63,8 @@ const Time  default__http__keepalive_timeout  =  60;
 class MomentInstance : public Object
 {
 private:
-    Mutex mutex;
-
-    MConfig::Config config;
+    StateMutex mutex;
+    Mutex config_reload_mutex;
 
     PagePool page_pool;
 
@@ -88,8 +87,6 @@ private:
 
     void doExit (ConstMemory reason);
 
-    static void profilerTimerTick (void *_self);
-
     static void exitTimerTick (void *_self);
 
     void ctl_startProfiler (ConstMemory filename);
@@ -110,6 +107,56 @@ private:
                           void        *_self);
 
   mt_iface_end
+
+  mt_iface (HttpService::HttpHandler)
+
+    static HttpService::HttpHandler const ctl_http_handler;
+
+    static Result ctlHttpRequest (HttpRequest   * mt_nonnull req,
+                                  Sender        * mt_nonnull conn_sender,
+                                  Memory const  & /* msg_body */,
+                                  void         ** mt_nonnull /* ret_msg_data */,
+                                  void          *_self);
+
+  mt_iface_end
+
+  mt_iface (MomentServer::Events)
+
+    static MomentServer::Events const moment_server_events;
+
+    static void configReload (MConfig::Config *new_config,
+                              void            *_self);
+
+  mt_iface_end
+
+
+  // ____________________________ Config reloading _____________________________
+
+    class MomentConfigParams : public Referenced
+    {
+    public:
+        Uint64 min_pages;
+        Uint64 num_threads;
+        Uint64 num_file_threads;
+        Uint64 http_keepalive_timeout;
+        bool   no_keepalive_conns;
+    };
+
+    Ref<MomentConfigParams> cur_params;
+
+    Result initiateConfigReload ();
+
+    Ref<MConfig::Config> loadConfig ();
+
+    void doConfigReload (MConfig::Config * mt_nonnull new_config);
+
+    static Result processConfig (MConfig::Config    *config,
+                                 MomentConfigParams *params);
+
+    void applyConfigParams (MConfig::Config *new_config);
+
+  // ___________________________________________________________________________
+
 
 public:
     int run ();
@@ -245,17 +292,6 @@ MomentInstance::doExit (ConstMemory const reason)
     server_app.stop ();
 }
 
-// TODO Unused
-void
-MomentInstance::profilerTimerTick (void * const _self)
-{
-    MomentInstance * const self = static_cast <MomentInstance*> (_self);
-
-    logD_ (_func_);
-
-//#error TODO
-}
-
 void
 MomentInstance::exitTimerTick (void * const _self)
 {
@@ -369,8 +405,209 @@ void MomentInstance::ctl_line (ConstMemory   const line,
         return;
     }
 
+    if (equal (line, "reload")) {
+        if (!self->initiateConfigReload ()) {
+            logE_ (_func, "Could not reload config");
+        }
+        return;
+    }
+
     logW_ (_func, "WARNING: Unknown control command: ", line);
 }
+
+HttpService::HttpHandler const MomentInstance::ctl_http_handler = {
+    ctlHttpRequest,
+    NULL /* httpMessageBody */
+};
+
+Result
+MomentInstance::ctlHttpRequest (HttpRequest   * const mt_nonnull req,
+                                Sender        * const mt_nonnull conn_sender,
+                                Memory const  & /* msg_body */,
+                                void         ** const mt_nonnull /* ret_msg_data */,
+                                void          * const _self)
+{
+    MomentInstance * const self = static_cast <MomentInstance*> (_self);
+
+    logD_ (_func_);
+
+    MOMENT_SERVER__HEADERS_DATE;
+
+    if (req->getNumPathElems() >= 2
+        && equal (req->getPath (1), "config_reload"))
+    {
+        ConstMemory reply;
+        if (self->initiateConfigReload ()) {
+            reply = "OK";
+        } else {
+            logE_ (_func, "Could not reload config");
+            reply = "ERROR";
+        }
+
+        conn_sender->send (
+                &self->page_pool,
+                true /* do_flush */,
+                MOMENT_SERVER__OK_HEADERS ("text/html", reply.len() /* content_length */),
+                "\r\n",
+                reply);
+
+        logA_ ("moment_ctl 200 ", req->getClientAddress(), " ", req->getRequestLine());
+    } else {
+	logE_ (_func, "Unknown admin HTTP request: ", req->getFullPath());
+
+	ConstMemory const reply_body = "Unknown command";
+	conn_sender->send (&self->page_pool,
+			   true /* do_flush */,
+			   MOMENT_SERVER__404_HEADERS (reply_body.len()),
+			   "\r\n",
+			   reply_body);
+
+	logA_ ("moment_ctl 404 ", req->getClientAddress(), " ", req->getRequestLine());
+    }
+
+    if (!req->getKeepalive())
+        conn_sender->closeAfterFlush();
+
+    return Result::Success;
+}
+
+MomentServer::Events const MomentInstance::moment_server_events = {
+    configReload,
+    NULL /* destroy */
+};
+
+void
+MomentInstance::configReload (MConfig::Config * const new_config,
+                              void            * const _self)
+{
+    MomentInstance * const self = static_cast <MomentInstance*> (_self);
+    self->doConfigReload (new_config);
+}
+
+
+// _____________________________ Config reloading ______________________________
+
+Result
+MomentInstance::initiateConfigReload ()
+{
+    Ref<MConfig::Config> const new_config = loadConfig ();
+    if (!new_config) {
+        logE_ (_func, "Could not load config");
+        return Result::Failure;
+    }
+
+    moment_server.setConfig (new_config);
+    return Result::Success;
+}
+
+Ref<MConfig::Config>
+MomentInstance::loadConfig ()
+{
+    Ref<MConfig::Config> const new_config = grab (new (std::nothrow) MConfig::Config);
+
+    ConstMemory const config_filename = options.config_filename ?
+                                                options.config_filename->mem() :
+                                                ConstMemory (
+#ifdef LIBMARY_PLATFORM_WIN32
+                                                        "moment.conf"
+#else
+                                                        "/opt/moment/moment.conf"
+#endif
+                                                        );
+    if (!MConfig::parseConfig (config_filename, new_config)) {
+        logE_ (_func, "Failed to parse config file ", config_filename);
+        return NULL;
+    }
+
+    return new_config;
+}
+
+void
+MomentInstance::doConfigReload (MConfig::Config * const new_config)
+{
+    logD_ (_func_);
+
+    config_reload_mutex.lock ();
+
+    if (logLevelOn_ (LogLevel::High)) {
+        logLock ();
+        log_unlocked__ (_func_);
+        new_config->dump (logs);
+        logUnlock ();
+    }
+
+    applyConfigParams (new_config);
+
+    config_reload_mutex.unlock ();
+}
+
+static char const opt_name__min_pages[]               = "moment/min_pages";
+static char const opt_name__num_threads[]             = "moment/num_threads";
+static char const opt_name__num_file_threads[]        = "moment/num_file_threads";
+static char const opt_name__http_keepalive_timeout[]  = "http/keepalive_timeout";
+static char const opt_name__http_no_keepalive_conns[] = "http/no_keepalive_conns";
+
+Result
+MomentInstance::processConfig (MConfig::Config    * const config,
+                               MomentConfigParams * const params)
+{
+    Result res = Result::Success;
+
+    if (!configGetUint64 (config, opt_name__min_pages, &params->min_pages, default__page_pool__min_pages))
+        res = Result::Failure;
+    logI_ (_func, opt_name__min_pages, ": ", params->min_pages);
+
+    if (!configGetUint64 (config, opt_name__num_threads, &params->num_threads, 0))
+        res = Result::Failure;
+    logI_ (_func, opt_name__num_threads, ": ", params->num_threads);
+
+    if (!configGetUint64 (config, opt_name__num_file_threads, &params->num_file_threads, 0))
+        res = Result::Failure;
+    logI_ (_func, opt_name__num_file_threads, ": ", params->num_file_threads);
+
+    if (!configGetUint64 (config, opt_name__http_keepalive_timeout, &params->http_keepalive_timeout, default__http__keepalive_timeout))
+        res = Result::Failure;
+    logI_ (_func, opt_name__http_keepalive_timeout, ": ", params->http_keepalive_timeout);
+
+    if (!configGetBoolean (config, opt_name__http_no_keepalive_conns, &params->no_keepalive_conns, false))
+        res = Result::Failure;
+    logI_ (_func, opt_name__http_no_keepalive_conns, ": ", params->no_keepalive_conns);
+
+    return res;
+}
+
+void MomentInstance::applyConfigParams (MConfig::Config * const new_config)
+{
+    Ref<MomentConfigParams> const params = grab (new (std::nothrow) MomentConfigParams);
+    if (!processConfig (new_config, params)) {
+        logE_ (_func, "Bad config. Server configuration has not been updated.");
+        return;
+    }
+
+    mutex.lock ();
+    Ref<MomentConfigParams> const old_params = cur_params;
+    cur_params = params;
+    mutex.unlock ();
+
+    if (old_params && old_params->min_pages != params->min_pages)
+        configWarnNoEffect (opt_name__min_pages);
+
+    if (old_params && old_params->num_threads != params->num_threads)
+        configWarnNoEffect (opt_name__num_threads);
+
+    if (old_params && old_params->num_file_threads != params->num_file_threads)
+        configWarnNoEffect (opt_name__num_file_threads);
+
+    http_service.setConfigParams (params->http_keepalive_timeout * 1000000 /* microseconds */,
+                                  params->no_keepalive_conns);
+    if (admin_http_service_ptr != &http_service) {
+        admin_http_service_ptr->setConfigParams (params->http_keepalive_timeout * 1000000 /* microseconds */,
+                                                 params->no_keepalive_conns);
+    }
+}
+
+// _____________________________________________________________________________
+
 
 static void
 serverApp_threadStarted (void * const /* cb_data */)
@@ -389,22 +626,6 @@ int
 MomentInstance::run ()
 {
     int ret_res = 0;
-
-    {
-	ConstMemory const config_filename = options.config_filename ?
-						    options.config_filename->mem() :
-						    ConstMemory (
-#ifdef LIBMARY_PLATFORM_WIN32
-                                                            "moment.conf"
-#else
-                                                            "/opt/moment/moment.conf"
-#endif
-                                                            );
-	if (!MConfig::parseConfig (config_filename, &config)) {
-	    logE_ (_func, "Failed to parse config file ", config_filename);
-	    return Result::Failure;
-	}
-    }
 
     {
 	ConstMemory const log_filename = options.log_filename ?
@@ -428,9 +649,27 @@ MomentInstance::run ()
 	}
     }
 
-    logLock ();
-    config.dump (logs);
-    logUnlock ();
+    Ref<MConfig::Config> const config = loadConfig ();
+    if (!config) {
+        logE_ (_func, "Could not load config");
+        return Result::Failure;
+    }
+
+    if (logLevelOn_ (LogLevel::High)) {
+        logLock ();
+        log_unlocked__ (_func_);
+        config->dump (logs);
+        logUnlock ();
+    }
+
+    Ref<MomentConfigParams> const params = grab (new (std::nothrow) MomentConfigParams);
+    if (!processConfig (config, params)) {
+        logE_ (_func, "Bad config. Exiting.");
+        return EXIT_FAILURE;
+    }
+    mutex.lock ();
+    cur_params = params;
+    mutex.unlock ();
 
     server_app.getEventInformer()->subscribe (CbDesc<ServerApp::Events> (&server_app_events, NULL, NULL));
 
@@ -439,81 +678,9 @@ MomentInstance::run ()
 	return EXIT_FAILURE;
     }
 
-    {
-	Uint64 min_pages = default__page_pool__min_pages;
-	{
-	    ConstMemory const opt_name ("moment/min_pages");
-	    ConstMemory const min_pages_mem = config.getString (opt_name);
-	    if (min_pages_mem.len()) {
-		if (!strToUint64_safe (min_pages_mem, &min_pages)) {
-		    logE_ (_func, "Bad option value \"", min_pages_mem, "\" "
-			   "for ", opt_name, " (number expected): ", exc->toString());
-		    logE_ (_func, "Using default value of ", min_pages, " for ", opt_name);
-		}
-	    }
-	}
-
-//	logD_ (_func, "min_pages: ", min_pages);
-	page_pool.setMinPages (min_pages);
-    }
-
-    {
-	Uint64 num_threads = 0;
-	{
-	    ConstMemory const opt_name = "moment/num_threads";
-	    if (!config.getUint64_default (opt_name, &num_threads, num_threads)) {
-		logE_ (_func, "Bad value for config option ", opt_name);
-		return EXIT_FAILURE;
-	    }
-
-	    logI_ (_func, opt_name, ": ", num_threads);
-	}
-
-	server_app.setNumThreads (num_threads);
-    }
-
-    {
-	Uint64 num_file_threads = 0;
-	{
-	    ConstMemory const opt_name = "moment/num_file_threads";
-	    if (!config.getUint64_default (opt_name, &num_file_threads, num_file_threads)) {
-		logE_ (_func, "Bad value for config option ", opt_name);
-		return EXIT_FAILURE;
-	    }
-
-	    logI_ (_func, opt_name, ": ", num_file_threads);
-	}
-
-	recorder_thread_pool.setNumThreads (num_file_threads);
-    }
-
-    Uint64 http_keepalive_timeout = default__http__keepalive_timeout;
-    {
-	ConstMemory const opt_name ("http/keepalive_timeout");
-	ConstMemory const http_keepalive_timeout_mem = config.getString (opt_name);
-	if (http_keepalive_timeout_mem.len()) {
-	    if (!strToUint64_safe (http_keepalive_timeout_mem, &http_keepalive_timeout)) {
-		logE_ (_func, "Bad option value \"", http_keepalive_timeout_mem, "\" "
-		       "for ", opt_name, " (number expected): ", exc->toString());
-		logE_ (_func, "Using default value of ", http_keepalive_timeout, " for ", opt_name);
-	    }
-	}
-    }
-
-    bool no_keepalive_conns = false;
-    {
-	ConstMemory const opt_name ("http/no_keepalive_conns");
-	MConfig::BooleanValue const enable = config.getBoolean (opt_name);
-	if (enable == MConfig::Boolean_Invalid) {
-	    logE_ (_func, "Invalid value for ", opt_name, ": ", config.getString (opt_name));
-	    return EXIT_FAILURE;
-	}
-
-	if (enable == MConfig::Boolean_True)
-	    no_keepalive_conns = true;
-
-	logI_ (_func, opt_name, ": ", no_keepalive_conns);
-    }
+    page_pool.setMinPages (params->min_pages);
+    server_app.setNumThreads (params->num_threads);
+    recorder_thread_pool.setNumThreads (params->num_file_threads);
 
     ConstMemory http_bind;
     {
@@ -521,8 +688,8 @@ MomentInstance::run ()
 				server_app.getMainThreadContext()->getTimers(),
                                 server_app.getMainThreadContext()->getDeferredProcessor(),
 				&page_pool,
-				http_keepalive_timeout * 1000000 /* in microseconds */,
-				no_keepalive_conns))
+				params->http_keepalive_timeout * 1000000 /* microseconds */,
+				params->no_keepalive_conns))
 	{
 	    logE_ (_func, "http_service.init() failed: ", exc->toString());
 	    return EXIT_FAILURE;
@@ -530,7 +697,7 @@ MomentInstance::run ()
 
 	do {
 	    ConstMemory const opt_name = "http/http_bind";
-	    http_bind = config.getString_default (opt_name, ":8080");
+	    http_bind = config->getString_default (opt_name, ":8080");
 	    logI_ (_func, opt_name, ": ", http_bind);
 	    if (http_bind.isNull()) {
 		logI_ (_func, "HTTP service is not bound to any port "
@@ -565,7 +732,7 @@ MomentInstance::run ()
     {
 	do {
 	    ConstMemory const opt_name = "http/admin_bind";
-	    ConstMemory const admin_bind = config.getString_default (opt_name, ":8082");
+	    ConstMemory const admin_bind = config->getString_default (opt_name, ":8082");
 	    logI_ (_func, opt_name, ": ", admin_bind);
 	    if (admin_bind.isNull()) {
 		logI_ (_func, "HTTP-Admin service is not bound to any port "
@@ -583,8 +750,8 @@ MomentInstance::run ()
 						   server_app.getMainThreadContext()->getTimers(),
                                                    server_app.getMainThreadContext()->getDeferredProcessor(),
 						   &page_pool,
-						   http_keepalive_timeout * 1000000 /* in microseconds */,
-						   no_keepalive_conns))
+						   params->http_keepalive_timeout * 1000000 /* microseconds */,
+						   params->no_keepalive_conns))
 	    {
 		logE_ (_func, "admin_http_service.init() failed: ", exc->toString());
 		return EXIT_FAILURE;
@@ -613,6 +780,10 @@ MomentInstance::run ()
 	} while (0);
     }
 
+    admin_http_service_ptr->addHttpHandler (
+	    CbDesc<HttpService::HttpHandler> (&ctl_http_handler, this, this),
+	    "ctl");
+
     recorder_thread_pool.setMainThreadContext (server_app.getMainThreadContext());
     if (!recorder_thread_pool.spawn ()) {
 	logE_ (_func, "recorder_thread_pool.spawn() failed");
@@ -623,7 +794,7 @@ MomentInstance::run ()
 			     &page_pool,
 			     &http_service,
 			     admin_http_service_ptr,
-			     &config,
+			     config,
 			     &recorder_thread_pool,
 			     &storage))
     {
@@ -631,6 +802,9 @@ MomentInstance::run ()
 	ret_res = EXIT_FAILURE;
 	goto _stop_recorder;
     }
+
+    moment_server.getEventInformer()->subscribe (
+            CbDesc<MomentServer::Events> (&moment_server_events, this, this));
 
     if (options.exit_after != (Uint64) -1) {
 	logI_ (_func, "options.exit_after: ", options.exit_after);
@@ -724,9 +898,9 @@ int main (int argc, char **argv)
 	return 0;
     }
 
-// Unnecessary   getDefaultLogGroup()->setLogLevel (options.loglevel);
     setGlobalLogLevel (options.loglevel);
 
+    // Note that the log file is not opened yet (logs == errs).
     if (options.daemonize) {
 #ifdef LIBMARY_PLATFORM_WIN32
         logW_ (_func, "Daemonization is not supported on Windows");

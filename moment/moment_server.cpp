@@ -20,23 +20,6 @@
 #include <moment/moment_server.h>
 
 
-#define MOMENT_SERVER__HEADERS_DATE \
-	Byte date_buf [timeToString_BufSize]; \
-	Size const date_len = timeToString (Memory::forObject (date_buf), getUnixtime());
-
-#define MOMENT_SERVER__COMMON_HEADERS \
-	"Server: Moment/1.0\r\n" \
-	"Date: ", ConstMemory (date_buf, date_len), "\r\n" \
-	"Connection: Keep-Alive\r\n"
-
-#define MOMENT_SERVER__OK_HEADERS(mime_type, content_length) \
-	"HTTP/1.1 200 OK\r\n" \
-	MOMENT_SERVER__COMMON_HEADERS \
-	"Content-Type: ", (mime_type), "\r\n" \
-	"Content-Length: ", (content_length), "\r\n" \
-	"Cache-Control: no-cache\r\n"
-
-
 namespace Moment {
 
 using namespace M;
@@ -541,9 +524,22 @@ MomentServer::setConfig (MConfig::Config * mt_nonnull const new_config)
 {
     config_mutex.lock ();
     config = new_config;
-// TODO Simplify synchronization: require the client to call getConfig() when handling configReload().
-//      'config_mutex' will then become unnecessary (! _vast_ simplification).
-//      Pass MomentServer pointer arg for convenience.
+
+    // TODO Simplify synchronization: require the client to call getConfig() when handling configReload().
+    //      'config_mutex' will then become unnecessary (! _vast_ simplification).
+    //      Pass MomentServer pointer arg for convenience.
+    // ^^^ The idea may be not that good at all.
+
+    // setConfig() может вызываться параллельно
+    // каждый setConfig() завершится только после уведомления всех слушателей
+    // без mutex не будет установленного порядка уведомления
+    // вызовы setConfig() могут быть вложенными, в этом случае параметр new_config не работает.
+    // два параллельных вызова setConfig => путаница, какой конфиг реально в силе?
+    // НО при этом реально в силе только один конфиг.
+    // Я за то, чтобы _явно_ сериализовать обновления конфига и не накладывать лишний ограничений.
+    // _но_ в этом случае не будет возможности определить момент, когда новый конфиг
+    // полностью применён.
+
     fireConfigReload (new_config);
     config_mutex.unlock ();
 }
@@ -1521,79 +1517,97 @@ MomentServer::unlock ()
     mutex.unlock ();
 }
 
-HttpService::HttpHandler const MomentServer::stat_http_handler = {
-    statHttpRequest,
+HttpService::HttpHandler const MomentServer::admin_http_handler = {
+    adminHttpRequest,
     NULL /* httpMessageBody */
 };
 
 Result
-MomentServer::statHttpRequest (HttpRequest   * const mt_nonnull req,
-                               Sender        * const mt_nonnull conn_sender,
-                               Memory const  & /* msg_body */,
-                               void         ** const mt_nonnull /* ret_msg_data */,
-                               void          * const _self)
+MomentServer::adminHttpRequest (HttpRequest   * const mt_nonnull req,
+                                Sender        * const mt_nonnull conn_sender,
+                                Memory const  & /* msg_body */,
+                                void         ** const mt_nonnull /* ret_msg_data */,
+                                void          * const _self)
 {
     MomentServer * const self = static_cast <MomentServer*> (_self);
 
+    logD_ (_func_);
+
     MOMENT_SERVER__HEADERS_DATE;
 
-    PagePool::PageListHead page_list;
-
-    self->page_pool->printToPages (
-            &page_list,
-            "<html>"
-            "<body>"
-            "<p>Stats</p>"
-            "<table>");
+    if (req->getNumPathElems() >= 2
+	&& equal (req->getPath (1), "channels_stat"))
     {
-        List<Stat::StatParam> stat_params;
-        getStat()->getAllParams (&stat_params);
+        PagePool::PageListHead page_list;
 
-        List<Stat::StatParam>::iter iter (stat_params);
-        while (!stat_params.iter_done (iter)) {
-            Stat::StatParam * const stat_param = &stat_params.iter_next (iter)->data;
+        self->page_pool->printToPages (
+                &page_list,
+                "<html>"
+                "<body>"
+                "<p>Stats</p>"
+                "<table>");
+        {
+            List<Stat::StatParam> stat_params;
+            getStat()->getAllParams (&stat_params);
 
-            self->page_pool->printToPages (
-                    &page_list,
-                    "<tr>"
-                        "<td>", stat_param->param_name, "</td>");
+            List<Stat::StatParam>::iter iter (stat_params);
+            while (!stat_params.iter_done (iter)) {
+                Stat::StatParam * const stat_param = &stat_params.iter_next (iter)->data;
 
-            if (stat_param->param_type == Stat::ParamType_Int64) {
                 self->page_pool->printToPages (
                         &page_list,
-                        "<td>", stat_param->int64_value, "</td>");
-            } else {
-                assert (stat_param->param_type == Stat::ParamType_Double);
+                        "<tr>"
+                            "<td>", stat_param->param_name, "</td>");
+
+                if (stat_param->param_type == Stat::ParamType_Int64) {
+                    self->page_pool->printToPages (
+                            &page_list,
+                            "<td>", stat_param->int64_value, "</td>");
+                } else {
+                    assert (stat_param->param_type == Stat::ParamType_Double);
+                    self->page_pool->printToPages (
+                            &page_list,
+                            "<td>", stat_param->double_value, "</td>");
+                }
+
                 self->page_pool->printToPages (
                         &page_list,
-                        "<td>", stat_param->double_value, "</td>");
+                            "<td>", stat_param->param_desc, "</td>"
+                        "</tr>");
             }
-
-            self->page_pool->printToPages (
-                    &page_list,
-                        "<td>", stat_param->param_desc, "</td>"
-                    "</tr>");
         }
+        self->page_pool->printToPages (
+                &page_list,
+                "</table>"
+                "</body>"
+                "</html>");
+
+        Size const data_len = PagePool::countPageListDataLen (page_list.first, 0 /* msg_offset */);
+
+        conn_sender->send (
+                self->page_pool,
+                false /* do_flush */,
+                MOMENT_SERVER__OK_HEADERS ("text/html", data_len),
+                "\r\n");
+        conn_sender->sendPages (self->page_pool, &page_list, true /* do_flush */);
+
+        logA_ ("file 200 ", req->getClientAddress(), " ", req->getRequestLine());
+    } else {
+	logE_ (_func, "Unknown admin HTTP request: ", req->getFullPath());
+
+	ConstMemory const reply_body = "Unknown command";
+	conn_sender->send (self->page_pool,
+			   true /* do_flush */,
+			   MOMENT_SERVER__404_HEADERS (reply_body.len()),
+			   "\r\n",
+			   reply_body);
+
+	logA_ ("gst_admin 404 ", req->getClientAddress(), " ", req->getRequestLine());
     }
-    self->page_pool->printToPages (
-            &page_list,
-            "</table>"
-            "</body>"
-            "</html>");
-
-    Size const data_len = PagePool::countPageListDataLen (page_list.first, 0 /* msg_offset */);
-
-    conn_sender->send (
-	    self->page_pool,
-	    false /* do_flush */,
-	    MOMENT_SERVER__OK_HEADERS ("text/html", data_len),
-	    "\r\n");
-    conn_sender->sendPages (self->page_pool, &page_list, true /* do_flush */);
 
     if (!req->getKeepalive())
-	conn_sender->closeAfterFlush();
+        conn_sender->closeAfterFlush();
 
-    logA_ ("file 200 ", req->getClientAddress(), " ", req->getRequestLine());
     return Result::Success;
 }
 
@@ -1635,8 +1649,8 @@ MomentServer::init (ServerApp        * const mt_nonnull server_app,
     }
 
     admin_http_service->addHttpHandler (
-	    CbDesc<HttpService::HttpHandler> (&stat_http_handler, this, this),
-	    "stat");
+	    CbDesc<HttpService::HttpHandler> (&admin_http_handler, this, this),
+	    "admin");
 
     if (!loadModules ())
 	logE_ (_func, "Could not load modules");

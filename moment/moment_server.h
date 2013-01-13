@@ -33,6 +33,29 @@
 #include <moment/transcoder.h>
 
 
+#define MOMENT_SERVER__HEADERS_DATE \
+	Byte date_buf [timeToString_BufSize]; \
+	Size const date_len = timeToString (Memory::forObject (date_buf), getUnixtime());
+
+#define MOMENT_SERVER__COMMON_HEADERS \
+	"Server: Moment/1.0\r\n" \
+	"Date: ", ConstMemory (date_buf, date_len), "\r\n" \
+	"Connection: Keep-Alive\r\n"
+
+#define MOMENT_SERVER__OK_HEADERS(mime_type, content_length) \
+	"HTTP/1.1 200 OK\r\n" \
+	MOMENT_SERVER__COMMON_HEADERS \
+	"Content-Type: ", (mime_type), "\r\n" \
+	"Content-Length: ", (content_length), "\r\n" \
+	"Cache-Control: no-cache\r\n"
+
+#define MOMENT_SERVER__404_HEADERS(content_length) \
+	"HTTP/1.1 404 Not Found\r\n" \
+	MOMENT_SERVER__COMMON_HEADERS \
+	"Content-Type: text/plain\r\n" \
+	"Content-Length: ", (content_length), "\r\n"
+
+
 namespace Moment {
 
 using namespace M;
@@ -155,16 +178,16 @@ public:
     }
 
 
-  // _______________________________ Statistics ________________________________
+  // __________________________________ Admin __________________________________
 
 private:
-    static HttpService::HttpHandler const stat_http_handler;
+    static HttpService::HttpHandler const admin_http_handler;
 
-    static Result statHttpRequest (HttpRequest   * mt_nonnull req,
-                                   Sender        * mt_nonnull conn_sender,
-                                   Memory const  & /* msg_body */,
-                                   void         ** mt_nonnull /* ret_msg_data */,
-                                   void          *_self);
+    static Result adminHttpRequest (HttpRequest   * mt_nonnull req,
+                                    Sender        * mt_nonnull conn_sender,
+                                    Memory const  & /* msg_body */,
+                                    void         ** mt_nonnull /* ret_msg_data */,
+                                    void          *_self);
 
 
   // __________________________ Video stream handlers __________________________
