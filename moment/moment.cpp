@@ -138,6 +138,11 @@ private:
         Uint64 min_pages;
         Uint64 num_threads;
         Uint64 num_file_threads;
+
+        StRef<String> profile_filename;
+        StRef<String> ctl_filename;
+        Uint64 ctl_pipe_reopen_timeout;
+
         Uint64 http_keepalive_timeout;
         bool   no_keepalive_conns;
 
@@ -380,8 +385,11 @@ void MomentInstance::ctl_line (ConstMemory   const line,
         ConstMemory const str = "profiler_start";
         if (line.len() >= str.len()) {
             if (equal (line.region (0, str.len()), str)) {
-                /* TODO Config parameter for default profile filename */
-                ConstMemory profile_filename = "/opt/moment/moment_profile";
+                self->mutex.lock ();
+                Ref<MomentConfigParams> const params = self->cur_params;
+                self->mutex.unlock ();
+
+                ConstMemory profile_filename = params->profile_filename->mem();
                 if (line.len() > str.len() + 1)
                     profile_filename = line.region (str.len() + 1);
 
@@ -550,6 +558,9 @@ MomentInstance::doConfigReload (MConfig::Config * const new_config)
 static char const opt_name__min_pages[]               = "moment/min_pages";
 static char const opt_name__num_threads[]             = "moment/num_threads";
 static char const opt_name__num_file_threads[]        = "moment/num_file_threads";
+static char const opt_name__profile[]                 = "moment/profile";
+static char const opt_name__ctl_pipe[]                = "moment/ctl_pipe";
+static char const opt_name__ctl_pipe_reopen_timeout[] = "moment/ctl_pipe_reopen_timeout";
 static char const opt_name__http_keepalive_timeout[]  = "http/keepalive_timeout";
 static char const opt_name__http_no_keepalive_conns[] = "http/no_keepalive_conns";
 static char const opt_name__http_http_bind[]          = "http/http_bind";
@@ -572,6 +583,15 @@ MomentInstance::processConfig (MConfig::Config    * const config,
     if (!configGetUint64 (config, opt_name__num_file_threads, &params->num_file_threads, 0))
         res = Result::Failure;
     logI_ (_func, opt_name__num_file_threads, ": ", params->num_file_threads);
+
+    params->profile_filename = st_grab (new (std::nothrow) String (
+            config->getString_default (opt_name__profile, "/opt/moment/moment_profile")));
+    params->ctl_filename = st_grab (new (std::nothrow) String (
+            config->getString_default (opt_name__ctl_pipe, "/opt/moment/moment_ctl")));
+
+    if (!configGetUint64 (config, opt_name__ctl_pipe_reopen_timeout, &params->ctl_pipe_reopen_timeout, 1))
+        res = Result::Failure;
+    logI_ (_func, opt_name__ctl_pipe_reopen_timeout, params->ctl_pipe_reopen_timeout);
 
     if (!configGetUint64 (config, opt_name__http_keepalive_timeout, &params->http_keepalive_timeout, default__http__keepalive_timeout))
         res = Result::Failure;
@@ -655,6 +675,15 @@ void MomentInstance::applyConfigParams (MConfig::Config * const new_config)
 
     if (old_params && old_params->num_file_threads != params->num_file_threads)
         configWarnNoEffect (opt_name__num_file_threads);
+
+    if (old_params && !equal (old_params->profile_filename->mem(), params->profile_filename->mem()))
+        configWarnNoEffect (opt_name__profile);
+
+    if (old_params && !equal (old_params->ctl_filename->mem(), params->ctl_filename->mem()))
+        configWarnNoEffect (opt_name__ctl_pipe);
+
+    if (old_params && old_params->ctl_pipe_reopen_timeout != params->ctl_pipe_reopen_timeout)
+        configWarnNoEffect (opt_name__ctl_pipe_reopen_timeout);
 
     if (old_params
         && (old_params->http_bind_valid != params->http_bind_valid
@@ -842,11 +871,11 @@ MomentInstance::run ()
 	mutex.unlock ();
     }
 
-    if (!line_pipe.init ("/opt/moment/moment_ctl" /* TODO config parameter */,
+    if (!line_pipe.init (params->ctl_filename->mem(),
                          CbDesc<LinePipe::Frontend> (&ctl_pipe_frontend, this, this),
                          server_app.getMainThreadContext()->getPollGroup(),
                          server_app.getMainThreadContext()->getTimers(),
-                         1000 /* reopen_timeout_millisec */ /* TODO config parameter */))
+                         params->ctl_pipe_reopen_timeout * 1000 /* reopen_timeout_millisec */))
     {
         logE_ (_func, "could not initialize ctl pipe: ", exc->toString());
     }
