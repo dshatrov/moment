@@ -140,6 +140,12 @@ private:
         Uint64 num_file_threads;
         Uint64 http_keepalive_timeout;
         bool   no_keepalive_conns;
+
+        IpAddress http_bind_addr;
+        bool      http_bind_valid;
+
+        IpAddress http_admin_bind_addr;
+        bool      http_admin_bind_valid;
     };
 
     Ref<MomentConfigParams> cur_params;
@@ -546,6 +552,8 @@ static char const opt_name__num_threads[]             = "moment/num_threads";
 static char const opt_name__num_file_threads[]        = "moment/num_file_threads";
 static char const opt_name__http_keepalive_timeout[]  = "http/keepalive_timeout";
 static char const opt_name__http_no_keepalive_conns[] = "http/no_keepalive_conns";
+static char const opt_name__http_http_bind[]          = "http/http_bind";
+static char const opt_name__http_admin_bind[]         = "http/admin_bind";
 
 Result
 MomentInstance::processConfig (MConfig::Config    * const config,
@@ -573,6 +581,56 @@ MomentInstance::processConfig (MConfig::Config    * const config,
         res = Result::Failure;
     logI_ (_func, opt_name__http_no_keepalive_conns, ": ", params->no_keepalive_conns);
 
+    {
+        params->http_bind_valid = false;
+
+        ConstMemory const opt_name = opt_name__http_http_bind; 
+        ConstMemory const opt_val = config->getString_default (opt_name, ":8080");
+        logI_ (_func, opt_name, ": ", opt_val);
+        if (opt_val.len() == 0) {
+            logI_ (_func, "HTTP service is not bound to any port "
+                   "and won't accept any connections. "
+                   "Set \"", opt_name, "\" option to bind the service.");
+        } else {
+            if (!setIpAddress_default (opt_val,
+                                       ConstMemory() /* default_host */,
+                                       8080          /* default_port */,
+                                       true          /* allow_any_host */,
+                                       &params->http_bind_addr))
+            {
+                logE_ (_func, "setIpAddress_default() failed (http)");
+                res = Result::Failure;
+            } else {
+                params->http_bind_valid = true;
+            }
+        }
+    }
+
+    {
+        params->http_admin_bind_valid = false;
+
+        ConstMemory const opt_name = opt_name__http_admin_bind; 
+        ConstMemory const opt_val = config->getString_default (opt_name, ":8080");
+        logI_ (_func, opt_name, ": ", opt_val);
+        if (opt_val.len() == 0) {
+            logI_ (_func, "HTTP service is not bound to any port "
+                   "and won't accept any connections. "
+                   "Set \"", opt_name, "\" option to bind the service.");
+        } else {
+            if (!setIpAddress_default (opt_val,
+                                       ConstMemory() /* default_host */,
+                                       8080          /* default_port */,
+                                       true          /* allow_any_host */,
+                                       &params->http_admin_bind_addr))
+            {
+                logE_ (_func, "setIpAddress_default() failed (http)");
+                res = Result::Failure;
+            } else {
+                params->http_admin_bind_valid = true;
+            }
+        }
+    }
+
     return res;
 }
 
@@ -597,6 +655,20 @@ void MomentInstance::applyConfigParams (MConfig::Config * const new_config)
 
     if (old_params && old_params->num_file_threads != params->num_file_threads)
         configWarnNoEffect (opt_name__num_file_threads);
+
+    if (old_params
+        && (old_params->http_bind_valid != params->http_bind_valid
+            || (params->http_bind_valid && (old_params->http_bind_addr != params->http_bind_addr))))
+    {
+        configWarnNoEffect (opt_name__http_http_bind);
+    }
+
+    if (old_params
+        && (old_params->http_admin_bind_valid != params->http_admin_bind_valid
+            || (params->http_admin_bind_valid && (old_params->http_admin_bind_addr != params->http_admin_bind_addr))))
+    {
+        configWarnNoEffect (opt_name__http_admin_bind);
+    }
 
     http_service.setConfigParams (params->http_keepalive_timeout * 1000000 /* microseconds */,
                                   params->no_keepalive_conns);
@@ -682,8 +754,7 @@ MomentInstance::run ()
     server_app.setNumThreads (params->num_threads);
     recorder_thread_pool.setNumThreads (params->num_file_threads);
 
-    ConstMemory http_bind;
-    {
+    if (params->http_bind_valid) {
 	if (!http_service.init (server_app.getMainThreadContext()->getPollGroup(),
 				server_app.getMainThreadContext()->getTimers(),
                                 server_app.getMainThreadContext()->getDeferredProcessor(),
@@ -695,89 +766,42 @@ MomentInstance::run ()
 	    return EXIT_FAILURE;
 	}
 
-	do {
-	    ConstMemory const opt_name = "http/http_bind";
-	    http_bind = config->getString_default (opt_name, ":8080");
-	    logI_ (_func, opt_name, ": ", http_bind);
-	    if (http_bind.isNull()) {
-		logI_ (_func, "HTTP service is not bound to any port "
-		       "and won't accept any connections. "
-		       "Set \"", opt_name, "\" option to bind the service.");
-		break;
-	    }
+        if (!http_service.bind (params->http_bind_addr)) {
+            logE_ (_func, "http_service.bind() failed (http): ", exc->toString());
+            return EXIT_FAILURE;
+        }
 
-	    IpAddress addr;
-	    if (!setIpAddress_default (http_bind,
-				       ConstMemory() /* default_host */,
-				       8080          /* default_port */,
-				       true          /* allow_any_host */,
-				       &addr))
-	    {
-		logE_ (_func, "setIpAddress_default() failed (http)");
-		return EXIT_FAILURE;
-	    }
-
-	    if (!http_service.bind (addr)) {
-		logE_ (_func, "http_service.bind() failed (http): ", exc->toString());
-		break;
-	    }
-
-	    if (!http_service.start ()) {
-		logE_ (_func, "http_service.start() failed (http): ", exc->toString());
-		return EXIT_FAILURE;
-	    }
-	} while (0);
+        if (!http_service.start ()) {
+            logE_ (_func, "http_service.start() failed (http): ", exc->toString());
+            return EXIT_FAILURE;
+        }
     }
 
-    {
-	do {
-	    ConstMemory const opt_name = "http/admin_bind";
-	    ConstMemory const admin_bind = config->getString_default (opt_name, ":8082");
-	    logI_ (_func, opt_name, ": ", admin_bind);
-	    if (admin_bind.isNull()) {
-		logI_ (_func, "HTTP-Admin service is not bound to any port "
-		       "and won't accept any connections. "
-		       "Set \"", opt_name, "\" option to bind the service.");
-		break;
-	    }
-
-	    if (equal (admin_bind, http_bind)) {
-		admin_http_service_ptr = &http_service;
-		break;
-	    }
-
-	    if (!separate_admin_http_service.init (server_app.getMainThreadContext()->getPollGroup(),
-						   server_app.getMainThreadContext()->getTimers(),
+    if (params->http_admin_bind_valid) {
+        if (params->http_admin_bind_addr == params->http_bind_addr) {
+            admin_http_service_ptr = &http_service;
+        } else {
+            if (!separate_admin_http_service.init (server_app.getMainThreadContext()->getPollGroup(),
+                                                   server_app.getMainThreadContext()->getTimers(),
                                                    server_app.getMainThreadContext()->getDeferredProcessor(),
-						   &page_pool,
-						   params->http_keepalive_timeout * 1000000 /* microseconds */,
-						   params->no_keepalive_conns))
-	    {
-		logE_ (_func, "admin_http_service.init() failed: ", exc->toString());
-		return EXIT_FAILURE;
-	    }
+                                                   &page_pool,
+                                                   params->http_keepalive_timeout * 1000000 /* microseconds */,
+                                                   params->no_keepalive_conns))
+            {
+                logE_ (_func, "admin_http_service.init() failed: ", exc->toString());
+                return EXIT_FAILURE;
+            }
 
-	    IpAddress addr;
-	    if (!setIpAddress_default (admin_bind,
-				       ConstMemory() /* default_host */,
-				       8082          /* default_port */,
-				       true          /* allow_any_host */,
-				       &addr))
-	    {
-		logE_ (_func, "setIpAddress_default() failed (admin)");
-		return EXIT_FAILURE;
-	    }
+            if (!separate_admin_http_service.bind (params->http_admin_bind_addr)) {
+                logE_ (_func, "http_service.bind() failed (admin): ", exc->toString());
+                return EXIT_FAILURE;
+            }
 
-	    if (!separate_admin_http_service.bind (addr)) {
-		logE_ (_func, "http_service.bind() failed (admin): ", exc->toString());
-		break;
-	    }
-
-	    if (!separate_admin_http_service.start ()) {
-		logE_ (_func, "http_service.start() failed (admin): ", exc->toString());
-		return EXIT_FAILURE;
-	    }
-	} while (0);
+            if (!separate_admin_http_service.start ()) {
+                logE_ (_func, "http_service.start() failed (admin): ", exc->toString());
+                return EXIT_FAILURE;
+            }
+        }
     }
 
     admin_http_service_ptr->addHttpHandler (
