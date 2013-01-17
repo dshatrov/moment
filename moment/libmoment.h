@@ -17,8 +17,8 @@
 */
 
 
-#ifndef __LIBMOMENT__LIBMOMENT_H__
-#define __LIBMOMENT__LIBMOMENT_H__
+#ifndef LIBMOMENT__LIBMOMENT_H__
+#define LIBMOMENT__LIBMOMENT_H__
 
 
 #include <libmary/libmary.h>
@@ -70,10 +70,15 @@ Result configGetBoolean (MConfig::Config * mt_nonnull config,
                          bool            * mt_nonnull ret_val,
                          bool             default_val);
 
+Result configSectionGetBoolean (MConfig::Section * mt_nonnull section,
+                                ConstMemory       opt_name,
+                                bool             * mt_nonnull ret_val,
+                                bool              default_val);
+
 void configWarnNoEffect (ConstMemory opt_name);
 
 }
 
 
-#endif /* __LIBMOMENT__LIBMOMENT_H__ */
+#endif /* LIBMOMENT__LIBMOMENT_H__ */
 

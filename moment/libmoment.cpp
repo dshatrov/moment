@@ -65,6 +65,34 @@ Result configGetBoolean (MConfig::Config * const mt_nonnull config,
     return Result::Success;
 }
 
+Result configSectionGetBoolean (MConfig::Section * const mt_nonnull section,
+                                ConstMemory        const opt_name,
+                                bool             * const mt_nonnull ret_val,
+                                bool               const default_val)
+{
+    *ret_val = default_val;
+
+    MConfig::Option * const opt = section->getOption (opt_name);
+    if (!opt)
+        return Result::Success;
+
+    MConfig::BooleanValue const val = opt->getBoolean();
+    if (val == MConfig::Boolean_Invalid) {
+        MConfig::Value * const mval = opt->getValue();
+        logE_ (_func, "Invalid value for ", opt_name, ": ", (mval ? mval->getAsString()->mem() : ConstMemory()));
+        return Result::Failure;
+    } else
+    if (val == MConfig::Boolean_True)
+        *ret_val = true;
+    else
+    if (val == MConfig::Boolean_False)
+        *ret_val = false;
+    else
+        assert (val == MConfig::Boolean_Default);
+
+    return Result::Success;
+}
+
 void configWarnNoEffect (ConstMemory const opt_name)
 {
     logI_ (_func, "Changing ", opt_name, " has no effect until the server is restarted");
