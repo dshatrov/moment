@@ -90,11 +90,26 @@ dumpGstBufferFlags (GstBuffer * const buffer)
 }
 
 void
-libMomentGstInit ()
+libMomentGstInit (ConstMemory const gst_debug_str)
 {
 // gst_is_initialized() is new API.
 //    if (!gst_is_initialized())
+
+    if (gst_debug_str.len() > 0) {
+        String const str (gst_debug_str);
+
+        int argc = 2;
+        char* argv [] = {
+            (char*) "moment",
+            (char*) str.cstr(),
+            NULL
+        };
+
+        char **argv_ = argv;
+        gst_init (&argc, &argv_);
+    } else {
         gst_init (NULL /* args */, NULL /* argv */);
+    }
 }
 
 }

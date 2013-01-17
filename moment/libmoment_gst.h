@@ -33,7 +33,7 @@ using namespace M;
 
 void dumpGstBufferFlags (GstBuffer *buffer);
 
-void libMomentGstInit ();
+void libMomentGstInit (ConstMemory gst_debug_str = ConstMemory());
 
 }
 
