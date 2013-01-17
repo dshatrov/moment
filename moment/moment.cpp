@@ -45,12 +45,14 @@ struct Options {
     Ref<String> log_filename;
     LogLevel loglevel;
     Uint64 exit_after;
+    bool gst_debug;
 
     Options ()
 	: help (false),
 	  daemonize (false),
 	  loglevel (LogLevel::Info),
-	  exit_after ((Uint64) -1)
+	  exit_after ((Uint64) -1),
+          gst_debug (false)
     {
     }
 };
@@ -280,7 +282,7 @@ cmdline_loglevel (char const * /* short_name */,
 }
 
 static bool
-cmdline_exit_after (char const * /* short_nmae */,
+cmdline_exit_after (char const * /* short_name */,
 		    char const * /* long_name */,
 		    char const *value,
 		    void       * /* opt_data */,
@@ -293,6 +295,17 @@ cmdline_exit_after (char const * /* short_nmae */,
     }
 
     logD_ (_func, "options.exit_after: ", options.exit_after);
+    return true;
+}
+
+static bool
+cmdline_gst_debug (char const * /* short_name */,
+                   char const * /* long_name */,
+                   char const * /* value */,
+                   void       * /* opt_data */,
+                   void       * /* cb_data */)
+{
+    options.gst_debug = true;
     return true;
 }
 
@@ -899,10 +912,9 @@ _stop_recorder:
 int main (int argc, char **argv)
 {
     libMaryInit ();
-    libMomentGstInit ();
 
     {
-	unsigned const num_opts = 6;
+	unsigned const num_opts = 7;
 	CmdlineOption opts [num_opts];
 
 	opts [0].short_name = "h";
@@ -941,9 +953,17 @@ int main (int argc, char **argv)
 	opts [5].opt_data = NULL;
 	opts [5].opt_callback = cmdline_exit_after;
 
+        opts [6].short_name = NULL;
+        opts [6].long_name = "gst-debug";
+        opts [6].with_value = false;
+        opts [6].opt_data = NULL;
+        opts [6].opt_callback = cmdline_gst_debug;
+
 	ArrayIterator<CmdlineOption> opts_iter (opts, num_opts);
 	parseCmdline (&argc, &argv, opts_iter, NULL /* callback */, NULL /* callbackData */);
     }
+
+    libMomentGstInit (options.gst_debug ? ConstMemory ("--gst-debug=*:3") : ConstMemory());
 
     if (options.help) {
         setGlobalLogLevel (LogLevel::Failure);
