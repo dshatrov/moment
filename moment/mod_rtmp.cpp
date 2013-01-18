@@ -23,7 +23,6 @@
 #include <moment/rtmp_push_protocol.h>
 
 
-// Flow control is disabled until done right.
 #define MOMENT_RTMP__FLOW_CONTROL
 
 
@@ -49,7 +48,7 @@ public:
 };
 
 mt_const bool audio_waits_video = false;
-mt_const bool wait_for_keyframe = false;
+mt_const bool wait_for_keyframe = true;
 mt_const bool default_start_paused = false;
 mt_const Uint64 paused_avc_interframes = 3;
 
@@ -387,9 +386,14 @@ void streamAudioMessage (VideoStream::AudioMessage * const mt_nonnull msg,
 void streamVideoMessage (VideoStream::VideoMessage * const mt_nonnull msg,
 			 void                      * const _session)
 {
-//    logD_ (_func, "ts ", msg->timestamp_nanosec, " ", msg->frame_type, (msg->is_saved_frame ? " SAVED" : ""));
-
     ClientSession * const client_session = static_cast <ClientSession*> (_session);
+
+/**/
+    logS_ (_func, "ts ", msg->timestamp_nanosec, " ", msg->frame_type, (msg->is_saved_frame ? " SAVED" : ""));
+    logS_ (_func, "fks: ", client_session->first_keyframe_sent, ", "
+           "ks: ", client_session->keyframe_sent, ", "
+           "nkfk: ", client_session->no_keyframe_counter);
+/**/
 
     client_session->mutex.lock ();
 
@@ -437,7 +441,7 @@ void streamVideoMessage (VideoStream::VideoMessage * const mt_nonnull msg,
 	} else
         if (wait_for_keyframe) {
 	  // Waiting for a keyframe, dropping current video frame.
-//            logD_ (_func, "--- wait_for_keyframe, dropping");
+            logS_ (_func, "wait_for_keyframe, dropping");
 	    client_session->mutex.unlock ();
 	    return;
 	}
@@ -787,10 +791,17 @@ savedVideoFrame (VideoStream::VideoMessage * const mt_nonnull video_msg,
 {
     ClientSession * const client_session = static_cast <ClientSession*> (_client_session);
 
+/**/
+    logS_ (_func, "ts ", video_msg->timestamp_nanosec, " ", video_msg->frame_type);
+    logS_ (_func, "fks: ", client_session->first_keyframe_sent, ", "
+           "ks: ", client_session->keyframe_sent, ", "
+           "nkfk: ", client_session->no_keyframe_counter);
+/**/
+
     if (!client_session->resumed
         && video_msg->frame_type.isInterFrame())
     {
-//        logD_ (_func, "!resumed, interframe, dropping");
+        logS_ (_func, "!resumed, interframe, dropping");
         if (video_msg->codec_id != VideoStream::VideoCodecId::AVC
             || client_session->first_interframes_sent >= paused_avc_interframes
             || !client_session->first_keyframe_sent)
@@ -802,7 +813,7 @@ savedVideoFrame (VideoStream::VideoMessage * const mt_nonnull video_msg,
 
     if (video_msg->frame_type.isKeyFrame()) {
         if (video_msg->page_list.first == client_session->paused_keyframe_page) {
-//            logD_ (_func, "same as paused keyframe, dropping");
+            logS_ (_func, "same as paused keyframe, dropping");
             return Result::Success;
         }
 
@@ -1081,14 +1092,17 @@ void sendStateChanged (Sender::SendState   const send_state,
 	    break;
 	case Sender::ConnectionOverloaded:
 	    logD (framedrop, _func, "ConnectionOverloaded");
+            // We used to set 'client_session->overloaded' to 'true' here,
+            // but this turned out to happen too frequently.
+            // Moved that to QueueSoftLimit instead.
+	    break;
+	case Sender::QueueSoftLimit:
+	    logD (framedrop, _func, "QueueSoftLimit");
 #ifdef MOMENT_RTMP__FLOW_CONTROL
 	    client_session->mutex.lock ();
 	    client_session->overloaded = true;
 	    client_session->mutex.unlock ();
 #endif
-	    break;
-	case Sender::QueueSoftLimit:
-	    logD (framedrop, _func, "QueueSoftLimit");
 	    // TODO Block input from the client.
 	    break;
 	case Sender::QueueHardLimit:
@@ -1224,16 +1238,15 @@ void momentRtmpInit ()
 	}
     }
 
+    Uint64 send_delay = 50;
     {
 	ConstMemory const opt_name = "mod_rtmp/send_delay";
-	Uint64 send_delay_val = 50;
 	MConfig::GetResult const res = config->getUint64_default (
-		opt_name, &send_delay_val, send_delay_val);
+		opt_name, &send_delay, send_delay);
 	if (!res) {
 	    logE_ (_func, "bad value for ", opt_name);
 	} else {
-	    logI_ (_func, "RTMP send delay: ", send_delay_val, " milliseconds");
-	    rtmp_module->rtmp_service.setSendDelay (send_delay_val);
+	    logI_ (_func, "RTMP send delay: ", send_delay, " milliseconds");
 	}
     }
 
@@ -1337,7 +1350,7 @@ void momentRtmpInit ()
 	if (opt_val == MConfig::Boolean_Invalid)
 	    logE_ (_func, "Invalid value for config option ", opt_name);
 	else
-	if (opt_val == MConfig::Boolean_True)
+	if (opt_val == MConfig::Boolean_False)
 	    wait_for_keyframe = true;
 	else
 	    wait_for_keyframe = false;
@@ -1474,14 +1487,13 @@ void momentRtmpInit ()
     }
 
     {
-	rtmp_module->rtmp_service.setFrontend (Cb<RtmpVideoService::Frontend> (
+	rtmp_module->rtmp_service.setFrontend (CbDesc<RtmpVideoService::Frontend> (
 		&rtmp_video_service_frontend, NULL, NULL));
 
-	rtmp_module->rtmp_service.setServerContext (server_app->getServerContext());
-	rtmp_module->rtmp_service.setPagePool (moment->getPagePool());
-
-	if (!rtmp_module->rtmp_service.init (prechunking_enabled,
-                                             server_app->getServerContext()->getTimers(),
+	if (!rtmp_module->rtmp_service.init (server_app->getServerContext(),
+                                             moment->getPagePool(),
+                                             send_delay,
+                                             prechunking_enabled,
                                              rtmp_accept_watchdog_timeout_sec))
         {
 	    logE_ (_func, "rtmp_service.init() failed: ", exc->toString());
@@ -1523,7 +1535,7 @@ void momentRtmpInit ()
     }
 
     {
-	rtmp_module->rtmpt_service.setFrontend (Cb<RtmpVideoService::Frontend> (
+	rtmp_module->rtmpt_service.setFrontend (CbDesc<RtmpVideoService::Frontend> (
 		&rtmp_video_service_frontend, NULL, NULL));
 
 	if (!rtmp_module->rtmpt_service.init (

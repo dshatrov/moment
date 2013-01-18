@@ -39,10 +39,10 @@ public:
     };
 
 protected:
-    Cb<Frontend> frontend;
+    mt_const Cb<Frontend> frontend;
 
 public:
-    void setFrontend (Cb<Frontend> const &frontend)
+    mt_const void setFrontend (CbDesc<Frontend> const &frontend)
     {
 	this->frontend = frontend;
     }
