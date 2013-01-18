@@ -1,5 +1,5 @@
 /*  Moment Video Server - High performance media server
-    Copyright (C) 2011 Dmitry Shatrov
+    Copyright (C) 2011-2013 Dmitry Shatrov
     e-mail: shatrov@gmail.com
 
     This program is free software: you can redistribute it and/or modify
@@ -17,8 +17,8 @@
 */
 
 
-#ifndef __LIBMOMENT__RTMP_SERVICE__H__
-#define __LIBMOMENT__RTMP_SERVICE__H__
+#ifndef LIBMOMENT__RTMP_SERVICE__H__
+#define LIBMOMENT__RTMP_SERVICE__H__
 
 
 #include <libmary/libmary.h>
@@ -38,6 +38,26 @@ class RtmpService : public RtmpVideoService,
 private:
     StateMutex mutex;
 
+public:
+    class ClientSessionInfo
+    {
+    public:
+        IpAddress client_addr;
+        Time creation_time;
+        Time last_send_time;
+        Time last_recv_time;
+        StRef<String> last_play_stream;
+        StRef<String> last_publish_stream;
+
+        ClientSessionInfo ()
+            : creation_time  (0),
+              last_send_time (0),
+              last_recv_time (0)
+        {
+        }
+    };
+
+private:
     class SessionList_name;
 
     class ClientSession : public Object,
@@ -62,6 +82,8 @@ private:
 
 	mt_mutex (RtmpService::mutex) PollGroup::PollableKey pollable_key;
 
+        mt_mutex (mutex) ClientSessionInfo session_info;
+
 	ClientSession ()
 	    : thread_ctx    (NULL),
 	      tcp_conn      (this /* coderef_container */),
@@ -85,6 +107,9 @@ private:
     TcpServer tcp_server;
 
     mt_mutex (mutex) SessionList session_list;
+
+    AtomicInt num_session_objects;
+    Count num_valid_sessions;
 
     mt_mutex (mutex) void destroySession (ClientSession *session);
 
@@ -117,28 +142,60 @@ private:
   mt_iface_end
 
 public:
-    mt_throws Result init (bool    prechunking_enabled,
-                           Timers *timers,
-                           Time    accept_watchdog_timeout_sec);
-
     mt_throws Result bind (IpAddress addr);
 
     mt_throws Result start ();
 
-    void setServerContext (ServerContext * const server_ctx)
-    {
-	this->server_ctx = server_ctx;
-    }
 
-    void setPagePool (PagePool * const page_pool)
-    {
-	this->page_pool = page_pool;
-    }
+  // _________________________ Current client sessions _________________________
 
-    void setSendDelay (Time const send_delay)
+private:
+    mt_mutex (mutex) void updateClientSessionsInfo ();
+
+public:
+    void rtmpServiceLock   () { mutex.lock (); }
+    void rtmpServiceUnlock () { mutex.unlock (); }
+
+    class SessionInfoIterator
     {
-	this->send_delay = send_delay;
-    }
+        friend class RtmpService;
+
+    private:
+        SessionList::iterator iter;
+
+        SessionInfoIterator (RtmpService const &rtmp_service) : iter (rtmp_service.session_list) {}
+
+    public:
+        SessionInfoIterator () {}
+
+        bool operator == (SessionInfoIterator const &iter) const { return this->iter == iter.iter; }
+        bool operator != (SessionInfoIterator const &iter) const { return this->iter != iter.iter; }
+
+        bool done () const { return iter.done(); }
+
+        ClientSessionInfo* next ()
+        {
+            ClientSession * const session = iter.next ();
+            return &session->session_info;
+        }
+    };
+
+    struct SessionsInfo
+    {
+        Count num_session_objects;
+        Count num_valid_sessions;
+    };
+
+    mt_mutex (mutex) SessionInfoIterator getClientSessionsInfo_unlocked (SessionsInfo *ret_info);
+
+  // ___________________________________________________________________________
+
+
+    mt_const mt_throws Result init (ServerContext * mt_nonnull server_ctx,
+                                    PagePool      * mt_nonnull page_pool,
+                                    Time           send_delay,
+                                    bool           prechunking_enabled,
+                                    Time           accept_watchdog_timeout_sec);
 
     RtmpService (Object *coderef_container);
 
@@ -148,5 +205,5 @@ public:
 }
 
 
-#endif /* __LIBMOMENT__RTMP_SERVICE__H__ */
+#endif /* LIBMOMENT__RTMP_SERVICE__H__ */
 

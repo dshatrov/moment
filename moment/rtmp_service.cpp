@@ -1,5 +1,5 @@
 /*  Moment Video Server - High performance media server
-    Copyright (C) 2011 Dmitry Shatrov
+    Copyright (C) 2011-2013 Dmitry Shatrov
     e-mail: shatrov@gmail.com
 
     This program is free software: you can redistribute it and/or modify
@@ -39,6 +39,12 @@ TcpServer::Frontend const RtmpService::tcp_server_frontend = {
 RtmpService::ClientSession::~ClientSession ()
 {
 //    logD_ (_func_);
+
+    CodeRef const rtmp_service_ref = weak_rtmp_service;
+    if (rtmp_service_ref) {
+        RtmpService * const rtmp_service = unsafe_rtmp_service;
+        rtmp_service->num_session_objects.dec ();
+    }
 }
 
 mt_mutex (mutex) void
@@ -52,13 +58,17 @@ RtmpService::destroySession (ClientSession * const session)
     }
     session->valid = false;
 
+    assert (session->pollable_key);
     session->thread_ctx->getPollGroup()->removePollable (session->pollable_key);
+    session->pollable_key = NULL;
 
     // TODO close TCP connection explicitly.
 
     session_list.remove (session);
     logD (rtmp_service, _func, "session refcount: ", session->getRefCount());
     session->unref ();
+
+    --num_valid_sessions;
 }
 
 void
@@ -94,7 +104,7 @@ RtmpService::acceptOneConnection ()
 
     ServerThreadContext * const thread_ctx = server_ctx->selectThreadContext();
 
-    Ref<ClientSession> const session = grab (new ClientSession);
+    Ref<ClientSession> const session = grab (new (std::nothrow) ClientSession);
     session->thread_ctx = thread_ctx;
     session->rtmp_conn.init (thread_ctx->getTimers(), page_pool, send_delay, prechunking_enabled);
 
@@ -104,6 +114,8 @@ RtmpService::acceptOneConnection ()
     session->valid = true;
     session->weak_rtmp_service = this;
     session->unsafe_rtmp_service = this;
+
+    num_session_objects.inc ();
 
     IpAddress client_addr;
     {
@@ -118,6 +130,7 @@ RtmpService::acceptOneConnection ()
 
 	assert (res == TcpServer::AcceptResult::Accepted);
     }
+    session->session_info.client_addr = client_addr;
 
     session->pollable_key = thread_ctx->getPollGroup()->addPollable (session->tcp_conn.getPollable(),
 								     NULL /* deferred_reg */,
@@ -138,16 +151,46 @@ RtmpService::acceptOneConnection ()
     session->conn_receiver.setFrontend (session->rtmp_conn.getReceiverFrontend());
 
     {
-	Result res;
-	if (!frontend.call_ret (&res, frontend->clientConnected, /*(*/ /* session, */ &session->rtmp_conn, client_addr /*)*/)
-	    || !res)
-	{
+        mutex.lock ();
+
+        // Completing session creation before calling any client callbacks.
+        session_list.append (session);
+        session->ref ();
+        // We may call destroySession(session) from now on.
+
+        ++num_valid_sessions;
+
+        {
+            Time const cur_time = getTime();
+            session->session_info.creation_time = cur_time;
+            last_accept_time = cur_time;
+        }
+
+        mutex.unlock ();
+    }
+
+    {
+	Result res = Result::Failure;
+	bool const call_res =
+                frontend.call_ret (&res, frontend->clientConnected,
+                                   /*(*/ &session->rtmp_conn, client_addr /*)*/);
+	if (!call_res || !res) {
+            mutex.lock ();
+            destroySession (session);
+            mutex.unlock ();
 	    return true;
 	}
     }
 
     mutex.lock ();
+    if (!session->valid) {
+        mutex.unlock ();
+        return true;
+    }
+
+    assert (session->pollable_key);
     if (!thread_ctx->getPollGroup()->activatePollable (session->pollable_key)) {
+        destroySession (session);
 	mutex.unlock ();
 
 	// TODO FIXME Call clientDisconnected()
@@ -156,14 +199,7 @@ RtmpService::acceptOneConnection ()
 	return true;
     }
 
-    session_list.append (session);
-    session->ref ();
-
-    last_accept_time = getTime();
-
     mutex.unlock ();
-  // The session is fully initialized and should be destroyed with
-  // destroySession() when necessary.
 
     logD (rtmp_service, _func, "done");
 
@@ -177,13 +213,10 @@ RtmpService::closeRtmpConn (void * const _session)
 
     ClientSession * const session = static_cast <ClientSession*> (_session);
 
-    CodeRef self_ref;
-    if (session->weak_rtmp_service.isValid()) {
-	self_ref = session->weak_rtmp_service;
-	if (!self_ref) {
-	    logD_ (_func, "self gone");
-	    return;
-	}
+    CodeRef const self_ref = session->weak_rtmp_service;
+    if (!self_ref) {
+        logD_ (_func, "self gone");
+        return;
     }
     RtmpService * const self = session->unsafe_rtmp_service;
 
@@ -204,10 +237,17 @@ RtmpService::accepted (void * const _self)
 }
 
 mt_const mt_throws Result
-RtmpService::init (bool     const prechunking_enabled,
-                   Timers * const timers,
-                   Time     const accept_watchdog_timeout_sec)
+RtmpService::init (ServerContext * const mt_nonnull server_ctx,
+                   PagePool      * const mt_nonnull page_pool,
+                   Time            const send_delay,
+                   bool            const prechunking_enabled,
+                   Time            const accept_watchdog_timeout_sec)
 {
+    Timers * const timers = server_ctx->getTimers();
+
+    this->server_ctx = server_ctx;
+    this->page_pool  = page_pool;
+    this->send_delay = send_delay;
     this->prechunking_enabled = prechunking_enabled;
     this->accept_watchdog_timeout_sec = accept_watchdog_timeout_sec;
 
@@ -252,10 +292,42 @@ RtmpService::start ()
     if (!tcp_server.listen ())
 	return Result::Failure;
 
+    // TODO FIXME Call removePollable() when done.
     if (!server_ctx->getMainPollGroup()->addPollable (tcp_server.getPollable(), NULL /* ret_reg */))
 	return Result::Failure;
 
     return Result::Success;
+}
+
+mt_mutex (mutex) void
+RtmpService::updateClientSessionsInfo ()
+{
+        SessionList::iterator iter (session_list);
+        while (!iter.done()) {
+            ClientSession * const session = iter.next ();
+#if 0
+// TODO Update the following fields:
+        Time last_send_time;
+        Time last_recv_time;
+        StRef<String> last_play_stream;
+        StRef<String> last_publish_stream;
+#endif
+           session->session_info.last_send_time = 0;
+           session->session_info.last_recv_time = 0;
+        }
+}
+
+mt_mutex (mutex) RtmpService::SessionInfoIterator
+RtmpService::getClientSessionsInfo_unlocked (SessionsInfo * const ret_info)
+{
+    if (ret_info) {
+        ret_info->num_session_objects = num_session_objects.get ();
+        ret_info->num_valid_sessions = num_valid_sessions;
+    }
+
+    updateClientSessionsInfo ();
+
+    return SessionInfoIterator (*this);
 }
 
 RtmpService::RtmpService (Object * const coderef_container)
@@ -265,6 +337,7 @@ RtmpService::RtmpService (Object * const coderef_container)
       page_pool (NULL),
       send_delay (0),
       tcp_server (coderef_container),
+      num_valid_sessions (0),
       accept_watchdog_timeout_sec (0),
       last_accept_time (0)
 {
