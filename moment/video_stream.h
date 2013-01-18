@@ -375,19 +375,6 @@ public:
 
 	void processVideoFrame (VideoMessage * mt_nonnull msg);
 
-	bool getSavedKeyframe (SavedFrame *ret_frame);
-
-	bool getSavedMetaData (SavedFrame * mt_nonnull ret_frame);
-
-	bool getSavedAacSeqHdr (SavedAudioFrame * mt_nonnull ret_frame);
-
-	bool getSavedAvcSeqHdr (SavedFrame * mt_nonnull ret_frame);
-
-	Size getNumSavedSpeexHeaders ();
-
-	void getSavedSpeexHeaders (SavedAudioFrame *ret_frames,
-				   Size             ret_frame_size);
-
         void copyStateFrom (FrameSaver *frame_saver);
 
         struct FrameHandler

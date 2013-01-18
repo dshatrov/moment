@@ -425,71 +425,6 @@ VideoStream::FrameSaver::processVideoFrame (VideoMessage * const mt_nonnull msg)
     }
 }
 
-bool
-VideoStream::FrameSaver::getSavedKeyframe (SavedFrame * const ret_frame)
-{
-    if (!got_saved_keyframe)
-	return false;
-
-    if (ret_frame)
-	*ret_frame = saved_keyframe;
-
-    return true;
-}
-
-bool
-VideoStream::FrameSaver::getSavedMetaData (SavedFrame * const mt_nonnull ret_frame)
-{
-    if (!got_saved_metadata)
-	return false;
-
-    *ret_frame = saved_metadata;
-    return true;
-}
-
-bool
-VideoStream::FrameSaver::getSavedAacSeqHdr (SavedAudioFrame * const mt_nonnull ret_frame)
-{
-    if (!got_saved_aac_seq_hdr)
-	return false;
-
-    *ret_frame = saved_aac_seq_hdr;
-    return true;
-}
-
-bool
-VideoStream::FrameSaver::getSavedAvcSeqHdr (SavedFrame * const mt_nonnull ret_frame)
-{
-    if (!got_saved_avc_seq_hdr)
-	return false;
-
-    *ret_frame = saved_avc_seq_hdr;
-    return true;
-}
-
-Size
-VideoStream::FrameSaver::getNumSavedSpeexHeaders ()
-{
-    return saved_speex_headers.getNumElements();
-}
-
-void
-VideoStream::FrameSaver::getSavedSpeexHeaders (SavedAudioFrame *ret_frames,
-					       Size             ret_frame_size)
-{
-    Size i = 0;
-    List<SavedAudioFrame*>::iter iter (saved_speex_headers);
-    while (!saved_speex_headers.iter_done (iter)) {
-	if (i >= ret_frame_size)
-	    break;
-
-	SavedAudioFrame * const frame = saved_speex_headers.iter_next (iter)->data;
-	ret_frames [i] = *frame;
-
-	++i;
-    }
-}
-
 void
 VideoStream::FrameSaver::copyStateFrom (FrameSaver * const frame_saver)
 {
@@ -560,29 +495,27 @@ VideoStream::FrameSaver::reportSavedFrames (FrameHandler const * const mt_nonnul
     if (got_saved_avc_seq_hdr
         && frame_handler->videoFrame)
     {
-        VideoStream::VideoMessage msg;
+        {
+            VideoStream::VideoMessage msg;
 
-        msg.timestamp_nanosec = saved_avc_seq_hdr.msg.timestamp_nanosec;
-        msg.codec_id = VideoStream::VideoCodecId::AVC;
-        msg.frame_type = VideoStream::VideoFrameType::AvcEndOfSequence;
+            msg.timestamp_nanosec = saved_avc_seq_hdr.msg.timestamp_nanosec;
+            msg.codec_id = VideoStream::VideoCodecId::AVC;
+            msg.frame_type = VideoStream::VideoFrameType::AvcEndOfSequence;
 
-        msg.page_pool = saved_avc_seq_hdr.msg.page_pool;
-        msg.prechunk_size = 0;
-        msg.msg_offset = 0;
+            msg.page_pool = saved_avc_seq_hdr.msg.page_pool;
+            msg.prechunk_size = 0;
+            msg.msg_offset = 0;
 
-        msg.is_saved_frame = true;
+            msg.is_saved_frame = true;
 
-      // TODO Send AvcEndOfSequence only when AvcSequenceHeader was sent.
+          // TODO Send AvcEndOfSequence only when AvcSequenceHeader was sent.
 
-        if (!frame_handler->videoFrame (&msg, cb_data))
-            return Result::Failure;
-    }
-
-    if (got_saved_avc_seq_hdr) {
-        if (frame_handler->videoFrame) {
-            if (!frame_handler->videoFrame (&saved_avc_seq_hdr.msg, cb_data))
+            if (!frame_handler->videoFrame (&msg, cb_data))
                 return Result::Failure;
         }
+
+        if (!frame_handler->videoFrame (&saved_avc_seq_hdr.msg, cb_data))
+            return Result::Failure;
     }
 
     if (frame_handler->audioFrame) {
@@ -784,7 +717,7 @@ VideoStream::informClosed (EventHandler * const event_handler,
 void
 VideoStream::fireAudioMessage (AudioMessage * const mt_nonnull msg)
 {
-    logS_ (_this_func, "ts: ", msg->timestamp_nanosec);
+    logS_ (_this_func, "ts ", msg->timestamp_nanosec, " ", msg->frame_type);
 
     mutex.lock ();
 
@@ -799,7 +732,7 @@ VideoStream::fireAudioMessage (AudioMessage * const mt_nonnull msg)
 void
 VideoStream::fireVideoMessage (VideoMessage * const mt_nonnull msg)
 {
-    logS_ (_this_func, "ts: ", msg->timestamp_nanosec);
+    logS_ (_this_func, "ts ", msg->timestamp_nanosec, " ", msg->frame_type);
 
     mutex.lock ();
 
