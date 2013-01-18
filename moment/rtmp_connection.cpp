@@ -137,7 +137,7 @@ RtmpConnection::mangleOutTimestamp (MessageDesc const * const mt_nonnull mdesc)
 {
 //    logD_ (_func, "timestamp: 0x", fmt_hex, timestamp);
 
-    // TEST
+// TEST
 //    return timestamp + 0x00ffffff;
 
 //    return timestamp;
@@ -158,8 +158,6 @@ RtmpConnection::mangleOutTimestamp (MessageDesc const * const mt_nonnull mdesc)
     //          A dirty hack, actually. Timestamps shouldn't wrap this way at the beginning
     //          of a stream. This should be dealt with in VideoStream's bindind logics and alike.
     if (out_first_frames_counter < 1000 /* Artificial limit */) {
-//        logD_ (_func, "mangled_timestamp: ", mangled_timestamp);
-
         if (mangled_timestamp >
                     (momentrtmp_proto ? (( (Uint64) -60000000000ULL /* 1 minute */) / 1000) :
                                         ((((Uint64) -60000000000ULL /* 1 minute */) / 1000000) & 0xffffffff)))
@@ -171,28 +169,6 @@ RtmpConnection::mangleOutTimestamp (MessageDesc const * const mt_nonnull mdesc)
     }
 
     return mangled_timestamp;
-
-#if 0
-// Deprecated and wrong.
-
-    if (!out_got_first_timestamp) {
-	if (timestamp != 0) {
-	    out_first_timestamp = timestamp;
-	    out_got_first_timestamp = true;
-	    return 0;
-	} else {
-	    return timestamp;
-	}
-    }
-
-    if (timestamp == 0)
-        return 0;
-
-    if (out_first_timestamp <= timestamp)
-	return timestamp - out_first_timestamp;
-
-    return 0;
-#endif
 }
 
 // @msg_len = mdesc->msg_len + extra header length
@@ -630,9 +606,9 @@ RtmpConnection::sendMessagePages (MessageDesc const      * const mt_nonnull mdes
     if (!unlocked)
 	send_mutex.lock ();
 
-    Uint64 const timestamp =
-//            (mdesc->adjustable_timestamp ? mangleOutTimestamp (mdesc->timestamp) : mdesc->timestamp);
-            mangleOutTimestamp (mdesc);
+    Uint64 const timestamp = mangleOutTimestamp (mdesc);
+    logS_ (_this_func, "adjusted ts ", timestamp, " (was ", mdesc->timestamp, ") ",
+           (RtmpMessageType) mdesc->msg_type_id);
 
     logD (proto_out, _func, "ts 0x", fmt_hex, timestamp, " (orig 0x", mdesc->timestamp, "), "
 	  "tid ", fmt_def, mdesc->msg_type_id, ", (", (RtmpMessageType) mdesc->msg_type_id, ")"
@@ -1137,8 +1113,6 @@ RtmpConnection::sendCommandMessage_AMF0_Pages (Uint32                   const ms
 void
 RtmpConnection::sendVideoMessage (VideoStream::VideoMessage * const mt_nonnull msg)
 {
-//    logD (rtmp_server, _func_);
-
 #if 0
     logD_ (_func_);
     logLock ();
@@ -1175,6 +1149,8 @@ RtmpConnection::sendVideoMessage (VideoStream::VideoMessage * const mt_nonnull m
     mdesc.msg_len = msg->msg_len;
     mdesc.cs_hdr_comp = true;
     mdesc.adjustable_timestamp = msg->frame_type.isVideoData();
+
+    logS_ (_this_func, "ts ", msg->timestamp_nanosec, " (", mdesc.timestamp, ") ", msg->frame_type);
 
     sendMessagePages (&mdesc,
                       chunk_stream,
