@@ -1536,7 +1536,7 @@ MomentServer::adminHttpRequest (HttpRequest   * const mt_nonnull req,
     MOMENT_SERVER__HEADERS_DATE;
 
     if (req->getNumPathElems() >= 2
-	&& equal (req->getPath (1), "channels_stat"))
+	&& equal (req->getPath (1), "stat"))
     {
         PagePool::PageListHead page_list;
 
@@ -1602,7 +1602,7 @@ MomentServer::adminHttpRequest (HttpRequest   * const mt_nonnull req,
 			   "\r\n",
 			   reply_body);
 
-	logA_ ("gst_admin 404 ", req->getClientAddress(), " ", req->getRequestLine());
+	logA_ ("moment_server__admin 404 ", req->getClientAddress(), " ", req->getRequestLine());
     }
 
     if (!req->getKeepalive())

@@ -161,9 +161,8 @@ RtmpService::acceptOneConnection ()
         ++num_valid_sessions;
 
         {
-            Time const cur_time = getTime();
-            session->session_info.creation_time = cur_time;
-            last_accept_time = cur_time;
+            session->session_info.creation_time = getUnixtime();
+            last_accept_time = getTime();
         }
 
         mutex.unlock ();

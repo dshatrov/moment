@@ -40,6 +40,20 @@ public:
     RtmpService  rtmp_service;
     RtmptService rtmpt_service;
 
+
+  // __________________________________ Admin __________________________________
+
+    static HttpService::HttpHandler const admin_http_handler;
+
+    static Result adminHttpRequest (HttpRequest   * mt_nonnull req,
+                                    Sender        * mt_nonnull conn_sender,
+                                    Memory const  &msg_body,
+                                    void         ** mt_nonnull ret_msg_data,
+                                    void          *_self);
+
+  // ___________________________________________________________________________
+
+
     MomentRtmpModule ()
         : rtmp_service  (this /* coderef_container */),
           rtmpt_service (this /* coderef_container */)
@@ -60,6 +74,7 @@ mt_const Count no_keyframe_limit = 250; // 25 fps * 10 seconds
 
 mt_const DataDepRef<MomentServer> moment (NULL /* coderef_container */);
 mt_const DataDepRef<Timers> timers (NULL /* coderef_container */);
+mt_const DataDepRef<PagePool> page_pool (NULL /* coderef_container */);
 
 mt_const Stat::ParamKey stat_num_sessions;
 
@@ -218,6 +233,7 @@ static VideoStream::FrameSaver::FrameHandler const saved_frame_handler = {
     savedAudioFrame,
     savedVideoFrame
 };
+
 
 void
 ClientSession::doResume ()
@@ -1200,6 +1216,107 @@ static MomentServer::Events const server_events = {
     serverDestroy
 };
 
+
+// ___________________________________ Admin ___________________________________
+
+HttpService::HttpHandler const MomentRtmpModule::admin_http_handler = {
+    adminHttpRequest,
+    NULL /* httpMessageBody */
+};
+
+Result
+MomentRtmpModule::adminHttpRequest (HttpRequest   * const mt_nonnull req,
+                                    Sender        * const mt_nonnull conn_sender,
+                                    Memory const  & /* msg_body */,
+                                    void         ** const mt_nonnull /* ret_msg_data */,
+                                    void          * const _self)
+{
+    MomentRtmpModule * const self = static_cast <MomentRtmpModule*> (_self);
+
+    logD_ (_func_);
+
+    MOMENT_SERVER__HEADERS_DATE;
+
+    if (req->getNumPathElems() >= 2
+	&& equal (req->getPath (1), "stat"))
+    {
+        PagePool::PageListHead page_list;
+
+        page_pool->printToPages (
+                &page_list,
+                "<html>"
+                "<body>"
+                "<p>mod_rtmp stats</p>"
+                "<table>");
+        {
+            self->rtmp_service.rtmpServiceLock ();
+
+            RtmpService::SessionsInfo sinfo_sum;
+            RtmpService::SessionInfoIterator iter = self->rtmp_service.getClientSessionsInfo_unlocked (&sinfo_sum);
+
+            page_pool->printToPages (
+                    &page_list,
+                    "<tr><td>num_session_objects</td><td>", sinfo_sum.num_session_objects, "</td></tr>"
+                    "<tr><td>num_valid_sessions</td><td>",  sinfo_sum.num_valid_sessions,  "</td></tr>");
+
+            while (!iter.done()) {
+                RtmpService::ClientSessionInfo * const sinfo = iter.next ();
+
+                Byte time_buf [timeToString_BufSize];
+                Size const time_len = timeToString (Memory::forObject (time_buf), sinfo->creation_time);
+
+                page_pool->printToPages (
+                        &page_list,
+                        "<tr>"
+                        "<td>", sinfo->client_addr, "</td>"
+                        "<td>", ConstMemory (time_buf, time_len), "</td>"
+                        "<td>", sinfo->last_send_time, "</td>"
+                        "<td>", sinfo->last_recv_time, "</td>"
+                        "<td>", sinfo->last_play_stream, "</td>"
+                        "<td>", sinfo->last_publish_stream, "</td>"
+                        "</tr>");
+            }
+
+            self->rtmp_service.rtmpServiceUnlock ();
+        }
+        page_pool->printToPages (
+                &page_list,
+                "</table>"
+                "</body>"
+                "</html>");
+
+        Size const data_len = PagePool::countPageListDataLen (page_list.first, 0 /* msg_offset */);
+
+        conn_sender->send (
+                page_pool,
+                false /* do_flush */,
+                MOMENT_SERVER__OK_HEADERS ("text/html", data_len),
+                "\r\n");
+        conn_sender->sendPages (page_pool, &page_list, true /* do_flush */);
+
+        logA_ ("file 200 ", req->getClientAddress(), " ", req->getRequestLine());
+    } else {
+	logE_ (_func, "Unknown admin HTTP request: ", req->getFullPath());
+
+	ConstMemory const reply_body = "mod_rtmp: unknown command";
+	conn_sender->send (page_pool,
+			   true /* do_flush */,
+			   MOMENT_SERVER__404_HEADERS (reply_body.len()),
+			   "\r\n",
+			   reply_body);
+
+	logA_ ("mod_rtmp__admin 404 ", req->getClientAddress(), " ", req->getRequestLine());
+    }
+
+    if (!req->getKeepalive())
+        conn_sender->closeAfterFlush();
+
+    return Result::Success;
+}
+
+// _____________________________________________________________________________
+
+
 void momentRtmpInit ()
 {
     stat_num_sessions = getStat()->createParam ("mod_rtmp/num_sessions",
@@ -1210,17 +1327,20 @@ void momentRtmpInit ()
     moment = MomentServer::getInstance();
     CodeDepRef<ServerApp> const server_app = moment->getServerApp();
     timers = server_app->getMainThreadContext()->getTimers();
+    page_pool = moment->getPagePool();
 
     MConfig::Config * const config = moment->getConfig();
 
     {
-        Ref<RtmpPushProtocol> const rtmp_push_proto = grab (new RtmpPushProtocol);
+        Ref<RtmpPushProtocol> const rtmp_push_proto = grab (new (std::nothrow) RtmpPushProtocol);
         rtmp_push_proto->init (moment);
         moment->addPushProtocol ("rtmp", rtmp_push_proto);
         moment->addPushProtocol ("momentrtmp", rtmp_push_proto);
     }
 
-    MomentRtmpModule * const rtmp_module = new MomentRtmpModule;
+    // TODO ref/unref
+    MomentRtmpModule * const rtmp_module = new (std::nothrow) MomentRtmpModule;
+    assert (rtmp_module);
     moment->getEventInformer()->subscribe (CbDesc<MomentServer::Events> (&server_events, rtmp_module, NULL));
 
     {
@@ -1584,6 +1704,10 @@ void momentRtmpInit ()
 		       "Set \"", opt_name, "\" option to \"y\" to bind the service.");
 	    }
 	} while (0);
+
+        moment->getAdminHttpService()->addHttpHandler (
+                CbDesc<HttpService::HttpHandler> (&MomentRtmpModule::admin_http_handler, rtmp_module, rtmp_module),
+                "mod_rtmp");
     }
 }
 

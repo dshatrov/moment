@@ -185,8 +185,8 @@ private:
 
     static Result adminHttpRequest (HttpRequest   * mt_nonnull req,
                                     Sender        * mt_nonnull conn_sender,
-                                    Memory const  & /* msg_body */,
-                                    void         ** mt_nonnull /* ret_msg_data */,
+                                    Memory const  &msg_body,
+                                    void         ** mt_nonnull ret_msg_data,
                                     void          *_self);
 
 
