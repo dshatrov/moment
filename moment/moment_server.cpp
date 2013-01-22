@@ -1630,7 +1630,7 @@ MomentServer::init (ServerApp        * const mt_nonnull server_app,
 
     mix_video_stream = grab (new VideoStream);
 
-    vs_inform_reg.setDeferredProcessor (server_app->getMainThreadContext()->getDeferredProcessor());
+    vs_inform_reg.setDeferredProcessor (server_app->getServerContext()->getMainThreadContext()->getDeferredProcessor());
 
     {
 	ConstMemory const opt_name = "moment/publish_all";

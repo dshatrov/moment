@@ -1,5 +1,5 @@
 /*  Moment Video Server - High performance media server
-    Copyright (C) 2011 Dmitry Shatrov
+    Copyright (C) 2011-2013 Dmitry Shatrov
     e-mail: shatrov@gmail.com
 
     This program is free software: you can redistribute it and/or modify
@@ -17,8 +17,8 @@
 */
 
 
-#ifndef __LIBMOMENT__RTMP_CONNECTION__H__
-#define __LIBMOMENT__RTMP_CONNECTION__H__
+#ifndef LIBMOMENT__RTMP_CONNECTION__H__
+#define LIBMOMENT__RTMP_CONNECTION__H__
 
 
 #include <libmary/libmary.h>
@@ -287,10 +287,9 @@ public:
     };
 
 private:
-    mt_const Timers *timers;
-    mt_const PagePool *page_pool;
-
-    mt_const Sender *sender;
+    mt_const DataDepRef<Timers>   timers;
+    mt_const DataDepRef<PagePool> page_pool;
+    mt_const DataDepRef<Sender>   sender;
 
     // Prechunking is always enabled currently.
     mt_const bool prechunking_enabled;
@@ -315,8 +314,6 @@ private:
     mt_sync_domain (receiver) bool ignore_extended_timestamp;
 
     mt_sync_domain (receiver) bool processing_input;
-    // TODO Unused (never set to 'true'). Support input blocking.
-    bool block_input;
 
     typedef AvlTree< Ref<ChunkStream>,
 		     MemberExtractor< ChunkStream,
@@ -331,7 +328,6 @@ private:
 
     mt_sync_domain (receiver)
     mt_begin
-
       Uint32 remote_wack_size;
 
       Size total_received;
@@ -350,7 +346,6 @@ private:
       // Can be set from 'receiver' when holding 'send_mutex'.
       // For sending, can be set as mt_const at init.
       mt_mutex (send_mutex) bool momentrtmp_proto;
-
     mt_end
 
   // Sending state
@@ -369,10 +364,10 @@ private:
 	return delta < 0x80000000 ? 1 : 0;
     }
 
-    mt_sync_domain (receiver) Receiver::ProcessInputResult doProcessInput (ConstMemory const &mem,
-									   Size * mt_nonnull ret_accepted);
-
 public:
+    mt_sync_domain (receiver) Receiver::ProcessInputResult doProcessInput (ConstMemory  mem,
+									   Size        * mt_nonnull ret_accepted);
+
     class MessageDesc;
 
 private:
@@ -570,10 +565,10 @@ private:
     void doError (Exception *exc_);
 
 public:
-    // TODO setReceiver
-    Cb<Receiver::Frontend> getReceiverFrontend ()
+    // TODO setReceiver()
+    CbDesc<Receiver::Frontend> getReceiverFrontend ()
     {
-	return Cb<Receiver::Frontend> (&receiver_frontend, this, getCoderefContainer());
+	return CbDesc<Receiver::Frontend> (&receiver_frontend, this, getCoderefContainer());
     }
 
     mt_const void setFrontend (Cb<Frontend> const &frontend)
@@ -655,5 +650,5 @@ public:
 }
 
 
-#endif /* __LIBMOMENT__RTMP_CONNECTION__H__ */
+#endif /* LIBMOMENT__RTMP_CONNECTION__H__ */
 

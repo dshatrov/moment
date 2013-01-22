@@ -24,9 +24,7 @@ using namespace M;
 
 namespace Moment {
 
-namespace {
-LogGroup libMary_logGroup_rtmp_service ("rtmp_service", LogLevel::E);
-}
+static LogGroup libMary_logGroup_rtmp_service ("rtmp_service", LogLevel::E);
 
 RtmpConnection::Backend const RtmpService::rtmp_conn_backend = {
     closeRtmpConn
@@ -133,13 +131,14 @@ RtmpService::acceptOneConnection ()
     session->session_info.client_addr = client_addr;
 
     session->pollable_key = thread_ctx->getPollGroup()->addPollable (session->tcp_conn.getPollable(),
-								     NULL /* deferred_reg */,
 								     false /* activate */);
     if (!session->pollable_key) {
 	logE (rtmp_service, _func, "PollGroup::addPollable() failed: ", exc->toString());
 	return true;
     }
 
+    session->conn_receiver.init (&session->tcp_conn,
+                                 thread_ctx->getDeferredProcessor());
     session->conn_sender.setConnection (&session->tcp_conn);
 #ifndef MOMENT__RTMP_SERVICE__USE_IMMEDIATE_SENDER
     session->conn_sender.setQueue (thread_ctx->getDeferredConnectionSenderQueue());
@@ -242,7 +241,7 @@ RtmpService::init (ServerContext * const mt_nonnull server_ctx,
                    bool            const prechunking_enabled,
                    Time            const accept_watchdog_timeout_sec)
 {
-    Timers * const timers = server_ctx->getTimers();
+    Timers * const timers = server_ctx->getMainThreadContext()->getTimers();
 
     this->server_ctx = server_ctx;
     this->page_pool  = page_pool;
@@ -292,8 +291,11 @@ RtmpService::start ()
 	return Result::Failure;
 
     // TODO FIXME Call removePollable() when done.
-    if (!server_ctx->getMainPollGroup()->addPollable (tcp_server.getPollable(), NULL /* ret_reg */))
+    if (!server_ctx->getMainThreadContext()->getPollGroup()->addPollable (
+                tcp_server.getPollable()))
+    {
 	return Result::Failure;
+    }
 
     return Result::Success;
 }

@@ -192,12 +192,12 @@ public:
         mutex.lock ();
 
         if (profiler_timer) {
-            server_app.getMainThreadContext()->getTimers()->deleteTimer (profiler_timer);
+            server_app.getServerContext()->getMainThreadContext()->getTimers()->deleteTimer (profiler_timer);
             profiler_timer = NULL;
         }
 
         if (exit_timer) {
-            server_app.getMainThreadContext()->getTimers()->deleteTimer (exit_timer);
+            server_app.getServerContext()->getMainThreadContext()->getTimers()->deleteTimer (exit_timer);
             exit_timer = NULL;
         }
 
@@ -212,7 +212,7 @@ printUsage ()
 		  "Options:\n"
 		  "  -c --config <config_file>  Configuration file to use (default: /opt/moment/moment.conf)\n"
 		  "  -l --log <log_file>        Log file to use (default: /var/log/moment.log)\n"
-		  "  --loglevel <loglevel>      Loglevel, one of A/D/I/W/E/H/F/N (default: I, \"Info\")\n"
+		  "  --loglevel <loglevel>      Loglevel, one of A/S/D/I/W/E/H/F/N (default: I, \"Info\")\n"
 #ifndef LIBMARY_PLATFORM_WIN32
 		  "  -d --daemonize             Daemonize (run in the background as a daemon).\n"
 #endif
@@ -277,7 +277,6 @@ cmdline_loglevel (char const * /* short_name */,
 	logE_ (_func, "Invalid loglevel name \"", value_mem, "\", using \"Info\"");
 	options.loglevel = LogLevel::Info;
     }
-
     return true;
 }
 
@@ -324,7 +323,7 @@ MomentInstance::exitTimerTick (void * const _self)
     logI_ (_func, "Exit timer expired (", options.exit_after, " seconds)");
     self->mutex.lock ();
     if (self->exit_timer) {
-        self->server_app.getMainThreadContext()->getTimers()->deleteTimer (self->exit_timer);
+        self->server_app.getServerContext()->getMainThreadContext()->getTimers()->deleteTimer (self->exit_timer);
         self->exit_timer = NULL;
     }
     self->mutex.unlock ();
@@ -797,9 +796,9 @@ MomentInstance::run ()
     recorder_thread_pool.setNumThreads (params->num_file_threads);
 
     if (params->http_bind_valid) {
-	if (!http_service.init (server_app.getMainThreadContext()->getPollGroup(),
-				server_app.getMainThreadContext()->getTimers(),
-                                server_app.getMainThreadContext()->getDeferredProcessor(),
+	if (!http_service.init (server_app.getServerContext()->getMainThreadContext()->getPollGroup(),
+				server_app.getServerContext()->getMainThreadContext()->getTimers(),
+                                server_app.getServerContext()->getMainThreadContext()->getDeferredProcessor(),
 				&page_pool,
 				params->http_keepalive_timeout * 1000000 /* microseconds */,
 				params->no_keepalive_conns))
@@ -823,9 +822,9 @@ MomentInstance::run ()
         if (params->http_admin_bind_addr == params->http_bind_addr) {
             admin_http_service_ptr = &http_service;
         } else {
-            if (!separate_admin_http_service.init (server_app.getMainThreadContext()->getPollGroup(),
-                                                   server_app.getMainThreadContext()->getTimers(),
-                                                   server_app.getMainThreadContext()->getDeferredProcessor(),
+            if (!separate_admin_http_service.init (server_app.getServerContext()->getMainThreadContext()->getPollGroup(),
+                                                   server_app.getServerContext()->getMainThreadContext()->getTimers(),
+                                                   server_app.getServerContext()->getMainThreadContext()->getDeferredProcessor(),
                                                    &page_pool,
                                                    params->http_keepalive_timeout * 1000000 /* microseconds */,
                                                    params->no_keepalive_conns))
@@ -850,7 +849,7 @@ MomentInstance::run ()
 	    CbDesc<HttpService::HttpHandler> (&ctl_http_handler, this, this),
 	    "ctl");
 
-    recorder_thread_pool.setMainThreadContext (server_app.getMainThreadContext());
+    recorder_thread_pool.setMainThreadContext (server_app.getServerContext()->getMainThreadContext());
     if (!recorder_thread_pool.spawn ()) {
 	logE_ (_func, "recorder_thread_pool.spawn() failed");
 	return EXIT_FAILURE;
@@ -875,7 +874,7 @@ MomentInstance::run ()
     if (options.exit_after != (Uint64) -1) {
 	logI_ (_func, "options.exit_after: ", options.exit_after);
 	mutex.lock ();
-	exit_timer = server_app.getMainThreadContext()->getTimers()->addTimer (
+	exit_timer = server_app.getServerContext()->getMainThreadContext()->getTimers()->addTimer (
                 exitTimerTick,
                 this /* cb_data */,
                 this /* coderef_container */,
@@ -886,8 +885,9 @@ MomentInstance::run ()
 
     if (!line_pipe.init (params->ctl_filename->mem(),
                          CbDesc<LinePipe::Frontend> (&ctl_pipe_frontend, this, this),
-                         server_app.getMainThreadContext()->getPollGroup(),
-                         server_app.getMainThreadContext()->getTimers(),
+                         server_app.getServerContext()->getMainThreadContext()->getPollGroup(),
+                         server_app.getServerContext()->getMainThreadContext()->getDeferredProcessor(),
+                         server_app.getServerContext()->getMainThreadContext()->getTimers(),
                          params->ctl_pipe_reopen_timeout * 1000 /* reopen_timeout_millisec */))
     {
         logE_ (_func, "could not initialize ctl pipe: ", exc->toString());

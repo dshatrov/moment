@@ -1119,7 +1119,6 @@ void sendStateChanged (Sender::SendState   const send_state,
 	    client_session->overloaded = true;
 	    client_session->mutex.unlock ();
 #endif
-	    // TODO Block input from the client.
 	    break;
 	case Sender::QueueHardLimit:
 	    logE_ (_func, "QueueHardLimit");
@@ -1174,7 +1173,7 @@ Result clientConnected (RtmpConnection  * const mt_nonnull rtmp_conn,
 	    client_session->recorder_thread_ctx = thread_ctx;
 	} else {
 	    logE_ (_func, "Couldn't get recorder thread context: ", exc->toString());
-	    thread_ctx = moment->getServerApp()->getMainThreadContext();
+	    thread_ctx = moment->getServerApp()->getServerContext()->getMainThreadContext();
 	}
 
 	client_session->flv_muxer.setPagePool (moment->getPagePool());
@@ -1256,8 +1255,8 @@ MomentRtmpModule::adminHttpRequest (HttpRequest   * const mt_nonnull req,
 
             page_pool->printToPages (
                     &page_list,
-                    "<tr><td>num_session_objects</td><td>", sinfo_sum.num_session_objects, "</td></tr>"
-                    "<tr><td>num_valid_sessions</td><td>",  sinfo_sum.num_valid_sessions,  "</td></tr>");
+                    "<tr><td>RtmpService: num_session_objects</td><td>", sinfo_sum.num_session_objects, "</td></tr>"
+                    "<tr><td>RtmpService: num_valid_sessions</td><td>",  sinfo_sum.num_valid_sessions,  "</td></tr>");
 
             while (!iter.done()) {
                 RtmpService::ClientSessionInfo * const sinfo = iter.next ();
@@ -1267,6 +1266,7 @@ MomentRtmpModule::adminHttpRequest (HttpRequest   * const mt_nonnull req,
 
                 page_pool->printToPages (
                         &page_list,
+                        "<tr><td>RtmpService sessions:</td></tr>"
                         "<tr>"
                         "<td>", sinfo->client_addr, "</td>"
                         "<td>", ConstMemory (time_buf, time_len), "</td>"
@@ -1326,7 +1326,7 @@ void momentRtmpInit ()
 
     moment = MomentServer::getInstance();
     CodeDepRef<ServerApp> const server_app = moment->getServerApp();
-    timers = server_app->getMainThreadContext()->getTimers();
+    timers = server_app->getServerContext()->getMainThreadContext()->getTimers();
     page_pool = moment->getPagePool();
 
     MConfig::Config * const config = moment->getConfig();
@@ -1438,16 +1438,6 @@ void momentRtmpInit ()
 
             logI_ (_func, opt_name, ": ", prechunking_enabled);
         }
-    }
-
-    {
-	ConstMemory const opt_name = "mod_rtmp/rtmpt_from_http";
-	MConfig::BooleanValue const opt_val = config->getBoolean (opt_name);
-	if (opt_val == MConfig::Boolean_Invalid)
-	    logE_ (_func, "Invalid value for config option ", opt_name);
-	else
-	if (opt_val != MConfig::Boolean_False)
-	    rtmp_module->rtmpt_service.getRtmptServer()->attachToHttpService (moment->getHttpService());
     }
 
     {
@@ -1655,16 +1645,22 @@ void momentRtmpInit ()
     }
 
     {
+	ConstMemory const opt_name = "mod_rtmp/rtmpt_from_http";
+	MConfig::BooleanValue const opt_val = config->getBoolean (opt_name);
+	if (opt_val == MConfig::Boolean_Invalid)
+	    logE_ (_func, "Invalid value for config option ", opt_name);
+	else
+	if (opt_val != MConfig::Boolean_False)
+	    rtmp_module->rtmpt_service.getRtmptServer()->attachToHttpService (moment->getHttpService());
+    }
+
+    {
 	rtmp_module->rtmpt_service.setFrontend (CbDesc<RtmpVideoService::Frontend> (
 		&rtmp_video_service_frontend, NULL, NULL));
 
 	if (!rtmp_module->rtmpt_service.init (
-                                 server_app->getServerContext()->getTimers(),
+                                 server_app->getServerContext(),
                                  moment->getPagePool(),
-                                 // TODO setServerContext()
-                                 // TODO Pick a server thread context and pass it here.
-                                 server_app->getServerContext()->getMainPollGroup(),
-                                 server_app->getMainThreadContext()->getDeferredProcessor(),
                                  rtmpt_session_timeout,
                                  rtmpt_no_keepalive_conns,
                                  prechunking_enabled))

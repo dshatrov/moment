@@ -61,7 +61,8 @@ RtmpPushConnection::startNewSession (Session * const old_session)
     session->conn_sender.setQueue (thread_ctx->getDeferredConnectionSenderQueue());
     // RtmpConnection sets sender frontend.
 
-    session->conn_receiver.setConnection (&session->tcp_conn);
+    session->conn_receiver.init (&session->tcp_conn,
+                                 thread_ctx->getDeferredProcessor());
     session->conn_receiver.setFrontend (session->rtmp_conn.getReceiverFrontend());
 
     session->rtmp_conn.init (timers,
@@ -110,8 +111,7 @@ RtmpPushConnection::startNewSession (Session * const old_session)
     }
 
     if (cur_session.ptr() /* TODO Why doesn't plain '==' work? */ == session) {
-        session->pollable_key = thread_ctx->getPollGroup()->addPollable (session->tcp_conn.getPollable(),
-                                                                         NULL /* ret_reg */);
+        session->pollable_key = thread_ctx->getPollGroup()->addPollable (session->tcp_conn.getPollable());
     }
     mutex.unlock ();
 }

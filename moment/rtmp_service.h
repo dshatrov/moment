@@ -88,7 +88,7 @@ private:
 	    : thread_ctx    (NULL),
 	      tcp_conn      (this /* coderef_container */),
 	      conn_sender   (this /* coderef_container */),
-	      conn_receiver (this /* coderef_container */, &tcp_conn),
+	      conn_receiver (this /* coderef_container */),
 	      rtmp_conn     (this /* coderef_container */)
 	{
 	}
@@ -126,19 +126,15 @@ private:
     bool acceptOneConnection ();
 
   mt_iface (RtmpConnection::Backend)
-
     static RtmpConnection::Backend const rtmp_conn_backend;
 
     static void closeRtmpConn (void *_session);
-
   mt_iface_end
 
   mt_iface (TcpServer::Frontend)
-
     static TcpServer::Frontend const tcp_server_frontend;
 
     static void accepted (void *_self);
-
   mt_iface_end
 
 public:

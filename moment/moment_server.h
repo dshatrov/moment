@@ -218,8 +218,8 @@ private:
 
     Informer_<VideoStreamHandler> video_stream_informer;
 
-    DeferredProcessor::Registration vs_inform_reg;
     DeferredProcessor::Task vs_added_inform_task;
+    DeferredProcessor::Registration vs_inform_reg;
 
     mt_mutex (mutex) List<VideoStreamAddedNotification> vs_added_notifications;
 

@@ -1,5 +1,5 @@
 /*  Moment Video Server - High performance media server
-    Copyright (C) 2011 Dmitry Shatrov
+    Copyright (C) 2011-2013 Dmitry Shatrov
     e-mail: shatrov@gmail.com
 
     This program is free software: you can redistribute it and/or modify
@@ -1893,8 +1893,8 @@ getDigestOffset (Byte const * const msg,
 }
 
 mt_sync_domain (receiver) Receiver::ProcessInputResult
-RtmpConnection::doProcessInput (ConstMemory const &mem,
-				Size * const mt_nonnull ret_accepted)
+RtmpConnection::doProcessInput (ConstMemory   const mem,
+				Size        * const mt_nonnull ret_accepted)
 {
     logD (msg, _func, "mem.len(): ", mem.len());
     if (logLevelOn (msg, LogLevel::Debug))
@@ -1923,11 +1923,6 @@ RtmpConnection::doProcessInput (ConstMemory const &mem,
     Receiver::ProcessInputResult ret_res = Receiver::ProcessInputResult::Normal;
 
     for (;;) {
-	if (block_input) {
-	    ret_res = Receiver::ProcessInputResult::InputBlocked;
-	    goto _return;
-	}
-
 	switch (conn_state) {
 	    case ReceiveState::Invalid:
 		unreachable ();
@@ -2940,10 +2935,9 @@ RtmpConnection::init (Timers     * const mt_nonnull timers,
 RtmpConnection::RtmpConnection (Object * const coderef_container)
     : DependentCodeReferenced (coderef_container),
 
-      timers (NULL),
-	
-      page_pool (NULL),
-      sender (NULL),
+      timers    (coderef_container),
+      page_pool (coderef_container),
+      sender    (coderef_container),
 
       prechunking_enabled (true),
       send_delay (0),
@@ -2961,7 +2955,6 @@ RtmpConnection::RtmpConnection (Object * const coderef_container)
       ignore_extended_timestamp (false),
 
       processing_input (false),
-      block_input (false),
 
       remote_wack_size (1 << 20 /* 1 Mb */),
 
