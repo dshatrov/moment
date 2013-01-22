@@ -1,5 +1,5 @@
 /*  Moment Video Server - High performance media server
-    Copyright (C) 2011 Dmitry Shatrov
+    Copyright (C) 2011-2013 Dmitry Shatrov
     e-mail: shatrov@gmail.com
 
     This program is free software: you can redistribute it and/or modify
@@ -17,8 +17,8 @@
 */
 
 
-#ifndef __LIBMOMENT__RTMPT_SERVER__H__
-#define __LIBMOMENT__RTMPT_SERVER__H__
+#ifndef LIBMOMENT__RTMPT_SERVER__H__
+#define LIBMOMENT__RTMPT_SERVER__H__
 
 
 #include <libmary/libmary.h>
@@ -56,7 +56,10 @@ private:
 
     private:
       mt_mutex (mutex)
-      // {
+      mt_begin
+        // Note: The only way to do proper framedropping for RTMPT clients is
+        // to monitor active senders' states. That looks too complex for now.
+
 	MessageList nonflushed_msg_list;
 	Size nonflushed_data_len;
 
@@ -64,41 +67,36 @@ private:
 	Size pending_data_len;
 
 	bool close_after_flush;
-      // }
+      mt_end
 
 	mt_mutex (mutex) void doFlush ();
 
     public:
       mt_iface (Sender)
-
 	mt_async void sendMessage (Sender::MessageEntry * mt_nonnull msg_entry,
 				   bool do_flush = false);
-
 	mt_async void flush ();
-
 	mt_async void closeAfterFlush ();
-
         mt_async void close ();
-
         mt_mutex (mutex) bool isClosed_unlocked ();
-
+        mt_mutex (mutex) SendState getSendState_unlocked ();
         void lock ();
-
         void unlock ();
-
       mt_iface_end
 
 	mt_mutex (mutex) void sendPendingData (Sender * mt_nonnull sender);
 
 	RtmptSender (Object *coderef_container);
-
 	mt_async ~RtmptSender ();
     };
 
     class RtmptSession : public Object
     {
     public:
-	bool valid;
+	mt_mutex (RtmptServer::mutex) bool valid;
+        mt_mutex (RtmptServer::mutex) bool closed;
+
+        mt_const WeakDepRef<RtmptServer> weak_rtmpt_server;
 
 	mt_const Uint32 session_id;
 
@@ -111,102 +109,86 @@ private:
 
 	mt_const SessionMap_::Entry session_map_entry;
 
-	mt_const WeakCodeRef const weak_rtmpt_server;
-	mt_const RtmptServer * const unsafe_rtmpt_server;
-
 	RtmptSender rtmpt_sender;
+
+        // Synchronizes calls to rtmp_conn.doProcessInput()
+        FastMutex rtmp_input_mutex;
 	RtmpConnection rtmp_conn;
 
 	mt_mutex (RtmptServer::mutex) Time last_msg_time;
 	mt_mutex (RtmptServer::mutex) Timers::TimerKey session_keepalive_timer;
 
-	RtmptSession (RtmptServer *rtmpt_server);
-
-	~RtmptSession ();
+	RtmptSession  ()
+            : rtmpt_sender (this /* coderef_container */),
+              rtmp_conn    (this /* coderef_container */)
+        {}
     };
 
     typedef RtmptSession::SessionMap_ SessionMap;
 
     class ConnectionList_name;
 
+public:
     mt_mutex (RtmptServer::mutex)
 	class RtmptConnection : public Object,
 				public IntrusiveListElement<ConnectionList_name>
     {
-    public:
+        friend class RtmptServer;
+
+    private:
 	bool valid;
 
-	WeakCodeRef weak_rtmpt_server;
-	RtmptServer *unsafe_rtmpt_server;
+        WeakDepRef<RtmptServer> weak_rtmpt_server;
 
 	mt_const Connection *conn;
+	VirtRef conn_ref;
 	void *conn_cb_data;
-	VirtRef ref_data;
 
 	ImmediateConnectionSender conn_sender;
 	ConnectionReceiver conn_receiver;
 	HttpServer http_server;
 
-	Timers::TimerKey conn_keepalive_timer;
+	mt_sync_domain (RtmptServer::http_frontend) Ref<RtmptSession> cur_req_session;
 
-	// TEST (uncomment)
-//	RtmptSession *cur_req_session;
-	Ref<RtmptSession> cur_req_session;
+        mt_mutex (RtmptServer::mutex) Time last_msg_time;
+        mt_mutex (RtmptServer::mutex) Timers::TimerKey conn_keepalive_timer;
 
 	RtmptConnection ()
-	    : valid (true),
-	      conn_sender   (this /* coderef_container */),
-	      conn_receiver (this /* coderef_container */),
-	      http_server   (this /* coderef_container */),
-	      cur_req_session (NULL)
-	{
-//            logD_ (_func, " 0x", fmt_hex, (UintPtr) this);
-	}
-
-	~RtmptConnection ()
-	{
-//	    logD_ (_func, "0x", fmt_hex, (UintPtr) this);
-	    delete conn;
-	}
+            : conn_sender   (this /* coderef_container */),
+              conn_receiver (this /* coderef_container */),
+              http_server   (this /* coderef_container */)
+        {}
     };
+
+private:
+    mt_const Cb<Frontend> frontend;
+
+    mt_const DataDepRef<Timers>   timers;
+    mt_const DataDepRef<PagePool> page_pool;
 
     mt_const bool prechunking_enabled;
 
-    mt_const Cb<Frontend> frontend;
-
-    mt_const DataDepRef<Timers>            timers;
-    mt_const DataDepRef<DeferredProcessor> deferred_processor;
-    mt_const DataDepRef<PagePool>          page_pool;
-
     mt_const Time session_keepalive_timeout;
+    mt_const Time conn_keepalive_timeout;
     mt_const bool no_keepalive_conns;
 
-  mt_mutex (mutex)
-  // {
     typedef IntrusiveList<RtmptConnection, ConnectionList_name> ConnectionList;
-    ConnectionList conn_list;
+    mt_mutex (mutex) ConnectionList conn_list;
 
-    SessionMap session_map;
+    mt_mutex (mutex) SessionMap session_map;
     // TODO IdMapper
-    Uint32 session_id_counter;
-  // }
+    mt_mutex (mutex) Uint32 session_id_counter;
 
     static void sessionKeepaliveTimerTick (void *_session);
 
-    mt_mutex (mutex) void destroyRtmptSession (RtmptSession * mt_nonnull session);
+    static void connKeepaliveTimerTick (void *_rtmpt_conn);
+
+    mt_unlocks (mutex) void destroyRtmptSession (RtmptSession * mt_nonnull session,
+                                                 bool          close_rtmp_conn);
 
     mt_mutex (mutex) void destroyRtmptConnection (RtmptConnection * mt_nonnull rtmpt_conn);
 
-  mt_iface (Sender::Frontend)
-    static Sender::Frontend const sender_frontend;
-
-// TODO
-//    void senderStateChanged (Sender::SendState  send_state,
-//			     void              *_rtmpt_conn);
-
-    static void senderClosed (Exception *exc_,
-			      void      *_rtmpt_conn);
-  mt_iface_end
+    mt_unlocks (mutex) void doConnectionClosed (RtmptConnection * mt_nonnull rtmpt_conn);
 
   mt_iface (RtmpConnection::Backend)
     static RtmpConnection::Backend const rtmp_conn_backend;
@@ -214,20 +196,22 @@ private:
     static mt_async void rtmpClosed (void *_session);
   mt_iface_end
 
-    mt_mutex (mutex) void sendDataInReply (Sender       * mt_nonnull conn_sender,
-					   RtmptSession * mt_nonnull session);
+    void sendDataInReply (Sender       * mt_nonnull conn_sender,
+                          RtmptSession * mt_nonnull session);
 
-    mt_mutex (mutex) void doOpen (Sender * mt_nonnull conn_sender,
-				  IpAddress const &client_addr);
+    void doOpen (Sender * mt_nonnull conn_sender,
+                 IpAddress const &client_addr);
 
-    mt_mutex (mutex) Ref<RtmptSession> doSend (Sender * mt_nonnull conn_sender,
-					       Uint32  session_id);
+    Ref<RtmptSession> doSend (Sender          * mt_nonnull conn_sender,
+                              Uint32           session_id,
+                              RtmptConnection *rtmpt_conn);
 
-    mt_mutex (mutex) void doIdle (Sender * mt_nonnull conn_sender,
-				  Uint32  session_id);
+    void doClose (Sender * mt_nonnull conn_sender,
+                  Uint32  session_id);
 
-    mt_mutex (mutex) void doClose (Sender * mt_nonnull conn_sender,
-				   Uint32  session_id);
+    Ref<RtmptSession> doHttpRequest (HttpRequest     * mt_nonnull req,
+                                     Sender          * mt_nonnull conn_sender,
+                                     RtmptConnection *rtmpt_conn);
 
   mt_iface (HttpServer::Frontend)
     static HttpServer::Frontend const http_frontend;
@@ -264,35 +248,25 @@ private:
   mt_iface_end
 
 public:
-    // API-разрыв: нужно делать accept на структуру данных TcpConnection... (так?).
-    // _или_ большей гибкости можно добиться, если подавать Connection из кучи.
-    // (?сделать его BasicReferenced?) - ни к чему...
-    // => Действительно, для этих целей Connection выделяем в куче...
-    // ...хотя можно было бы и в RtmptSession вписать, хвостом.
+    Ref<RtmptConnection> addConnection (Connection        * mt_nonnull conn,
+                                        DeferredProcessor * mt_nonnull conn_deferred_processor,
+                                        VirtReferenced    *conn_ref,
+                                        void              *conn_cb_data,
+                                        IpAddress          client_addr);
 
-    // Takes ownership of the connection.
-    // TODO Грубая несогласованность по Coderef containers.
-    mt_async void addConnection (Connection              * mt_nonnull conn,
-				 DependentCodeReferenced * mt_nonnull dep_code_referenced,
-				 IpAddress const         &client_addr,
-				 void                    *conn_cb_data,
-				 VirtReferenced          *ref_data);
+    void removeConnection (RtmptConnection * mt_nonnull rtmpt_conn);
 
     // mostly mt_const
     void attachToHttpService (HttpService *http_service,
 			      ConstMemory  path = ConstMemory());
 
-    mt_const void setFrontend (Cb<Frontend> const frontend)
-    {
-	this->frontend = frontend;
-    }
-
-    mt_const void init (Timers   *timers,
-                        DeferredProcessor *deferred_processor,
-                        PagePool *page_pool,
-                        Time      session_keepalive_timeout,
-			bool      no_keepalive_conns,
-                        bool      prechunking_enabled);
+    mt_const void init (CbDesc<Frontend> const &frontend,
+                        Timers                 *timers,
+                        PagePool               *page_pool,
+                        Time                    session_keepalive_timeout,
+                        Time                    conn_keepalive_timeout,
+			bool                    no_keepalive_conns,
+                        bool                    prechunking_enabled);
 
     RtmptServer (Object *coderef_container);
 
@@ -302,5 +276,5 @@ public:
 }
 
 
-#endif /* __LIBMOMENT__RTMPT_SERVER__H__ */
+#endif /* LIBMOMENT__RTMPT_SERVER__H__ */
 

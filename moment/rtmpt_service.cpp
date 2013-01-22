@@ -1,5 +1,5 @@
 /*  Moment Video Server - High performance media server
-    Copyright (C) 2011 Dmitry Shatrov
+    Copyright (C) 2011-2013 Dmitry Shatrov
     e-mail: shatrov@gmail.com
 
     This program is free software: you can redistribute it and/or modify
@@ -24,6 +24,8 @@ using namespace M;
 
 namespace Moment {
 
+static LogGroup libMary_logGroup_rtmpt_service ("rtmpt_service", LogLevel::D);
+
 RtmptServer::Frontend const RtmptService::rtmpt_server_frontend = {
     clientConnected,
     connectionClosed
@@ -40,75 +42,77 @@ RtmptService::clientConnected (RtmpConnection  * const mt_nonnull rtmp_conn,
 {
     RtmptService * const self = static_cast <RtmptService*> (_self);
 
-    Result res;
-    if (!self->frontend.call_ret<Result> (&res, self->frontend->clientConnected, /*(*/ rtmp_conn, client_addr /*)*/)
-	|| !res)
-    {
-	return Result::Failure;
-    }
+    Result res = Result::Failure;
+    if (!self->frontend.call_ret<Result> (&res, self->frontend->clientConnected, /*(*/ rtmp_conn, client_addr /*)*/))
+        return Result::Failure;
+
+    if (!res)
+        return Result::Failure;
 
     return Result::Success;
 }
 
 void
 RtmptService::connectionClosed (void * const _conn_data,
-				void * const _self)
+				void * const /* _self */)
 {
-    RtmptService * const self = static_cast <RtmptService*> (_self);
+//    RtmptService * const self = static_cast <RtmptService*> (_self);
     ConnectionData * const conn_data = static_cast <ConnectionData*> (_conn_data);
 
-    conn_data->mutex.lock ();
+    logD (rtmpt_service, _func, "closed, conn_data 0x", fmt_hex, (UintPtr) conn_data);
 
-    if (conn_data->pollable_key) {
-	self->poll_group->removePollable (conn_data->pollable_key);
-	conn_data->pollable_key = NULL;
+    CodeDepRef<ServerThreadContext> const thread_ctx = conn_data->weak_thread_ctx;
+
+    if (thread_ctx) {
+        conn_data->mutex.lock ();
+        if (conn_data->pollable_key) {
+            thread_ctx->getPollGroup()->removePollable (conn_data->pollable_key);
+            conn_data->pollable_key = NULL;
+        }
+        conn_data->mutex.unlock ();
     }
-
-    conn_data->mutex.unlock ();
 }
 
 bool
 RtmptService::acceptOneConnection ()
 {
-//    logD_ (_func_);
+    Ref<ConnectionData> const conn_data = grab (new (std::nothrow) ConnectionData);
+    conn_data->pollable_key = NULL;
 
-    TcpConnection * const tcp_conn = new TcpConnection (NULL /* coderef_container */);
-    assert (tcp_conn);
+    CodeDepRef<ServerThreadContext> const thread_ctx = server_ctx->selectThreadContext ();
+    conn_data->weak_thread_ctx = thread_ctx;
+
     IpAddress client_addr;
     {
-	TcpServer::AcceptResult const res = tcp_server.accept (tcp_conn, &client_addr);
+	TcpServer::AcceptResult const res = tcp_server.accept (&conn_data->tcp_conn, &client_addr);
 	if (res == TcpServer::AcceptResult::Error) {
-	    delete tcp_conn;
 	    logE_ (_func, exc->toString());
 	    return false;
 	}
 
-	if (res == TcpServer::AcceptResult::NotAccepted) {
-	    delete tcp_conn;
+	if (res == TcpServer::AcceptResult::NotAccepted)
 	    return false;
-	}
 
 	assert (res == TcpServer::AcceptResult::Accepted);
-	logD_ (_func, "Connection accepted");
     }
 
-    Ref<ConnectionData> const conn_data = grab (new ConnectionData);
-    conn_data->pollable_key = NULL;
+    logD (rtmpt_service, _func, "accepted, conn_data 0x", fmt_hex, (UintPtr) conn_data.ptr());
 
-    rtmpt_server.addConnection (tcp_conn,
-				tcp_conn  /* dep_code_referenced */,
-				client_addr,
-				conn_data /* conn_cb_data */,
-				conn_data /* ref_data */);
+    Ref<RtmptServer::RtmptConnection> const rtmpt_conn =
+            rtmpt_server.addConnection (&conn_data->tcp_conn,
+                                        thread_ctx->getDeferredProcessor(),
+                                        conn_data /* conn_ref */,
+                                        conn_data /* conn_cb_data */,
+                                        client_addr);
 
     conn_data->mutex.lock ();
-    PollGroup::PollableKey const pollable_key = poll_group->addPollable (tcp_conn->getPollable(), NULL /* ret_reg */);
+    PollGroup::PollableKey const pollable_key =
+            thread_ctx->getPollGroup()->addPollable (conn_data->tcp_conn.getPollable(),
+                                                     true /* activate */);
     conn_data->pollable_key = pollable_key;
     if (!pollable_key) {
 	conn_data->mutex.unlock ();
-	// TODO FIXME Remove the connection from rtmpt_server.
-
-	delete tcp_conn;
+        rtmpt_server.removeConnection (rtmpt_conn);
 	logE_ (_func, "PollGroup::addPollable() failed: ", exc->toString ());
 	return true;
     }
@@ -122,8 +126,6 @@ RtmptService::accepted (void * const _self)
 {
     RtmptService * const self = static_cast <RtmptService*> (_self);
 
-//    logD_ (_func_);
-
     for (;;) {
 	if (!self->acceptOneConnection ())
 	    break;
@@ -131,32 +133,34 @@ RtmptService::accepted (void * const _self)
 }
 
 mt_const mt_throws Result
-RtmptService::init (Timers    * const mt_nonnull timers,
-                    PagePool  * const mt_nonnull page_pool,
-                    PollGroup * const mt_nonnull poll_group,
-                    DeferredProcessor * const mt_nonnull deferred_processor,
-                    Time        const session_keepalive_timeout,
-		    bool        const no_keepalive_conns,
-                    bool        const prechunking_enabled)
+RtmptService::init (ServerContext * const mt_nonnull server_ctx,
+                    PagePool      * const mt_nonnull page_pool,
+                    Time            const session_keepalive_timeout,
+		    bool            const no_keepalive_conns,
+                    bool            const prechunking_enabled)
 {
-    this->poll_group = poll_group;
-    this->deferred_processor = deferred_processor;
+    this->server_ctx = server_ctx;
 
-    rtmpt_server.init (timers, deferred_processor, page_pool, session_keepalive_timeout, no_keepalive_conns, prechunking_enabled);
+    rtmpt_server.init (CbDesc<RtmptServer::Frontend> (&rtmpt_server_frontend, this, getCoderefContainer()),
+                       server_ctx->getMainThreadContext()->getTimers(),
+                       page_pool,
+                       session_keepalive_timeout,
+                       // TODO Separate conn_keepalive_timeout
+                       session_keepalive_timeout,
+                       no_keepalive_conns,
+                       prechunking_enabled);
+
+    tcp_server.init (CbDesc<TcpServer::Frontend> (&tcp_server_frontend, this, getCoderefContainer()),
+                     server_ctx->getMainThreadContext()->getTimers());
 
     if (!tcp_server.open ())
 	return Result::Failure;
-
-    rtmpt_server.setFrontend (Cb<RtmptServer::Frontend> (&rtmpt_server_frontend, this, getCoderefContainer()));
-
-    tcp_server.init (CbDesc<TcpServer::Frontend> (&tcp_server_frontend, this, getCoderefContainer()),
-                     timers);
 
     return Result::Success;
 }
 
 mt_throws Result
-RtmptService::bind (IpAddress const &addr)
+RtmptService::bind (IpAddress const addr)
 {
     if (!tcp_server.bind (addr))
 	return Result::Failure;
@@ -170,13 +174,34 @@ RtmptService::start ()
     if (!tcp_server.listen ())
 	return Result::Failure;
 
-    if (!poll_group->addPollable (tcp_server.getPollable(), NULL /* ret_reg */))
+    mutex.lock ();
+    assert (!server_pollable_key);
+    server_pollable_key =
+            server_ctx->getMainThreadContext()->getPollGroup()->addPollable (
+                    tcp_server.getPollable());
+    if (!server_pollable_key) {
+        mutex.unlock ();
 	return Result::Failure;
+    }
+    mutex.unlock ();
 
     return Result::Success;
 }
 
-// TODO Remove tcp_server pollable from poll group in destructor.
+RtmptService::~RtmptService ()
+{
+    mutex.lock ();
+
+    if (server_pollable_key) {
+        server_ctx->getMainThreadContext()->getPollGroup()->removePollable (server_pollable_key);
+        server_pollable_key = NULL;
+    }
+
+    // TODO Merge RtmptService and RtmptServer to form a single class "RtmptService".
+    //      Then release all active connections here.
+
+    mutex.unlock ();
+}
 
 }
 

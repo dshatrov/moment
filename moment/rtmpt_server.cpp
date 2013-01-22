@@ -1,5 +1,5 @@
 /*  Moment Video Server - High performance media server
-    Copyright (C) 2011 Dmitry Shatrov
+    Copyright (C) 2011-2013 Dmitry Shatrov
     e-mail: shatrov@gmail.com
 
     This program is free software: you can redistribute it and/or modify
@@ -20,7 +20,7 @@
 #include <moment/rtmpt_server.h>
 
 
-// TODO 1. keepalive timers.
+// TODO Current RTMPT implementation is not secure enough.
 
 
 // Hint: Don't put commas after *HEADERS macros when using them.
@@ -60,32 +60,21 @@ using namespace M;
 
 namespace Moment {
 
-namespace {
-LogGroup libMary_logGroup_rtmpt ("rtmpt", LogLevel::I);
-}
-
-Sender::Frontend const RtmptServer::sender_frontend = {
-    NULL, // sendStateChanged
-    senderClosed
-};
+static LogGroup libMary_logGroup_rtmpt ("rtmpt", LogLevel::I);
 
 RtmpConnection::Backend const RtmptServer::rtmp_conn_backend = {
     rtmpClosed
 };
 
-mt_rev (11.06.18)
 mt_async void
 RtmptServer::RtmptSender::sendMessage (Sender::MessageEntry * const mt_nonnull msg_entry,
 				       bool const do_flush)
 {
-//    logD (rtmpt, _func, "<", fmt_hex, (UintPtr) this, "> ", fmt_def, "msg_entry: 0x", fmt_hex, (UintPtr) msg_entry);
-
     mutex.lock ();
 
     nonflushed_msg_list.append (msg_entry);
 
-  // Counting length of new data.
-
+    // Counting length of new data.
     switch (msg_entry->type) {
 	case Sender::MessageEntry::Pages: {
 	    Sender::MessageEntry_Pages * const msg_pages =
@@ -112,58 +101,38 @@ RtmptServer::RtmptSender::doFlush ()
     nonflushed_data_len = 0;
 }
 
-mt_rev (11.06.18)
 mt_async void
 RtmptServer::RtmptSender::flush ()
 {
-    logD (rtmpt, _func, "<", fmt_hex, (UintPtr) this, "> ", fmt_def, "nonflushed_data_len: ", nonflushed_data_len);
-
     mutex.lock ();
     doFlush ();
     mutex.unlock ();
 }
 
-// RtmptSender may be accessed by 'rtmp_conn' only, which in turn lists
-// RmtptSession as its coderef container, thus prevening RtmptSender from being
-// destroyed as well.
-mt_rev (11.06.18)
 mt_async void
 RtmptServer::RtmptSender::closeAfterFlush ()
 {
     mutex.lock ();
-
     close_after_flush = true;
-
-#if 0
-// Unnecessary here (+ wrong).
-    if (pending_data_len == 0) {
-	CodeRef rtmpt_server_ref;
-	if (session->weak_rtmpt_server.isValid()) {
-	    rtmpt_server_ref = session->weak_rtmpt_server;
-	    if (!rtmpt_server_ref)
-		return;
-	}
-	RtmptServer * const self = session->unsafe_rtmpt_server;
-
-	self->destroyRtmptSession (this);
-    }
-#endif
-
     mutex.unlock ();
 }
 
 mt_async void
 RtmptServer::RtmptSender::close ()
 {
-    // TODO Correct?
     closeAfterFlush ();
 }
 
 mt_mutex (mutex) bool
 RtmptServer::RtmptSender::isClosed_unlocked ()
 {
-    // TODO Correct?
     return false;
+}
+
+mt_mutex (mutex) Sender::SendState
+RtmptServer::RtmptSender::getSendState_unlocked ()
+{
+    return SendState::ConnectionReady;
 }
 
 void
@@ -178,16 +147,12 @@ RtmptServer::RtmptSender::unlock ()
     mutex.unlock ();
 }
 
-mt_rev (11.06.18)
 mt_mutex (mutex) void
 RtmptServer::RtmptSender::sendPendingData (Sender * const mt_nonnull sender)
 {
-    logD (rtmpt, _func);
-
     MessageList::iter iter (pending_msg_list);
     while (!pending_msg_list.iter_done (iter)) {
 	MessageEntry * const msg_entry = pending_msg_list.iter_next (iter);
-//	logD (rtmpt, _func, "msg_entry: 0x", fmt_hex, (UintPtr) msg_entry);
 	sender->sendMessage (msg_entry);
     }
 
@@ -204,7 +169,6 @@ RtmptServer::RtmptSender::RtmptSender (Object * const coderef_container)
 {
 }
 
-mt_rev (11.06.18)
 mt_async
 RtmptServer::RtmptSender::~RtmptSender ()
 {
@@ -229,39 +193,14 @@ RtmptServer::RtmptSender::~RtmptSender ()
     mutex.unlock ();
 }
 
-
-RtmptServer::RtmptSession::RtmptSession (RtmptServer * const rtmpt_server)
-    : valid (true),
-      session_id (0),
-      weak_rtmpt_server (rtmpt_server),
-      unsafe_rtmpt_server (rtmpt_server),
-      rtmpt_sender (this /* coderef_container */),
-      rtmp_conn    (this /* coderef_containter */),
-      last_msg_time (0),
-      session_keepalive_timer (NULL)
-{
-//    logD_ (_func, "0x", fmt_hex, (UintPtr) this);
-}
-
-RtmptServer::RtmptSession::~RtmptSession ()
-{
-//    logD_ (_func, "0x", fmt_hex, (UintPtr) this);
-}
-
 void
 RtmptServer::sessionKeepaliveTimerTick (void * const _session)
 {
-//    logD_ (_func_);
-
     RtmptSession * const session = static_cast <RtmptSession*> (_session);
 
-    CodeRef rtmpt_server_ref;
-    if (session->weak_rtmpt_server.isValid()) {
-	rtmpt_server_ref = session->weak_rtmpt_server;
-	if (!rtmpt_server_ref)
-	    return;
-    }
-    RtmptServer * const self = session->unsafe_rtmpt_server;
+    CodeDepRef<RtmptServer> const self = session->weak_rtmpt_server;
+    if (!self)
+        return;
 
     self->mutex.lock ();
     if (!session->valid) {
@@ -271,39 +210,66 @@ RtmptServer::sessionKeepaliveTimerTick (void * const _session)
 
     Time const cur_time = getTime();
     if (cur_time >= session->last_msg_time &&
-	cur_time - session->last_msg_time >= self->session_keepalive_timeout)
+	cur_time - session->last_msg_time > self->session_keepalive_timeout)
     {
 	logE_ (_func, "RTMPT session timeout");
-	self->destroyRtmptSession (session);
+	mt_unlocks (mutex) self->destroyRtmptSession (session, true /* close_rtmp_conn */);
+    } else {
+        self->mutex.unlock ();
     }
-
-    self->mutex.unlock ();
 }
 
-mt_rev (11.06.18)
-mt_mutex (mutex) void
-RtmptServer::destroyRtmptSession (RtmptSession * const mt_nonnull session)
+void
+RtmptServer::connKeepaliveTimerTick (void * const _rtmpt_conn)
 {
-//    logD_ (_func, "session 0x", fmt_hex, (UintPtr) session);
+    RtmptConnection * const rtmpt_conn = static_cast <RtmptConnection*> (_rtmpt_conn);
 
+    CodeDepRef<RtmptServer> const self = rtmpt_conn->weak_rtmpt_server;
+    if (!self)
+        return;
+
+    self->mutex.lock ();
+    if (!rtmpt_conn->valid) {
+        self->mutex.unlock ();
+        return;
+    }
+
+    Time const cur_time = getTime();
+    if (cur_time >= rtmpt_conn->last_msg_time &&
+        cur_time - rtmpt_conn->last_msg_time > self->conn_keepalive_timeout)
+    {
+        logE_ (_func, "RTMPT connection timeout");
+        mt_unlocks (mutex) self->doConnectionClosed (rtmpt_conn);
+    } else {
+        self->mutex.unlock ();
+    }
+}
+
+mt_unlocks (mutex) void
+RtmptServer::destroyRtmptSession (RtmptSession * const mt_nonnull session,
+                                  bool           const close_rtmp_conn)
+{
     if (!session->valid) {
-	logD (rtmpt, _func, "session is invalid already");
+        mutex.unlock ();
 	return;
     }
     session->valid = false;
 
     if (session->session_keepalive_timer) {
-//	logD_ (_func, "deleting session_keepalive_timer");
 	timers->deleteTimer (session->session_keepalive_timer);
 	session->session_keepalive_timer = NULL;
     }
 
-    session->rtmp_conn.close_noBackendCb ();
-    // Last unref.
+    Ref<RtmptSession> tmp_session = session;
     session_map.remove (session->session_map_entry);
+    mutex.unlock ();
+
+    if (close_rtmp_conn) {
+        tmp_session->rtmp_conn.close_noBackendCb ();
+        tmp_session = NULL; // last unref
+    }
 }
 
-mt_rev (11.06.18)
 mt_mutex (mutex) void
 RtmptServer::destroyRtmptConnection (RtmptConnection * const mt_nonnull rtmpt_conn)
 {
@@ -312,80 +278,49 @@ RtmptServer::destroyRtmptConnection (RtmptConnection * const mt_nonnull rtmpt_co
     }
     rtmpt_conn->valid = false;
 
-    // TODO Destroy conn_keepalive_timer
+    if (rtmpt_conn->conn_keepalive_timer) {
+        timers->deleteTimer (rtmpt_conn->conn_keepalive_timer);
+        rtmpt_conn->conn_keepalive_timer = NULL;
+    }
 
     conn_list.remove (rtmpt_conn);
     rtmpt_conn->unref ();
 }
 
-void
-RtmptServer::senderClosed (Exception * const /* exc_ */,
-			   void      * const _rtmpt_conn)
+mt_unlocks (mutex) void
+RtmptServer::doConnectionClosed (RtmptConnection * const mt_nonnull rtmpt_conn)
 {
-    RtmptConnection * const rtmpt_conn = static_cast <RtmptConnection*> (_rtmpt_conn);
+    destroyRtmptConnection (rtmpt_conn);
+    mutex.unlock ();
 
-    CodeRef rtmpt_server_ref;
-    if (rtmpt_conn->weak_rtmpt_server.isValid()) {
-	rtmpt_server_ref = rtmpt_conn->weak_rtmpt_server;
-	if (!rtmpt_server_ref)
-	    return;
-    }
-    RtmptServer * const self = rtmpt_conn->unsafe_rtmpt_server;
-
-    self->frontend.call (self->frontend->closed, /*(*/ rtmpt_conn->conn_cb_data /*)*/);
-
+#if 0
 // Too early to close the connection. It is still in use.
 // In particular, it is very likely that processInput() is yet to be called
 // for this connection.
-//    rtmpt_conn->conn->close ();
 
-    self->mutex.lock ();
-    logD (rtmpt, _func, "calling destroyRtmptConnection");
-    self->destroyRtmptConnection (rtmpt_conn);
-    self->mutex.unlock ();
+    rtmpt_conn->conn->close ();
+#endif
+
+    frontend.call (frontend->closed, /*(*/ rtmpt_conn->conn_cb_data /*)*/);
 }
 
-mt_rev (11.06.18)
 mt_async void
 RtmptServer::rtmpClosed (void * const _session)
 {
     RtmptSession * const session = static_cast <RtmptSession*> (_session);
 
-    CodeRef rtmpt_server_ref;
-    if (session->weak_rtmpt_server.isValid()) {
-	rtmpt_server_ref = session->weak_rtmpt_server;
-	if (!rtmpt_server_ref)
-	    return;
-    }
-    RtmptServer * const self = session->unsafe_rtmpt_server;
+    CodeDepRef<RtmptServer> const self = session->weak_rtmpt_server;
+    if (!self)
+        return;
 
     self->mutex.lock ();
-    if (!session->valid) {
-	self->mutex.unlock ();
-	return;
-    }
-    session->valid = false;
-
-//    logD_ (_func, "session 0x", fmt_hex, (UintPtr) session);
-
-    if (session->session_keepalive_timer) {
-//	logD_ (_func, "deleting session_keepalive_timer");
-	self->timers->deleteTimer (session->session_keepalive_timer);
-	session->session_keepalive_timer = NULL;
-    }
-
-    // Last unref.
-    self->session_map.remove (session->session_map_entry);
-    self->mutex.unlock ();
+    mt_unlocks (mutex) self->destroyRtmptSession (session, false /* close_rtmp_conn */);
 }
 
-mt_rev (11.06.18)
-mt_mutex (mutex) void
+void
 RtmptServer::sendDataInReply (Sender       * const mt_nonnull conn_sender,
 			      RtmptSession * const mt_nonnull session)
 {
-    logD (rtmpt, _func, "<", fmt_hex, (UintPtr) session, ":", (UintPtr) &session->rtmpt_sender, ">");
-
     session->rtmpt_sender.mutex.lock ();
 
     RTMPT_SERVER__HEADERS_DATE
@@ -397,51 +332,52 @@ RtmptServer::sendDataInReply (Sender       * const mt_nonnull conn_sender,
 	    "\r\n",
 	    // TODO Variable idle intervals.
 	    "\x09");
-    logD (rtmpt, _func, "pending data length: ", session->rtmpt_sender.pending_data_len);
 
     session->rtmpt_sender.sendPendingData (conn_sender);
     conn_sender->flush ();
 
-    bool destroy_session = false;
     if (session->rtmpt_sender.close_after_flush)
-	destroy_session = true;
+        session->closed = true;
 
     session->rtmpt_sender.mutex.unlock ();
+
+#if 0
+// We're not destroying the session immediately, since more requests may arrive
+// from the client for this session. The session is expected to time out eventually.
 
     // If close after flush has been requested for session->rtmpt_sender, then
     // virtual RTMP connection should be closed, hence we're destroying the session.
     if (destroy_session) {
-	logD (rtmpt, _func, "calling destroyRtmptSession()");
-	destroyRtmptSession (session);
+        mutex.lock ();
+	mt_unlocks (mutex) destroyRtmptSession (session, true /* close_rtmp_conn */);
     }
+#endif
 }
 
-mt_rev (11.06.18)
-mt_mutex (mutex) void
+void
 RtmptServer::doOpen (Sender * const mt_nonnull conn_sender,
 		     IpAddress const &client_addr)
 {
-    logD (rtmpt, _func_);
-
-    Ref<RtmptSession> const session = grab (new RtmptSession (this));
+    Ref<RtmptSession> const session = grab (new (std::nothrow) RtmptSession);
+    session->valid = true;
+    session->closed = false;
+    session->weak_rtmpt_server = this;
+    session->last_msg_time = getTime();
 
     session->session_id = session_id_counter;
     ++session_id_counter;
 
     session->rtmp_conn.init (timers, page_pool, 0 /* send_delay_millisec */, prechunking_enabled);
     session->rtmp_conn.setBackend (
-	    Cb<RtmpConnection::Backend> (
-		    &rtmp_conn_backend,
-		    session,
-		    session /* TODO Coderef container may be null, because session contains rtmp_conn? */));
+            Cb<RtmpConnection::Backend> (&rtmp_conn_backend, session, session));
     session->rtmp_conn.setSender (&session->rtmpt_sender);
     session->rtmp_conn.startServer ();
 
+    mutex.lock ();
     session->session_map_entry = session_map.add (session);
 
     {
-	Time const timeout = session_keepalive_timeout >= 10 ? 10 : session_keepalive_timeout;
-//	logD_ (_func, "session_keepalive_timer period: ", timeout);
+	Time const timeout = (session_keepalive_timeout >= 10 ? 10 : session_keepalive_timeout);
 	// Checking for session timeout at least each 10 seconds.
 	session->session_keepalive_timer =
                 timers->addTimer (CbDesc<Timers::TimerCallback> (sessionKeepaliveTimerTick,
@@ -451,6 +387,7 @@ RtmptServer::doOpen (Sender * const mt_nonnull conn_sender,
                                   true  /* periodical */,
                                   false /* auto_delete */);
     }
+    mutex.unlock ();
 
     RTMPT_SERVER__HEADERS_DATE
     conn_sender->send (
@@ -466,60 +403,59 @@ RtmptServer::doOpen (Sender * const mt_nonnull conn_sender,
 	frontend.call (frontend->clientConnected, /*(*/ &session->rtmp_conn, client_addr /*)*/);
 }
 
-mt_rev (11.06.18)
-mt_mutex (mutex) Ref<RtmptServer::RtmptSession>
-RtmptServer::doSend (Sender * const mt_nonnull conn_sender,
-		     Uint32   const session_id)
+Ref<RtmptServer::RtmptSession>
+RtmptServer::doSend (Sender          * const mt_nonnull conn_sender,
+		     Uint32            const session_id,
+                     RtmptConnection * const rtmpt_conn)
 {
+    mutex.lock ();
     SessionMap::Entry session_entry = session_map.lookup (session_id);
-    if (session_entry.isNull()) {
-	logD_ (_func, "Session not found: ", session_id);
-	RTMPT_SERVER__HEADERS_DATE
-	conn_sender->send (
-		page_pool,
-		true /* do_flush */,
-		RTMPT_SERVER__404_HEADERS(!no_keepalive_conns)
-		"\r\n");
-	return NULL;
+    Ref<RtmptSession> session;
+    if (!session_entry.isNull()) {
+        session = session_entry.getData();
+        if (session->closed)
+            logD_ (_func, "Session closed: ", session_id);
+    } else {
+        logD_ (_func, "Session not found: ", session_id);
     }
 
-    Ref<RtmptSession> const session = session_entry.getData();
-    session->last_msg_time = getTime();
+    if (session_entry.isNull()
+        || session->closed)
+    {
+        mutex.unlock ();
+        RTMPT_SERVER__HEADERS_DATE
+        conn_sender->send (
+                page_pool,
+                true /* do_flush */,
+                RTMPT_SERVER__404_HEADERS(!no_keepalive_conns)
+                "\r\n");
+        return NULL;
+    }
+
+    {
+        Time const cur_time = getTime();
+        session->last_msg_time = cur_time;
+        if (rtmpt_conn)
+            rtmpt_conn->last_msg_time = cur_time;
+    }
+
+    mutex.unlock ();
 
     sendDataInReply (conn_sender, session);
     return session;
 }
 
-mt_rev (11.06.18)
-mt_mutex (mutex) void
-RtmptServer::doIdle (Sender * const mt_nonnull conn_sender,
-		     Uint32   const session_id)
-{
-    SessionMap::Entry session_entry = session_map.lookup (session_id);
-    if (session_entry.isNull()) {
-	logD_ (_func, "Session not found: ", session_id);
-	RTMPT_SERVER__HEADERS_DATE
-	conn_sender->send (
-		page_pool,
-		true /* do_flush */,
-		RTMPT_SERVER__404_HEADERS(!no_keepalive_conns)
-		"\r\n");
-	return;
-    }
-
-    Ref<RtmptSession> const &session = session_entry.getData();
-    session->last_msg_time = getTime();
-    sendDataInReply (conn_sender, session);
-}
-
-mt_rev (11.06.18)
-mt_mutex (mutex) void
+void
 RtmptServer::doClose (Sender * const mt_nonnull conn_sender,
 		      Uint32   const session_id)
 {
+    mutex.lock ();
     SessionMap::Entry session_entry = session_map.lookup (session_id);
     if (session_entry.isNull()) {
+        mutex.unlock ();
+
 	logD_ (_func, "Session not found: ", session_id);
+
 	RTMPT_SERVER__HEADERS_DATE
 	conn_sender->send (
 		page_pool,
@@ -529,11 +465,8 @@ RtmptServer::doClose (Sender * const mt_nonnull conn_sender,
 	return;
     }
 
-    // TODO FIXME Avoid closing a session while we're receiving message body
-    //            from another request for the same session (cur_req_session).
-    Ref<RtmptSession> const &session = session_entry.getData();
-    logD (rtmpt, _func, "calling destroyRtmptSession()");
-    destroyRtmptSession (session);
+    Ref<RtmptSession> const session = session_entry.getData();
+    mt_unlocks (mutex) destroyRtmptSession (session, true /* close_rtmp_conn */);
 
     RTMPT_SERVER__HEADERS_DATE
     conn_sender->send (
@@ -545,74 +478,70 @@ RtmptServer::doClose (Sender * const mt_nonnull conn_sender,
 	    "\r\n");
 }
 
+Ref<RtmptServer::RtmptSession>
+RtmptServer::doHttpRequest (HttpRequest     * const mt_nonnull req,
+                            Sender          * const mt_nonnull conn_sender,
+                            RtmptConnection * const rtmpt_conn)
+{
+    logD_ (_func, req->getRequestLine());
+
+    ConstMemory const command = req->getPath (0);
+
+    logD (rtmpt, _func, "request: ", req->getRequestLine());
+    logD (rtmpt, _func, "command: ", command);
+    if (equal (command, "send")) {
+        Uint32 const session_id = strToUlong (req->getPath (1));
+        return doSend (conn_sender, session_id, rtmpt_conn);
+    } else
+    if (equal (command, "idle")) {
+        Uint32 const session_id = strToUlong (req->getPath (1));
+        doSend (conn_sender, session_id, rtmpt_conn);
+    } else
+    if (equal (command, "open")) {
+        doOpen (conn_sender, req->getClientAddress());
+    } else
+    if (equal (command, "close")) {
+        Uint32 const session_id = strToUlong (req->getPath (1));
+        doClose (conn_sender, session_id);
+    } else {
+        if (!equal (command, "fcs"))
+            logW_ (_func, "uknown command: ", command);
+
+        RTMPT_SERVER__HEADERS_DATE
+        conn_sender->send (
+                page_pool,
+                true /* do_flush */,
+                RTMPT_SERVER__400_HEADERS (!no_keepalive_conns)
+                "\r\n");
+    }
+
+    return NULL;
+}
+
 HttpServer::Frontend const RtmptServer::http_frontend = {
     httpRequest,
     httpMessageBody,
     httpClosed
 };
 
-mt_rev (11.06.18)
 mt_async void
 RtmptServer::httpRequest (HttpRequest * const req,
 			  void        * const _rtmpt_conn)
 {
     RtmptConnection * const rtmpt_conn = static_cast <RtmptConnection*> (_rtmpt_conn);
-
-    CodeRef rtmpt_server_ref;
-    if (rtmpt_conn->weak_rtmpt_server.isValid()) {
-	rtmpt_server_ref = rtmpt_conn->weak_rtmpt_server;
-	if (!rtmpt_server_ref)
-	    return;
-    }
-    RtmptServer * const self = rtmpt_conn->unsafe_rtmpt_server;
-
-    self->mutex.lock ();
-
-    logD (rtmpt, _func_);
+    CodeDepRef<RtmptServer> const self = rtmpt_conn->weak_rtmpt_server;
+    if (!self)
+        return;
 
     rtmpt_conn->cur_req_session = NULL;
-
-    ConstMemory const command = req->getPath (0);
-    logD (rtmpt, _func, "request: ", req->getRequestLine());
-    logD (rtmpt, _func, "command: ", command);
-    if (equal (command, "send")) {
-	Uint32 const session_id = strToUlong (req->getPath (1));
-	Ref<RtmptSession> const session = self->doSend (&rtmpt_conn->conn_sender, session_id);
-	if (session) {
-	    // Message body will be directed into the specified session
-	    // in httpMessageBody().
-	    rtmpt_conn->cur_req_session = session;
-	}
-    } else
-    if (equal (command, "idle")) {
-	Uint32 const session_id = strToUlong (req->getPath (1));
-	self->doIdle (&rtmpt_conn->conn_sender, session_id);
-    } else
-    if (equal (command, "open")) {
-	self->doOpen (&rtmpt_conn->conn_sender, req->getClientAddress());
-    } else
-    if (equal (command, "close")) {
-	Uint32 const session_id = strToUlong (req->getPath (1));
-	self->doClose (&rtmpt_conn->conn_sender, session_id);
-    } else {
-	if (!equal (command, "fcs"))
-	    logW_ (_func, "uknown command: ", command);
-
-	RTMPT_SERVER__HEADERS_DATE
-	rtmpt_conn->conn_sender.send (
-		self->page_pool,
-		true /* do_flush */,
-		RTMPT_SERVER__400_HEADERS (!self->no_keepalive_conns)
-		"\r\n");
-    }
-
-    self->mutex.unlock ();
+    Ref<RtmptSession> const session = self->doHttpRequest (req, &rtmpt_conn->conn_sender, rtmpt_conn);
+    if (session && req->getContentLength() > 0)
+        rtmpt_conn->cur_req_session = session;
 
     if (self->no_keepalive_conns)
 	rtmpt_conn->conn_sender.closeAfterFlush ();
 }
 
-mt_rev (11.06.18)
 mt_async void
 RtmptServer::httpMessageBody (HttpRequest * const mt_nonnull /* req */,
 			      Memory        const &mem,
@@ -621,99 +550,69 @@ RtmptServer::httpMessageBody (HttpRequest * const mt_nonnull /* req */,
 			      void        * const  _rtmpt_conn)
 {
     RtmptConnection * const rtmpt_conn = static_cast <RtmptConnection*> (_rtmpt_conn);
+    CodeDepRef<RtmptServer> const self = rtmpt_conn->weak_rtmpt_server;
+    if (!self)
+        return;
 
-    CodeRef rtmpt_server_ref;
-    if (rtmpt_conn->weak_rtmpt_server.isValid()) {
-	rtmpt_server_ref = rtmpt_conn->weak_rtmpt_server;
-	if (!rtmpt_server_ref)
-	    return;
+    RtmptSession * const session = rtmpt_conn->cur_req_session;
+
+    if (!session) {
+	*ret_accepted = mem.len();
+        return;
     }
-    RtmptServer * const self = rtmpt_conn->unsafe_rtmpt_server;
 
-    logD (rtmpt, _func);
+    logD (rtmpt, _func_);
     if (logLevelOn (rtmpt, LogLevel::D)) {
         logLock ();
 	hexdump (logs, mem);
         logUnlock ();
     }
 
-    self->mutex.lock ();
+  // 'cur_req_session' is not null, which means that we're processing
+  // message body of a "/send" request.
 
-    if (!rtmpt_conn->cur_req_session) {
-	self->mutex.unlock ();
-	*ret_accepted = mem.len();
-//	logD_ (_func, "!cur_req_session");
-	return;
-    }
+  // Note that we don't check 'cur_req_session->valid' here because
+  // that would require an extra mutex lock. Calling rtmp_conn.doProcessInput()
+  // for an invalid session should be harmless.
 
-  // Processing message body of a "/send" request.
-
-    Cb<Receiver::Frontend> const rcv_fe = rtmpt_conn->cur_req_session->rtmp_conn.getReceiverFrontend ();
-    assert (rcv_fe->processInput);
     Size accepted;
     Receiver::ProcessInputResult res;
-    if (!rcv_fe.call_ret<Receiver::ProcessInputResult> (&res, rcv_fe->processInput, /*(*/ mem, &accepted /*)*/)) {
-	logE_ (_func, "rcv_fe gone");
-
-	self->destroyRtmptSession (rtmpt_conn->cur_req_session);
-	rtmpt_conn->cur_req_session = NULL;
-
-	self->mutex.unlock ();
-
-	*ret_accepted = mem.len();
-	return;
-    }
-
-    // TODO InputBlocked - ?
-    if (    res != Receiver::ProcessInputResult::Normal
-	 && res != Receiver::ProcessInputResult::Again)
     {
+        session->rtmp_input_mutex.lock ();
+        res = session->rtmp_conn.doProcessInput (mem, &accepted);
+        session->rtmp_input_mutex.unlock ();
+    }
+    if (res == Receiver::ProcessInputResult::Error) {
 	logE_ (_func, "failed to parse RTMP data: ", toString (res));
 
-	self->destroyRtmptSession (rtmpt_conn->cur_req_session);
+        self->mutex.lock ();
+	mt_unlocks (mutex) self->destroyRtmptSession (session, true /* close_rtmp_conn */);
+
 	rtmpt_conn->cur_req_session = NULL;
 
-	self->mutex.unlock ();
-
 	*ret_accepted = mem.len();
-	return;
+    } else {
+        // RtmpConnection::doProcessInput() never returns InputBlocked.
+        assert (res != Receiver::ProcessInputResult::InputBlocked);
+        *ret_accepted = accepted;
     }
-
-    self->mutex.unlock ();
-
-    *ret_accepted = accepted;
-
-//    logD_ (_func, "done");
 }
 
-mt_rev (11.06.18)
 mt_async void
-RtmptServer::httpClosed (Exception * const exc,
+RtmptServer::httpClosed (Exception * const exc_,
 			 void      * const _rtmpt_conn)
 {
+    if (exc_)
+	logE_ (_func, "exception: ", exc_->toString());
+
     RtmptConnection * const rtmpt_conn = static_cast <RtmptConnection*> (_rtmpt_conn);
 
-    CodeRef rtmpt_server_ref;
-    if (rtmpt_conn->weak_rtmpt_server.isValid()) {
-	rtmpt_server_ref = rtmpt_conn->weak_rtmpt_server;
-	if (!rtmpt_server_ref)
-	    return;
-    }
-    RtmptServer * const self = rtmpt_conn->unsafe_rtmpt_server;
-
-    if (exc)
-	logE_ (_func, "exception: ", exc->toString());
-
-    logD (rtmpt, _func, "0x", fmt_hex, (UintPtr) rtmpt_conn);
-
-    // TODO Destroy conn_keepalive_timer
-
-    self->frontend.call (self->frontend->closed, /*(*/ rtmpt_conn->conn_cb_data /*)*/);
+    CodeDepRef<RtmptServer> const self = rtmpt_conn->weak_rtmpt_server;
+    if (!self)
+        return;
 
     self->mutex.lock ();
-//    logD_ (_func, "--- rtmpt_conn refcount: ", rtmpt_conn->getRefCount());
-    self->destroyRtmptConnection (rtmpt_conn);
-    self->mutex.unlock ();
+    mt_unlocks (mutex) self->doConnectionClosed (rtmpt_conn);
 }
 
 HttpService::HttpHandler const RtmptServer::http_handler = {
@@ -721,7 +620,6 @@ HttpService::HttpHandler const RtmptServer::http_handler = {
     service_httpMessageBody
 };
 
-// TODO Code duplication with httpRequest()
 Result
 RtmptServer::service_httpRequest (HttpRequest   * const mt_nonnull req,
 				  Sender        * const mt_nonnull conn_sender,
@@ -731,39 +629,11 @@ RtmptServer::service_httpRequest (HttpRequest   * const mt_nonnull req,
 {
     RtmptServer * const self = static_cast <RtmptServer*> (_self);
 
-    self->mutex.lock ();
-
-    ConstMemory const command = req->getPath (0);
-    logD (rtmpt, _func, "request: ", req->getRequestLine());
-    if (equal (command, "send")) {
-	Uint32 const session_id = strToUlong (req->getPath (1));
-	Ref<RtmptSession> session = self->doSend (conn_sender, session_id);
-	*ret_msg_data = session;
-	session.setNoUnref ((RtmptSession*) NULL);
-    } else
-    if (equal (command, "idle")) {
-	Uint32 const session_id = strToUlong (req->getPath (1));
-	self->doIdle (conn_sender, session_id);
-    } else
-    if (equal (command, "open")) {
-	self->doOpen (conn_sender, req->getClientAddress());
-    } else
-    if (equal (command, "close")) {
-	Uint32 const session_id = strToUlong (req->getPath (1));
-	self->doClose (conn_sender, session_id);
-    } else {
-	if (!equal (command, "fcs"))
-	    logW_ (_func, "uknown command: ", command);
-
-	RTMPT_SERVER__HEADERS_DATE
-	conn_sender->send (
-		self->page_pool,
-		true /* do_flush */,
-		RTMPT_SERVER__400_HEADERS (!self->no_keepalive_conns)
-		"\r\n");
+    Ref<RtmptSession> session = self->doHttpRequest (req, conn_sender, NULL /* rtmpt_conn */);
+    if (session && req->getContentLength() > 0) {
+        *ret_msg_data = session;
+        session.setNoUnref ((RtmptSession*) NULL);
     }
-
-    self->mutex.unlock ();
 
     if (self->no_keepalive_conns)
 	conn_sender->closeAfterFlush ();
@@ -771,7 +641,7 @@ RtmptServer::service_httpRequest (HttpRequest   * const mt_nonnull req,
     return Result::Success;
 }
 
-// TODO Code duplication with httpMessaggeBody()
+// Almost identical to httpMessaggeBody()
 Result
 RtmptServer::service_httpMessageBody (HttpRequest  * const mt_nonnull /* req */,
 				      Sender       * const mt_nonnull /* conn_sender */,
@@ -784,103 +654,103 @@ RtmptServer::service_httpMessageBody (HttpRequest  * const mt_nonnull /* req */,
     RtmptServer * const self = static_cast <RtmptServer*> (_self);
     RtmptSession * const session = static_cast <RtmptSession*> (_session);
 
-  {
     if (!session) {
 	*ret_accepted = mem.len();
 	return Result::Success;
     }
 
-    logD (rtmpt, _func);
+    logD (rtmpt, _func_);
     if (logLevelOn (rtmpt, LogLevel::D)) {
         logLock ();
 	hexdump (logs, mem);
         logUnlock ();
     }
 
-    self->mutex.lock ();
+  // 'cur_req_session' is not null, which means that we're processing
+  // message body of a "/send" request.
 
-    if (!session->valid) {
-	self->mutex.unlock ();
-	*ret_accepted = mem.len();
-	goto _return;
-    }
+  // Note that we don't check 'cur_req_session->valid' here because
+  // that would require an extra mutex lock. Calling rtmp_conn.doProcessInput()
+  // for an invalid session should be harmless.
 
-  // Processing message body of a "/send" request.
-
-    Cb<Receiver::Frontend> const rcv_fe = session->rtmp_conn.getReceiverFrontend ();
-    assert (rcv_fe->processInput);
     Size accepted;
     Receiver::ProcessInputResult res;
-    if (!rcv_fe.call_ret<Receiver::ProcessInputResult> (&res, rcv_fe->processInput, /*(*/ mem, &accepted /*)*/)) {
-	logE_ (_func, "rcv_fe gone");
-
-	self->destroyRtmptSession (session);
-	self->mutex.unlock ();
-
-	*ret_accepted = mem.len();
-	goto _return;
-    }
-
-    // TODO InputBlocked - ?
-    if (    res != Receiver::ProcessInputResult::Normal
-	 && res != Receiver::ProcessInputResult::Again)
     {
-//	logE_ (_func, "failed to parse RTMP data: ", toString (res));
+        session->rtmp_input_mutex.lock ();
+        res = session->rtmp_conn.doProcessInput (mem, &accepted);
+        session->rtmp_input_mutex.unlock ();
+    }
+    if (res == Receiver::ProcessInputResult::Error) {
+	logE_ (_func, "failed to parse RTMP data: ", toString (res));
 
-	self->destroyRtmptSession (session);
-	self->mutex.unlock ();
+	self->mutex.lock ();
+	mt_unlocks (mutex) self->destroyRtmptSession (session, true /* close_rtmp_conn */);
 
 	*ret_accepted = mem.len();
-	goto _return;
+    } else {
+        // RtmpConnection::doProcessInput() never returns InputBlocked.
+        assert (res != Receiver::ProcessInputResult::InputBlocked);
+        *ret_accepted = accepted;
     }
 
-    self->mutex.unlock ();
-
-    *ret_accepted = accepted;
-  }
-
-_return:
     if (end_of_request)
 	session->unref ();
 
-//    logD_ (_func, "done");
     return Result::Success;
 }
 
-mt_rev (11.06.18)
-mt_async void
-RtmptServer::addConnection (Connection              * const mt_nonnull conn,
-			    DependentCodeReferenced * const mt_nonnull dep_code_referenced,
-			    IpAddress const         &client_addr,
-			    void                    * const conn_cb_data,
-			    VirtReferenced          * const ref_data)
+Ref<RtmptServer::RtmptConnection>
+RtmptServer::addConnection (Connection        * const mt_nonnull conn,
+                            DeferredProcessor * const mt_nonnull conn_deferred_processor,
+                            VirtReferenced    * const conn_ref,
+			    void              * const conn_cb_data,
+			    IpAddress           const client_addr)
 {
-    RtmptConnection * const rtmpt_conn = new RtmptConnection;
-    // This is a hack. What could be done with it? (conn init callback?)
-    dep_code_referenced->setCoderefContainer (rtmpt_conn);
-
+    Ref<RtmptConnection> const rtmpt_conn = grab (new (std::nothrow) RtmptConnection);
+    rtmpt_conn->valid = true;
     rtmpt_conn->weak_rtmpt_server = this;
-    rtmpt_conn->unsafe_rtmpt_server = this;
-    rtmpt_conn->conn = conn;
-    rtmpt_conn->conn_cb_data = conn_cb_data;
-    rtmpt_conn->ref_data = ref_data;
-    rtmpt_conn->conn_sender.init (deferred_processor);
-    rtmpt_conn->conn_sender.setFrontend (CbDesc<Sender::Frontend> (&sender_frontend, rtmpt_conn, rtmpt_conn));
-    rtmpt_conn->conn_sender.setConnection (conn);
-    rtmpt_conn->conn_receiver.setConnection (conn);
-    rtmpt_conn->conn_receiver.setFrontend (rtmpt_conn->http_server.getReceiverFrontend ());
 
-    rtmpt_conn->http_server.init (client_addr);
-    rtmpt_conn->http_server.setSender (&rtmpt_conn->conn_sender, page_pool);
-    rtmpt_conn->http_server.setFrontend (
-            CbDesc<HttpServer::Frontend> (
-                    &http_frontend, rtmpt_conn, rtmpt_conn /* coderef_container */));
+    rtmpt_conn->conn = conn;
+    rtmpt_conn->conn_ref = conn_ref;
+    rtmpt_conn->conn_cb_data = conn_cb_data;
+
+    rtmpt_conn->last_msg_time = getTime();
+    rtmpt_conn->cur_req_session = NULL;
+
+    rtmpt_conn->conn_sender.init (conn_deferred_processor);
+    rtmpt_conn->conn_sender.setConnection (conn);
+    rtmpt_conn->conn_receiver.init (conn, conn_deferred_processor);
+
+    rtmpt_conn->http_server.init (CbDesc<HttpServer::Frontend> (&http_frontend, rtmpt_conn, rtmpt_conn),
+                                  &rtmpt_conn->conn_receiver,
+                                  &rtmpt_conn->conn_sender,
+                                  page_pool,
+                                  client_addr);
 
     mutex.lock ();
+    if (conn_keepalive_timeout > 0) {
+        rtmpt_conn->conn_keepalive_timer =
+                // TODO Use Timers from conn's thread context.
+                timers->addTimer_microseconds (CbDesc<Timers::TimerCallback> (
+                                                       connKeepaliveTimerTick, rtmpt_conn, rtmpt_conn),
+                                               conn_keepalive_timeout,
+                                               true  /* periodical */,
+                                               false /* auto_delete */);
+    }
+
     conn_list.append (rtmpt_conn);
+    rtmpt_conn->ref ();
     mutex.unlock ();
 
-//    logD_ (_func, "new rtmpt_conn refcount: ", rtmpt_conn->getRefCount());
+    return rtmpt_conn;
+}
+
+void
+RtmptServer::removeConnection (RtmptConnection * const mt_nonnull rtmpt_conn)
+{
+    mutex.lock ();
+    destroyRtmptConnection (rtmpt_conn);
+    mutex.unlock ();
 }
 
 void
@@ -893,8 +763,7 @@ RtmptServer::attachToHttpService (HttpService * const http_service,
 
     for (unsigned i = 0; i < num_paths; ++i) {
 	http_service->addHttpHandler (
-		CbDesc<HttpService::HttpHandler> (
-			&http_handler, this, /* this */ NULL /* There's only a single static instance of RtmptServer anyway*/),
+		CbDesc<HttpService::HttpHandler> (&http_handler, this, getCoderefContainer()),
 		paths [i],
 		false /* preassembly */,
 		0     /* preassembly_limit */,
@@ -903,34 +772,35 @@ RtmptServer::attachToHttpService (HttpService * const http_service,
 }
 
 mt_const void
-RtmptServer::init (Timers   * const timers,
-                   DeferredProcessor * const deferred_processor,
-                   PagePool * const page_pool,
-                   Time       const session_keepalive_timeout,
-                   bool       const no_keepalive_conns,
-                   bool       const prechunking_enabled)
+RtmptServer::init (CbDesc<Frontend> const &frontend,
+                   Timers                 * const timers,
+                   PagePool               * const page_pool,
+                   Time                     const session_keepalive_timeout,
+                   Time                     const conn_keepalive_timeout,
+                   bool                     const no_keepalive_conns,
+                   bool                     const prechunking_enabled)
 {
-    this->timers = timers;
-    this->deferred_processor = deferred_processor;
-    this->page_pool = page_pool;
+    this->frontend                  = frontend;
+    this->timers                    = timers;
+    this->page_pool                 = page_pool;
     this->session_keepalive_timeout = session_keepalive_timeout;
-    this->no_keepalive_conns = no_keepalive_conns;
-    this->prechunking_enabled = prechunking_enabled;
+    this->conn_keepalive_timeout    = conn_keepalive_timeout;
+    this->no_keepalive_conns        = no_keepalive_conns;
+    this->prechunking_enabled       = prechunking_enabled;
 }
 
 RtmptServer::RtmptServer (Object * const coderef_container)
     : DependentCodeReferenced   (coderef_container),
-      prechunking_enabled       (prechunking_enabled),
       timers                    (coderef_container),
-      deferred_processor        (coderef_container),
       page_pool                 (coderef_container),
-      session_keepalive_timeout (30),
+      prechunking_enabled       (true),
+      session_keepalive_timeout (60),
+      conn_keepalive_timeout    (60),
       no_keepalive_conns        (false),
       session_id_counter        (1)
 {
 }
 
-mt_rev (11.06.18)
 RtmptServer::~RtmptServer ()
 {
     mutex.lock ();
@@ -938,8 +808,9 @@ RtmptServer::~RtmptServer ()
     {
 	SessionMap::Iterator iter (session_map);
 	while (!iter.done ()) {
-	    Ref<RtmptSession> &session = iter.next ().getData();
-	    destroyRtmptSession (session);
+	    Ref<RtmptSession> const session = iter.next().getData();
+	    mt_unlocks (mutex) destroyRtmptSession (session, true /* close_rtmp_conn */);
+            mutex.lock ();
 	}
     }
 

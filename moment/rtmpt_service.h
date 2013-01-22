@@ -1,5 +1,5 @@
 /*  Moment Video Server - High performance media server
-    Copyright (C) 2011 Dmitry Shatrov
+    Copyright (C) 2011-2013 Dmitry Shatrov
     e-mail: shatrov@gmail.com
 
     This program is free software: you can redistribute it and/or modify
@@ -17,8 +17,8 @@
 */
 
 
-#ifndef __LIBMOMENT__RTMPT_SERVICE__H__
-#define __LIBMOMENT__RTMPT_SERVICE__H__
+#ifndef LIBMOMENT__RTMPT_SERVICE__H__
+#define LIBMOMENT__RTMPT_SERVICE__H__
 
 
 #include <libmary/libmary.h>
@@ -41,13 +41,22 @@ private:
     public:
         StateMutex mutex;
 
+        mt_const WeakDepRef<ServerThreadContext> weak_thread_ctx;
+
+        TcpConnection tcp_conn;
 	mt_mutex (mutex) PollGroup::PollableKey pollable_key;
+
+        ConnectionData ()
+            : tcp_conn (this /* coderef_container */)
+        {
+        }
     };
 
-    mt_const DataDepRef<PollGroup> poll_group;
-    mt_const DataDepRef<DeferredProcessor> deferred_processor;
+    mt_const DataDepRef<ServerContext> server_ctx;
 
     TcpServer tcp_server;
+    mt_mutex (mutex) PollGroup::PollableKey server_pollable_key;
+
     RtmptServer rtmpt_server;
 
   mt_iface (RtmptServer::Frontend)
@@ -70,15 +79,13 @@ private:
   mt_iface_end
 
 public:
-    mt_const mt_throws Result init (Timers    * mt_nonnull timers,
-                                    PagePool  * mt_nonnull page_pool,
-                                    PollGroup * mt_nonnull poll_group,
-                                    DeferredProcessor * mt_nonnull deferred_processor,
-                                    Time       session_keepalive_timeout,
-                                    bool       no_keepalive_conns,
-                                    bool       prechunking_enabled);
+    mt_const mt_throws Result init (ServerContext * mt_nonnull server_ctx,
+                                    PagePool      * mt_nonnull page_pool,
+                                    Time           session_keepalive_timeout,
+                                    bool           no_keepalive_conns,
+                                    bool           prechunking_enabled);
 
-    mt_throws Result bind (IpAddress const &addr);
+    mt_throws Result bind (IpAddress addr);
 
     mt_throws Result start ();
 
@@ -89,16 +96,17 @@ public:
 
     RtmptService (Object * const coderef_container)
 	: DependentCodeReferenced (coderef_container),
-	  poll_group         (coderef_container),
-          deferred_processor (coderef_container),
+	  server_ctx         (coderef_container),
 	  tcp_server         (coderef_container),
 	  rtmpt_server       (coderef_container)
     {
     }
+
+    ~RtmptService ();
 };
 
 }
 
 
-#endif /* __LIBMOMENT__RTMPT_SERVICE__H__ */
+#endif /* LIBMOMENT__RTMPT_SERVICE__H__ */
 
