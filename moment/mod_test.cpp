@@ -34,7 +34,7 @@ static void momentTestInit ()
     MConfig::Config       * const config     = moment->getConfig();
     CodeDepRef<ServerApp>   const server_app = moment->getServerApp();
     CodeDepRef<PagePool>    const page_pool  = moment->getPagePool();
-    CodeDepRef<Timers>      const timers     = server_app->getMainThreadContext()->getTimers();
+    CodeDepRef<Timers>      const timers     = server_app->getServerContext()->getMainThreadContext()->getTimers();
 
     TestStreamGenerator::Options opts;
 
