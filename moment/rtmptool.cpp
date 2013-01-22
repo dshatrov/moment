@@ -54,17 +54,20 @@ public:
 
     bool dump_frames;
 
+    LogLevel loglevel;
+
     Options ()
 	: help (false),
 	  num_clients (1),
 	  got_server_addr (false),
           publish (false),
 	  nonfatal_errors (false),
-	  app_name (grab (new String ("app"))),
-	  channel (grab (new String ("video"))),
+	  app_name (grab (new (std::nothrow) String ("app"))),
+	  channel (grab (new (std::nothrow) String ("video"))),
 	  num_threads (0),
 	  report_interval (0),
-          dump_frames (false)
+          dump_frames (false),
+          loglevel (LogLevel::Debug)
     {
     }
 };
@@ -84,7 +87,7 @@ private:
 
     mt_const Byte id_char;
 
-    mt_const ServerThreadContext *thread_ctx;
+    mt_const DataDepRef<ServerThreadContext> thread_ctx;
     mt_const DataDepRef<PagePool> page_pool;
 
     RtmpConnection rtmp_conn;
@@ -246,13 +249,13 @@ RtmpClient::commandMessage (VideoStream::Message   * const mt_nonnull msg,
                 if (options.publish) {
                     self->rtmp_conn.sendPublish (options.channel->mem());
 
-                    Ref<VideoStream> const video_stream = grab (new VideoStream);
+                    Ref<VideoStream> const video_stream = grab (new (std::nothrow) VideoStream);
                     video_stream->getEventInformer()->subscribe (
                             CbDesc<VideoStream::EventHandler> (&gen_stream_handler,
                                                                self,
                                                                self->getCoderefContainer()));
 
-                    self->test_stream_generator = grab (new TestStreamGenerator);
+                    self->test_stream_generator = grab (new (std::nothrow) TestStreamGenerator);
                     self->test_stream_generator->init (self->page_pool,
                                                        self->thread_ctx->getTimers(),
                                                        video_stream,
@@ -435,7 +438,7 @@ RtmpClient::start (IpAddress const &addr)
 	return Result::Failure;
     }
 
-    thread_ctx->getPollGroup()->addPollable (tcp_conn.getPollable(), NULL /* ret_reg */);
+    thread_ctx->getPollGroup()->addPollable (tcp_conn.getPollable());
 
     if (connect_res == TcpConnection::ConnectResult_Connected)
         rtmp_conn.startClient ();
@@ -452,7 +455,17 @@ RtmpClient::init (ServerThreadContext * const thread_ctx,
     this->thread_ctx = thread_ctx;
     this->page_pool = page_pool;
 
+    conn_sender.setConnection (&tcp_conn);
     conn_sender.setQueue (thread_ctx->getDeferredConnectionSenderQueue());
+
+    conn_receiver.init (&tcp_conn, thread_ctx->getDeferredProcessor());
+    conn_receiver.setFrontend (rtmp_conn.getReceiverFrontend());
+
+    rtmp_conn.setBackend (Cb<RtmpConnection::Backend> (&rtmp_conn_backend, NULL /* cb_data */, NULL /* coderef_container */));
+    rtmp_conn.setFrontend (Cb<RtmpConnection::Frontend> (&rtmp_conn_frontend, this, getCoderefContainer()));
+    rtmp_conn.setSender (&conn_sender);
+
+    tcp_conn.setFrontend (Cb<TcpConnection::Frontend> (&tcp_conn_frontend, &rtmp_conn, rtmp_conn.getCoderefContainer()));
 
     rtmp_conn.init (thread_ctx->getTimers(),
                     page_pool,
@@ -465,6 +478,7 @@ RtmpClient::RtmpClient (Object * const coderef_container,
 			Byte     const id_char)
     : DependentCodeReferenced (coderef_container),
       id_char (id_char),
+      thread_ctx    (coderef_container),
       page_pool     (coderef_container),
       rtmp_conn     (coderef_container),
       tcp_conn      (coderef_container),
@@ -472,16 +486,6 @@ RtmpClient::RtmpClient (Object * const coderef_container,
       conn_receiver (coderef_container),
       conn_state (ConnectionState_Connect)
 {
-    conn_sender.setConnection (&tcp_conn);
-
-    conn_receiver.setConnection (&tcp_conn);
-    conn_receiver.setFrontend (rtmp_conn.getReceiverFrontend());
-
-    rtmp_conn.setBackend (Cb<RtmpConnection::Backend> (&rtmp_conn_backend, NULL /* cb_data */, NULL /* coderef_container */));
-    rtmp_conn.setFrontend (Cb<RtmpConnection::Frontend> (&rtmp_conn_frontend, this, getCoderefContainer()));
-    rtmp_conn.setSender (&conn_sender);
-
-    tcp_conn.setFrontend (Cb<TcpConnection::Frontend> (&tcp_conn_frontend, &rtmp_conn, rtmp_conn.getCoderefContainer()));
 }
 
 Result
@@ -496,11 +500,12 @@ startClients (PagePool  * const page_pool,
 	logD_ (_func, "Starting client, id_char: ", ConstMemory::forObject (id_char));
 
 	// Note that RtmpClient objects are never freed.
-	RtmpClient * const client = new RtmpClient (NULL /* coderef_container */, id_char);
+	RtmpClient * const client = new (std::nothrow) RtmpClient (NULL /* coderef_container */, id_char);
+        assert (client);
 
-	ServerThreadContext *thread_ctx;
+	CodeDepRef<ServerThreadContext> thread_ctx;
 	if (use_main_thread)
-	    thread_ctx = server_app->getMainThreadContext();
+	    thread_ctx = server_app->getServerContext()->getMainThreadContext();
 	else
 	    thread_ctx = server_app->getServerContext()->selectThreadContext();
 
@@ -594,11 +599,11 @@ RtmptoolInstance::run (void)
 	startClients (&page_pool, &server_app, &server_addr, true /* use_main_thread */);
 #ifdef LIBMARY_MT_SAFE
     } else {
-	Ref<ClientThreadData> const client_thread_data = grab (new ClientThreadData);
+	Ref<ClientThreadData> const client_thread_data = grab (new (std::nothrow) ClientThreadData);
 	client_thread_data->page_pool = &page_pool;
 	client_thread_data->server_app = &server_app;
 	client_thread_data->server_addr = server_addr;
-	client_thread = grab (new Thread (
+	client_thread = grab (new (std::nothrow) Thread (
 		CbDesc<Thread::ThreadFunc> (clientThreadFunc,
 					    client_thread_data /* cb_data */,
 					    NULL /* coderef_container */,
@@ -646,6 +651,7 @@ printUsage ()
                  "  -d --dump-frames               Dump incoming messages.\n"
 		 "  -r --report-interval <number>  Interval between video frame reports. Default: 0, no reports.\n"
 		 "  --nonfatal-errors              Do not exit on the first error.\n"
+                 "  --loglevel <loglevel>          Loglevel (same as for 'moment' server).\n"
 		 "  -h --help                      Show this help message.\n"
 //		 "  -o --out-file - Output file name.\n"
 		 );
@@ -702,7 +708,7 @@ bool cmdline_app (char const * /* short_name */,
 		  void       * /* opt_data */,
 		  void       * /* cb_data */)
 {
-    options.app_name = grab (new String (value));
+    options.app_name = grab (new (std::nothrow) String (value));
     return true;
 }
 
@@ -712,7 +718,7 @@ bool cmdline_channel (char const * /* short_name */,
 		      void       * /* opt_data */,
 		      void       * /* cb_data */)
 {
-    options.channel = grab (new String (value));
+    options.channel = grab (new (std::nothrow) String (value));
     return true;
 }
 
@@ -722,7 +728,7 @@ bool cmdline_out_file (char const * /* short_name */,
 		       void       * /* opt_data */,
 		       void       * /* cb_data */)
 {
-    options.out_file = grab (new String (value));
+    options.out_file = grab (new (std::nothrow) String (value));
     return true;
 }
 
@@ -854,6 +860,21 @@ bool cmdline_burst_width (char const * /* short_name */,
     return true;
 }
 
+static bool
+cmdline_loglevel (char const * /* short_name */,
+                  char const * /* long_name */,
+                  char const * const value,
+                  void       * /* opt_data */,
+                  void       * /* cb_data */)
+{
+    ConstMemory const value_mem = ConstMemory (value, value ? strlen (value) : 0);
+    if (!LogLevel::fromString (value_mem, &options.loglevel)) {
+        logE_ (_func, "Invalid loglevel name \"", value_mem, "\", using \"Info\"");
+        options.loglevel = LogLevel::Info;
+    }
+    return true;
+}
+
 } // namespace {}
 
 int main (int argc, char **argv)
@@ -861,7 +882,7 @@ int main (int argc, char **argv)
     libMaryInit ();
 
     {
-	unsigned const num_opts = 16;
+	unsigned const num_opts = 17;
 	CmdlineOption opts [num_opts];
 
 	opts [0].short_name = "h";
@@ -960,6 +981,12 @@ int main (int argc, char **argv)
         opts [15].opt_data   = NULL;
         opts [15].opt_callback = cmdline_burst_width;
 
+        opts [16].short_name = NULL;
+        opts [16].long_name  = "loglevel";
+        opts [16].with_value = true;
+        opts [16].opt_data   = NULL;
+        opts [16].opt_callback = cmdline_loglevel;
+
 	ArrayIterator<CmdlineOption> opts_iter (opts, num_opts);
 	parseCmdline (&argc, &argv, opts_iter, NULL /* callback */, NULL /* callback_data */);
     }
@@ -969,7 +996,9 @@ int main (int argc, char **argv)
 	return 0;
     }
 
-    Ref<RtmptoolInstance> const rtmptool_instance = grab (new RtmptoolInstance);
+    setGlobalLogLevel (options.loglevel);
+
+    Ref<RtmptoolInstance> const rtmptool_instance = grab (new (std::nothrow) RtmptoolInstance);
     if (rtmptool_instance->run ())
 	return 0;
 
