@@ -1651,7 +1651,7 @@ void momentRtmpInit ()
 	    logE_ (_func, "Invalid value for config option ", opt_name);
 	else
 	if (opt_val != MConfig::Boolean_False)
-	    rtmp_module->rtmpt_service.getRtmptServer()->attachToHttpService (moment->getHttpService());
+	    rtmp_module->rtmpt_service.attachToHttpService (moment->getHttpService());
     }
 
     {
@@ -1661,6 +1661,10 @@ void momentRtmpInit ()
 	if (!rtmp_module->rtmpt_service.init (
                                  server_app->getServerContext(),
                                  moment->getPagePool(),
+                                 // TODO standalone_rtmpt enable/disable from config
+                                 true /* enable_standalone_tcp_server */,
+                                 rtmpt_session_timeout,
+                                 // TODO Separate rtmpt_conn_keepalive_timeout
                                  rtmpt_session_timeout,
                                  rtmpt_no_keepalive_conns,
                                  prechunking_enabled))

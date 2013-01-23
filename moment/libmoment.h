@@ -1,5 +1,5 @@
 /*  Moment Video Server - High performance media server
-    Copyright (C) 2011, 2012 Dmitry Shatrov
+    Copyright (C) 2011-2013 Dmitry Shatrov
     e-mail: shatrov@gmail.com
 
     This program is free software: you can redistribute it and/or modify
@@ -34,7 +34,6 @@
 #include <moment/rtmp_connection.h>
 #include <moment/rtmp_server.h>
 #include <moment/rtmp_service.h>
-#include <moment/rtmpt_server.h>
 #include <moment/rtmpt_service.h>
 
 #include <moment/video_stream.h>

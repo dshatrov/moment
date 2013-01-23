@@ -40,7 +40,6 @@ moment_target_headers =		\
 	rtmp_server.h		\
 	rtmp_video_service.h	\
 	rtmp_service.h		\
-	rtmpt_server.h		\
 	rtmpt_service.h		\
 				\
 	video_stream.h		\
@@ -82,7 +81,6 @@ libmoment_1_0_la_SOURCES =	\
 	rtmp_connection.cpp	\
 	rtmp_server.cpp		\
 	rtmp_service.cpp	\
-	rtmpt_server.cpp	\
 	rtmpt_service.cpp	\
 				\
 	video_stream.cpp	\
