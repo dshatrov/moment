@@ -48,6 +48,8 @@ private:
     // It'd be optimal to use a fence just once for each invocation of doProcessInput()
     // and only if there was a change to the part of the state which the destructor
     // needs.
+#warning TODO get rid of in_destr_mutex by malloc'ing part of RtmpConnection which is accessed
+#warning      from receiver's sync domain and using DeferredProcessor to schedule its deletion.
     Mutex in_destr_mutex;
 
     // Protects sending state.
@@ -293,13 +295,15 @@ private:
 
     // Prechunking is always enabled currently.
     mt_const bool prechunking_enabled;
-    mt_const Time send_delay;
+    mt_const Time send_delay_millisec;
+    mt_const Time ping_timeout_millisec;
 
     mt_const Cb<Frontend> frontend;
     mt_const Cb<Backend> backend;
 
     mt_mutex (in_destr_mutex) Timers::TimerKey ping_send_timer;
     AtomicInt ping_reply_received;
+    AtomicInt ping_timeout_expired_once;
 
     mt_sync_domain (receiver) Size in_chunk_size;
     mt_mutex (send_mutex) Size out_chunk_size;
@@ -344,7 +348,7 @@ private:
       ReceiveState conn_state;
 
       // Can be set from 'receiver' when holding 'send_mutex'.
-      // For sending, can be set as mt_const at init.
+      // For sending; can be set as mt_const at init.
       mt_mutex (send_mutex) bool momentrtmp_proto;
     mt_end
 
@@ -521,7 +525,7 @@ public:
 private:
   // Ping timer
 
-    mt_sync_domain (receiver) void beginPings ();
+    mt_const void beginPings ();
 
     static void pingTimerTick (void *_self);
 
@@ -628,6 +632,7 @@ public:
     mt_const void init (Timers   * mt_nonnull timers,
 			PagePool * mt_nonnull page_pool,
 			Time      send_delay_millisec,
+                        Time      ping_timeout_millisec,
                         bool      prechunking_enabled,
                         bool      momentrtmp_proto = false);
 

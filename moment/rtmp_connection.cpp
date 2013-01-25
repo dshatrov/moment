@@ -106,7 +106,7 @@ RtmpConnection::getChunkStream (Uint32 const chunk_stream_id,
 
 	// TODO Max number of chunk streams.
 
-	Ref<ChunkStream> const chunk_stream = grab (new ChunkStream);
+	Ref<ChunkStream> const chunk_stream = grab (new (std::nothrow) ChunkStream);
 
 	chunk_stream->chunk_stream_id = chunk_stream_id;
 	chunk_stream->in_msg_offset = 0;
@@ -721,7 +721,7 @@ RtmpConnection::sendMessagePages (MessageDesc const      * const mt_nonnull mdes
 
 //	    logD (flush, _func, "cur_time: ", cur_time, ", out_last_flush_time: ", out_last_flush_time);
 	    if (cur_time >= out_last_flush_time
-		&& cur_time - out_last_flush_time < send_delay)
+		&& cur_time - out_last_flush_time < send_delay_millisec)
 	    {
 		logD (flush, _func, "cs 0x", fmt_hex, (UintPtr) chunk_stream, ": Delaying flush, ts 0x", fmt_hex, timestamp);
 		do_flush = false;
@@ -1386,25 +1386,19 @@ RtmpConnection::close_noBackendCb ()
     frontend.call (frontend->closed, /*(*/ (Exception*) NULL /*)*/);
 }
 
-mt_sync_domain (receiver) void
+mt_const void
 RtmpConnection::beginPings ()
 {
-    // It'd be better to initialize 'ping_reply_received' to 1 in the constructor.
-    ping_reply_received.set (1);
+    logI_ (_this_func_);
 
-    in_destr_mutex.lock ();
-    if (ping_send_timer) {
-	in_destr_mutex.unlock ();
-	return;
-    }
-
-    ping_send_timer = timers->addTimer (CbDesc<Timers::TimerCallback> (pingTimerTick,
-                                                                       this,
-                                                                       getCoderefContainer()),
-					5 * 60 /* TODO Config parameter for timeout */,
-					true  /* periodical */,
-                                        false /* auto_delete */);
-    in_destr_mutex.unlock ();
+    assert (!ping_send_timer);
+    ping_send_timer =
+            timers->addTimer_microseconds (CbDesc<Timers::TimerCallback> (pingTimerTick,
+                                                                          this,
+                                                                          getCoderefContainer()),
+                                           ping_timeout_millisec * 1000,
+                                           true  /* periodical */,
+                                           false /* auto_delete */);
 }
 
 void
@@ -1415,8 +1409,16 @@ RtmpConnection::pingTimerTick (void * const _self)
     if (!self->ping_reply_received.compareAndExchange (1 /* old_value */, 0 /* new_value */)) {
       // 'self->ping_reply_received' if 'false'.
 
-	logE_ (_func, "no ping reply, rtmp_conn 0x", fmt_hex, (UintPtr) self);
-	logD (close, _func, "0x", fmt_hex, (UintPtr) self, " closing");
+        {
+            logLock ();
+            logE_unlocked_ (_self_func, "no ping reply");
+            if (int const hit = self->ping_timeout_expired_once.fetchAdd (1)) {
+                logE_unlocked_ (_self_func, "pingTimerTick hit #", hit);
+            }
+            logUnlock ();
+        }
+
+	logD (close, _self_func, "closing");
 	{
 	    InternalException internal_exc (InternalException::ProtocolError);
 	    self->frontend.call (self->frontend->closed, /*(*/ &internal_exc /*)*/);
@@ -2000,8 +2002,6 @@ RtmpConnection::doProcessInput (ConstMemory   const mem,
 		    }
 		}
 
-		beginPings ();
-
 		conn_state = ReceiveState::BasicHeader;
 	    } break;
 	    case ReceiveState::ServerWaitC0: {
@@ -2220,8 +2220,6 @@ RtmpConnection::doProcessInput (ConstMemory   const mem,
 			goto _return;
 		    }
 		}
-
-		beginPings ();
 
 		conn_state = ReceiveState::BasicHeader;
 	    } break;
@@ -2740,12 +2738,16 @@ RtmpConnection::startClient ()
     }
 
     sendRawPages (page_list.first, 0 /* msg_offset */);
+
+    beginPings ();
 }
 
 mt_const void
 RtmpConnection::startServer ()
 {
     conn_state = ReceiveState::ServerWaitC0;
+
+    beginPings ();
 }
 
 Result
@@ -2762,7 +2764,7 @@ RtmpConnection::doCreateStream (Uint32       const msg_stream_id,
     //      (a simple increment of a counter would do).
     double const reply_msg_stream_id = DefaultMessageStreamId;
 
-    logD_ (_this_func, msg_stream_id, ", ", reply_msg_stream_id);
+//    logD_ (_this_func, msg_stream_id, ", ", reply_msg_stream_id);
 
     {
 	AmfAtom atoms [4];
@@ -2921,15 +2923,17 @@ RtmpConnection::fireVideoMessage (VideoStream::VideoMessage * const mt_nonnull v
 mt_const void
 RtmpConnection::init (Timers     * const mt_nonnull timers,
 		      PagePool   * const mt_nonnull page_pool,
-		      Time         const send_delay,
+		      Time         const send_delay_millisec,
+                      Time         const ping_timeout_millisec,
                       bool         const prechunking_enabled,
                       bool         const momentrtmp_proto)
 {
-    this->timers = timers;
-    this->page_pool = page_pool;
-    this->send_delay = send_delay;
-    this->prechunking_enabled = prechunking_enabled;
-    this->momentrtmp_proto = momentrtmp_proto;
+    this->timers                = timers;
+    this->page_pool             = page_pool;
+    this->send_delay_millisec   = send_delay_millisec;
+    this->ping_timeout_millisec = ping_timeout_millisec;
+    this->prechunking_enabled   = prechunking_enabled;
+    this->momentrtmp_proto      = momentrtmp_proto;
 }
 
 RtmpConnection::RtmpConnection (Object * const coderef_container)
@@ -2940,7 +2944,11 @@ RtmpConnection::RtmpConnection (Object * const coderef_container)
       sender    (coderef_container),
 
       prechunking_enabled (true),
-      send_delay (0),
+      send_delay_millisec (0),
+      ping_timeout_millisec (5 * 60 * 1000),
+
+      // First timeout period has double duration.
+      ping_reply_received (1),
 
       in_chunk_size  (DefaultChunkSize),
       out_chunk_size (DefaultChunkSize),
@@ -2980,10 +2988,12 @@ RtmpConnection::~RtmpConnection ()
     if (frontend)
         frontend.call (frontend->closed, /*(*/ (Exception*) NULL /*)*/);
 
-    in_destr_mutex.lock ();
-
-    if (ping_send_timer)
+    if (ping_send_timer) {
 	timers->deleteTimer (ping_send_timer);
+        ping_send_timer = NULL;
+    }
+
+    in_destr_mutex.lock ();
 
     {
 	ChunkStreamTree::Iterator iter (chunk_stream_tree);
