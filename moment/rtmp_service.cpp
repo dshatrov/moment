@@ -55,6 +55,7 @@ RtmpService::destroySession (ClientSession * const session)
 	return;
     }
     session->valid = false;
+    --num_valid_sessions;
 
     assert (session->pollable_key);
     session->thread_ctx->getPollGroup()->removePollable (session->pollable_key);
@@ -65,8 +66,6 @@ RtmpService::destroySession (ClientSession * const session)
     session_list.remove (session);
     logD (rtmp_service, _func, "session refcount: ", session->getRefCount());
     session->unref ();
-
-    --num_valid_sessions;
 }
 
 void
@@ -103,8 +102,15 @@ RtmpService::acceptOneConnection ()
     ServerThreadContext * const thread_ctx = server_ctx->selectThreadContext();
 
     Ref<ClientSession> const session = grab (new (std::nothrow) ClientSession);
+    num_session_objects.inc ();
+    session->session_info.creation_unixtime = getUnixtime();
+
     session->thread_ctx = thread_ctx;
-    session->rtmp_conn.init (thread_ctx->getTimers(), page_pool, send_delay, prechunking_enabled);
+    session->rtmp_conn.init (thread_ctx->getTimers(),
+                             page_pool,
+                             send_delay_millisec,
+                             rtmp_ping_timeout_millisec,
+                             prechunking_enabled);
 
 // TEST
 //    session->traceReferences ();
@@ -112,8 +118,6 @@ RtmpService::acceptOneConnection ()
     session->valid = true;
     session->weak_rtmp_service = this;
     session->unsafe_rtmp_service = this;
-
-    num_session_objects.inc ();
 
     IpAddress client_addr;
     {
@@ -158,11 +162,7 @@ RtmpService::acceptOneConnection ()
         // We may call destroySession(session) from now on.
 
         ++num_valid_sessions;
-
-        {
-            session->session_info.creation_time = getUnixtime();
-            last_accept_time = getTime();
-        }
+        last_accept_time = getTime();
 
         mutex.unlock ();
     }
@@ -237,15 +237,17 @@ RtmpService::accepted (void * const _self)
 mt_const mt_throws Result
 RtmpService::init (ServerContext * const mt_nonnull server_ctx,
                    PagePool      * const mt_nonnull page_pool,
-                   Time            const send_delay,
+                   Time            const send_delay_millisec,
+                   Time            const rtmp_ping_timeout_millisec,
                    bool            const prechunking_enabled,
                    Time            const accept_watchdog_timeout_sec)
 {
     Timers * const timers = server_ctx->getMainThreadContext()->getTimers();
 
     this->server_ctx = server_ctx;
-    this->page_pool  = page_pool;
-    this->send_delay = send_delay;
+    this->page_pool = page_pool;
+    this->send_delay_millisec = send_delay_millisec;
+    this->rtmp_ping_timeout_millisec = rtmp_ping_timeout_millisec;
     this->prechunking_enabled = prechunking_enabled;
     this->accept_watchdog_timeout_sec = accept_watchdog_timeout_sec;
 
@@ -303,19 +305,19 @@ RtmpService::start ()
 mt_mutex (mutex) void
 RtmpService::updateClientSessionsInfo ()
 {
-        SessionList::iterator iter (session_list);
-        while (!iter.done()) {
-            ClientSession * const session = iter.next ();
+    SessionList::iterator iter (session_list);
+    while (!iter.done()) {
+        ClientSession * const session = iter.next ();
 #if 0
 // TODO Update the following fields:
-        Time last_send_time;
-        Time last_recv_time;
-        StRef<String> last_play_stream;
-        StRef<String> last_publish_stream;
+    Time last_send_time;
+    Time last_recv_time;
+    StRef<String> last_play_stream;
+    StRef<String> last_publish_stream;
 #endif
-           session->session_info.last_send_time = 0;
-           session->session_info.last_recv_time = 0;
-        }
+       session->session_info.last_send_unixtime = 0;
+       session->session_info.last_recv_unixtime = 0;
+    }
 }
 
 mt_mutex (mutex) RtmpService::SessionInfoIterator
@@ -336,7 +338,8 @@ RtmpService::RtmpService (Object * const coderef_container)
       prechunking_enabled (true),
       server_ctx (NULL),
       page_pool (NULL),
-      send_delay (0),
+      send_delay_millisec (0),
+      rtmp_ping_timeout_millisec (5 * 60 * 1000),
       tcp_server (coderef_container),
       num_valid_sessions (0),
       accept_watchdog_timeout_sec (0),

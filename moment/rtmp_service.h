@@ -43,16 +43,16 @@ public:
     {
     public:
         IpAddress client_addr;
-        Time creation_time;
-        Time last_send_time;
-        Time last_recv_time;
+        Time creation_unixtime;
+        Time last_send_unixtime;
+        Time last_recv_unixtime;
         StRef<String> last_play_stream;
         StRef<String> last_publish_stream;
 
         ClientSessionInfo ()
-            : creation_time  (0),
-              last_send_time (0),
-              last_recv_time (0)
+            : creation_unixtime  (0),
+              last_send_unixtime (0),
+              last_recv_unixtime (0)
         {
         }
     };
@@ -102,7 +102,8 @@ private:
 
     mt_const ServerContext *server_ctx;
     mt_const PagePool *page_pool;
-    mt_const Time send_delay;
+    mt_const Time send_delay_millisec;
+    mt_const Time rtmp_ping_timeout_millisec;
 
     TcpServer tcp_server;
 
@@ -142,6 +143,9 @@ public:
 
     mt_throws Result start ();
 
+    void rtmpServiceLock   () { mutex.lock (); }
+    void rtmpServiceUnlock () { mutex.unlock (); }
+
 
   // _________________________ Current client sessions _________________________
 
@@ -149,9 +153,6 @@ private:
     mt_mutex (mutex) void updateClientSessionsInfo ();
 
 public:
-    void rtmpServiceLock   () { mutex.lock (); }
-    void rtmpServiceUnlock () { mutex.unlock (); }
-
     class SessionInfoIterator
     {
         friend class RtmpService;
@@ -189,7 +190,8 @@ public:
 
     mt_const mt_throws Result init (ServerContext * mt_nonnull server_ctx,
                                     PagePool      * mt_nonnull page_pool,
-                                    Time           send_delay,
+                                    Time           send_delay_millisec,
+                                    Time           rtmp_ping_timeout_millisec,
                                     bool           prechunking_enabled,
                                     Time           accept_watchdog_timeout_sec);
 
