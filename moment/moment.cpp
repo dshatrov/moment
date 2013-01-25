@@ -605,8 +605,13 @@ MomentInstance::processConfig (MConfig::Config    * const config,
         res = Result::Failure;
     logI_ (_func, opt_name__ctl_pipe_reopen_timeout, params->ctl_pipe_reopen_timeout);
 
-    if (!configGetUint64 (config, opt_name__http_keepalive_timeout, &params->http_keepalive_timeout, default__http__keepalive_timeout))
+    if (!configGetUint64 (config,
+                          opt_name__http_keepalive_timeout,
+                          &params->http_keepalive_timeout,
+                          default__http__keepalive_timeout))
+    {
         res = Result::Failure;
+    }
     logI_ (_func, opt_name__http_keepalive_timeout, ": ", params->http_keepalive_timeout);
 
     if (!configGetBoolean (config, opt_name__http_no_keepalive_conns, &params->no_keepalive_conns, false))

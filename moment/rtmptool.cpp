@@ -315,6 +315,9 @@ RtmpClient::commandMessage (VideoStream::Message   * const mt_nonnull msg,
             }
 	}
 #endif
+    } else
+    if (equal (method, "|RtmpSampleAccess")) {
+      // No-op
     } else {
         logLock ();
 	logW_unlocked_ (_func, "unknown method: ", method);
@@ -469,7 +472,8 @@ RtmpClient::init (ServerThreadContext * const thread_ctx,
 
     rtmp_conn.init (thread_ctx->getTimers(),
                     page_pool,
-                    0    /* send_delay_millisec */,
+                    0             /* send_delay_millisec */,
+                    5 * 60 * 1000 /* ping_timeout_millisec */,
                     // Note: Set to "false" for hexdumps.
                     true /* prechunking_enabled */);
 }
