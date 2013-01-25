@@ -37,6 +37,38 @@ class RtmptService : public RtmpVideoService,
 private:
     StateMutex mutex;
 
+public:
+    class RtmptSessionInfo
+    {
+    public:
+        IpAddress last_client_addr;
+        Time creation_unixtime;
+        Time last_req_unixtime;
+        StRef<String> last_play_stream;
+        StRef<String> last_publish_stream;
+
+        RtmptSessionInfo ()
+            : creation_unixtime (0),
+              last_req_unixtime (0)
+        {
+        }
+    };
+
+    class RtmptConnectionInfo
+    {
+    public:
+        IpAddress client_addr;
+        Time creation_unixtime;
+        Time last_req_unixtime;
+
+        RtmptConnectionInfo ()
+            : creation_unixtime (0),
+              last_req_unixtime (0)
+        {
+        }
+    };
+
+private:
     class RtmptSender : public Sender,
                         public DependentCodeReferenced
     {
@@ -81,6 +113,8 @@ private:
     class RtmptSession : public Object
     {
     public:
+        mt_mutex (RtmptService::mutex) RtmptSessionInfo session_info;
+
 	mt_mutex (RtmptService::mutex) bool valid;
         mt_mutex (RtmptService::mutex) bool closed;
 
@@ -110,6 +144,8 @@ private:
             : rtmpt_sender (this /* coderef_container */),
               rtmp_conn    (this /* coderef_container */)
         {}
+
+        ~RtmptSession ();
     };
 
     typedef RtmptSession::SessionMap_ SessionMap;
@@ -123,6 +159,8 @@ public:
         friend class RtmptService;
 
     private:
+        mt_mutex (RtmptService::mutex) RtmptConnectionInfo connection_info;
+
 	mt_mutex (RtmptService::mutex) bool valid;
 
         mt_const WeakDepRef<RtmptService> weak_rtmpt_service;
@@ -146,10 +184,15 @@ public:
               conn_receiver (this /* coderef_container */),
               http_server   (this /* coderef_container */)
         {}
+
+        ~RtmptConnection ();
     };
+
+    typedef IntrusiveList<RtmptConnection, ConnectionList_name> ConnectionList;
 
 private:
     mt_const bool prechunking_enabled;
+    mt_const Time rtmp_ping_timeout_millisec;
     mt_const Time session_keepalive_timeout;
     mt_const Time conn_keepalive_timeout;
     mt_const bool no_keepalive_conns;
@@ -160,12 +203,17 @@ private:
     TcpServer tcp_server;
     mt_mutex (mutex) PollGroup::PollableKey server_pollable_key;
 
-    typedef IntrusiveList<RtmptConnection, ConnectionList_name> ConnectionList;
     mt_mutex (mutex) ConnectionList conn_list;
 
     mt_mutex (mutex) SessionMap session_map;
     // TODO IdMapper
     mt_mutex (mutex) Uint32 session_id_counter;
+
+    AtomicInt num_session_objects;
+    Count num_valid_sessions;
+
+    AtomicInt num_connection_objects;
+    Count num_valid_connections;
 
     static void sessionKeepaliveTimerTick (void *_session);
 
@@ -187,8 +235,8 @@ private:
     void sendDataInReply (Sender       * mt_nonnull conn_sender,
                           RtmptSession * mt_nonnull session);
 
-    void doOpen (Sender * mt_nonnull conn_sender,
-                 IpAddress const &client_addr);
+    void doOpen (Sender    * mt_nonnull conn_sender,
+                 IpAddress  client_addr);
 
     Ref<RtmptSession> doSend (Sender          * mt_nonnull conn_sender,
                               Uint32           session_id,
@@ -252,9 +300,90 @@ public:
 
     mt_throws Result start ();
 
+    void rtmptServiceLock   () { mutex.lock (); }
+    void rtmptServiceUnlock () { mutex.unlock (); }
+
+
+  // __________________________ Current RTMPT sessions _________________________
+
+private:
+    mt_mutex (mutex) void updateRtmptSessionsInfo ();
+
+public:
+    class RtmptSessionInfoIterator
+    {
+        friend class RtmptService;
+
+    private:
+        SessionMap::data_iterator iter;
+
+        RtmptSessionInfoIterator (RtmptService &rtmpt_service) : iter (rtmpt_service.session_map) {}
+
+    public:
+        bool operator == (RtmptSessionInfoIterator const &iter) const { return this->iter == iter.iter; }
+        bool operator != (RtmptSessionInfoIterator const &iter) const { return this->iter != iter.iter; }
+
+        bool done () /* const */ { return iter.done(); }
+
+        RtmptSessionInfo* next ()
+        {
+            RtmptSession * const session = iter.next ();
+            return &session->session_info;
+        }
+    };
+
+    struct RtmptSessionsInfo
+    {
+        Count num_session_objects;
+        Count num_valid_sessions;
+    };
+
+    mt_mutex (mutex) RtmptSessionInfoIterator getRtmptSessionsInfo_unlocked (RtmptSessionsInfo *ret_info);
+
+
+  // ________________________ Current RTMPT connections ________________________
+
+private:
+    mt_mutex (mutex) void updateRtmptConnectionsInfo ();
+
+public:
+    class RtmptConnectionInfoIterator
+    {
+        friend class RtmptService;
+
+    private:
+        ConnectionList::iterator iter;
+
+        RtmptConnectionInfoIterator (RtmptService &rtmpt_service) : iter (rtmpt_service.conn_list) {}
+
+    public:
+        bool operator == (RtmptConnectionInfoIterator const &iter) const { return this->iter == iter.iter; }
+        bool operator != (RtmptConnectionInfoIterator const &iter) const { return this->iter != iter.iter; }
+
+        bool done () const { return iter.done(); }
+
+        RtmptConnectionInfo* next ()
+        {
+            RtmptConnection * const rtmpt_conn = iter.next ();
+            return &rtmpt_conn->connection_info;
+        }
+    };
+
+    struct RtmptConnectionsInfo
+    {
+        Count num_connection_objects;
+        Count num_valid_connections;
+    };
+
+    mt_mutex (mutex) RtmptConnectionInfoIterator getRtmptConnectionsInfo_unlocked (RtmptConnectionsInfo *ret_info);
+
+  // ___________________________________________________________________________
+
+
     mt_const Result init (ServerContext * mt_nonnull server_ctx,
                           PagePool      * mt_nonnull page_pool,
                           bool           enable_standalone_tcp_server,
+                          Time           rtmp_ping_timeout_millisec,
                           Time           session_keepalive_timeout,
                           Time           conn_keepalive_timeout,
                           bool           no_keepalive_conns,

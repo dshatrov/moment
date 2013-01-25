@@ -193,6 +193,18 @@ RtmptService::RtmptSender::~RtmptSender ()
     mutex.unlock ();
 }
 
+RtmptService::RtmptSession::~RtmptSession ()
+{
+    CodeDepRef<RtmptService> const rtmpt_service = weak_rtmpt_service;
+    rtmpt_service->num_session_objects.dec ();
+}
+
+RtmptService::RtmptConnection::~RtmptConnection ()
+{
+    CodeDepRef<RtmptService> const rtmpt_service = weak_rtmpt_service;
+    rtmpt_service->num_connection_objects.dec ();
+}
+
 void
 RtmptService::sessionKeepaliveTimerTick (void * const _session)
 {
@@ -261,7 +273,11 @@ RtmptService::destroyRtmptSession (RtmptSession * const mt_nonnull session,
     }
 
     Ref<RtmptSession> tmp_session = session;
-    session_map.remove (session->session_map_entry);
+    if (!session->session_map_entry.isNull()) {
+        session_map.remove (session->session_map_entry);
+        --num_valid_sessions;
+    }
+
     mutex.unlock ();
 
     if (close_rtmp_conn) {
@@ -277,6 +293,7 @@ RtmptService::destroyRtmptConnection (RtmptConnection * const mt_nonnull rtmpt_c
 	return;
     }
     rtmpt_conn->valid = false;
+    --num_valid_connections;
 
     logI (rtmpt, _func, "closed, rtmpt_conn 0x", fmt_hex, (UintPtr) rtmpt_conn);
 
@@ -365,13 +382,19 @@ RtmptService::sendDataInReply (Sender       * const mt_nonnull conn_sender,
 
 void
 RtmptService::doOpen (Sender * const mt_nonnull conn_sender,
-		     IpAddress const &client_addr)
+		     IpAddress const client_addr)
 {
     Ref<RtmptSession> const session = grab (new (std::nothrow) RtmptSession);
+    num_session_objects.inc ();
+    session->session_info.creation_unixtime = getUnixtime();
+
     session->valid = true;
     session->closed = false;
     session->weak_rtmpt_service = this;
     session->last_msg_time = getTime();
+    // TODO Do not allow more than one external IP address for a single session.
+    //      ^^^ Maybe configurable, disallowed by default.
+    session->session_info.last_client_addr = client_addr;
 
     session->session_id = session_id_counter;
     ++session_id_counter;
@@ -379,18 +402,49 @@ RtmptService::doOpen (Sender * const mt_nonnull conn_sender,
     session->rtmp_conn.init (server_ctx->getMainThreadContext()->getTimers(),
                              page_pool,
                              0 /* send_delay_millisec */,
+                             rtmp_ping_timeout_millisec,
                              prechunking_enabled);
     session->rtmp_conn.setBackend (
             Cb<RtmpConnection::Backend> (&rtmp_conn_backend, session, session));
     session->rtmp_conn.setSender (&session->rtmpt_sender);
-    session->rtmp_conn.startServer ();
-
-    mutex.lock ();
-    session->session_map_entry = session_map.add (session);
 
     {
-	Time const timeout = (session_keepalive_timeout >= 10 ? 10 : session_keepalive_timeout);
+	Result res = Result::Failure;
+	bool const call_res =
+                frontend.call_ret (&res, frontend->clientConnected,
+                                   /*(*/ &session->rtmp_conn, client_addr /*)*/);
+	if (!call_res || !res) {
+            session->rtmp_conn.close_noBackendCb ();
+
+            RTMPT_SERVICE__HEADERS_DATE
+            conn_sender->send (
+                    page_pool,
+                    true /* do_flush */,
+                    RTMPT_SERVICE__404_HEADERS(!no_keepalive_conns)
+                    "\r\n");
+            return;
+	}
+    }
+
+    mutex.lock ();
+    // The session might have been invalidated by rtmpClose().
+    if (!session->valid) {
+        mutex.unlock ();
+        RTMPT_SERVICE__HEADERS_DATE
+        conn_sender->send (
+                page_pool,
+                true /* do_flush */,
+                RTMPT_SERVICE__404_HEADERS(!no_keepalive_conns)
+                "\r\n");
+        return;
+    }
+
+    session->session_map_entry = session_map.add (session);
+    ++num_valid_sessions;
+
+    {
 	// Checking for session timeout at least each 10 seconds.
+	Time const timeout = (session_keepalive_timeout >= 10 ? 10 : session_keepalive_timeout);
 	session->session_keepalive_timer =
                 server_ctx->getMainThreadContext()->getTimers()->addTimer (
                         CbDesc<Timers::TimerCallback> (sessionKeepaliveTimerTick,
@@ -411,9 +465,6 @@ RtmptService::doOpen (Sender * const mt_nonnull conn_sender,
 	    "\r\n",
 	    session->session_id,
 	    "\n");
-
-    if (frontend && frontend->clientConnected)
-	frontend.call (frontend->clientConnected, /*(*/ &session->rtmp_conn, client_addr /*)*/);
 }
 
 Ref<RtmptService::RtmptSession>
@@ -422,7 +473,7 @@ RtmptService::doSend (Sender          * const mt_nonnull conn_sender,
                       RtmptConnection * const rtmpt_conn)
 {
     mutex.lock ();
-    SessionMap::Entry session_entry = session_map.lookup (session_id);
+    SessionMap::Entry const session_entry = session_map.lookup (session_id);
     Ref<RtmptSession> session;
     if (!session_entry.isNull()) {
         session = session_entry.getData();
@@ -463,7 +514,7 @@ RtmptService::doClose (Sender * const mt_nonnull conn_sender,
                        Uint32   const session_id)
 {
     mutex.lock ();
-    SessionMap::Entry session_entry = session_map.lookup (session_id);
+    SessionMap::Entry const session_entry = session_map.lookup (session_id);
     if (session_entry.isNull()) {
         mutex.unlock ();
 
@@ -549,7 +600,7 @@ RtmptService::httpRequest (HttpRequest * const req,
     if (session && req->getContentLength() > 0)
         rtmpt_conn->cur_req_session = session;
 
-    if (self->no_keepalive_conns)
+    if (!req->getKeepalive() || self->no_keepalive_conns)
 	rtmpt_conn->conn_sender.closeAfterFlush ();
 }
 
@@ -639,7 +690,7 @@ RtmptService::service_httpRequest (HttpRequest   * const mt_nonnull req,
         session.setNoUnref ((RtmptSession*) NULL);
     }
 
-    if (self->no_keepalive_conns)
+    if (!req->getKeepalive() || self->no_keepalive_conns)
 	conn_sender->closeAfterFlush ();
 
     return Result::Success;
@@ -700,6 +751,9 @@ bool
 RtmptService::acceptOneConnection ()
 {
     Ref<RtmptConnection> const rtmpt_conn = grab (new (std::nothrow) RtmptConnection);
+    num_connection_objects.inc ();
+    rtmpt_conn->connection_info.creation_unixtime = getUnixtime();
+
     rtmpt_conn->valid = true;
     rtmpt_conn->weak_rtmpt_service = this;
 
@@ -722,6 +776,7 @@ RtmptService::acceptOneConnection ()
 
 	assert (res == TcpServer::AcceptResult::Accepted);
     }
+    rtmpt_conn->connection_info.client_addr = client_addr;
 
     rtmpt_conn->conn_sender.init (thread_ctx->getDeferredProcessor());
     rtmpt_conn->conn_sender.setConnection (&rtmpt_conn->tcp_conn);
@@ -757,6 +812,7 @@ RtmptService::acceptOneConnection ()
 
     conn_list.append (rtmpt_conn);
     rtmpt_conn->ref ();
+    ++num_valid_connections;
     mutex.unlock ();
 
     return true;
@@ -824,22 +880,76 @@ RtmptService::start ()
     return Result::Success;
 }
 
+mt_mutex (mutex) void
+RtmptService::updateRtmptSessionsInfo ()
+{
+    Time const cur_unixtime = getUnixtime();
+    Time const cur_time = getTime();
+
+    SessionMap::data_iterator iter (session_map);
+    while (!iter.done()) {
+        RtmptSession * const session = iter.next ();
+        session->session_info.last_req_unixtime = cur_unixtime - (cur_time - session->last_msg_time);
+    }
+}
+
+mt_mutex (mutex) RtmptService::RtmptSessionInfoIterator
+RtmptService::getRtmptSessionsInfo_unlocked (RtmptSessionsInfo * const ret_info)
+{
+    if (ret_info) {
+        ret_info->num_session_objects = num_session_objects.get ();
+        ret_info->num_valid_sessions = num_valid_sessions;
+    }
+
+    updateRtmptSessionsInfo ();
+
+    return RtmptSessionInfoIterator (*this);
+}
+
+mt_mutex (mutex) void
+RtmptService::updateRtmptConnectionsInfo ()
+{
+    Time const cur_unixtime = getUnixtime();
+    Time const cur_time = getTime();
+
+    ConnectionList::iterator iter (conn_list);
+    while (!iter.done()) {
+        RtmptConnection * const rtmpt_conn = iter.next ();
+        rtmpt_conn->connection_info.last_req_unixtime = cur_unixtime - (cur_time - rtmpt_conn->last_msg_time);
+    }
+}
+
+mt_mutex (mutex) RtmptService::RtmptConnectionInfoIterator
+RtmptService::getRtmptConnectionsInfo_unlocked (RtmptConnectionsInfo * const ret_info)
+{
+    if (ret_info) {
+        ret_info->num_connection_objects = num_connection_objects.get ();
+        ret_info->num_valid_connections = num_valid_connections;
+    }
+
+    updateRtmptConnectionsInfo ();
+
+    return RtmptConnectionInfoIterator (*this);
+}
+
 mt_const Result
 RtmptService::init (ServerContext * const mt_nonnull server_ctx,
                     PagePool      * const mt_nonnull page_pool,
                     bool            const enable_standalone_tcp_server,
+                    Time            const rtmp_ping_timeout_millisec,
                     Time            const session_keepalive_timeout,
                     Time            const conn_keepalive_timeout,
                     bool            const no_keepalive_conns,
                     bool            const prechunking_enabled)
 {
-    this->frontend                  = frontend;
-    this->server_ctx                = server_ctx;
-    this->page_pool                 = page_pool;
-    this->session_keepalive_timeout = session_keepalive_timeout;
-    this->conn_keepalive_timeout    = conn_keepalive_timeout;
-    this->no_keepalive_conns        = no_keepalive_conns;
-    this->prechunking_enabled       = prechunking_enabled;
+    this->frontend                   = frontend;
+    this->server_ctx                 = server_ctx;
+    this->page_pool                  = page_pool;
+    this->rtmp_ping_timeout_millisec = rtmp_ping_timeout_millisec;
+    this->session_keepalive_timeout  = session_keepalive_timeout;
+    this->conn_keepalive_timeout     = conn_keepalive_timeout;
+    this->no_keepalive_conns         = no_keepalive_conns;
+    this->prechunking_enabled        = prechunking_enabled;
 
     if (enable_standalone_tcp_server) {
         tcp_server.init (CbDesc<TcpServer::Frontend> (&tcp_server_frontend, this, getCoderefContainer()),
@@ -853,15 +963,18 @@ RtmptService::init (ServerContext * const mt_nonnull server_ctx,
 }
 
 RtmptService::RtmptService (Object * const coderef_container)
-    : DependentCodeReferenced   (coderef_container),
-      prechunking_enabled       (true),
-      session_keepalive_timeout (60),
-      conn_keepalive_timeout    (60),
-      no_keepalive_conns        (false),
-      server_ctx                (coderef_container),
-      page_pool                 (coderef_container),
-      tcp_server                (coderef_container),
-      session_id_counter        (1)
+    : DependentCodeReferenced    (coderef_container),
+      prechunking_enabled        (true),
+      rtmp_ping_timeout_millisec (5 * 60 * 1000),
+      session_keepalive_timeout  (60),
+      conn_keepalive_timeout     (60),
+      no_keepalive_conns         (false),
+      server_ctx                 (coderef_container),
+      page_pool                  (coderef_container),
+      tcp_server                 (coderef_container),
+      session_id_counter         (1),
+      num_valid_sessions         (0),
+      num_valid_connections      (0)
 {
 }
 
