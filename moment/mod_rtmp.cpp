@@ -520,7 +520,6 @@ void streamClosed (void * const _session)
 {
     logD (session, _func_);
     ClientSession * const client_session = static_cast <ClientSession*> (_session);
-// Unnecessary    destroyClientSession (client_session);
     client_session->rtmp_conn->closeAfterFlush ();
 }
 
@@ -1122,8 +1121,7 @@ void sendStateChanged (Sender::SendState   const send_state,
 	    break;
 	case Sender::QueueHardLimit:
 	    logE_ (_func, "QueueHardLimit");
-	    destroyClientSession (client_session);
-	    // FIXME Close client connection
+            client_session->rtmp_conn->close ();
 	    break;
 	default:
 	    unreachable();
@@ -1160,7 +1158,7 @@ Result clientConnected (RtmpConnection  * const mt_nonnull rtmp_conn,
 
     getStat()->addInt (stat_num_sessions, 1);
 
-    Ref<ClientSession> const client_session = grab (new ClientSession);
+    Ref<ClientSession> const client_session = grab (new (std::nothrow) ClientSession);
     client_session->client_addr = client_addr;
     client_session->rtmp_conn = rtmp_conn;
 
@@ -1239,15 +1237,21 @@ MomentRtmpModule::adminHttpRequest (HttpRequest   * const mt_nonnull req,
     if (req->getNumPathElems() >= 2
 	&& equal (req->getPath (1), "stat"))
     {
+        Time const cur_unixtime = getUnixtime();
+
         PagePool::PageListHead page_list;
 
         page_pool->printToPages (
                 &page_list,
                 "<html>"
                 "<body>"
-                "<p>mod_rtmp stats</p>"
-                "<table>");
+                "<p>mod_rtmp stats</p>");
+
         {
+            page_pool->printToPages (
+                    &page_list,
+                    "<table>");
+
             self->rtmp_service.rtmpServiceLock ();
 
             RtmpService::SessionsInfo sinfo_sum;
@@ -1256,32 +1260,108 @@ MomentRtmpModule::adminHttpRequest (HttpRequest   * const mt_nonnull req,
             page_pool->printToPages (
                     &page_list,
                     "<tr><td>RtmpService: num_session_objects</td><td>", sinfo_sum.num_session_objects, "</td></tr>"
-                    "<tr><td>RtmpService: num_valid_sessions</td><td>",  sinfo_sum.num_valid_sessions,  "</td></tr>");
+                    "<tr><td>RtmpService: num_valid_sessions</td><td>",  sinfo_sum.num_valid_sessions,  "</td></tr>"
+                    "<tr><td>RtmpService sessions:</td></tr>");
 
             while (!iter.done()) {
                 RtmpService::ClientSessionInfo * const sinfo = iter.next ();
 
                 Byte time_buf [timeToString_BufSize];
-                Size const time_len = timeToString (Memory::forObject (time_buf), sinfo->creation_time);
+                Size const time_len = timeToString (Memory::forObject (time_buf), sinfo->creation_unixtime);
 
                 page_pool->printToPages (
                         &page_list,
-                        "<tr><td>RtmpService sessions:</td></tr>"
                         "<tr>"
                         "<td>", sinfo->client_addr, "</td>"
                         "<td>", ConstMemory (time_buf, time_len), "</td>"
-                        "<td>", sinfo->last_send_time, "</td>"
-                        "<td>", sinfo->last_recv_time, "</td>"
+                        "<td>", sinfo->last_send_unixtime, "</td>"
+                        "<td>", sinfo->last_recv_unixtime, "</td>"
                         "<td>", sinfo->last_play_stream, "</td>"
                         "<td>", sinfo->last_publish_stream, "</td>"
                         "</tr>");
             }
 
             self->rtmp_service.rtmpServiceUnlock ();
+
+            page_pool->printToPages (
+                    &page_list,
+                    "</table>");
         }
+
+        {
+            self->rtmpt_service.rtmptServiceLock ();
+
+            RtmptService::RtmptSessionsInfo sinfo_sum;
+            RtmptService::RtmptSessionInfoIterator sinfo_iter = self->rtmpt_service.getRtmptSessionsInfo_unlocked (&sinfo_sum);
+
+            RtmptService::RtmptConnectionsInfo cinfo_sum;
+            RtmptService::RtmptConnectionInfoIterator cinfo_iter = self->rtmpt_service.getRtmptConnectionsInfo_unlocked (&cinfo_sum);
+
+            page_pool->printToPages (
+                    &page_list,
+                    "<h1>RTMPT stats</h1>"
+                    "<table>"
+                    "<tr><td>RtmptService: num_session_objects</td><td>",    sinfo_sum.num_session_objects,    "</td></tr>"
+                    "<tr><td>RtmptService: num_valid_sessions</td><td>",     sinfo_sum.num_valid_sessions,     "</td></tr>"
+                    "<tr><td>RtmptService: num_connection_objects</td><td>", cinfo_sum.num_connection_objects, "</td></tr>"
+                    "<tr><td>RtmptService: num_valid_connections</td><td>",  cinfo_sum.num_valid_connections,  "</td></tr>"
+                    "</table>"
+                    "<h2>RTMPT sessions</h2>"
+                    "<table>");
+
+            while (!sinfo_iter.done()) {
+                RtmptService::RtmptSessionInfo * const sinfo = sinfo_iter.next ();
+
+                Byte time_buf [timeToString_BufSize];
+                Size const time_len = timeToString (Memory::forObject (time_buf), sinfo->creation_unixtime);
+
+                Time idle_time = cur_unixtime - sinfo->last_req_unixtime;
+                if (sinfo->last_req_unixtime > cur_unixtime)
+                    idle_time = 0;
+
+                page_pool->printToPages (
+                        &page_list,
+                        "<tr>"
+                        "<td>", sinfo->last_client_addr, "</td>"
+                        "<td>", ConstMemory (time_buf, time_len), "</td>"
+                        "<td>", idle_time, "</td>"
+                        "</tr>");
+            }
+
+            page_pool->printToPages (
+                    &page_list,
+                    "</table>"
+                    "<h2>RTMPT connections</h2>"
+                    "<table>");
+
+            while (!cinfo_iter.done()) {
+                RtmptService::RtmptConnectionInfo * const cinfo = cinfo_iter.next ();
+
+                Byte time_buf [timeToString_BufSize];
+                Size const time_len = timeToString (Memory::forObject (time_buf), cinfo->creation_unixtime);
+
+                Time idle_time = cur_unixtime - cinfo->last_req_unixtime;
+                if (cinfo->last_req_unixtime > cur_unixtime)
+                    idle_time = 0;
+
+                page_pool->printToPages (
+                        &page_list,
+                        "<tr>"
+                        "<td>", cinfo->client_addr, "</td>"
+                        "<td>", ConstMemory (time_buf, time_len), "</td>"
+                        "<td>", idle_time, "</td>"
+                        "</tr>");
+            }
+
+            page_pool->printToPages (
+                    &page_list,
+                    "</table>");
+
+            self->rtmpt_service.rtmptServiceUnlock ();
+        }
+
         page_pool->printToPages (
                 &page_list,
-                "</table>"
                 "</body>"
                 "</html>");
 
@@ -1317,7 +1397,9 @@ MomentRtmpModule::adminHttpRequest (HttpRequest   * const mt_nonnull req,
 // _____________________________________________________________________________
 
 
-void momentRtmpInit ()
+static char const opt_name__ping_timeout[]               = "mod_rtmp/ping_timeout";
+
+static Result momentRtmpInit ()
 {
     stat_num_sessions = getStat()->createParam ("mod_rtmp/num_sessions",
                                                 "Number of active RTMP(T) sessions",
@@ -1348,27 +1430,32 @@ void momentRtmpInit ()
 	MConfig::BooleanValue const enable = config->getBoolean (opt_name);
 	if (enable == MConfig::Boolean_Invalid) {
 	    logE_ (_func, "Invalid value for ", opt_name, ": ", config->getString (opt_name));
-	    return;
+	    return Result::Failure;
 	}
 
 	if (enable == MConfig::Boolean_False) {
 	    logI_ (_func, "Unrestricted RTMP access module is not enabled. "
 		   "Set \"", opt_name, "\" option to \"y\" to enable.");
-	    return;
+	    return Result::Failure;
 	}
     }
 
-    Uint64 send_delay = 50;
+    Uint64 send_delay_millisec = 50;
     {
 	ConstMemory const opt_name = "mod_rtmp/send_delay";
 	MConfig::GetResult const res = config->getUint64_default (
-		opt_name, &send_delay, send_delay);
+		opt_name, &send_delay_millisec, send_delay_millisec);
 	if (!res) {
 	    logE_ (_func, "bad value for ", opt_name);
 	} else {
-	    logI_ (_func, "RTMP send delay: ", send_delay, " milliseconds");
+	    logI_ (_func, "RTMP send delay: ", send_delay_millisec, " milliseconds");
 	}
     }
+
+    Uint64 rtmp_ping_timeout_sec = 5 * 60;
+    if (!configGetUint64 (config, opt_name__ping_timeout, &rtmp_ping_timeout_sec, rtmp_ping_timeout_sec))
+        return Result::Failure;
+    logI_ (_func, opt_name__ping_timeout, ": ", rtmp_ping_timeout_sec);
 
     Time rtmpt_session_timeout = 30;
     {
@@ -1386,7 +1473,7 @@ void momentRtmpInit ()
 	MConfig::BooleanValue const enable = config->getBoolean (opt_name);
 	if (enable == MConfig::Boolean_Invalid) {
 	    logE_ (_func, "Invalid value for ", opt_name, ": ", config->getString (opt_name));
-	    return;
+	    return Result::Failure;
 	}
 
 	if (enable == MConfig::Boolean_True)
@@ -1602,12 +1689,13 @@ void momentRtmpInit ()
 
 	if (!rtmp_module->rtmp_service.init (server_app->getServerContext(),
                                              moment->getPagePool(),
-                                             send_delay,
+                                             send_delay_millisec,
+                                             rtmp_ping_timeout_sec * 1000,
                                              prechunking_enabled,
                                              rtmp_accept_watchdog_timeout_sec))
         {
 	    logE_ (_func, "rtmp_service.init() failed: ", exc->toString());
-	    return;
+	    return Result::Failure;
 	}
 
 	do {
@@ -1624,7 +1712,7 @@ void momentRtmpInit ()
 					   &addr))
 		{
 		    logE_ (_func, "setIpAddress_default() failed (rtmp)");
-		    return;
+		    return Result::Failure;
 		}
 
 		if (!rtmp_module->rtmp_service.bind (addr)) {
@@ -1634,7 +1722,7 @@ void momentRtmpInit ()
 
 		if (!rtmp_module->rtmp_service.start ()) {
 		    logE_ (_func, "rtmp_service.start() failed: ", exc->toString());
-		    return;
+		    return Result::Failure;
 		}
 	    } else {
 		logI_ (_func, "RTMP service is not bound to any port "
@@ -1663,6 +1751,7 @@ void momentRtmpInit ()
                                  moment->getPagePool(),
                                  // TODO standalone_rtmpt enable/disable from config
                                  true /* enable_standalone_tcp_server */,
+                                 rtmp_ping_timeout_sec * 1000,
                                  rtmpt_session_timeout,
                                  // TODO Separate rtmpt_conn_keepalive_timeout
                                  rtmpt_session_timeout,
@@ -1670,7 +1759,7 @@ void momentRtmpInit ()
                                  prechunking_enabled))
         {
 	    logE_ (_func, "rtmpt_service.init() failed: ", exc->toString());
-	    return;
+	    return Result::Failure;
 	}
 
 	do {
@@ -1686,7 +1775,7 @@ void momentRtmpInit ()
 					   &addr))
 		{
 		    logE_ (_func, "setIpAddress_default() failed (rtmpt)");
-		    return;
+		    return Result::Failure;
 		}
 
 		if (!rtmp_module->rtmpt_service.bind (addr)) {
@@ -1696,7 +1785,7 @@ void momentRtmpInit ()
 
 		if (!rtmp_module->rtmpt_service.start ()) {
 		    logE_ (_func, "rtmpt_service.start() failed: ", exc->toString());
-		    return;
+		    return Result::Failure;
 		}
 	    } else {
 		logI_ (_func, "RTMPT service is not bound to any port "
@@ -1709,6 +1798,8 @@ void momentRtmpInit ()
                 CbDesc<HttpService::HttpHandler> (&MomentRtmpModule::admin_http_handler, rtmp_module, rtmp_module),
                 "mod_rtmp");
     }
+
+    return Result::Success;
 }
 
 void momentRtmpUnload ()
