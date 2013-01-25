@@ -844,7 +844,7 @@ VideoStream::plusOneWatcher_unlocked (Object * const guard_obj)
 
     ++num_watchers;
 
-    logD_ (_func, "calling fireNumWatchersChanged()");
+//    logD_ (_func, "calling fireNumWatchersChanged()");
     mt_async mt_unlocks_locks (mutex) fireNumWatchersChanged (num_watchers);
 
     if (guard_obj) {
@@ -888,7 +888,7 @@ VideoStream::minusOneWatcher_unlocked ()
         mutex.lock ();
     }
 
-    logD_ (_func, "calling fireNumWatchersChanged()");
+//    logD_ (_func, "calling fireNumWatchersChanged()");
     mt_async mt_unlocks_locks (mutex) fireNumWatchersChanged (num_watchers);
 }
 
@@ -951,7 +951,7 @@ VideoStream::plusWatchers_unlocked (Count const delta)
 
     num_watchers += delta;
 
-    logD_ (_func, "calling fireNumWatchersChanged()");
+//    logD_ (_func, "calling fireNumWatchersChanged()");
     mt_async mt_unlocks_locks (mutex) fireNumWatchersChanged (num_watchers);
 }
 
@@ -992,7 +992,7 @@ VideoStream::minusWatchers_unlocked (Count const delta)
         mutex.lock ();
     }
 
-    logD_ (_func, "calling fireNumWatchersChanged()");
+//    logD_ (_func, "calling fireNumWatchersChanged()");
     mt_unlocks_locks (mutex) fireNumWatchersChanged (num_watchers);
 }
 

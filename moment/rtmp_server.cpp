@@ -36,7 +36,7 @@ RtmpServer::sendRtmpSampleAccess (Uint32 const msg_stream_id,
 {
   // Sending |RtmpSampleAccess
 
-    logD_ (_this_func, " (", msg_stream_id, ", ", allow_a, ", ", allow_b, ")");
+//    logD_ (_this_func, " (", msg_stream_id, ", ", allow_a, ", ", allow_b, ")");
 
     AmfAtom atoms [3];
     AmfEncoder encoder (atoms);
