@@ -1667,7 +1667,8 @@ MomentServer::MomentServer ()
       recorder_thread_pool  (NULL),
       storage               (NULL),
       publish_all_streams   (true),
-      config                (NULL)
+      config                (NULL),
+      media_source_provider (this /* coderef_container */)
 {
     instance = this;
 

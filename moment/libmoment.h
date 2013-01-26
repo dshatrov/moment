@@ -26,6 +26,12 @@
 #include <moment/libmoment_config.h>
 
 #include <moment/moment_types.h>
+#include <moment/channel.h>
+#include <moment/channel_options.h>
+#include <moment/channel_set.h>
+#include <moment/media_source.h>
+#include <moment/playback.h>
+#include <moment/recorder.h>
 
 #include <moment/flv_util.h>
 #include <moment/amf_encoder.h>

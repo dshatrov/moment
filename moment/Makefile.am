@@ -33,6 +33,15 @@ moment_target_headers =		\
         libmoment_gst.h         \
 				\
 	moment_types.h		\
+        channel.h               \
+        channel_options.h       \
+        channel_set.h           \
+        media_source.h          \
+        media_source_provider.h \
+        playback.h              \
+        playlist.h              \
+        recorder.h              \
+                                \
         flv_util.h              \
 	amf_encoder.h		\
 	amf_decoder.h		\
@@ -74,7 +83,13 @@ libmomentinclude_HEADERS = $(moment_target_headers)
 lib_LTLIBRARIES = libmoment-1.0.la
 libmoment_1_0_la_SOURCES =	\
 	libmoment.cpp		\
-				\
+                                \
+        channel.cpp             \
+        channel_set.cpp         \
+        playback.cpp            \
+        playlist.cpp            \
+        recorder.cpp            \
+                                \
         flv_util.cpp            \
 	amf_encoder.cpp		\
 	amf_decoder.cpp		\

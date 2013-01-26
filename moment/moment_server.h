@@ -1,5 +1,5 @@
 /*  Moment Video Server - High performance media server
-    Copyright (C) 2011, 2012 Dmitry Shatrov
+    Copyright (C) 2011-2013 Dmitry Shatrov
     e-mail: shatrov@gmail.com
 
     This program is free software: you can redistribute it and/or modify
@@ -17,8 +17,8 @@
 */
 
 
-#ifndef __MOMENT__SERVER__H__
-#define __MOMENT__SERVER__H__
+#ifndef MOMENT__SERVER__H__
+#define MOMENT__SERVER__H__
 
 
 #include <libmary/libmary.h>
@@ -31,6 +31,7 @@
 #include <moment/storage.h>
 #include <moment/push_protocol.h>
 #include <moment/transcoder.h>
+#include <moment/media_source_provider.h>
 
 
 #define MOMENT_SERVER__HEADERS_DATE \
@@ -679,6 +680,48 @@ public:
                                               ConstMemory  password);
 
 
+  // _________________________ media source providers __________________________
+
+private:
+    mt_const DataDepRef<MediaSourceProvider> media_source_provider;
+
+public:
+    Ref<MediaSource> createMediaSource (CbDesc<MediaSource::Frontend> const &frontend,
+                                        Timers         *timers,
+                                        PagePool       *page_pool,
+                                        VideoStream    *video_stream,
+                                        VideoStream    *mix_video_stream,
+                                        Time            initial_seek,
+                                        ChannelOptions *channel_opts,
+                                        ConstMemory     stream_spec,
+                                        bool            is_chain,
+                                        bool            force_transcode,
+                                        bool            force_transcode_audio,
+                                        bool            force_transcode_video)
+    {
+        if (!media_source_provider)
+            return NULL;
+
+        return media_source_provider->createMediaSource (frontend,
+                                                         timers,
+                                                         page_pool,
+                                                         video_stream,
+                                                         mix_video_stream,
+                                                         initial_seek,
+                                                         channel_opts,
+                                                         stream_spec,
+                                                         is_chain,
+                                                         force_transcode,
+                                                         force_transcode_audio,
+                                                         force_transcode_video);
+    }
+
+    mt_const void setMediaSourceProvider (MediaSourceProvider * const media_source_provider)
+    {
+        this->media_source_provider = media_source_provider;
+    }
+
+
   // ______________________________ Authorization ______________________________
 
 public:
@@ -765,5 +808,5 @@ public:
 }
 
 
-#endif /* __MOMENT__SERVER__H__ */
+#endif /* MOMENT__SERVER__H__ */
 
