@@ -26,48 +26,6 @@ namespace Moment {
 
 static LogGroup libMary_logGroup_ctl ("moment.channel", LogLevel::D);
 
-#if 0
-GstStreamCtl::Frontend Channel::gst_stream_ctl_frontend = {
-    newVideoStream,
-    streamError,
-    streamEos
-};
-
-void
-Channel::newVideoStream (void * const /* _advance_ticket */,
-			 void * const _self)
-{
-    Channel * const self = static_cast <Channel*> (_self);
-    self->fireNewVideoStream ();
-}
-
-void
-Channel::streamError (void * const _advance_ticket,
-		      void * const _self)
-{
-    Channel * const self = static_cast <Channel*> (_self);
-    Playback::AdvanceTicket * const advance_ticket = static_cast <Playback::AdvanceTicket*> (_advance_ticket);
-
-    logD_ (_func, "channel 0x", fmt_hex, (UintPtr) self, ", "
-	   "advance_ticket: 0x", (UintPtr) advance_ticket);
-
-  // No-op
-}
-
-void
-Channel::streamEos (void * const _advance_ticket,
-		    void * const _self)
-{
-    Channel * const self = static_cast <Channel*> (_self);
-    Playback::AdvanceTicket * const advance_ticket = static_cast <Playback::AdvanceTicket*> (_advance_ticket);
-
-    logD_ (_func, "channel 0x", fmt_hex, (UintPtr) self, ", "
-	   "advance_ticket: 0x", (UintPtr) advance_ticket);
-
-    self->playback.advance (advance_ticket);
-}
-#endif
-
 Playback::Frontend Channel::playback_frontend = {
     startPlaybackItem,
     stopPlaybackItem
@@ -134,38 +92,6 @@ Channel::stopPlaybackItem (void * const _self)
     self->endVideoStream ();
     self->fireStopItem ();
 }
-
-#if 0
-mt_const void
-Channel::init (MomentServer   * const moment,
-               ChannelOptions * const opts)
-{
-    playback.init (CbDesc<Playback::Frontend> (&playback_frontend, this, this),
-                   moment->getServerApp()->getServerContext()->getMainThreadContext()->getTimers(),
-                   opts->min_playlist_duration_sec);
-
-#if 0
-    stream_ctl = grab (new GstStreamCtl);
-    stream_ctl->init (moment,
-		      moment->getServerApp()->getServerContext()->getMainThreadContext()->getDeferredProcessor(),
-                      opts);
-
-    stream_ctl->setFrontend (CbDesc<GstStreamCtl::Frontend> (
-	    &gst_stream_ctl_frontend, this /* cb_data */, this /* coderef_container */));
-#endif
-}
-
-Channel::Channel ()
-    : playback       (this /* coderef_container */),
-      event_informer (this /* coderef_container */, &mutex)
-{
-}
-#endif
-
-// _____________________________________________________________________________
-// _____________________________________________________________________________
-// _____________________________________________________________________________
-
 
 VideoStream::EventHandler const Channel::stream_event_handler = {
     NULL /* audioMessage */,
