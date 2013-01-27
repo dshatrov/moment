@@ -1548,9 +1548,9 @@ static Result momentRtmpInit ()
 	    logE_ (_func, "Invalid value for config option ", opt_name);
 	else
 	if (opt_val == MConfig::Boolean_False)
-	    wait_for_keyframe = true;
-	else
 	    wait_for_keyframe = false;
+	else
+	    wait_for_keyframe = true;
 
         logI_ (_func, opt_name, ": ", wait_for_keyframe);
     }
