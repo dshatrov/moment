@@ -713,38 +713,6 @@ static Result momentFile_sendTemplate (HttpRequest * const http_req,
     ctemplate::mutable_default_template_cache()->ReloadAllIfChanged (ctemplate::TemplateCache::LAZY_RELOAD);
 
     ctemplate::TemplateDictionary dict ("tmpl");
-    {
-        // ctemplate has ShowSection(), but doesn't have HideSection() or alike.
-        // We have to filter sections in a separate hash because of this.
-        VarlistSectionHash sect_hash;
-
-        if (enable_varlist_defaults) {
-            MConfig::Varlist defaults_varlist;
-            loadDefaultsVarlist (path_dir, &defaults_varlist);
-            fillDictionaryFromVarlist (&dict, &defaults_varlist, &sect_hash);
-        }
-
-        fillDictionaryFromVarlist (&dict, &glob_varlist, &sect_hash);
-        if (varlist)
-            fillDictionaryFromVarlist (&dict, varlist, &sect_hash);
-
-        VarlistSectionHash::iterator iter (sect_hash);
-        while (!iter.done()) {
-            VarlistSectionHashEntry * const entry = iter.next ();
-
-            StRef<String> sect_name;
-            if (entry->enabled)
-                sect_name = st_makeString (entry->sect_name->mem(), "_ON");
-            else
-                sect_name = st_makeString (entry->sect_name->mem(), "_OFF");
-
-            logD_ (_func, "ShowSection: ", sect_name);
-            dict.ShowSection (ctemplate::TemplateString ((char const *) sect_name->mem().mem(),
-                                                         sect_name->mem().len()));
-
-            delete entry;
-        }
-    }
 
     {
         char const val_name [] = "ThisHttpServerAddr";
@@ -770,6 +738,43 @@ static Result momentFile_sendTemplate (HttpRequest * const http_req,
                                                   this_rtmpt_server_addr->mem().len()));
     }
 
+    {
+        // ctemplate has ShowSection(), but doesn't have HideSection() or alike.
+        // We have to filter sections in a separate hash because of this.
+        VarlistSectionHash sect_hash;
+
+        if (enable_varlist_defaults) {
+            MConfig::Varlist defaults_varlist;
+            loadDefaultsVarlist (path_dir, &defaults_varlist);
+            fillDictionaryFromVarlist (&dict, &defaults_varlist, &sect_hash);
+        }
+
+        {
+            Ref<MConfig::Varlist> const server_varlist = moment->getDefaultVarlist();
+            fillDictionaryFromVarlist (&dict, server_varlist, &sect_hash);
+        }
+
+        fillDictionaryFromVarlist (&dict, &glob_varlist, &sect_hash);
+        if (varlist)
+            fillDictionaryFromVarlist (&dict, varlist, &sect_hash);
+
+        VarlistSectionHash::iterator iter (sect_hash);
+        while (!iter.done()) {
+            VarlistSectionHashEntry * const entry = iter.next ();
+
+            StRef<String> sect_name;
+            if (entry->enabled)
+                sect_name = st_makeString (entry->sect_name->mem(), "_ON");
+            else
+                sect_name = st_makeString (entry->sect_name->mem(), "_OFF");
+
+            logD_ (_func, "ShowSection: ", sect_name);
+            dict.ShowSection (ctemplate::TemplateString ((char const *) sect_name->mem().mem(),
+                                                         sect_name->mem().len()));
+
+            delete entry;
+        }
+    }
 
 #if 0
     {
@@ -833,63 +838,6 @@ static HttpService::HttpHandler const http_handler = {
     httpRequest,
     NULL /* httpMessageBody */
 };
-
-static void parseVarlist (MConfig::Section * const section,
-                          MConfig::Varlist * const varlist)
-{
-    logD_ (_func_);
-
-    MConfig::Section::iterator iter (*section);
-    while (!iter.done()) {
-        MConfig::SectionEntry * const sect_entry = iter.next ();
-        if (sect_entry->getType() == MConfig::SectionEntry::Type_Option) {
-            MConfig::Option * const option = static_cast <MConfig::Option*> (sect_entry);
-
-            ConstMemory var_name = option->getName();
-            ConstMemory var_value;
-
-            bool enable_section = false;
-            {
-                ConstMemory const enable_mem = "enable ";
-                if (var_name.len() > enable_mem.len() &&
-                    equal (var_name.region (0, enable_mem.len()), enable_mem))
-                {
-                    enable_section = true;
-                    var_name = var_name.region (enable_mem.len());
-                }
-            }
-
-            bool disable_section = false;
-            if (!enable_section) {
-                ConstMemory const disable_mem = "disable ";
-                if (var_name.len() > disable_mem.len() &&
-                    equal (var_name.region (0, disable_mem.len()), disable_mem))
-                {
-                    disable_section = true;
-                    var_name = var_name.region (disable_mem.len());
-                }
-            }
-
-            MConfig::Value * const value = option->getValue();
-            bool const with_value = value;
-            if (value)
-                var_value = value->mem();
-
-            logD_ (_func,
-                   "var_name: ", var_name, ", ",
-                   "var_value: ", var_value, ", ",
-                   "with_value: ", with_value, ", ",
-                   "enable_section: ", enable_section, ", ",
-                   "disable_section: ", disable_section);
-
-            varlist->addEntry (var_name,
-                               var_value,
-                               with_value,
-                               enable_section,
-                               disable_section);
-        }
-    }
-}
 
 void momentFile_addPathEntry (PathEntry   * const path_entry,
                               HttpService * const http_service)
@@ -975,7 +923,7 @@ void momentFile_addPathForSection (MConfig::Section * const section,
             }
         }
 
-        parseVarlist (vars_section, &path_entry->varlist);
+        MConfig::parseVarlistSection (vars_section, &path_entry->varlist);
     } else {
         logD_ (_func, "no \"vars\" section");
     }
@@ -1048,7 +996,7 @@ void momentFileInit ()
 	if (!opt_val.isNull()) {
 	    this_rtmpt_server_addr = grab (new String (opt_val));
 	} else {
-	    this_rtmpt_server_addr = grab (new String ("127.0.0.1:8081"));
+	    this_rtmpt_server_addr = grab (new String ("127.0.0.1:8080"));
 	    logI_ (_func, opt_name, " config parameter is not set. "
 		   "Defaulting to ", this_rtmpt_server_addr);
 	}
@@ -1080,7 +1028,7 @@ void momentFileInit ()
                 }
             }
 
-            parseVarlist (vars_section, &glob_varlist);
+            MConfig::parseVarlistSection (vars_section, &glob_varlist);
         }
 
 	MConfig::Section::iter iter (*modfile_section);
