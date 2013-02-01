@@ -90,10 +90,11 @@ private:
     mt_mutex (mutex) void doSetPosition (Playlist::Item *item,
 					 Time            seek);
 
-    Result doLoadPlaylist (ConstMemory  src,
-			   bool         keep_cur_item,
-			   Ref<String> *ret_err_msg,
-			   bool         is_file);
+    Result doLoadPlaylist (ConstMemory   src,
+			   bool          keep_cur_item,
+                           PlaybackItem * mt_nonnull default_playback_item,
+			   Ref<String>  *ret_err_msg,
+			   bool          is_file);
 
 public:
     void advance (AdvanceTicket *user_advance_ticket);
@@ -104,21 +105,19 @@ public:
     Result setPosition_Index (Count idx,
 			      Time  seek);
 
-    void setSingleItem (ConstMemory stream_spec,
-			bool        is_chain,
-                        bool        force_transcode,
-                        bool        force_transcode_audio,
-                        bool        force_transcode_video);
+    void setSingleItem (PlaybackItem *item);
 
     void setSingleChannelRecorder (ConstMemory channel_name);
 
-    Result loadPlaylistFile (ConstMemory  filename,
-			     bool         keep_cur_item,
-			     Ref<String> *ret_err_msg);
+    Result loadPlaylistFile (ConstMemory   filename,
+			     bool          keep_cur_item,
+                             PlaybackItem * mt_nonnull default_playback_item,
+			     Ref<String>  *ret_err_msg);
 
-    Result loadPlaylistMem (ConstMemory  mem,
-			    bool         keep_cur_item,
-			    Ref<String> *ret_err_msg);
+    Result loadPlaylistMem (ConstMemory   mem,
+			    bool          keep_cur_item,
+                            PlaybackItem * mt_nonnull default_playback_item,
+			    Ref<String>  *ret_err_msg);
 
     mt_const void init (CbDesc<Frontend> const &frontend,
                         Timers *timers,

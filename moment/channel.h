@@ -110,13 +110,7 @@ private:
     DeferredProcessor::Task deferred_task;
     DeferredProcessor::Registration deferred_reg;
 
-  // Stream source description
-
-    mt_mutex (mutex) Ref<String> stream_spec;
-    mt_mutex (mutex) bool is_chain;
-    mt_mutex (mutex) bool force_transcode;
-    mt_mutex (mutex) bool force_transcode_audio;
-    mt_mutex (mutex) bool force_transcode_video;
+    mt_mutex (mutex) Ref<PlaybackItem> cur_item;
 
   // Video stream state
 
@@ -202,11 +196,7 @@ private:
     static bool deferredTask (void *_self);
 
 public:
-    void beginVideoStream (ConstMemory     stream_spec,
-			   bool            is_chain,
-                           bool            force_transcode,
-                           bool            force_transcode_audio,
-                           bool            force_transcode_video,
+    void beginVideoStream (PlaybackItem * mt_nonnull item,
 			   void           *stream_ticket,
 			   VirtReferenced *stream_ticket_ref,
 			   Time            seek = 0);

@@ -197,10 +197,11 @@ Playback::doSetPosition (Playlist::Item * const item,
 }
 
 Result
-Playback::doLoadPlaylist (ConstMemory   const src,
-			  bool          const keep_cur_item,
-			  Ref<String> * const ret_err_msg,
-			  bool          const is_file)
+Playback::doLoadPlaylist (ConstMemory    const src,
+			  bool           const keep_cur_item,
+                          PlaybackItem * const mt_nonnull default_playback_item,
+			  Ref<String>  * const ret_err_msg,
+			  bool           const is_file)
 {
     logD (playback, _func_);
 
@@ -213,9 +214,9 @@ Playback::doLoadPlaylist (ConstMemory   const src,
     Ref<String> err_msg;
     Result res;
     if (is_file)
-	res = playlist.parsePlaylistFile (src, &err_msg);
+	res = playlist.parsePlaylistFile (src, default_playback_item, &err_msg);
     else
-	res = playlist.parsePlaylistMem (src, &err_msg);
+	res = playlist.parsePlaylistMem (src, default_playback_item, &err_msg);
 
     if (!res) {
 	mutex.unlock ();
@@ -308,21 +309,13 @@ Playback::setPosition_Index (Count const idx,
 }
 
 void
-Playback::setSingleItem (ConstMemory const stream_spec,
-			 bool        const is_chain,
-                         bool        const force_transcode,
-                         bool        const force_transcode_audio,
-                         bool        const force_transcode_video)
+Playback::setSingleItem (PlaybackItem * const item)
 {
     logD (playback, _func_);
 
     mutex.lock ();
     playlist.clear ();
-    playlist.setSingleItem (stream_spec,
-                            is_chain,
-                            force_transcode,
-                            force_transcode_audio,
-                            force_transcode_video);
+    playlist.setSingleItem (item);
 
     next_item = playlist.getNextItem (NULL /* prv_item */,
 				      getUnixtime(),
@@ -360,19 +353,21 @@ Playback::setSingleChannelRecorder (ConstMemory const channel_name)
 }
 
 Result
-Playback::loadPlaylistFile (ConstMemory   const filename,
-			    bool          const keep_cur_item,
-			    Ref<String> * const ret_err_msg)
+Playback::loadPlaylistFile (ConstMemory    const filename,
+			    bool           const keep_cur_item,
+                            PlaybackItem * const mt_nonnull default_playback_item,
+			    Ref<String>  * const ret_err_msg)
 {
-    return doLoadPlaylist (filename, keep_cur_item, ret_err_msg, true /* is_file */);
+    return doLoadPlaylist (filename, keep_cur_item, default_playback_item, ret_err_msg, true /* is_file */);
 }
 
 Result
 Playback::loadPlaylistMem (ConstMemory    const mem,
-			   bool           const keep_cur_item,
-			    Ref<String> * const ret_err_msg)
+                           bool           const keep_cur_item,
+                           PlaybackItem * const mt_nonnull default_playback_item,
+                           Ref<String>  * const ret_err_msg)
 {
-    return doLoadPlaylist (mem, keep_cur_item, ret_err_msg, false /* is_file */);
+    return doLoadPlaylist (mem, keep_cur_item, default_playback_item, ret_err_msg, false /* is_file */);
 }
 
 mt_const void

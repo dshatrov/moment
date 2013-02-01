@@ -39,11 +39,7 @@ public:
                                                 VideoStream    *mix_video_stream,
                                                 Time            initial_seek,
                                                 ChannelOptions *channel_opts,
-                                                ConstMemory     stream_spec,
-                                                bool            is_chain,
-                                                bool            force_transcode,
-                                                bool            force_transcode_audio,
-                                                bool            force_transcode_video) = 0;
+                                                PlaybackItem   *playback_item) = 0;
 };
 
 }

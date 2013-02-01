@@ -41,46 +41,13 @@ Channel::startPlaybackItem (Playlist::Item          * const item,
 
     Channel * const self = static_cast <Channel*> (_self);
 
-    bool const got_chain_spec = item->chain_spec && !item->chain_spec.isNull();
-    bool const got_uri = item->uri && !item->uri.isNull();
+    self->beginVideoStream (item->playback_item,
+                            advance_ticket /* stream_ticket */,
+                            advance_ticket /* stream_ticket_ref */,
+                            seek);
 
-    logD_ (_self_func, "got_chain_spec: ", got_chain_spec, ", got_uri: ", got_uri);
-
-    if (got_chain_spec && got_uri) {
-	logW_ (_func, "Both chain spec and uri are specified for a playlist item. "
-	       "Ignoring the uri.");
-    }
-
-    bool item_started = true;
-    if (got_chain_spec) {
-	self->beginVideoStream (item->chain_spec->mem(),
-                                true /* is_chain */,
-                                item->force_transcode,
-                                item->force_transcode_audio,
-                                item->force_transcode_video,
-                                advance_ticket /* stream_ticket */,
-                                advance_ticket /* stream_ticket_ref */,
-                                seek);
-    } else
-    if (got_uri) {
-	self->beginVideoStream (item->uri->mem(),
-                                false /* is_chain */,
-                                item->force_transcode,
-                                item->force_transcode_audio,
-                                item->force_transcode_video,
-                                advance_ticket /* stream_ticket */,
-                                advance_ticket /* stream_ticket_ref */,
-                                seek);
-    } else {
-	logW_ (_func, "Nor chain spec, no uri is specified for a playlist item.");
-	self->playback.advance (advance_ticket);
-	item_started = false;
-    }
-
-    if (item_started) {
-	logD_ (_func, "firing startItem");
-	self->fireStartItem ();
-    }
+    logD_ (_func, "firing startItem");
+    self->fireStartItem ();
 }
 
 void
@@ -138,6 +105,8 @@ Channel::numWatchersChanged (Count   const num_watchers,
             self->connect_on_demand_timer = NULL;
         }
 
+        logD_ (_func, "media_source: 0x", fmt_hex, (UintPtr) self->media_source.ptr(), ", "
+               "stream_stopped: ", self->stream_stopped);
         if (!self->media_source
             && !self->stream_stopped)
         {
@@ -211,9 +180,9 @@ void
 Channel::setStreamParameters (VideoStream * const mt_nonnull video_stream)
 {
     Ref<StreamParameters> const stream_params = grab (new (std::nothrow) StreamParameters);
-    if (channel_opts->no_audio)
+    if (cur_item->no_audio)
         stream_params->setParam ("no_audio", "true");
-    if (channel_opts->no_video)
+    if (cur_item->no_video)
         stream_params->setParam ("no_video", "true");
 
     video_stream->setStreamParameters (stream_params);
@@ -278,11 +247,7 @@ Channel::createStream (Time const initial_seek)
                            moment->getMixVideoStream(),
                            initial_seek,
                            channel_opts,
-                           stream_spec->mem(),
-                           is_chain,
-                           force_transcode,
-                           force_transcode_audio,
-                           force_transcode_video);
+                           cur_item);
     if (media_source) {
 	media_source->ref ();
 	GThread * const thread = g_thread_create (
@@ -338,23 +303,32 @@ Channel::closeStream (bool const replace_video_stream)
     }
     cur_stream_data = NULL;
 
-    if (video_stream
-        && replace_video_stream
-	&& !channel_opts->keep_video_stream
-        && !channel_opts->continuous_playback)
-    {
-	// TODO moment->replaceVideoStream() to swap video streams atomically
-	moment->removeVideoStream (video_stream_key);
-	video_stream->close ();
+    logD_ (_func, "video_stream: 0x", fmt_hex, (UintPtr) video_stream.ptr(), ", "
+           "replace_video_stream: ", replace_video_stream, ", "
+           "keep_video_stream: ", channel_opts->keep_video_stream, ", "
+           "continuous_playback: ", channel_opts->continuous_playback);
+    if (video_stream) {
+        if (!replace_video_stream) {
+            moment->removeVideoStream (video_stream_key);
+            video_stream->close ();
+            if (video_stream_events_sbn) {
+                video_stream->getEventInformer()->unsubscribe (video_stream_events_sbn);
+                video_stream_events_sbn = NULL;
+            }
+            video_stream = NULL;
+        } else
+        if (   !channel_opts->keep_video_stream
+            && !channel_opts->continuous_playback)
+        {
+            // TODO moment->replaceVideoStream() to swap video streams atomically
+            moment->removeVideoStream (video_stream_key);
+            video_stream->close ();
+            if (video_stream_events_sbn) {
+                video_stream->getEventInformer()->unsubscribe (video_stream_events_sbn);
+                video_stream_events_sbn = NULL;
+            }
+            video_stream = NULL;
 
-        if (video_stream_events_sbn) {
-            video_stream->getEventInformer()->unsubscribe (video_stream_events_sbn);
-            video_stream_events_sbn = NULL;
-        }
-
-	video_stream = NULL;
-
-	if (replace_video_stream) {
             {
                 assert (!cur_stream_data);
 
@@ -363,16 +337,15 @@ Channel::closeStream (bool const replace_video_stream)
                 cur_stream_data = stream_data;
             }
 
-	    video_stream = grab (new (std::nothrow) VideoStream);
+            video_stream = grab (new (std::nothrow) VideoStream);
             setStreamParameters (video_stream);
 
-	    logD_ (_func, "Calling moment->addVideoStream, stream_name: ", channel_opts->channel_name->mem());
-	    video_stream_key = moment->addVideoStream (video_stream, channel_opts->channel_name->mem());
+            logD_ (_func, "Calling moment->addVideoStream, stream_name: ", channel_opts->channel_name->mem());
+            video_stream_key = moment->addVideoStream (video_stream, channel_opts->channel_name->mem());
 
-// This seems to be unnecessary here.
-//            // FIXME Connect on demand is not resumed if we don't get here. Bug.
-//            beginConnectOnDemand (false /* start_timer */);
-	}
+            // Note: This is correct and essential for connect_on_demand.
+            beginConnectOnDemand (false /* start_timer */);
+        }
     }
 
     logD_ (_func, "done");
@@ -476,6 +449,7 @@ Channel::noVideo (void * const _stream_data)
 	return;
     }
 
+    logW_ (_func, "restarting stream");
     mt_unlocks (mutex) self->doRestartStream ();
 }
 
@@ -534,30 +508,20 @@ _return:
     return false /* Do not reschedule */;
 }
 
-// If @is_chain is 'true', then @stream_spec is a chain spec with gst-launch
-// syntax. Otherwise, @stream_spec is an uri for uridecodebin2.
 void
-Channel::beginVideoStream (ConstMemory      const stream_spec,
-                           bool             const is_chain,
-                           bool             const force_transcode,
-                           bool             const force_transcode_audio,
-                           bool             const force_transcode_video,
+Channel::beginVideoStream (PlaybackItem   * const mt_nonnull item,
                            void           * const stream_ticket,
                            VirtReferenced * const stream_ticket_ref,
                            Time             const seek)
 {
-    logD (ctl, _this_func, "is_chain: ", is_chain);
+    logD (ctl, _this_func_);
 
     mutex.lock ();
 
     if (media_source)
 	closeStream (true /* replace_video_stream */);
 
-    this->stream_spec = grab (new (std::nothrow) String (stream_spec));
-    this->is_chain = is_chain;
-    this->force_transcode = force_transcode;
-    this->force_transcode_audio = force_transcode_audio;
-    this->force_transcode_video = force_transcode_video;
+    this->cur_item = item;
 
     this->stream_ticket = stream_ticket;
     this->stream_ticket_ref = stream_ticket_ref;
@@ -699,7 +663,19 @@ Channel::~Channel ()
 
     mutex.lock ();
 
-    closeStream (false /* replace_video_stream */);
+    // Note: Calling closeStream() here would be wrong, because timer and
+    //       subscription keys are invalid at this point, since deletion
+    //       callbacks have already been called.
+//    closeStream (false /* replace_video_stream */);
+    {
+        if (media_source)
+            media_source->releasePipeline ();
+
+        if (video_stream) {
+            moment->removeVideoStream (video_stream_key);
+            video_stream->close ();
+        }
+    }
 
 #if 0
     if (gst_stream) {

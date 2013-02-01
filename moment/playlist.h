@@ -25,6 +25,8 @@
 #include <libxml/parser.h>
 #include <libmary/libmary.h>
 
+#include <moment/channel_options.h>
+
 
 namespace Moment {
 
@@ -52,13 +54,7 @@ public:
 	bool duration_default;
 
 	Time seek;
-
-	Ref<String> chain_spec;
-	Ref<String> uri;
-
-        bool force_transcode;
-        bool force_transcode_audio;
-        bool force_transcode_video;
+        Ref<PlaybackItem> playback_item;
 
 	Ref<String> id;
 
@@ -75,10 +71,6 @@ public:
 	    duration_default = true;
 
 	    seek = 0;
-
-            force_transcode = false;
-            force_transcode_audio = false;
-            force_transcode_video = false;
 	}
 
 	Item ()
@@ -104,11 +96,13 @@ public:
     ItemList item_list;
     ItemHash item_hash;
 
-    void doParsePlaylist (xmlDocPtr doc);
+    void doParsePlaylist (xmlDocPtr     doc,
+                          PlaybackItem * mt_nonnull default_playback_item);
 
-    static void parseItem (xmlDocPtr   doc,
-			   xmlNodePtr  media_node,
-			   Item       * mt_nonnull item);
+    static void parseItem (xmlDocPtr     doc,
+			   xmlNodePtr    media_node,
+                           PlaybackItem * mt_nonnull default_playback_item,
+			   Item         * mt_nonnull item);
 
     static void parseItemAttributes (xmlNodePtr  node,
 				     Item       * mt_nonnull item);
@@ -129,19 +123,17 @@ public:
 
     void clear ();
 
-    void setSingleItem (ConstMemory stream_spec,
-			bool        is_chain,
-                        bool        force_transcode,
-                        bool        force_transcode_audio,
-                        bool        force_transcode_video);
+    void setSingleItem (PlaybackItem * mt_nonnull playback_item);
 
     void setSingleChannelRecorder (ConstMemory channel_name);
 
-    mt_throws Result parsePlaylistFile (ConstMemory  filename,
-					Ref<String> *ret_err_msg);
+    mt_throws Result parsePlaylistFile (ConstMemory   filename,
+                                        PlaybackItem * mt_nonnull default_playback_item,
+					Ref<String>  *ret_err_msg);
 
-    mt_throws Result parsePlaylistMem (ConstMemory  mem,
-				       Ref<String> *ret_err_msg);
+    mt_throws Result parsePlaylistMem (ConstMemory   mem,
+                                       PlaybackItem * mt_nonnull default_playback_item,
+				       Ref<String>  *ret_err_msg);
 
     ~Playlist ();
 };

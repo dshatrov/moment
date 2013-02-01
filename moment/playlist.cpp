@@ -67,8 +67,8 @@ Playlist::getNextItem (Item  * const prv_item,
 	      "duration: ", item->duration, ", "
 	      "duration_full: ", item->duration_full ? "true" : "false", ", "
 	      "duration_default: ", item->duration_default ? "true" : "false");
-	logD (playlist, _func, "chain_spec: ", item->chain_spec);
-	logD (playlist, _func, "uri: ", item->uri);
+//	logD (playlist, _func, "chain_spec: ", item->chain_spec);
+//	logD (playlist, _func, "uri: ", item->uri);
 
 	if (item->start_immediate) {
 	    *ret_start_rel = 0;
@@ -245,7 +245,8 @@ static xmlNodePtr firstXmlElementNode (xmlNodePtr node)
 }
 
 void
-Playlist::doParsePlaylist (xmlDocPtr doc)
+Playlist::doParsePlaylist (xmlDocPtr     doc,
+                           PlaybackItem * const mt_nonnull default_playback_item)
 {
     xmlNodePtr root_node = xmlDocGetRootElement (doc);
     if (!root_node)
@@ -262,7 +263,7 @@ Playlist::doParsePlaylist (xmlDocPtr doc)
 	    Item * const item = new (std::nothrow) Item;
             assert (item);
 	    item_list.append (item);
-	    parseItem (doc, cur_node, item);
+	    parseItem (doc, cur_node, default_playback_item, item);
 	    if (item->id)
 		item_hash.add (item);
 	} else {
@@ -274,9 +275,10 @@ Playlist::doParsePlaylist (xmlDocPtr doc)
 }
 
 void
-Playlist::parseItem (xmlDocPtr   doc,
-		     xmlNodePtr  item_node,
-		     Item       * const mt_nonnull item)
+Playlist::parseItem (xmlDocPtr     doc,
+                     xmlNodePtr    item_node,
+                     PlaybackItem * const mt_nonnull default_playback_item,
+                     Item         * const mt_nonnull item)
 {
     ConstMemory chain;
     ConstMemory uri;
@@ -326,14 +328,22 @@ Playlist::parseItem (xmlDocPtr   doc,
 	    logW_ (_func, "Only one of chain/uri/path should be specified.");
     }
 
-    if (chain.len())
-	item->chain_spec = grab (new (std::nothrow) String (chain));
-    else
-    if (uri.len())
-	item->uri = grab (new (std::nothrow) String (uri));
-    else
-    if (path.len())
-	item->uri = makeString ("file://", path);
+    item->playback_item = grab (new (std::nothrow) PlaybackItem);
+    *item->playback_item = *default_playback_item;
+
+    item->playback_item->spec_kind = PlaybackItem::SpecKind::None;
+    if (chain.len()) {
+	item->playback_item->stream_spec = grab (new (std::nothrow) String (chain));
+        item->playback_item->spec_kind = PlaybackItem::SpecKind::Chain;
+    } else
+    if (uri.len()) {
+	item->playback_item->stream_spec = grab (new (std::nothrow) String (uri));
+        item->playback_item->spec_kind = PlaybackItem::SpecKind::Uri;
+    } else
+    if (path.len()) {
+	item->playback_item->stream_spec = makeString ("file://", path);
+        item->playback_item->spec_kind = PlaybackItem::SpecKind::Uri;
+    }
 
     logD (playlist, _func, "Parsing attributes");
     parseItemAttributes (item_node, item);
@@ -653,23 +663,11 @@ static void reportXmlParsingError (ConstMemory   const filename,
 }
 
 void
-Playlist::setSingleItem (ConstMemory const stream_spec,
-			 bool        const is_chain,
-                         bool        const force_transcode,
-                         bool        const force_transcode_audio,
-                         bool        const force_transcode_video)
+Playlist::setSingleItem (PlaybackItem * const mt_nonnull playback_item)
 {
     Item * const item = new (std::nothrow) Item;
     assert (item);
-    item->force_transcode = force_transcode;
-    item->force_transcode_audio = force_transcode_audio;
-    item->force_transcode_video = force_transcode_video;
-
-    if (is_chain)
-	item->chain_spec = grab (new (std::nothrow) String (stream_spec));
-    else
-	item->uri = grab (new (std::nothrow) String (stream_spec));
-
+    item->playback_item = playback_item;
     item_list.append (item);
 }
 
@@ -683,8 +681,9 @@ Playlist::setSingleChannelRecorder (ConstMemory const channel_name)
 }
 
 mt_throws Result
-Playlist::parsePlaylistFile (ConstMemory   const filename,
-			     Ref<String> * const ret_err_msg)
+Playlist::parsePlaylistFile (ConstMemory    const filename,
+                             PlaybackItem * const mt_nonnull default_playback_item,
+			     Ref<String>  * const ret_err_msg)
 {
     Byte filename_cstr [filename.len() + 1];
     memcpy (filename_cstr, filename.mem(), filename.len());
@@ -697,15 +696,16 @@ Playlist::parsePlaylistFile (ConstMemory   const filename,
 	return Result::Failure;
     }
 
-    doParsePlaylist (doc);
+    doParsePlaylist (doc, default_playback_item);
 
     xmlFreeDoc (doc);
     return Result::Success;
 }
 
 mt_throws Result
-Playlist::parsePlaylistMem (ConstMemory   const mem,
-			    Ref<String> * const ret_err_msg)
+Playlist::parsePlaylistMem (ConstMemory    const mem,
+                            PlaybackItem * const mt_nonnull default_playback_item,
+			    Ref<String>  * const ret_err_msg)
 {
     xmlDocPtr doc = xmlReadMemory (
 	    (char const *) mem.mem(), mem.len(), "" /* URL */, NULL /* encoding */, XML_PARSE_NONET);
@@ -715,7 +715,7 @@ Playlist::parsePlaylistMem (ConstMemory   const mem,
 	return Result::Failure;
     }
 
-    doParsePlaylist (doc);
+    doParsePlaylist (doc, default_playback_item);
 
     xmlFreeDoc (doc);
     return Result::Success;

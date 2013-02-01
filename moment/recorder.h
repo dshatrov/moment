@@ -94,18 +94,20 @@ public:
 	playback.setSingleChannelRecorder (channel_name);
     }
 
-    Result loadPlaylistFile (ConstMemory   const filename,
-			     bool          const keep_cur_item,
-			     Ref<String> * const ret_err_msg)
+    Result loadPlaylistFile (ConstMemory    const filename,
+			     bool           const keep_cur_item,
+                             PlaybackItem * const mt_nonnull default_playback_item,
+			     Ref<String>  * const ret_err_msg)
     {
-	return playback.loadPlaylistFile (filename, keep_cur_item, ret_err_msg);
+	return playback.loadPlaylistFile (filename, keep_cur_item, default_playback_item, ret_err_msg);
     }
 
-    Result loadPlaylistMem (ConstMemory   const mem,
-			    bool          const keep_cur_item,
-			    Ref<String> * const ret_err_msg)
+    Result loadPlaylistMem (ConstMemory    const mem,
+			    bool           const keep_cur_item,
+                            PlaybackItem * const mt_nonnull default_playback_item,
+			    Ref<String>  * const ret_err_msg)
     {
-	return playback.loadPlaylistMem (mem, keep_cur_item, ret_err_msg);
+	return playback.loadPlaylistMem (mem, keep_cur_item, default_playback_item, ret_err_msg);
     }
 
     mt_const void init (MomentServer *moment,

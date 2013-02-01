@@ -302,6 +302,8 @@ Recorder::~Recorder ()
 {
     mutex.lock ();
 
+#if 0
+// Wrong: channel_sbn has been invalidated by deletion callback.
     {
 	Ref<Channel> const channel = weak_cur_channel.getRef ();
 	if (channel && channel_sbn) {
@@ -309,6 +311,7 @@ Recorder::~Recorder ()
 	}
 	channel_sbn = GenericInformer::SubscriptionKey ();
     }
+#endif
 
     doStopItem ();
 
