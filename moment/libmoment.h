@@ -29,6 +29,7 @@
 #include <moment/channel.h>
 #include <moment/channel_options.h>
 #include <moment/channel_set.h>
+#include <moment/channel_manager.h>
 #include <moment/media_source.h>
 #include <moment/playback.h>
 #include <moment/recorder.h>
@@ -69,6 +70,11 @@ Result configGetUint64 (MConfig::Config * mt_nonnull config,
                         ConstMemory      opt_name,
                         Uint64          * mt_nonnull ret_val,
                         Uint64           default_val);
+
+Result configSectionGetUint64 (MConfig::Section * mt_nonnull section,
+                               ConstMemory       opt_name,
+                               Uint64           * mt_nonnull ret_val,
+                               Uint64            default_val);
 
 Result configGetBoolean (MConfig::Config * mt_nonnull config,
                          ConstMemory      opt_name,

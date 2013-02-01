@@ -41,6 +41,31 @@ Result configGetUint64 (MConfig::Config * const mt_nonnull config,
     return Result::Success;
 }
 
+Result configSectionGetUint64 (MConfig::Section * mt_nonnull section,
+                               ConstMemory       opt_name,
+                               Uint64           * mt_nonnull ret_val,
+                               Uint64            default_val)
+{
+    *ret_val = default_val;
+
+    MConfig::Option * const opt = section->getOption (opt_name, false /* create */);
+    if (!opt)
+        return Result::Success;
+
+    MConfig::Value * const val = opt->getValue();
+    if (!val)
+        return Result::Success;
+
+    Uint64 res_val = 0;
+    if (!strToUint64_safe (val->mem(), &res_val)) {
+        logE_ (_func, "Invalid falue for ", opt_name, ": ", val->mem());
+        return Result::Failure;
+    }
+
+    *ret_val = res_val;
+    return Result::Success;
+}
+
 Result configGetBoolean (MConfig::Config * const mt_nonnull config,
                          ConstMemory       const opt_name,
                          bool            * const mt_nonnull ret_val,
