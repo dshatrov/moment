@@ -50,8 +50,20 @@
 	"Content-Length: ", (content_length), "\r\n" \
 	"Cache-Control: no-cache\r\n"
 
+#define MOMENT_SERVER__400_HEADERS(content_length) \
+	"HTTP/1.1 400 Bad Request\r\n" \
+	MOMENT_SERVER__COMMON_HEADERS \
+	"Content-Type: text/plain\r\n" \
+	"Content-Length: ", (content_length), "\r\n"
+
 #define MOMENT_SERVER__404_HEADERS(content_length) \
 	"HTTP/1.1 404 Not Found\r\n" \
+	MOMENT_SERVER__COMMON_HEADERS \
+	"Content-Type: text/plain\r\n" \
+	"Content-Length: ", (content_length), "\r\n"
+
+#define MOMENT_SERVER__500_HEADERS(content_length) \
+	"HTTP/1.1 500 Internal Server Error\r\n" \
 	MOMENT_SERVER__COMMON_HEADERS \
 	"Content-Type: text/plain\r\n" \
 	"Content-Length: ", (content_length), "\r\n"
@@ -179,7 +191,7 @@ public:
     }
 
 
-  // __________________________________ Admin __________________________________
+  // __________________________ HTTP request handlers __________________________
 
 private:
     static HttpService::HttpHandler const admin_http_handler;
@@ -189,6 +201,54 @@ private:
                                     Memory const  &msg_body,
                                     void         ** mt_nonnull ret_msg_data,
                                     void          *_self);
+
+    static HttpService::HttpHandler const server_http_handler;
+
+    static Result serverHttpRequest (HttpRequest   * mt_nonnull req,
+                                     Sender        * mt_nonnull conn_sender,
+                                     Memory const  &msg_body,
+                                     void         ** mt_nonnull ret_msg_data,
+                                     void          *_self);
+
+public:
+    struct HttpRequestResult {
+	enum Value {
+	    Success,
+	    NotFound
+	};
+	operator Value () const { return value; }
+	HttpRequestResult (Value const value) : value (value) {}
+	HttpRequestResult () {}
+    private:
+	Value value;
+    };
+
+    struct HttpRequestHandler {
+        HttpRequestResult (*httpRequest) (HttpRequest  * mt_nonnull req,
+                                          Sender       * mt_nonnull conn_sender,
+                                          Memory        msg_body,
+                                          void         *cb_data);
+    };
+
+private:
+    class HttpHandlerEntryList_name;
+
+    struct HttpHandlerEntry : public IntrusiveListElement< HttpHandlerEntryList_name >
+    {
+        Cb<HttpRequestHandler> cb;
+    };
+
+    typedef IntrusiveList< HttpHandlerEntry,
+                           HttpHandlerEntryList_name,
+                           DeleteAction<HttpHandlerEntry> >
+            HttpHandlerEntryList;
+
+    HttpHandlerEntryList  admin_http_handlers;
+    HttpHandlerEntryList server_http_handlers;
+
+public:
+    void  addAdminRequestHandler (CbDesc<HttpRequestHandler> const &cb);
+    void addServerRequestHandler (CbDesc<HttpRequestHandler> const &cb);
 
 
   // __________________________ Video stream handlers __________________________
@@ -404,10 +464,11 @@ private:
 	}
     };
 
+
+  // _____________________ Serving templated static pages ______________________
+
 public:
-    class PageRequestResult
-    {
-    public:
+    struct PageRequestResult {
 	enum Value {
 	    Success,
 	    NotFound,
@@ -421,25 +482,17 @@ public:
 	Value value;
     };
 
-    class PageRequest
-    {
-    public:
+    struct PageRequest {
 	// If ret.mem() == NULL, then the parameter is not set.
 	// If ret.len() == 0, then the parameter has empty value.
-	virtual ConstMemory getParameter (ConstMemory name) = 0;
-
-	virtual IpAddress getClientAddress () = 0;
-
-	virtual void addHashVar (ConstMemory name,
-				 ConstMemory value) = 0;
-
-	virtual void showSection (ConstMemory name) = 0;
-
+	virtual ConstMemory getParameter     (ConstMemory name) = 0;
+	virtual IpAddress   getClientAddress () = 0;
+	virtual void        addHashVar       (ConstMemory name, ConstMemory value) = 0;
+	virtual void        showSection      (ConstMemory name) = 0;
         virtual ~PageRequest () {}
     };
 
-    struct PageRequestHandler
-    {
+    struct PageRequestHandler {
 	PageRequestResult (*pageRequest) (PageRequest  *req,
 					  ConstMemory   path,
 					  ConstMemory   full_path,
@@ -471,18 +524,34 @@ private:
 
     public:
 	Informer_<PageRequestHandler>* getEventInformer ()
-	{
-	    return &event_informer;
-	}
+            { return &event_informer; }
 
 	PageRequestHandlerEntry ()
 	    : event_informer (this, &mutex),
 	      num_handlers (0)
-	{
-	}
+	{}
     };
 
     typedef PageRequestHandlerEntry::PageRequestHandlerHash PageRequestHandlerHash;
+
+    mt_mutex (mutex) PageRequestHandlerHash page_handler_hash;
+
+public:
+    struct PageRequestHandlerKey {
+	PageRequestHandlerEntry *handler_entry;
+	GenericInformer::SubscriptionKey sbn_key;
+    };
+
+    PageRequestHandlerKey addPageRequestHandler (CbDesc<PageRequestHandler> const &cb,
+						 ConstMemory path);
+
+    void removePageRequestHandler (PageRequestHandlerKey handler_key);
+
+    PageRequestResult processPageRequest (PageRequest *page_req,
+					  ConstMemory  path);
+
+  // ___________________________________________________________________________
+
 
 private:
     mt_const ServerApp *server_app;
@@ -493,8 +562,6 @@ private:
     mt_const Storage *storage;
 
     mt_const bool publish_all_streams;
-
-    mt_mutex (mutex) PageRequestHandlerHash page_handler_hash;
 
     mt_mutex (mutex) ClientSessionList client_session_list;
 
@@ -557,15 +624,43 @@ public:
 
   // _________________________________ Config __________________________________
 
+public:
+    class VarHashEntry : public HashEntry<>
+    {
+    public:
+        MConfig::Varlist::Var *var;
+    };
+
+    typedef Hash< VarHashEntry,
+                  ConstMemory,
+                  MemberExtractor< VarHashEntry,
+                                   MConfig::Varlist::Var*,
+                                   &VarHashEntry::var,
+                                   ConstMemory,
+                                   AccessorExtractor< MConfig::Varlist::Var,
+                                                      ConstMemory,
+                                                      &MConfig::Varlist::Var::getName > >,
+                  MemoryComparator<>,
+                  DefaultStringHasher >
+            VarHash;
+
 private:
     Mutex config_mutex;
 
-    mt_mutex (config_mutex) Ref<MConfig::Config> config;
+    mt_mutex (config_mutex) Ref<MConfig::Config>  config;
+    mt_mutex (config_mutex) Ref<MConfig::Varlist> default_varlist;
+    mt_mutex (config_mutex) VarHash               default_var_hash;
+
+    mt_one_of(( mt_const, mt_mutex (config_mutex) )) void parseDefaultVarlist (MConfig::Config * mt_nonnull new_config);
+
+    mt_mutex (config_mutex) void releaseDefaultVarHash ();
 
 public:
-    Ref<MConfig::Config> getConfig ();
+    Ref<MConfig::Config>  getConfig ();
+    Ref<MConfig::Varlist> getDefaultVarlist ();
 
     mt_mutex (config_mutex) MConfig::Config* getConfig_unlocked ();
+    mt_mutex (config_mutex) VarHash* getDefaultVarHash_unlocked () { return &default_var_hash; }
 
     void setConfig (MConfig::Config * mt_nonnull new_config);
 
@@ -646,21 +741,6 @@ public:
 
     Ref<VideoStream> getMixVideoStream ();
 
-  // Serving of static pages (mod_file)
-
-    struct PageRequestHandlerKey {
-	PageRequestHandlerEntry *handler_entry;
-	GenericInformer::SubscriptionKey sbn_key;
-    };
-
-    PageRequestHandlerKey addPageRequestHandler (CbDesc<PageRequestHandler> const &cb,
-						 ConstMemory path);
-
-    void removePageRequestHandler (PageRequestHandlerKey handler_key);
-
-    PageRequestResult processPageRequest (PageRequest *page_req,
-					  ConstMemory  path);
-
   // Push protocols
 
 private:
@@ -693,11 +773,7 @@ public:
                                         VideoStream    *mix_video_stream,
                                         Time            initial_seek,
                                         ChannelOptions *channel_opts,
-                                        ConstMemory     stream_spec,
-                                        bool            is_chain,
-                                        bool            force_transcode,
-                                        bool            force_transcode_audio,
-                                        bool            force_transcode_video)
+                                        PlaybackItem   *playback_item)
     {
         if (!media_source_provider)
             return NULL;
@@ -709,11 +785,7 @@ public:
                                                          mix_video_stream,
                                                          initial_seek,
                                                          channel_opts,
-                                                         stream_spec,
-                                                         is_chain,
-                                                         force_transcode,
-                                                         force_transcode_audio,
-                                                         force_transcode_video);
+                                                         playback_item);
     }
 
     mt_const void setMediaSourceProvider (MediaSourceProvider * const media_source_provider)

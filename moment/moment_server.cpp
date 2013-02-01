@@ -1,5 +1,5 @@
 /*  Moment Video Server - High performance media server
-    Copyright (C) 2011, 2012 Dmitry Shatrov
+    Copyright (C) 2011-2013 Dmitry Shatrov
     e-mail: shatrov@gmail.com
 
     This program is free software: you can redistribute it and/or modify
@@ -27,6 +27,190 @@ using namespace M;
 static LogGroup libMary_logGroup_session ("MomentServer.session", LogLevel::I);
 
 MomentServer* MomentServer::instance = NULL;
+
+
+// ___________________________ HTTP request handlers ___________________________
+
+HttpService::HttpHandler const MomentServer::admin_http_handler = {
+    adminHttpRequest,
+    NULL /* httpMessageBody */
+};
+
+Result
+MomentServer::adminHttpRequest (HttpRequest   * const mt_nonnull req,
+                                Sender        * const mt_nonnull conn_sender,
+                                Memory const  &msg_body,
+                                void         ** const mt_nonnull /* ret_msg_data */,
+                                void          * const _self)
+{
+    MomentServer * const self = static_cast <MomentServer*> (_self);
+
+    logD_ (_func_);
+
+    MOMENT_SERVER__HEADERS_DATE
+
+    if (req->getNumPathElems() >= 2
+	&& equal (req->getPath (1), "stat"))
+    {
+        PagePool::PageListHead page_list;
+
+        self->page_pool->printToPages (
+                &page_list,
+                "<html>"
+                "<body>"
+                "<p>Stats</p>"
+                "<table>");
+        {
+            List<Stat::StatParam> stat_params;
+            getStat()->getAllParams (&stat_params);
+
+            List<Stat::StatParam>::iter iter (stat_params);
+            while (!stat_params.iter_done (iter)) {
+                Stat::StatParam * const stat_param = &stat_params.iter_next (iter)->data;
+
+                self->page_pool->printToPages (
+                        &page_list,
+                        "<tr>"
+                            "<td>", stat_param->param_name, "</td>");
+
+                if (stat_param->param_type == Stat::ParamType_Int64) {
+                    self->page_pool->printToPages (
+                            &page_list,
+                            "<td>", stat_param->int64_value, "</td>");
+                } else {
+                    assert (stat_param->param_type == Stat::ParamType_Double);
+                    self->page_pool->printToPages (
+                            &page_list,
+                            "<td>", stat_param->double_value, "</td>");
+                }
+
+                self->page_pool->printToPages (
+                        &page_list,
+                            "<td>", stat_param->param_desc, "</td>"
+                        "</tr>");
+            }
+        }
+        self->page_pool->printToPages (
+                &page_list,
+                "</table>"
+                "</body>"
+                "</html>");
+
+        Size const data_len = PagePool::countPageListDataLen (page_list.first, 0 /* msg_offset */);
+
+        conn_sender->send (
+                self->page_pool,
+                false /* do_flush */,
+                MOMENT_SERVER__OK_HEADERS ("text/html", data_len),
+                "\r\n");
+        conn_sender->sendPages (self->page_pool, &page_list, true /* do_flush */);
+
+        logA_ ("file 200 ", req->getClientAddress(), " ", req->getRequestLine());
+    } else {
+        HttpHandlerEntryList::iterator iter (self->admin_http_handlers);
+        while (!iter.done()) {
+            HttpHandlerEntry * const handler_entry = iter.next ();
+
+            if (handler_entry->cb->httpRequest) {
+                HttpRequestResult res;
+                if (!handler_entry->cb.call_ret (&res, handler_entry->cb->httpRequest, req, conn_sender, msg_body))
+                    continue;
+
+                if (res == HttpRequestResult::Success)
+                    return Result::Success;
+
+                assert (res == HttpRequestResult::NotFound);
+            }
+        }
+
+	logE_ (_func, "Unknown admin HTTP request: ", req->getFullPath());
+
+	ConstMemory const reply_body = "Unknown command";
+	conn_sender->send (self->page_pool,
+			   true /* do_flush */,
+			   MOMENT_SERVER__404_HEADERS (reply_body.len()),
+			   "\r\n",
+			   reply_body);
+
+	logA_ ("moment_server__admin 404 ", req->getClientAddress(), " ", req->getRequestLine());
+    }
+
+    if (!req->getKeepalive())
+        conn_sender->closeAfterFlush();
+
+    return Result::Success;
+}
+
+HttpService::HttpHandler const MomentServer::server_http_handler = {
+    serverHttpRequest,
+    NULL /* httpMessageBody */
+};
+
+Result
+MomentServer::serverHttpRequest (HttpRequest   * const mt_nonnull req,
+                                 Sender        * const mt_nonnull conn_sender,
+                                 Memory const  &msg_body,
+                                 void         ** const mt_nonnull /* ret_msg_data */,
+                                 void          * const _self)
+{
+    MomentServer * const self = static_cast <MomentServer*> (_self);
+
+    logD_ (_func_);
+
+    MOMENT_SERVER__HEADERS_DATE;
+
+    {
+        HttpHandlerEntryList::iterator iter (self->server_http_handlers);
+        while (!iter.done()) {
+            HttpHandlerEntry * const handler_entry = iter.next ();
+
+            if (handler_entry->cb->httpRequest) {
+                HttpRequestResult res;
+                if (!handler_entry->cb.call_ret (&res, handler_entry->cb->httpRequest, req, conn_sender, msg_body))
+                    continue;
+
+                if (res == HttpRequestResult::Success)
+                    return Result::Success;
+
+                assert (res == HttpRequestResult::NotFound);
+            }
+        }
+
+	logE_ (_func, "Unknown server HTTP request: ", req->getFullPath());
+
+	ConstMemory const reply_body = "Unknown command";
+	conn_sender->send (self->page_pool,
+			   true /* do_flush */,
+			   MOMENT_SERVER__404_HEADERS (reply_body.len()),
+			   "\r\n",
+			   reply_body);
+
+	logA_ ("moment_server__server 404 ", req->getClientAddress(), " ", req->getRequestLine());
+    }
+
+    if (!req->getKeepalive())
+        conn_sender->closeAfterFlush();
+
+    return Result::Success;
+}
+
+void
+MomentServer::addAdminRequestHandler (CbDesc<HttpRequestHandler> const &cb)
+{
+    HttpHandlerEntry * const handler_entry = new (std::nothrow) HttpHandlerEntry;
+    assert (handler_entry);
+    handler_entry->cb = cb;
+    admin_http_handlers.append (handler_entry);
+}
+
+void
+MomentServer::addServerRequestHandler (CbDesc<HttpRequestHandler> const &cb)
+{
+    HttpHandlerEntry * const handler_entry = new (std::nothrow) HttpHandlerEntry;
+    assert (handler_entry);
+    handler_entry->cb = cb;
+    server_http_handlers.append (handler_entry);
+}
 
 
 // ___________________________ Video stream handlers ___________________________
@@ -513,10 +697,101 @@ MomentServer::getConfig ()
     return tmp_config;
 }
 
+Ref<MConfig::Varlist>
+MomentServer::getDefaultVarlist ()
+{
+    config_mutex.lock ();
+    Ref<MConfig::Varlist> const tmp_varlist = default_varlist;
+    config_mutex.unlock ();
+    return tmp_varlist;
+}
+
 mt_mutex (config_mutex) MConfig::Config*
 MomentServer::getConfig_unlocked ()
 {
     return config;
+}
+
+mt_one_of(( mt_const, mt_mutex (config_mutex) )) void
+MomentServer::parseDefaultVarlist (MConfig::Config * mt_nonnull const new_config)
+{
+    releaseDefaultVarHash ();
+
+    Ref<MConfig::Varlist> const new_varlist = grab (new (std::nothrow) MConfig::Varlist);
+    MConfig::Section * const varlist_section = new_config->getSection ("moment/vars", false /* create */);
+    if (varlist_section)
+        MConfig::parseVarlistSection (varlist_section, new_varlist);
+
+    default_varlist = new_varlist;
+
+    {
+	ConstMemory const opt_name = "moment/this_http_server_addr";
+	ConstMemory opt_val = config->getString (opt_name);
+	logI_ (_func, opt_name, ":  ", opt_val);
+	if (!opt_val.mem())
+            opt_val = "127.0.0.1:8080";
+
+        new_varlist->addEntry ("HttpAddr",
+                               opt_val,
+                               true  /* with_value */,
+                               false /* enable_section */,
+                               false /* disable_section */);
+    }
+
+    {
+	ConstMemory const opt_name = "moment/this_rtmp_server_addr";
+	ConstMemory opt_val = config->getString (opt_name);
+	logI_ (_func, opt_name, ":  ", opt_val);
+	if (!opt_val.mem())
+            opt_val = "127.0.0.1:1935";
+
+        new_varlist->addEntry ("RtmpAddr",
+                               opt_val,
+                               true  /* with_value */,
+                               false /* enable_section */,
+                               false /* disable_section */);
+    }
+
+    {
+	ConstMemory const opt_name = "moment/this_rtmpt_server_addr";
+	ConstMemory opt_val = config->getString (opt_name);
+	logI_ (_func, opt_name, ":  ", opt_val);
+	if (!opt_val.mem())
+            opt_val = "127.0.0.1:8080";
+
+        new_varlist->addEntry ("RtmptAddr",
+                               opt_val,
+                               true  /* with_value */,
+                               false /* enable_section */,
+                               false /* disable_section */);
+    }
+
+    MConfig::Varlist::VarList::iterator iter (new_varlist->var_list);
+    while (!iter.done()) {
+        MConfig::Varlist::Var * const var = iter.next ();
+        VarHashEntry * const entry = new (std::nothrow) VarHashEntry;
+        assert (entry);
+        entry->var = var;
+
+        if (VarHashEntry * const old_entry = default_var_hash.lookup (var->getName())) {
+            default_var_hash.remove (old_entry);
+            delete old_entry;
+        }
+
+        default_var_hash.add (entry);
+    }
+}
+
+mt_mutex (config_mutex) void
+MomentServer::releaseDefaultVarHash ()
+{
+    VarHash::iterator iter (default_var_hash);
+    while (!iter.done()) {
+        VarHashEntry * const entry = iter.next ();
+        delete entry;
+    }
+
+    default_var_hash.clear ();
 }
 
 void
@@ -524,6 +799,7 @@ MomentServer::setConfig (MConfig::Config * mt_nonnull const new_config)
 {
     config_mutex.lock ();
     config = new_config;
+    parseDefaultVarlist (new_config);
 
     // TODO Simplify synchronization: require the client to call getConfig() when handling configReload().
     //      'config_mutex' will then become unnecessary (! _vast_ simplification).
@@ -1236,6 +1512,8 @@ MomentServer::VideoStreamKey
 MomentServer::addVideoStream (VideoStream * const video_stream,
 			      ConstMemory   const path)
 {
+    logD_ (_func, "name: ", path, ", stream 0x", fmt_hex, (UintPtr) video_stream);
+
   StateMutexLock l (&mutex);
 
     MomentServer::VideoStreamKey const vs_key = video_stream_hash.add (path, video_stream);
@@ -1246,6 +1524,8 @@ MomentServer::addVideoStream (VideoStream * const video_stream,
 mt_mutex (mutex) void
 MomentServer::removeVideoStream_unlocked (VideoStreamKey const video_stream_key)
 {
+    logD_ (_func, "name: ", video_stream_key.entry_key.getKey(), ", "
+           "stream 0x", fmt_hex, (UintPtr) video_stream_key.entry_key.getDataPtr());
     video_stream_hash.remove (video_stream_key.entry_key);
 }
 
@@ -1517,100 +1797,6 @@ MomentServer::unlock ()
     mutex.unlock ();
 }
 
-HttpService::HttpHandler const MomentServer::admin_http_handler = {
-    adminHttpRequest,
-    NULL /* httpMessageBody */
-};
-
-Result
-MomentServer::adminHttpRequest (HttpRequest   * const mt_nonnull req,
-                                Sender        * const mt_nonnull conn_sender,
-                                Memory const  & /* msg_body */,
-                                void         ** const mt_nonnull /* ret_msg_data */,
-                                void          * const _self)
-{
-    MomentServer * const self = static_cast <MomentServer*> (_self);
-
-    logD_ (_func_);
-
-    MOMENT_SERVER__HEADERS_DATE;
-
-    if (req->getNumPathElems() >= 2
-	&& equal (req->getPath (1), "stat"))
-    {
-        PagePool::PageListHead page_list;
-
-        self->page_pool->printToPages (
-                &page_list,
-                "<html>"
-                "<body>"
-                "<p>Stats</p>"
-                "<table>");
-        {
-            List<Stat::StatParam> stat_params;
-            getStat()->getAllParams (&stat_params);
-
-            List<Stat::StatParam>::iter iter (stat_params);
-            while (!stat_params.iter_done (iter)) {
-                Stat::StatParam * const stat_param = &stat_params.iter_next (iter)->data;
-
-                self->page_pool->printToPages (
-                        &page_list,
-                        "<tr>"
-                            "<td>", stat_param->param_name, "</td>");
-
-                if (stat_param->param_type == Stat::ParamType_Int64) {
-                    self->page_pool->printToPages (
-                            &page_list,
-                            "<td>", stat_param->int64_value, "</td>");
-                } else {
-                    assert (stat_param->param_type == Stat::ParamType_Double);
-                    self->page_pool->printToPages (
-                            &page_list,
-                            "<td>", stat_param->double_value, "</td>");
-                }
-
-                self->page_pool->printToPages (
-                        &page_list,
-                            "<td>", stat_param->param_desc, "</td>"
-                        "</tr>");
-            }
-        }
-        self->page_pool->printToPages (
-                &page_list,
-                "</table>"
-                "</body>"
-                "</html>");
-
-        Size const data_len = PagePool::countPageListDataLen (page_list.first, 0 /* msg_offset */);
-
-        conn_sender->send (
-                self->page_pool,
-                false /* do_flush */,
-                MOMENT_SERVER__OK_HEADERS ("text/html", data_len),
-                "\r\n");
-        conn_sender->sendPages (self->page_pool, &page_list, true /* do_flush */);
-
-        logA_ ("file 200 ", req->getClientAddress(), " ", req->getRequestLine());
-    } else {
-	logE_ (_func, "Unknown admin HTTP request: ", req->getFullPath());
-
-	ConstMemory const reply_body = "Unknown command";
-	conn_sender->send (self->page_pool,
-			   true /* do_flush */,
-			   MOMENT_SERVER__404_HEADERS (reply_body.len()),
-			   "\r\n",
-			   reply_body);
-
-	logA_ ("moment_server__admin 404 ", req->getClientAddress(), " ", req->getRequestLine());
-    }
-
-    if (!req->getKeepalive())
-        conn_sender->closeAfterFlush();
-
-    return Result::Success;
-}
-
 Result
 MomentServer::init (ServerApp        * const mt_nonnull server_app,
 		    PagePool         * const mt_nonnull page_pool,
@@ -1624,9 +1810,11 @@ MomentServer::init (ServerApp        * const mt_nonnull server_app,
     this->page_pool = page_pool;
     this->http_service = http_service;
     this->admin_http_service = admin_http_service;
-    this->config = config;
     this->recorder_thread_pool = recorder_thread_pool;
     this->storage = storage;
+
+    this->config = config;
+    parseDefaultVarlist (config);
 
     mix_video_stream = grab (new VideoStream);
 
@@ -1651,6 +1839,10 @@ MomentServer::init (ServerApp        * const mt_nonnull server_app,
     admin_http_service->addHttpHandler (
 	    CbDesc<HttpService::HttpHandler> (&admin_http_handler, this, this),
 	    "admin");
+
+    http_service->addHttpHandler (
+            CbDesc<HttpService::HttpHandler> (&server_http_handler, this, this),
+            "server");
 
     if (!loadModules ())
 	logE_ (_func, "Could not load modules");
@@ -1689,6 +1881,10 @@ MomentServer::~MomentServer ()
 
     if (server_app)
         server_app->release ();
+
+    config_mutex.lock ();
+    releaseDefaultVarHash ();
+    config_mutex.unlock ();
 }
 
 }
