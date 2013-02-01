@@ -36,6 +36,7 @@ moment_target_headers =		\
         channel.h               \
         channel_options.h       \
         channel_set.h           \
+        channel_manager.h       \
         media_source.h          \
         media_source_provider.h \
         playback.h              \
@@ -86,6 +87,7 @@ libmoment_1_0_la_SOURCES =	\
                                 \
         channel.cpp             \
         channel_set.cpp         \
+        channel_manager.cpp     \
         playback.cpp            \
         playlist.cpp            \
         recorder.cpp            \

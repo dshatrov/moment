@@ -84,7 +84,6 @@ private:
 
     MomentServer moment_server;
 
-    mt_mutex (mutex) Timers::TimerKey profiler_timer;
     mt_mutex (mutex) Timers::TimerKey exit_timer;
 
     void doExit (ConstMemory reason);
@@ -189,19 +188,6 @@ public:
 
     ~MomentInstance ()
     {
-        mutex.lock ();
-
-        if (profiler_timer) {
-            server_app.getServerContext()->getMainThreadContext()->getTimers()->deleteTimer (profiler_timer);
-            profiler_timer = NULL;
-        }
-
-        if (exit_timer) {
-            server_app.getServerContext()->getMainThreadContext()->getTimers()->deleteTimer (exit_timer);
-            exit_timer = NULL;
-        }
-
-        mutex.unlock ();
     }
 };
 
@@ -250,7 +236,7 @@ cmdline_config (char const * /* short_name */,
 		void       * /* opt_data */,
 		void       * /* cb_data */)
 {
-    options.config_filename = grab (new String (value));
+    options.config_filename = grab (new (std::nothrow) String (value));
     return true;
 }
 
@@ -261,7 +247,7 @@ cmdline_log (char const * /* short_name */,
 	     void       * /* opt_data */,
 	     void       * /* cb_data */)
 {
-    options.log_filename = grab (new String (value));
+    options.log_filename = grab (new (std::nothrow) String (value));
     return true;
 }
 
@@ -750,7 +736,7 @@ MomentInstance::run ()
 						 options.log_filename->mem() :
 						 ConstMemory ("/var/log/moment.log");
 	// We never deallocate 'log_file' after log file is opened successfully.
-	NativeFile * const log_file = new NativeFile ();
+	NativeFile * const log_file = new (std::nothrow) NativeFile ();
 	assert (log_file);
 	if (!log_file->open (log_filename,
 			     File::OpenFlags::Create | File::OpenFlags::Append,
@@ -762,7 +748,7 @@ MomentInstance::run ()
 	    logI_ (_func, "Log file is at ", log_filename);
 	    // We never deallocate 'logs'
 	    delete logs;
-	    logs = new BufferedOutputStream (log_file, 4096);
+	    logs = new (std::nothrow) BufferedOutputStream (log_file, 4096);
 	    assert (logs);
 	}
     }
@@ -898,11 +884,32 @@ MomentInstance::run ()
         logE_ (_func, "could not initialize ctl pipe: ", exc->toString());
     }
 
+  {
+    Ref<ChannelManager> const channel_manager = grab (new (std::nothrow) ChannelManager);
+    channel_manager->init (&moment_server, &page_pool);
+    {
+        // TODO Parse 'streams' config section for these.
+        Ref<ChannelOptions> const default_channel_opts = grab (new (std::nothrow) ChannelOptions);
+        Ref<PlaybackItem> const default_item = grab (new (std::nothrow) PlaybackItem);
+        default_channel_opts->default_item = default_item;
+
+#warning call setDefaultChannelOptions() on config reload
+        channel_manager->setDefaultChannelOptions (default_channel_opts);
+    }
+    {
+        if (!channel_manager->loadConfigFull ()) {
+            logE_ (_func, "loadConfigFull() failed");
+            ret_res = EXIT_FAILURE;
+            goto _stop_recorder;
+        }
+    }
+
     if (!server_app.run ()) {
 	logE_ (_func, "server_app.run() failed: ", exc->toString());
 	ret_res = EXIT_FAILURE;
 	goto _stop_recorder;
     }
+  }
 
     logI_ (_func, "done");
 
@@ -993,7 +1000,7 @@ int main (int argc, char **argv)
 #endif
     }
 
-    Ref<MomentInstance> const moment_instance = grab (new MomentInstance);
+    Ref<MomentInstance> const moment_instance = grab (new (std::nothrow) MomentInstance);
     return moment_instance->run ();
 }
 
