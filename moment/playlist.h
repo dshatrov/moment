@@ -135,6 +135,8 @@ public:
                                        PlaybackItem * mt_nonnull default_playback_item,
 				       Ref<String>  *ret_err_msg);
 
+    void dump ();
+
     ~Playlist ();
 };
 

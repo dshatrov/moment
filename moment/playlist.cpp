@@ -42,7 +42,10 @@ Playlist::getNextItem (Item  * const prv_item,
 		       Time  * const mt_nonnull ret_duration,
 		       bool  * const mt_nonnull ret_duration_full)
 {
-    logD (playlist, _func, "cur_time: ", cur_time, ", time_offset: ", time_offset);
+    if (logLevelOn_ (LogLevel::Debug)) {
+        logD (playlist, _func, "cur_time: ", cur_time, ", time_offset: ", time_offset);
+        dump ();
+    }
 
     Item *item = prv_item;
     for (;;) {
@@ -333,15 +336,15 @@ Playlist::parseItem (xmlDocPtr     doc,
 
     item->playback_item->spec_kind = PlaybackItem::SpecKind::None;
     if (chain.len()) {
-	item->playback_item->stream_spec = grab (new (std::nothrow) String (chain));
+	item->playback_item->stream_spec = st_grab (new (std::nothrow) String (chain));
         item->playback_item->spec_kind = PlaybackItem::SpecKind::Chain;
     } else
     if (uri.len()) {
-	item->playback_item->stream_spec = grab (new (std::nothrow) String (uri));
+	item->playback_item->stream_spec = st_grab (new (std::nothrow) String (uri));
         item->playback_item->spec_kind = PlaybackItem::SpecKind::Uri;
     } else
     if (path.len()) {
-	item->playback_item->stream_spec = makeString ("file://", path);
+	item->playback_item->stream_spec = st_makeString ("file://", path);
         item->playback_item->spec_kind = PlaybackItem::SpecKind::Uri;
     }
 
@@ -719,6 +722,19 @@ Playlist::parsePlaylistMem (ConstMemory    const mem,
 
     xmlFreeDoc (doc);
     return Result::Success;
+}
+
+void
+Playlist::dump ()
+{
+    ItemList::iterator iter (item_list);
+    unsigned i = 0;
+    while (!iter.done()) {
+        Item * const item = iter.next ();
+        logD_ (_func, "item #", i);
+        item->playback_item->dump ();
+        ++i;
+    }
 }
 
 Playlist::~Playlist ()
