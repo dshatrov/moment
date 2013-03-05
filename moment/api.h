@@ -17,8 +17,8 @@
 */
 
 
-#ifndef __MOMENT__API__H__
-#define __MOMENT__API__H__
+#ifndef MOMENT__API__H__
+#define MOMENT__API__H__
 
 
 // Stable C API for external modules.
@@ -73,6 +73,10 @@ typedef void (*MomentRtmpDataMessageCallback) (MomentMessage *msg,
 
 typedef void (*MomentStreamClosedCallback) (void *user_data);
 
+typedef void (*MomentNumWatchersChangedCallback) (unsigned long  num_watchers,
+                                                  void          *user_data);
+
+// TODO Add dtor_cb/cb_data pair to MomentStreamHandler for WeakRef race prevention.
 MomentStreamHandler* moment_stream_handler_new (void);
 
 void moment_stream_handler_delete (MomentStreamHandler *stream_handler);
@@ -92,6 +96,10 @@ void moment_stream_handler_set_rtmp_command_message (MomentStreamHandler        
 void moment_stream_handler_set_closed (MomentStreamHandler        *stream_handler,
 				       MomentStreamClosedCallback  cb,
 				       void                       *user_data);
+
+void moment_stream_handler_set_num_watchers_changed (MomentStreamHandler              *stream_handler,
+                                                     MomentNumWatchersChangedCallback  cb,
+                                                     void                             *user_data);
 
 
 // ___________________________ Video stream control ____________________________
@@ -378,5 +386,5 @@ int moment_amf_encoder_encode (MomentAmfEncoder *encoder,
 #endif
 
 
-#endif /* __MOMENT__API__H__ */
+#endif /* MOMENT__API__H__ */
 

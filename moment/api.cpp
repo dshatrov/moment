@@ -47,9 +47,6 @@ using namespace M;
 using namespace Moment;
 
 
-//#define MOMENT_API_INITIALIZED_MAGIC 0x1234
-
-
 extern "C" {
 
 
@@ -97,9 +94,8 @@ void moment_message_get_data (MomentMessage * const message,
 
 // _______________________________ Stream events _______________________________
 
-struct MomentStreamHandler {
-//    unsigned initialized;
-
+struct MomentStreamHandler
+{
     MomentAudioMessageCallback audio_cb;
     void *audio_cb_data;
 
@@ -111,11 +107,14 @@ struct MomentStreamHandler {
 
     MomentStreamClosedCallback closed_cb;
     void *closed_cb_data;
+
+    MomentNumWatchersChangedCallback num_watchers_cb;
+    void *num_watchers_cb_data;
 };
 
 MomentStreamHandler* moment_stream_handler_new (void)
 {
-    MomentStreamHandler * const stream_handler = new MomentStreamHandler;
+    MomentStreamHandler * const stream_handler = new (std::nothrow) MomentStreamHandler;
     assert (stream_handler);
 
     stream_handler->audio_cb = NULL;
@@ -130,7 +129,8 @@ MomentStreamHandler* moment_stream_handler_new (void)
     stream_handler->closed_cb = NULL;
     stream_handler->closed_cb_data = NULL;
 
-//    stream_handler->initialized = MOMENT_API_INITIALIZED_MAGIC;
+    stream_handler->num_watchers_cb = NULL;
+    stream_handler->num_watchers_cb_data = NULL;
 
     return stream_handler;
 }
@@ -164,12 +164,20 @@ void moment_stream_handler_set_rtmp_command_message (MomentStreamHandler        
     stream_handler->command_cb_data = user_data;
 }
 
-void moment_stream_handler_set_closed (MomentStreamHandler * const stream_handler,
+void moment_stream_handler_set_closed (MomentStreamHandler        * const stream_handler,
 				       MomentStreamClosedCallback   const cb,
-				       void * const user_data)
+				       void                       * const user_data)
 {
     stream_handler->closed_cb = cb;
     stream_handler->closed_cb_data = user_data;
+}
+
+void moment_stream_handler_set_num_watchers_changed (MomentStreamHandler              * const stream_handler,
+                                                     MomentNumWatchersChangedCallback   const cb,
+                                                     void                             * const user_data)
+{
+    stream_handler->num_watchers_cb = cb;
+    stream_handler->num_watchers_cb_data = user_data;
 }
 
 
@@ -177,7 +185,7 @@ void moment_stream_handler_set_closed (MomentStreamHandler * const stream_handle
 
 MomentStream* moment_create_stream (void)
 {
-    Ref<VideoStream> video_stream = grab (new VideoStream);
+    Ref<VideoStream> video_stream = grab (new (std::nothrow) VideoStream);
     MomentStream * const stream = static_cast <MomentStream*> (video_stream);
     video_stream.setNoUnref ((VideoStream*) NULL);
     return stream;
@@ -199,7 +207,7 @@ MomentStream* moment_get_stream (char const      * const name_buf,
 	if (!create)
 	    return NULL;
 
-	video_stream = grab (new VideoStream);
+	video_stream = grab (new (std::nothrow) VideoStream);
 	video_stream_key = moment->addVideoStream (video_stream, ConstMemory (name_buf, name_len));
     }
 
@@ -289,18 +297,27 @@ static void stream_closed (void * const _stream_handler)
 	stream_handler->closed_cb (stream_handler->closed_cb_data);
 }
 
+static void stream_num_watchers_changed (Count   const num_watchers,
+                                         void  * const _stream_handler)
+{
+    MomentStreamHandler * const stream_handler = static_cast <MomentStreamHandler*> (_stream_handler);
+
+    if (stream_handler->num_watchers_cb)
+        stream_handler->num_watchers_cb (num_watchers, stream_handler->num_watchers_cb_data);
+}
+
 static VideoStream::EventHandler const stream_event_handler = {
     stream_audioMessage,
     stream_videoMessage,
     stream_rtmpCommandMessage,
     stream_closed,
-    NULL /* numWatchersChanged */
+    stream_num_watchers_changed
 };
 
 MomentStreamHandlerKey moment_stream_add_handler (MomentStream        * const stream,
 						  MomentStreamHandler * const stream_handler)
 {
-    Ref<Api_StreamHandler_Wrapper> wrapper = grab (new Api_StreamHandler_Wrapper);
+    Ref<Api_StreamHandler_Wrapper> wrapper = grab (new (std::nothrow) Api_StreamHandler_Wrapper);
     wrapper->stream_handler = *stream_handler;
     // TODO Fix race condition with stream_closed() (What if the stream has just been closed?)
     wrapper->subscription_key =
@@ -315,6 +332,8 @@ void moment_stream_remove_handler (MomentStream           * const stream,
     Api_StreamHandler_Wrapper * const wrapper =
 	    static_cast <Api_StreamHandler_Wrapper*> (stream_handler_key);
     static_cast <VideoStream*> (stream)->getEventInformer()->unsubscribe (wrapper->subscription_key);
+    // TODO FIXME wrapper->unref() would be more logical, since wrapper is used as 'ref_data' for subscribe().
+    // TODO FIXME What if a call is already in progress? Is it a race condition?
     delete wrapper;
 }
 
@@ -362,7 +381,7 @@ struct MomentClientHandler {
 
 MomentClientHandler* moment_client_handler_new (void)
 {
-    MomentClientHandler * const client_handler = new MomentClientHandler;
+    MomentClientHandler * const client_handler = new (std::nothrow) MomentClientHandler;
     assert (client_handler);
 
     client_handler->connected_cb = NULL;
@@ -473,7 +492,7 @@ void moment_client_session_disconnect (MomentClientSession * const api_client_se
 
 static void client_rtmpCommandMessage (RtmpConnection       * const mt_nonnull conn,
 				       VideoStream::Message * const mt_nonnull int_msg,
-				       ConstMemory const    &method_name,
+				       ConstMemory            const method_name,
 				       AmfDecoder           * const mt_nonnull amf_decoder,
 				       void                 * const _api_client_session)
 {
@@ -574,7 +593,8 @@ static bool client_startWatching (ConstMemory        const stream_name,
     MomentClientSession * const api_client_session = static_cast <MomentClientSession*> (_api_client_session);
 
     if (api_client_session->api_client_handler_wrapper->ext_client_handler.start_watching_cb) {
-        Client_StartWatchingCallback_Data * const data = new Client_StartWatchingCallback_Data;
+        Client_StartWatchingCallback_Data * const data = new (std::nothrow) Client_StartWatchingCallback_Data;
+        assert (data);
         data->cb = cb;
 
 	MomentStream *ext_stream = NULL;
@@ -629,7 +649,8 @@ static bool client_startStreaming (ConstMemory     const stream_name,
     MomentClientSession * const api_client_session = static_cast <MomentClientSession*> (_api_client_session);
 
     if (api_client_session->api_client_handler_wrapper->ext_client_handler.start_streaming_cb) {
-        Client_StartStreamingCallback_Data * const data = new Client_StartStreamingCallback_Data;
+        Client_StartStreamingCallback_Data * const data = new (std::nothrow) Client_StartStreamingCallback_Data;
+        assert (data);
         data->cb = cb;
 
         MomentResult res = MomentResult_Failure;
@@ -663,15 +684,15 @@ static MomentServer::ClientSession::Backend const client_session_backend = {
 };
 
 static void client_clientConnected (MomentServer::ClientSession * const int_client_session,
-				    ConstMemory const &app_name,
-				    ConstMemory const &full_app_name,
-				    void * const _api_client_handler_wrapper)
+				    ConstMemory  app_name,
+				    ConstMemory  full_app_name,
+				    void        * const _api_client_handler_wrapper)
 {
     Api_ClientHandler_Wrapper * const api_client_handler_wrapper =
 	    static_cast <Api_ClientHandler_Wrapper*> (_api_client_handler_wrapper);
     MomentClientHandler * const ext_client_handler = &api_client_handler_wrapper->ext_client_handler;
 
-    Ref<MomentClientSession> api_client_session = grab (new MomentClientSession);
+    Ref<MomentClientSession> api_client_session = grab (new (std::nothrow) MomentClientSession);
     api_client_session->int_client_session = int_client_session;
     api_client_session->client_cb_data = NULL;
     api_client_session->api_client_handler_wrapper = api_client_handler_wrapper;
@@ -713,7 +734,7 @@ MomentClientHandlerKey moment_add_client_handler (MomentClientHandler * const ex
 {
     MomentServer * const moment = MomentServer::getInstance ();
 
-    Ref<Api_ClientHandler_Wrapper> api_client_handler_wrapper = grab (new Api_ClientHandler_Wrapper);
+    Ref<Api_ClientHandler_Wrapper> api_client_handler_wrapper = grab (new (std::nothrow) Api_ClientHandler_Wrapper);
     api_client_handler_wrapper->ext_client_handler = *ext_client_handler;
     api_client_handler_wrapper->int_client_handler_key =
 	    moment->addClientHandler (
@@ -734,6 +755,8 @@ void moment_remove_client_handler (MomentClientHandlerKey const ext_client_handl
     MomentServer * const moment = MomentServer::getInstance ();
 
     moment->removeClientHandler (api_client_handler_wrapper->int_client_handler_key);
+    // TODO FIXME wrapper->unref() would be more logical, since wrapper is used as 'ref_data' for subscribe().
+    // TODO FIXME What if a call is already in progress? Is it a race condition?
     delete api_client_handler_wrapper;
 }
 
@@ -866,7 +889,8 @@ void moment_vlog (MomentLogLevel   const log_level,
     va_list ap;
 
     while (1) {
-	p = new char [size];
+	p = new (std::nothrow) char [size];
+        assert (p);
 
 	va_copy (ap, orig_ap);
 	n = vsnprintf (p, size, fmt, ap);
