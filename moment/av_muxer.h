@@ -37,24 +37,14 @@ protected:
 
 public:
     virtual mt_throws Result beginMuxing () = 0;
-
     virtual mt_throws Result muxAudioMessage (VideoStream::AudioMessage * mt_nonnull msg) = 0;
-
     virtual mt_throws Result muxVideoMessage (VideoStream::VideoMessage * mt_nonnull msg) = 0;
-
     virtual mt_throws Result endMuxing () = 0;
-
     virtual void reset () = 0;
 
-    void setSender (Sender * const sender)
-    {
-	this->sender = sender;
-    }
+    void setSender (Sender * const sender) { this->sender = sender; }
 
-    AvMuxer ()
-	: sender (NULL)
-    {
-    }
+    AvMuxer () : sender (NULL) {}
 
     virtual ~AvMuxer () {}
 };

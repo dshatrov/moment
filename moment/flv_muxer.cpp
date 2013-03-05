@@ -122,7 +122,7 @@ FlvMuxer::doMuxMessage (VideoStream::Message * const mt_nonnull msg,
 	msg_pages->header_len = sizeof (tag_header);
 
 	if (msg->prechunk_size == 0) {
-	    msg_pages->page_pool = msg->page_pool;
+	    msg_pages->page_pool  = msg->page_pool;
 	    msg_pages->first_page = msg->page_list.first;
 	    msg_pages->msg_offset = msg->msg_offset;
 
@@ -139,7 +139,7 @@ FlvMuxer::doMuxMessage (VideoStream::Message * const mt_nonnull msg,
 						     &norm_page_pool,
 						     &norm_page_list,
 						     &norm_msg_offs);
-	    msg_pages->page_pool = norm_page_pool;
+	    msg_pages->page_pool  = norm_page_pool;
 	    msg_pages->first_page = norm_page_list.first;
 	    msg_pages->msg_offset = norm_msg_offs;
 	}
