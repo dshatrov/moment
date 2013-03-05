@@ -99,6 +99,8 @@ private:
 public:
     void advance (AdvanceTicket *user_advance_ticket);
 
+    void stop ();
+
     Result setPosition_Id (ConstMemory id,
 			   Time        seek);
 
@@ -123,8 +125,7 @@ public:
                         Timers *timers,
                         Uint64  min_playlist_duration_sec);
 
-    Playback (Object *coderef_container);
-
+     Playback (Object *coderef_container);
     ~Playback ();
 };
 

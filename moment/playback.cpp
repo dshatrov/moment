@@ -24,7 +24,7 @@ using namespace M;
 
 namespace Moment {
 
-static LogGroup libMary_logGroup_playback ("moment.playback", LogLevel::I);
+static LogGroup libMary_logGroup_playback ("moment.playback", LogLevel::D);
 
 mt_unlocks_locks (mutex) void
 Playback::advancePlayback ()
@@ -237,7 +237,6 @@ Playback::doLoadPlaylist (ConstMemory    const src,
 					  &next_duration,
 					  &next_duration_full);
 	got_next = true;
-
 	advancePlayback ();
     }
 
@@ -265,7 +264,23 @@ Playback::advance (AdvanceTicket * const user_advance_ticket)
 				      &next_duration,
 				      &next_duration_full);
     got_next = true;
+    advancePlayback ();
+    mutex.unlock ();
+}
 
+void
+Playback::stop ()
+{
+    mutex.lock ();
+    playlist.clear ();
+    next_item = playlist.getNextItem (NULL /* prv_item */,
+				      getUnixtime(),
+				      0 /* time_offset */,
+				      &next_start_rel,
+				      &next_seek,
+				      &next_duration,
+				      &next_duration_full);
+    got_next = true;
     advancePlayback ();
     mutex.unlock ();
 }
@@ -325,7 +340,6 @@ Playback::setSingleItem (PlaybackItem * const item)
 				      &next_duration,
 				      &next_duration_full);
     got_next = true;
-
     advancePlayback ();
     mutex.unlock ();
 }
@@ -347,7 +361,6 @@ Playback::setSingleChannelRecorder (ConstMemory const channel_name)
 				      &next_duration,
 				      &next_duration_full);
     got_next = true;
-
     advancePlayback ();
     mutex.unlock ();
 }
