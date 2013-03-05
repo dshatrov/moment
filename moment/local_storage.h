@@ -1,5 +1,5 @@
 /*  Moment Video Server - High performance media server
-    Copyright (C) 2011 Dmitry Shatrov
+    Copyright (C) 2011-2013 Dmitry Shatrov
     e-mail: shatrov@gmail.com
 
     This program is free software: you can redistribute it and/or modify
@@ -17,8 +17,8 @@
 */
 
 
-#ifndef __MOMENT__LOCAL_STORAGE__H__
-#define __MOMENT__LOCAL_STORAGE__H__
+#ifndef MOMENT__LOCAL_STORAGE__H__
+#define MOMENT__LOCAL_STORAGE__H__
 
 
 #include <libmary/libmary.h>
@@ -30,34 +30,31 @@ namespace Moment {
 
 using namespace M;
 
-class LocalStorage : public Storage
+class LocalStorage : public Storage,
+                     public DependentCodeReferenced
 {
 private:
-    StateMutex mutex;
-
-    class FileEntry : public IntrusiveListElement<>,
-		      public Referenced
+    class LocalStorageFile : public Storage::StorageFile
     {
     public:
 	NativeFile file;
 	FileConnection conn;
+
+      mt_iface (Storage::StorageFile)
+        Connection* getConnection () { return &conn; }
+      mt_iface_end
     };
 
-    typedef IntrusiveList<FileEntry> FileEntryList;
-
-    mt_mutex (mutex) FileEntryList file_list;
-
 public:
-    FileKey openFile (ConstMemory   filename,
-		      Connection  **ret_conn);
+    mt_throws Ref<StorageFile> openFile (ConstMemory filename);
 
-    void releaseFile (FileKey file_key);
-
-    ~LocalStorage ();
+    LocalStorage (Object * const coderef_container)
+        : DependentCodeReferenced (coderef_container)
+    {}
 };
 
 }
 
 
-#endif /* __MOMENT__LOCAL_STORAGE__H__ */
+#endif /* MOMENT__LOCAL_STORAGE__H__ */
 
