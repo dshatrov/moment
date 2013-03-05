@@ -1,5 +1,5 @@
 /*  Moment Video Server - High performance media server
-    Copyright (C) 2011, 2012 Dmitry Shatrov
+    Copyright (C) 2011-2013 Dmitry Shatrov
     e-mail: shatrov@gmail.com
 
     This program is free software: you can redistribute it and/or modify
@@ -67,7 +67,7 @@ mt_const bool default_start_paused = false;
 mt_const Uint64 paused_avc_interframes = 3;
 
 mt_const bool record_all = false;
-mt_const ConstMemory record_path = "/opt/moment/records";
+mt_const StRef<String> record_path = st_grab (new (std::nothrow) String ("/opt/moment/records"));
 mt_const Uint64 recording_limit = 1 << 24 /* 16 Mb */;
 
 mt_const Count no_keyframe_limit = 250; // 25 fps * 10 seconds
@@ -234,7 +234,6 @@ static VideoStream::FrameSaver::FrameHandler const saved_frame_handler = {
     savedVideoFrame
 };
 
-
 void
 ClientSession::doResume ()
 {
@@ -321,9 +320,10 @@ startTranscoder (ClientSession * const client_session)
             return;
         }
 
-        transcoder->init (timers,
+        transcoder->init (moment->getServerApp()->getServerContext()->
+                                  getMainThreadContext()->getDeferredProcessor(),
+                          timers,
                           moment->getPagePool(),
-                          client_session->video_stream,
                           transcode_on_demand,
                           transcode_on_demand_timeout_millisec);
 
@@ -335,9 +335,9 @@ startTranscoder (ClientSession * const client_session)
                     makeString (client_session->stream_name ?
                                         client_session->stream_name->mem() : ConstMemory(),
                                 transcode_entry->suffix->mem());
-            Ref<VideoStream> const out_stream = grab (new VideoStream);
+            Ref<VideoStream> const out_stream = grab (new (std::nothrow) VideoStream);
             {
-                Ref<StreamParameters> const stream_params = grab (new StreamParameters);
+                Ref<StreamParameters> const stream_params = grab (new (std::nothrow) StreamParameters);
                 if (transcode_entry->audio_mode == Transcoder::TranscodingMode_Off)
                     stream_params->setParam ("no_audio", "true");
                 if (transcode_entry->video_mode == Transcoder::TranscodingMode_Off)
@@ -355,6 +355,8 @@ startTranscoder (ClientSession * const client_session)
                     moment->addVideoStream (out_stream, out_stream_name->mem());
             client_session->out_stream_keys.append (out_stream_key);
         }
+
+        transcoder->start (client_session->video_stream);
     }
 
     client_session->transcoder = transcoder;
@@ -558,61 +560,18 @@ Result connect (ConstMemory const &app_name,
     return Result::Success;
 }
 
-typedef void (*ParameterCallback) (ConstMemory  name,
-				   ConstMemory  value,
-				   void        *cb_data);
-
-// Very similar to M::HttpRequest::parseParameters().
-static void parseParameters (ConstMemory         const mem,
-			     ParameterCallback   const param_cb,
-			     void              * const param_cb_data)
-{
-    Byte const *uri_end = mem.mem() + mem.len();
-    Byte const *param_pos = mem.mem();
-
-    while (param_pos < uri_end) {
-	ConstMemory name;
-	ConstMemory value;
-	Byte const *value_start = (Byte const *) memchr (param_pos, '=', uri_end - param_pos);
-	if (value_start) {
-	    ++value_start; // Skipping '='
-	    if (value_start > uri_end)
-		value_start = uri_end;
-
-	    name = ConstMemory (param_pos, value_start - 1 /*'='*/ - param_pos);
-
-	    Byte const *value_end = (Byte const *) memchr (value_start, '&', uri_end - value_start);
-	    if (value_end) {
-		if (value_end > uri_end)
-		    value_end = uri_end;
-
-		value = ConstMemory (value_start, value_end - value_start);
-		param_pos = value_end + 1; // Skipping '&'
-	    } else {
-		value = ConstMemory (value_start, uri_end - value_start);
-		param_pos = uri_end;
-	    }
-	} else {
-	    name = ConstMemory (param_pos, uri_end - param_pos);
-	    param_pos = uri_end;
-	}
-
-	logD_ (_func, "parameter: ", name, " = ", value);
-
-	param_cb (name, value, param_cb_data);
-    }
-}
-
 static void startRtmpStreaming_paramCallback (ConstMemory   const name,
                                               ConstMemory   const value,
                                               void        * const _streaming_params)
 {
     StreamingParams * const streaming_params = static_cast <StreamingParams*> (_streaming_params);
 
+    logD_ (_func, "name: ", name, ", value: ", value);
+
     if (equal (name, "transcode"))
 	streaming_params->transcode = true;
     if (equal (name, "auth"))
-        streaming_params->auth_key = grab (new String (value));
+        streaming_params->auth_key = grab (new (std::nothrow) String (value));
 }
 
 static void startRtmpWatching_paramCallback (ConstMemory   const name,
@@ -625,7 +584,7 @@ static void startRtmpWatching_paramCallback (ConstMemory   const name,
 	watching_params->start_paused = true;
     else
     if (equal (name, "auth"))
-        watching_params->auth_key = grab (new String (value));
+        watching_params->auth_key = grab (new (std::nothrow) String (value));
 }
 
 class StartStreamingCallback_Data : public Referenced
@@ -682,7 +641,7 @@ static void completeStartStreaming (ClientSession * const client_session,
 	    // TODO Support "append" mode.
 	    client_session->recorder.setVideoStream (video_stream);
 	    client_session->recorder.start (
-		    makeString (record_path, stream_name, ".flv")->mem());
+		    makeString (record_path->mem(), stream_name, ".flv")->mem());
 	}
     }
 
@@ -727,33 +686,35 @@ bool startRtmpStreaming (ConstMemory     const _stream_name,
     {
 	Byte const * const name_sep = (Byte const *) memchr (stream_name.mem(), '?', stream_name.len());
 	if (name_sep) {
-	    parseParameters (stream_name.region (name_sep + 1 - stream_name.mem()),
-                             startRtmpStreaming_paramCallback,
-                             &client_session->streaming_params);
+            ConstMemory const params_mem = stream_name.region (name_sep + 1 - stream_name.mem());
+            logD_ (_func, "parameters: ", params_mem);
+	    parseHttpParameters (params_mem,
+                                 startRtmpStreaming_paramCallback,
+                                 &client_session->streaming_params);
 	    stream_name = stream_name.region (0, name_sep - stream_name.mem());
 	}
     }
-    client_session->stream_name = grab (new String (stream_name));
+    client_session->stream_name = grab (new (std::nothrow) String (stream_name));
     client_session->mutex.unlock ();
 
     // 'srv_session' is created in connect(), which is synchronized with
     // startStreaming(). No locking needed.
-    Ref<StreamParameters> const stream_params = grab (new StreamParameters);
+    Ref<StreamParameters> const stream_params = grab (new (std::nothrow) StreamParameters);
     stream_params->setParam ("source", momentrtmp_proto ? ConstMemory ("momentrtmp") : ConstMemory ("rtmp"));
     if (!momentrtmp_proto) {
         // TODO nellymoser? Use "source" param from above instead.
         stream_params->setParam ("audio_codec", "speex");
     }
 
-    Ref<VideoStream> const video_stream = grab (new VideoStream);
+    Ref<VideoStream> const video_stream = grab (new (std::nothrow) VideoStream);
     video_stream->setStreamParameters (stream_params);
 
     Result res = Result::Failure;
     {
-        Ref<StartStreamingCallback_Data> const data = grab (new StartStreamingCallback_Data);
+        Ref<StartStreamingCallback_Data> const data = grab (new (std::nothrow) StartStreamingCallback_Data);
         data->weak_client_session = client_session;
         data->cb = cb;
-        data->stream_name = grab (new String (stream_name));
+        data->stream_name = grab (new (std::nothrow) String (stream_name));
         data->rec_mode = rec_mode;
         data->video_stream = video_stream;
 
@@ -898,7 +859,6 @@ static Result completeStartWatching (VideoStream   * const video_stream,
                                      ClientSession * const client_session,
                                      ConstMemory     const stream_name)
 {
-    // TODO Repetitive locking of 'client_session' - bad.
     client_session->mutex.lock ();
     // TODO Set watching_video_stream to NULL when it's not needed anymore.
     client_session->watching_video_stream = video_stream;
@@ -906,6 +866,7 @@ static Result completeStartWatching (VideoStream   * const video_stream,
     video_stream->lock ();
     if (video_stream->isClosed_unlocked()) {
         video_stream->unlock ();
+        client_session->mutex.unlock ();
 
         logD (mod_rtmp, _func, "video stream closed: ", stream_name);
         return Result::Failure;
@@ -920,7 +881,8 @@ static Result completeStartWatching (VideoStream   * const video_stream,
                                                           client_session,
                                                           NULL /* ref_data */,
                                                           client_session);
-    mt_async mt_unlocks_locks (video_stream->mutex) video_stream->plusOneWatcher_unlocked (client_session /* guard_obj */);
+    mt_async mt_unlocks_locks (video_stream->mutex) video_stream->plusOneWatcher_unlocked (
+            client_session /* guard_obj */);
     video_stream->unlock ();
 
     return Result::Success;
@@ -955,9 +917,9 @@ static bool startRtmpWatching (ConstMemory    const _stream_name,
     {
 	Byte const * const name_sep = (Byte const *) memchr (stream_name.mem(), '?', stream_name.len());
 	if (name_sep) {
-	    parseParameters (stream_name.region (name_sep + 1 - stream_name.mem()),
-                             startRtmpWatching_paramCallback,
-                             &client_session->watching_params);
+	    parseHttpParameters (stream_name.region (name_sep + 1 - stream_name.mem()),
+                                 startRtmpWatching_paramCallback,
+                                 &client_session->watching_params);
 	    stream_name = stream_name.region (0, name_sep - stream_name.mem());
 	}
     }
@@ -966,21 +928,20 @@ static bool startRtmpWatching (ConstMemory    const _stream_name,
 
     Ref<VideoStream> video_stream;
     {
-        Ref<StartWatchingCallback_Data> const data = grab (new StartWatchingCallback_Data);
+        Ref<StartWatchingCallback_Data> const data = grab (new (std::nothrow) StartWatchingCallback_Data);
         data->weak_client_session = client_session;
         data->cb = cb;
-        data->stream_name = grab (new String (stream_name));
+        data->stream_name = grab (new (std::nothrow) String (stream_name));
 
-        bool const complete = moment->startWatching (client_session->srv_session,
-                                                     stream_name,
-                                                     (client_session->watching_params.auth_key ?
-                                                             client_session->watching_params.auth_key->mem() : ConstMemory()),
-                                                     CbDesc<MomentServer::StartWatchingCallback> (
-                                                             startWatchingCallback,
-                                                             data,
-                                                             NULL,
-                                                             data),
-                                                     &video_stream);
+        bool const complete =
+                moment->startWatching (client_session->srv_session,
+                                       stream_name,
+                                       (client_session->watching_params.auth_key ?
+                                               client_session->watching_params.auth_key->mem() :
+                                               ConstMemory()),
+                                       CbDesc<MomentServer::StartWatchingCallback> (
+                                               startWatchingCallback, data, NULL, data),
+                                       &video_stream);
         if (!complete)
             return false;
     }
@@ -1266,8 +1227,8 @@ MomentRtmpModule::adminHttpRequest (HttpRequest   * const mt_nonnull req,
             while (!iter.done()) {
                 RtmpService::ClientSessionInfo * const sinfo = iter.next ();
 
-                Byte time_buf [timeToString_BufSize];
-                Size const time_len = timeToString (Memory::forObject (time_buf), sinfo->creation_unixtime);
+                Byte time_buf [unixtimeToString_BufSize];
+                Size const time_len = unixtimeToString (Memory::forObject (time_buf), sinfo->creation_unixtime);
 
                 page_pool->printToPages (
                         &page_list,
@@ -1312,8 +1273,8 @@ MomentRtmpModule::adminHttpRequest (HttpRequest   * const mt_nonnull req,
             while (!sinfo_iter.done()) {
                 RtmptService::RtmptSessionInfo * const sinfo = sinfo_iter.next ();
 
-                Byte time_buf [timeToString_BufSize];
-                Size const time_len = timeToString (Memory::forObject (time_buf), sinfo->creation_unixtime);
+                Byte time_buf [unixtimeToString_BufSize];
+                Size const time_len = unixtimeToString (Memory::forObject (time_buf), sinfo->creation_unixtime);
 
                 Time idle_time = cur_unixtime - sinfo->last_req_unixtime;
                 if (sinfo->last_req_unixtime > cur_unixtime)
@@ -1337,8 +1298,8 @@ MomentRtmpModule::adminHttpRequest (HttpRequest   * const mt_nonnull req,
             while (!cinfo_iter.done()) {
                 RtmptService::RtmptConnectionInfo * const cinfo = cinfo_iter.next ();
 
-                Byte time_buf [timeToString_BufSize];
-                Size const time_len = timeToString (Memory::forObject (time_buf), cinfo->creation_unixtime);
+                Byte time_buf [unixtimeToString_BufSize];
+                Size const time_len = unixtimeToString (Memory::forObject (time_buf), cinfo->creation_unixtime);
 
                 Time idle_time = cur_unixtime - cinfo->last_req_unixtime;
                 if (cinfo->last_req_unixtime > cur_unixtime)
@@ -1413,13 +1374,6 @@ static Result momentRtmpInit ()
 
     MConfig::Config * const config = moment->getConfig();
 
-    {
-        Ref<RtmpPushProtocol> const rtmp_push_proto = grab (new (std::nothrow) RtmpPushProtocol);
-        rtmp_push_proto->init (moment);
-        moment->addPushProtocol ("rtmp", rtmp_push_proto);
-        moment->addPushProtocol ("momentrtmp", rtmp_push_proto);
-    }
-
     // TODO ref/unref
     MomentRtmpModule * const rtmp_module = new (std::nothrow) MomentRtmpModule;
     assert (rtmp_module);
@@ -1452,10 +1406,15 @@ static Result momentRtmpInit ()
 	}
     }
 
-    Uint64 rtmp_ping_timeout_sec = 5 * 60;
-    if (!configGetUint64 (config, opt_name__ping_timeout, &rtmp_ping_timeout_sec, rtmp_ping_timeout_sec))
-        return Result::Failure;
-    logI_ (_func, opt_name__ping_timeout, ": ", rtmp_ping_timeout_sec);
+    Time rtmp_ping_timeout_millisec;
+    {
+        Uint64 rtmp_ping_timeout_sec = 5 * 60;
+        if (!configGetUint64 (config, opt_name__ping_timeout, &rtmp_ping_timeout_sec, rtmp_ping_timeout_sec))
+            return Result::Failure;
+        logI_ (_func, opt_name__ping_timeout, ": ", rtmp_ping_timeout_sec);
+
+        rtmp_ping_timeout_millisec = rtmp_ping_timeout_sec * 1000;
+    }
 
     Time rtmpt_session_timeout = 30;
     {
@@ -1498,7 +1457,8 @@ static Result momentRtmpInit ()
 	}
     }
 
-    record_path = config->getString_default ("mod_rtmp/record_path", record_path);
+    record_path = st_grab (new (std::nothrow) String (
+                          config->getString_default ("mod_rtmp/record_path", record_path->mem())));
 
     {
 	ConstMemory const opt_name = "mod_rtmp/record_limit";
@@ -1637,9 +1597,9 @@ static Result momentRtmpInit ()
                         video_mode = Transcoder::TranscodingMode_Off;
                 }
 
-                Ref<TranscodeEntry> const transcode_entry = grab (new TranscodeEntry);
-                transcode_entry->suffix = grab (new String (suffix));
-                transcode_entry->chain  = grab (new String (chain));
+                Ref<TranscodeEntry> const transcode_entry = grab (new (std::nothrow) TranscodeEntry);
+                transcode_entry->suffix = grab (new (std::nothrow) String (suffix));
+                transcode_entry->chain  = grab (new (std::nothrow) String (chain));
                 transcode_entry->audio_mode = audio_mode;
                 transcode_entry->video_mode = video_mode;
 
@@ -1690,7 +1650,7 @@ static Result momentRtmpInit ()
 	if (!rtmp_module->rtmp_service.init (server_app->getServerContext(),
                                              moment->getPagePool(),
                                              send_delay_millisec,
-                                             rtmp_ping_timeout_sec * 1000,
+                                             rtmp_ping_timeout_millisec,
                                              prechunking_enabled,
                                              rtmp_accept_watchdog_timeout_sec))
         {
@@ -1751,7 +1711,7 @@ static Result momentRtmpInit ()
                                  moment->getPagePool(),
                                  // TODO standalone_rtmpt enable/disable from config
                                  true /* enable_standalone_tcp_server */,
-                                 rtmp_ping_timeout_sec * 1000,
+                                 rtmp_ping_timeout_millisec,
                                  rtmpt_session_timeout,
                                  // TODO Separate rtmpt_conn_keepalive_timeout
                                  rtmpt_session_timeout,
@@ -1797,6 +1757,13 @@ static Result momentRtmpInit ()
         moment->getAdminHttpService()->addHttpHandler (
                 CbDesc<HttpService::HttpHandler> (&MomentRtmpModule::admin_http_handler, rtmp_module, rtmp_module),
                 "mod_rtmp");
+    }
+
+    {
+        Ref<RtmpPushProtocol> const rtmp_push_proto = grab (new (std::nothrow) RtmpPushProtocol);
+        rtmp_push_proto->init (moment, rtmp_ping_timeout_millisec);
+        moment->addPushProtocol ("rtmp", rtmp_push_proto);
+        moment->addPushProtocol ("momentrtmp", rtmp_push_proto);
     }
 
     return Result::Success;
