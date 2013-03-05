@@ -60,7 +60,7 @@ ChannelManager::adminHttpRequest (HttpRequest * const mt_nonnull req,
             goto _return;
         }
 
-        ConstMemory const dir_name = "/opt/moment/conf.d";
+        ConstMemory const dir_name = self->confd_dirname->mem();
         StRef<String> const path = st_makeString (dir_name, "/", item_name);
 
         if (!self->loadConfigItem (item_name, path->mem())) {
@@ -192,15 +192,67 @@ ChannelManager::serverHttpRequest (HttpRequest * const mt_nonnull req,
     return MomentServer::HttpRequestResult::Success;
 }
 
+void
+ChannelManager::notifyChannelCreated (ChannelInfo * const mt_nonnull channel_info)
+{
+    logD_ (_func_);
+
+    {
+        ChannelCreationMessage * const msg = new (std::nothrow) ChannelCreationMessage;
+        assert (msg);
+        msg->channel = channel_info->channel;
+        msg->channel_name = st_grab (new (std::nothrow) String (channel_info->channel_name));
+        msg->config = channel_info->config;
+
+        mutex.lock ();
+        channel_creation_messages.append (msg);
+        mutex.unlock ();
+    }
+
+    deferred_reg.scheduleTask (&channel_created_task, false /* permanent */);
+}
+
+bool
+ChannelManager::channelCreatedTask (void * const _self)
+{
+    ChannelManager * const self = static_cast <ChannelManager*> (_self);
+
+    logD_ (_func_);
+
+    self->mutex.lock ();
+
+    while (!self->channel_creation_messages.isEmpty()) {
+        ChannelCreationMessage * const msg = self->channel_creation_messages.getFirst();
+        self->channel_creation_messages.remove (msg);
+
+        ChannelInfo channel_info;
+        channel_info.channel      = msg->channel;
+        channel_info.channel_name = msg->channel_name->mem();
+        channel_info.config       = msg->config;
+
+        self->mutex.unlock ();
+
+        self->fireChannelCreated (&channel_info);
+        delete msg;
+
+        self->mutex.lock ();
+    }
+
+    self->mutex.unlock ();
+
+    return false /* do not rechedule */;
+}
+
 Result
 ChannelManager::loadConfigFull ()
 {
     logD_ (_func_);
 
-    ConstMemory const dir_name = "/opt/moment/conf.d";
+#ifndef LIBMARY_PLATFORM_WIN32
+    ConstMemory const dir_name = confd_dirname->mem();
     Ref<Vfs> const vfs = Vfs::createDefaultLocalVfs (dir_name);
 
-    Ref<Vfs::Directory> const dir = vfs->openDirectory ("");
+    Ref<Vfs::VfsDirectory> const dir = vfs->openDirectory ("");
     if (!dir) {
         logE_ (_func, "could not open ", dir_name, " directory: ", exc->toString());
         return Result::Failure;
@@ -209,7 +261,7 @@ ChannelManager::loadConfigFull ()
     for (;;) {
         Ref<String> filename;
         if (!dir->getNextEntry (filename)) {
-            logE_ (_func, "Vfs::Directory::getNextEntry() failed: ", exc->toString());
+            logE_ (_func, "Vfs::VfsDirectory::getNextEntry() failed: ", exc->toString());
             return Result::Failure;
         }
         if (!filename)
@@ -222,6 +274,7 @@ ChannelManager::loadConfigFull ()
         if (!loadConfigItem (filename->mem(), path->mem()))
             return Result::Failure;
     }
+#endif
 
     return Result::Success;
 }
@@ -264,6 +317,7 @@ parseChannelConfig (MConfig::Section * const mt_nonnull section,
     char const opt_name__force_transcode[]           = "force_transcode";
     char const opt_name__force_transcode_audio[]     = "force_transcode_audio";
     char const opt_name__force_transcode_video[]     = "force_transcode_video";
+    char const opt_name__sync_to_clock[]             = "sync_to_clock";
     char const opt_name__send_metadata[]             = "send_metadata";
     char const opt_name__enable_prechunking[]        = "enable_prechunking";
 // TODO resize and transcoding settings
@@ -451,6 +505,16 @@ parseChannelConfig (MConfig::Section * const mt_nonnull section,
     }
     logD_ (_func, opt_name__force_transcode_video, ": ", force_transcode_video);
 
+    bool sync_to_clock = default_opts->default_item->sync_to_clock;
+    if (!configSectionGetBoolean (section,
+                                  opt_name__sync_to_clock,
+                                  &sync_to_clock,
+                                  sync_to_clock))
+    {
+        return Result::Failure;
+    }
+    logD_ (_func, opt_name__sync_to_clock, ": ", sync_to_clock);
+
     bool send_metadata = default_opts->default_item->send_metadata;
     if (!configSectionGetBoolean (section,
                                   opt_name__send_metadata,
@@ -497,6 +561,8 @@ parseChannelConfig (MConfig::Section * const mt_nonnull section,
     item->force_transcode_audio = force_transcode_audio;
     item->force_transcode_video = force_transcode_video;
 
+    item->sync_to_clock = sync_to_clock;
+
     item->send_metadata = /* TODO send_metadata */ false;
     item->enable_prechunking = enable_prechunking;
 
@@ -516,7 +582,8 @@ ChannelManager::loadConfigItem (ConstMemory const item_name,
         mutex.lock ();
         if (ItemHash::EntryKey const old_item_key = item_hash.lookup (item_name)) {
             StRef<ConfigItem> const item = old_item_key.getData();
-            item->channel->endVideoStream ();
+// DEPRECATED            item->channel->endVideoStream ();
+            item->channel->getPlayback()->stop ();
             item_hash.remove (old_item_key);
         }
         mutex.unlock ();
@@ -531,7 +598,8 @@ ChannelManager::loadConfigItem (ConstMemory const item_name,
     StRef<ConfigItem> item;
     if (ItemHash::EntryKey const old_item_key = item_hash.lookup (item_name)) {
         item = old_item_key.getData();
-        item->channel->endVideoStream ();
+// DEPRECATED        item->channel->endVideoStream ();
+        item->channel->getPlayback()->stop ();
     } else {
         item = st_grab (new (std::nothrow) ConfigItem);
         item_hash.add (item_name, item);
@@ -558,19 +626,33 @@ ChannelManager::loadConfigItem (ConstMemory const item_name,
     logD_ (_func, "PlaybackItem: ");
     playback_item->dump();
 
-#warning Don't substitute existing channel
+#warning Don't substitute existing channel.
+#warning Notify only when a new channel is created.
     item->channel = grab (new (std::nothrow) Channel);
     item->channel->init (moment, channel_opts);
 
     item->config = config;
 
     // Calling with 'mutex' locked for extra safety.
+#if 0
+// DEPRECATED
     item->channel->beginVideoStream (
             playback_item,
             NULL /* stream_ticket */,
             NULL /* stream_ticket_ref */);
+#endif
+    item->channel->getPlayback()->setSingleItem (playback_item);
 
     mutex.unlock ();
+
+    {
+        ChannelInfo channel_info;
+        channel_info.channel      = item->channel;
+        channel_info.channel_name = item->channel_name->mem();
+        channel_info.config       = item->config;
+
+        notifyChannelCreated (&channel_info);
+    }
 
     return Result::Success;
 }
@@ -590,6 +672,15 @@ ChannelManager::init (MomentServer * const mt_nonnull moment,
     this->moment = moment;
     this->page_pool = page_pool;
 
+    {
+        Ref<MConfig::Config> const config = moment->getConfig();
+        confd_dirname = st_grab (new (std::nothrow) String (
+                                config->getString_default ("moment/confd_dir", "/opt/moment/conf.d")));
+    }
+
+    deferred_reg.setDeferredProcessor (
+            moment->getServerApp()->getServerContext()->getMainThreadContext()->getDeferredProcessor());
+
     moment->addAdminRequestHandler (
             CbDesc<MomentServer::HttpRequestHandler> (&admin_http_handler, this, this));
     moment->addServerRequestHandler (
@@ -597,8 +688,24 @@ ChannelManager::init (MomentServer * const mt_nonnull moment,
 }
 
 ChannelManager::ChannelManager ()
-    : page_pool (this)
+    : event_informer (this, &mutex),
+      page_pool (this)
 {
+    channel_created_task.cb = CbDesc<DeferredProcessor::TaskCallback> (channelCreatedTask, this, this);
+}
+
+ChannelManager::~ChannelManager ()
+{
+    deferred_reg.release ();
+
+    {
+        ChannelCreationMessageList::iterator iter (channel_creation_messages);
+        while (!iter.done()) {
+            ChannelCreationMessage * const msg = iter.next ();
+            delete msg;
+        }
+        channel_creation_messages.clear ();
+    }
 }
 
 }
