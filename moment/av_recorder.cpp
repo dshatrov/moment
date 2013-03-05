@@ -24,10 +24,8 @@ using namespace M;
 
 namespace Moment {
 
-namespace {
-LogGroup libMary_logGroup_recorder ("av_recorder", LogLevel::I);
-LogGroup libMary_logGroup_recorder_frames ("av_recorder_frames", LogLevel::I);
-}
+static LogGroup libMary_logGroup_recorder ("av_recorder", LogLevel::I);
+static LogGroup libMary_logGroup_recorder_frames ("av_recorder_frames", LogLevel::I);
 
 Sender::Frontend const AvRecorder::sender_frontend = {
     senderSendStateChanged,
@@ -139,10 +137,7 @@ AvRecorder::senderClosed (Exception * const exc_,
     AvRecorder * const self = recording->unsafe_av_recorder;
 
     recording->mutex.lock ();
-    if (recording->file_key) {
-	self->storage->releaseFile (recording->file_key);
-	recording->file_key = NULL;
-    }
+    recording->storage_file = NULL;
     recording->mutex.unlock ();
 }
 
@@ -281,14 +276,15 @@ AvRecorder::start (ConstMemory const filename)
     recording = grab (new Recording);
     muxer->setSender (&recording->sender);
 
-    recording->file_key = storage->openFile (filename, &recording->conn);
-    if (!recording->file_key) {
+    recording->storage_file = storage->openFile (filename);
+    if (!recording->storage_file) {
 	logE (recorder, _func, "storage->openFile() failed for filename ",
 	      filename, ": ", exc->toString());
 	recording = NULL;
 	mutex.unlock ();
 	return;
     }
+    recording->conn = recording->storage_file->getConnection();
 
     recording->weak_av_recorder = this;
     recording->unsafe_av_recorder = this;

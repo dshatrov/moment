@@ -65,7 +65,7 @@ private:
 	AvRecorder *unsafe_av_recorder;
 
 	Connection *conn;
-	mt_mutex (mutex) Storage::FileKey file_key;
+	mt_mutex (mutex) Ref<Storage::StorageFile> storage_file;
 
 	DeferredConnectionSender sender;
 
@@ -104,7 +104,6 @@ private:
     mt_const Cb<Frontend> frontend;
 
   mt_iface (VideoStream::FrameSaver::FrameHandler)
-
     static VideoStream::FrameSaver::FrameHandler const saved_frame_handler;
 
     static Result savedAudioFrame (VideoStream::AudioMessage * mt_nonnull audio_msg,
@@ -112,65 +111,54 @@ private:
 
     static Result savedVideoFrame (VideoStream::VideoMessage * mt_nonnull video_msg,
                                    void                      *_self);
-
   mt_iface_end
 
     mt_mutex (mutex) void muxInitialMessages ();
 
     mt_mutex (mutex) void doStop ();
 
-    mt_iface (Sender::Frontend)
-    mt_begin
-      static Sender::Frontend const sender_frontend;
+  mt_iface (Sender::Frontend)
+    static Sender::Frontend const sender_frontend;
 
-      static void senderSendStateChanged (Sender::SendState  send_state,
-					  void              *_recording);
+    static void senderSendStateChanged (Sender::SendState  send_state,
+                                        void              *_recording);
 
-      static void senderClosed (Exception *exc_,
-				void      *_recording);
-    mt_end
+    static void senderClosed (Exception *exc_,
+                              void      *_recording);
+  mt_iface_end
 
-    mt_iface (VideoStream::EventHandler)
-    mt_begin
-      static VideoStream::EventHandler const stream_handler;
+  mt_iface (VideoStream::EventHandler)
+    static VideoStream::EventHandler const stream_handler;
 
-      static void streamAudioMessage (VideoStream::AudioMessage * mt_nonnull msg,
-				      void *_stream_ticket);
+    static void streamAudioMessage (VideoStream::AudioMessage * mt_nonnull msg,
+                                    void *_stream_ticket);
 
-      static void streamVideoMessage (VideoStream::VideoMessage * mt_nonnull msg,
-				      void *_stream_ticket);
+    static void streamVideoMessage (VideoStream::VideoMessage * mt_nonnull msg,
+                                    void *_stream_ticket);
 
-      static void streamClosed (void *_stream_ticket);
-    mt_end
+    static void streamClosed (void *_stream_ticket);
+  mt_iface_end
 
 public:
-    void start (ConstMemory filename);
-
-    void pause ();
-
+    void start  (ConstMemory filename);
+    void pause  ();
     void resume ();
-
-    void stop ();
+    void stop   ();
 
     void setVideoStream (VideoStream *stream);
 
     mt_const void setMuxer (AvMuxer *muxer);
 
     mt_const void setFrontend (CbDesc<Frontend> const &frontend)
-    {
-	this->frontend = frontend;
-    }
+        { this->frontend = frontend; }
 
     mt_const void setRecordingLimit (Uint64 recording_limit)
-    {
-	this->recording_limit = recording_limit;
-    }
+        { this->recording_limit = recording_limit; }
 
     mt_const void init (ServerThreadContext *thread_ctx,
 			Storage             *storage);
 
-    AvRecorder (Object *coderef_container);
-
+     AvRecorder (Object *coderef_container);
     ~AvRecorder ();
 };
 
