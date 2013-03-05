@@ -38,31 +38,27 @@ class Recorder : public Object
 private:
     StateMutex mutex;
 
-    class Recording : public Referenced
-    {
-    public:
-	Recorder *recorder;
-    };
+    struct RecordingTicket : public Referenced
+        { Recorder *recorder; };
 
     mt_const MomentServer *moment;
-    mt_const ChannelSet *channel_set;
-    mt_const Ref<String> filename_prefix;
+    mt_const ChannelSet   *channel_set;
+    mt_const Ref<String>   filename_prefix;
     mt_const ServerThreadContext *recorder_thread_ctx;
 
     mt_async Playback playback;
 
     mt_async AvRecorder recorder;
-    mt_async FlvMuxer flv_muxer;
+    mt_async FlvMuxer   flv_muxer;
 
-    mt_mutex (mutex) bool recording_now;
-    mt_mutex (mutex) Ref<Recording> cur_recording;
-    mt_mutex (mutex) Ref<String> cur_channel_name;
-    mt_mutex (mutex) WeakRef<Channel> weak_cur_channel;
+    mt_mutex (mutex) bool                 recording_now;
+    mt_mutex (mutex) Ref<RecordingTicket> cur_recording_ticket;
+    mt_mutex (mutex) Ref<String>          cur_channel_name;
+    mt_mutex (mutex) WeakRef<Channel>     weak_cur_channel;
     mt_mutex (mutex) WeakRef<VideoStream> weak_cur_video_stream;
     mt_mutex (mutex) GenericInformer::SubscriptionKey channel_sbn;
 
     mt_iface (Playback::Frontend)
-    mt_begin
       static Playback::Frontend playback_frontend;
 
       static void startPlaybackItem (Playlist::Item          *item,
@@ -71,22 +67,25 @@ private:
 				     void                    *_self);
 
       static void stopPlaybackItem (void *_self);
-    mt_end
+    mt_iface_end
 
     mt_iface (Channel::ChannelEvents)
-    mt_begin
       static Channel::ChannelEvents channel_events;
 
-      static void startChannelItem (void *_recording);
+      static void startChannelItem (VideoStream *stream,
+                                    bool         stream_changed,
+                                    void        *_recording_ticket);
 
-      static void stopChannelItem (void *_recording);
+      static void stopChannelItem  (VideoStream *stream,
+                                    bool         stream_changed,
+                                    void        *_recording_ticket);
 
-      static void newVideoStream (void *_recording);
-    mt_end
+      static void newVideoStream   (VideoStream *stream,
+                                    void        *_recording_ticket);
+    mt_iface_end
 
     mt_mutex (mutex) void doStartItem ();
-
-    mt_mutex (mutex) void doStopItem ();
+    mt_mutex (mutex) void doStopItem  ();
 
 public:
     void setSingleChannel (ConstMemory const channel_name)
@@ -116,8 +115,7 @@ public:
 			ConstMemory   filename_prefix,
                         Uint64        min_playlist_duration_sec);
 
-    Recorder ();
-
+     Recorder ();
     ~Recorder ();
 };
 

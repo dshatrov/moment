@@ -39,7 +39,7 @@ Recorder::startPlaybackItem (Playlist::Item           * const item,
 
     self->mutex.lock ();
 
-    self->cur_recording = NULL;
+    self->cur_recording_ticket = NULL;
     self->cur_channel_name = NULL;
     self->weak_cur_channel = NULL;
     self->weak_cur_video_stream = NULL;
@@ -72,14 +72,14 @@ Recorder::startPlaybackItem (Playlist::Item           * const item,
     self->cur_channel_name = grab (new (std::nothrow) String (item->id->mem()));
     self->weak_cur_channel = channel;
 
-    self->cur_recording = grab (new (std::nothrow) Recording);
-    self->cur_recording->recorder = self;
+    self->cur_recording_ticket = grab (new (std::nothrow) RecordingTicket);
+    self->cur_recording_ticket->recorder = self;
 
     self->channel_sbn = channel->getEventInformer()->subscribe (CbDesc<Channel::ChannelEvents> (
 	    &channel_events,
-	    self->cur_recording /* cb_data */,
+	    self->cur_recording_ticket /* cb_data */,
 	    self /* coderef_container */,
-	    self->cur_recording /* ref_data */));
+	    self->cur_recording_ticket /* ref_data */));
 
     self->doStartItem ();
 
@@ -110,21 +110,25 @@ Recorder::stopPlaybackItem (void * const _self)
 Channel::ChannelEvents Recorder::channel_events = {
     startChannelItem,
     stopChannelItem,
-    newVideoStream
+    newVideoStream,
+    NULL /* destroyed */
 };
 
 void
-Recorder::startChannelItem (void * const _recording)
+Recorder::startChannelItem (VideoStream * const /* stream */,
+                            bool          const /* stream_changed */,
+                            void        * const _recording_ticket)
 {
-    Recording * const recording = static_cast <Recording*> (_recording);
-    Recorder * const self = recording->recorder;
+    RecordingTicket * const recording_ticket =
+            static_cast <RecordingTicket*> (_recording_ticket);
+    Recorder * const self = recording_ticket->recorder;
 
     logD_ (_func_);
 
     self->mutex.lock ();
-    if (self->cur_recording != recording) {
+    if (self->cur_recording_ticket != recording_ticket) {
 	self->mutex.unlock ();
-	logD_ (_func, "recording mismatch");
+	logD_ (_func, "recording ticket mismatch");
 	return;
     }
 
@@ -143,13 +147,16 @@ Recorder::startChannelItem (void * const _recording)
 }
 
 void
-Recorder::stopChannelItem (void * const _recording)
+Recorder::stopChannelItem (VideoStream * const /* stream */,
+                           bool          const /* stream_changed */,
+                           void        * const _recording_ticket)
 {
-    Recording * const recording = static_cast <Recording*> (_recording);
-    Recorder * const self = recording->recorder;
+    RecordingTicket * const recording_ticket =
+            static_cast <RecordingTicket*> (_recording_ticket);
+    Recorder * const self = recording_ticket->recorder;
 
     self->mutex.lock ();
-    if (self->cur_recording != recording) {
+    if (self->cur_recording_ticket != recording_ticket) {
 	self->mutex.unlock ();
 	return;
     }
@@ -160,13 +167,15 @@ Recorder::stopChannelItem (void * const _recording)
 }
 
 void
-Recorder::newVideoStream (void * const _recording)
+Recorder::newVideoStream (VideoStream * const /* stream */,
+                          void        * const _recording_ticket)
 {
-    Recording * const recording = static_cast <Recording*> (_recording);
-    Recorder * const self = recording->recorder;
+    RecordingTicket * const recording_ticket =
+            static_cast <RecordingTicket*> (_recording_ticket);
+    Recorder * const self = recording_ticket->recorder;
 
     self->mutex.lock ();
-    if (self->cur_recording != recording) {
+    if (self->cur_recording_ticket != recording_ticket) {
 	self->mutex.unlock ();
 	return;
     }
