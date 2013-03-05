@@ -26,8 +26,8 @@
 // Hint: Don't put commas after *HEADERS macros when using them.
 
 #define RTMPT_SERVICE__HEADERS_DATE \
-	Byte date_buf [timeToString_BufSize]; \
-	Size const date_len = timeToString (Memory::forObject (date_buf), getUnixtime());
+	Byte date_buf [unixtimeToString_BufSize]; \
+	Size const date_len = unixtimeToString (Memory::forObject (date_buf), getUnixtime());
 
 #define RTMPT_SERVICE__COMMON_HEADERS(keepalive) \
 	"Server: Moment/1.0\r\n" \
@@ -403,7 +403,8 @@ RtmptService::doOpen (Sender * const mt_nonnull conn_sender,
                              page_pool,
                              0 /* send_delay_millisec */,
                              rtmp_ping_timeout_millisec,
-                             prechunking_enabled);
+                             prechunking_enabled,
+                             false /* momentrtmp_proto */);
     session->rtmp_conn.setBackend (
             Cb<RtmpConnection::Backend> (&rtmp_conn_backend, session, session));
     session->rtmp_conn.setSender (&session->rtmpt_sender);
@@ -597,7 +598,7 @@ RtmptService::httpRequest (HttpRequest * const req,
 
     rtmpt_conn->cur_req_session = NULL;
     Ref<RtmptSession> const session = self->doHttpRequest (req, &rtmpt_conn->conn_sender, rtmpt_conn);
-    if (session && req->getContentLength() > 0)
+    if (session && req->hasBody())
         rtmpt_conn->cur_req_session = session;
 
     if (!req->getKeepalive() || self->no_keepalive_conns)
@@ -606,7 +607,7 @@ RtmptService::httpRequest (HttpRequest * const req,
 
 mt_async void
 RtmptService::httpMessageBody (HttpRequest * const mt_nonnull /* req */,
-                               Memory        const &mem,
+                               Memory        const mem,
                                bool          const /* end_of_request */,
                                Size        * const mt_nonnull ret_accepted,
                                void        * const  _rtmpt_conn)
@@ -617,7 +618,6 @@ RtmptService::httpMessageBody (HttpRequest * const mt_nonnull /* req */,
         return;
 
     RtmptSession * const session = rtmpt_conn->cur_req_session;
-
     if (!session) {
 	*ret_accepted = mem.len();
         return;
@@ -654,8 +654,9 @@ RtmptService::httpMessageBody (HttpRequest * const mt_nonnull /* req */,
 }
 
 mt_async void
-RtmptService::httpClosed (Exception * const exc_,
-                          void      * const _rtmpt_conn)
+RtmptService::httpClosed (HttpRequest * const /* req */,
+                          Exception   * const exc_,
+                          void        * const _rtmpt_conn)
 {
     if (exc_)
 	logE_ (_func, "exception: ", exc_->toString());
@@ -685,7 +686,7 @@ RtmptService::service_httpRequest (HttpRequest   * const mt_nonnull req,
     RtmptService * const self = static_cast <RtmptService*> (_self);
 
     Ref<RtmptSession> session = self->doHttpRequest (req, conn_sender, NULL /* rtmpt_conn */);
-    if (session && req->getContentLength() > 0) {
+    if (session && req->hasBody()) {
         *ret_msg_data = session;
         session.setNoUnref ((RtmptSession*) NULL);
     }
@@ -741,8 +742,17 @@ RtmptService::service_httpMessageBody (HttpRequest  * const mt_nonnull /* req */
         *ret_accepted = accepted;
     }
 
-    if (end_of_request)
+    if (end_of_request) {
+        if (*ret_accepted != mem.len()) {
+            logW_ (_func, "RTMPT request contains an incomplete RTMP message");
+            self->mutex.lock ();
+            mt_unlocks (mutex) self->destroyRtmptSession (session, true /* close_rtmp_conn */);
+            session->unref ();
+            return Result::Failure;
+        }
+
 	session->unref ();
+    }
 
     return Result::Success;
 }

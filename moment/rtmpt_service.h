@@ -256,13 +256,14 @@ private:
 				      void        *_rtmpt_conn);
 
     static mt_async void httpMessageBody (HttpRequest  * mt_nonnull req,
-					  Memory const &mem,
+					  Memory        mem,
 					  bool          end_of_request,
 					  Size         * mt_nonnull ret_accepted,
 					  void         *_rtmpt_conn);
 
-    static mt_async void httpClosed (Exception *exc,
-				     void      *_rtmpt_conn);
+    static mt_async void httpClosed (HttpRequest *req,
+                                     Exception   *exc,
+				     void        *_rtmpt_conn);
   mt_iface_end
 
   mt_iface (HttpService::HttpHandler)
