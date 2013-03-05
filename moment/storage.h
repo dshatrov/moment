@@ -1,5 +1,5 @@
 /*  Moment Video Server - High performance media server
-    Copyright (C) 2011 Dmitry Shatrov
+    Copyright (C) 2011-2013 Dmitry Shatrov
     e-mail: shatrov@gmail.com
 
     This program is free software: you can redistribute it and/or modify
@@ -17,9 +17,12 @@
 */
 
 
-#ifndef __MOMENT__STORAGE__H__
-#define __MOMENT__STORAGE__H__
+#ifndef MOMENT__STORAGE__H__
+#define MOMENT__STORAGE__H__
 
+
+#include <libmary/types.h>
+#include <cstring>
 
 #include <libmary/libmary.h>
 
@@ -28,21 +31,20 @@ namespace Moment {
 
 using namespace M;
 
-class Storage
+class Storage : public virtual CodeReferenced
 {
 public:
-    typedef void* FileKey;
+    class StorageFile : public Referenced
+    {
+    public:
+        virtual Connection* getConnection () = 0;
+    };
 
-    virtual mt_throws FileKey openFile (ConstMemory   filename,
-					Connection  **ret_conn) = 0;
-
-    virtual void releaseFile (FileKey file_key) = 0;
-
-    virtual ~Storage () {}
+    virtual mt_throws Ref<StorageFile> openFile (ConstMemory filename) = 0;
 };
 
 }
 
 
-#endif /* __MOMENT__STORAGE__H__ */
+#endif /* MOMENT__STORAGE__H__ */
 
