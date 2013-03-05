@@ -59,16 +59,8 @@ private:
 
         mt_mutex (mutex) PollGroup::PollableKey pollable_key;
 
-        Session ()
-            : rtmp_conn     (this /* coderef_container */),
-              tcp_conn      (this /* coderef_container */),
-              conn_sender   (this /* coderef_container */),
-              conn_receiver (this /* coderef_container */),
-              conn_state    (ConnectionState_Connect),
-              publishing    (0),
-              pollable_key  (NULL)
-        {
-        }
+         Session ();
+        ~Session ();
     };
 
     mt_const ServerThreadContext *thread_ctx;
@@ -82,7 +74,8 @@ private:
     mt_const Ref<String> password;
     mt_const Ref<String> app_name;
     mt_const Ref<String> stream_name;
-    bool momentrtmp_proto;
+    mt_const Time ping_timeout_millisec;
+    mt_const bool momentrtmp_proto;
 
     mt_mutex (mutex) Ref<Session> cur_session;
     mt_mutex (mutex) Timers::TimerKey reconnect_timer;
@@ -100,24 +93,19 @@ private:
     void scheduleReconnect (Session *old_session);
 
   mt_iface (TcpConnection::Frontend)
-
     static TcpConnection::Frontend const tcp_conn_frontend;
 
     static void connected (Exception *exc_,
                            void      *_session);
-
   mt_iface_end
 
   mt_iface (RtmpConnection::Backend)
-
     static RtmpConnection::Backend const rtmp_conn_backend;
 
     static void closeRtmpConn (void *_session);
-
   mt_iface_end
 
   mt_iface (VideoStream::FrameSaver::FrameHandler)
-
     static VideoStream::FrameSaver::FrameHandler const saved_frame_handler;
 
     static Result savedAudioFrame (VideoStream::AudioMessage * mt_nonnull audio_msg,
@@ -125,11 +113,9 @@ private:
 
     static Result savedVideoFrame (VideoStream::VideoMessage * mt_nonnull video_msg,
                                    void                      *_session);
-
   mt_iface_end
 
   mt_iface (RtmpConnection::Frontend)
-
     static RtmpConnection::Frontend const rtmp_conn_frontend;
 
     static Result handshakeComplete (void *_session);
@@ -142,11 +128,9 @@ private:
 
     static void closed (Exception *exc_,
                         void      *_session);
-
   mt_iface_end
 
   mt_iface (VideoStream::EventHandler)
-
     static VideoStream::EventHandler const video_event_handler;
 
     static void audioMessage (VideoStream::AudioMessage * mt_nonnull msg,
@@ -154,7 +138,6 @@ private:
 
     static void videoMessage (VideoStream::VideoMessage * mt_nonnull msg,
                               void                      *_self);
-
   mt_iface_end
 
 public:
@@ -166,6 +149,7 @@ public:
                         ConstMemory          _password,
                         ConstMemory          _app_name,
                         ConstMemory          _stream_name,
+                        Time                 _ping_timeout_millisec,
                         bool                 _momentrtmp_proto);
 
     RtmpPushConnection ();
@@ -177,18 +161,20 @@ class RtmpPushProtocol : public PushProtocol
 {
 private:
     mt_const Ref<MomentServer> moment;
+    mt_const Time ping_timeout_millisec;
 
 public:
   mt_iface (PushProtocol)
-
     mt_throws Ref<PushConnection> connect (VideoStream * mt_nonnull video_stream,
                                            ConstMemory  uri,
                                            ConstMemory  username,
                                            ConstMemory  password);
-
   mt_iface_end
 
-    mt_const void init (MomentServer * mt_nonnull moment);
+    mt_const void init (MomentServer * mt_nonnull moment,
+                        Time          ping_timeout_millisec);
+
+    RtmpPushProtocol ();
 };
 
 }

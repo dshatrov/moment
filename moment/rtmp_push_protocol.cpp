@@ -24,6 +24,23 @@ using namespace M;
 
 namespace Moment {
 
+RtmpPushConnection::Session::Session ()
+            : rtmp_conn     (this /* coderef_container */),
+              tcp_conn      (this /* coderef_container */),
+              conn_sender   (this /* coderef_container */),
+              conn_receiver (this /* coderef_container */),
+              conn_state    (ConnectionState_Connect),
+              publishing    (0),
+              pollable_key  (NULL)
+{
+    logD_ (_this_func_);
+}
+
+RtmpPushConnection::Session::~Session ()
+{
+    logD_ (_this_func_);
+}
+
 mt_mutex (mutex) void
 RtmpPushConnection::destroySession (Session * const mt_nonnull session)
 {
@@ -52,7 +69,7 @@ RtmpPushConnection::startNewSession (Session * const old_session)
     logD_ (_func, "calling deleteReconnectTimer()");
     deleteReconnectTimer ();
 
-    Ref<Session> const session = grab (new Session);
+    Ref<Session> const session = grab (new (std::nothrow) Session);
     cur_session = session;
 
     session->rtmp_push_conn = this;
@@ -71,6 +88,7 @@ RtmpPushConnection::startNewSession (Session * const old_session)
                              // Using non-zero send delay gives negligible performance
                              // increase in this case.
                              0    /* send_delay_millisec */,
+                             ping_timeout_millisec,
                              /* TODO Control prechunking, it's not always desirable here. */
                              true /* prechunking_enabled */,
                              momentrtmp_proto);
@@ -418,6 +436,7 @@ RtmpPushConnection::init (ServerThreadContext * const mt_nonnull _thread_ctx,
                           ConstMemory           const _password,
                           ConstMemory           const _app_name,
                           ConstMemory           const _stream_name,
+                          Time                  const _ping_timeout_millisec,
                           bool                  const _momentrtmp_proto)
 {
     thread_ctx = _thread_ctx;
@@ -427,10 +446,11 @@ RtmpPushConnection::init (ServerThreadContext * const mt_nonnull _thread_ctx,
     video_stream = _video_stream;
 
     server_addr = _server_addr;
-    username = grab (new String (_username));
-    password = grab (new String (_password));
-    app_name = grab (new String (_app_name));
-    stream_name = grab (new String (_stream_name));
+    username = grab (new (std::nothrow) String (_username));
+    password = grab (new (std::nothrow) String (_password));
+    app_name = grab (new (std::nothrow) String (_app_name));
+    stream_name = grab (new (std::nothrow) String (_stream_name));
+    ping_timeout_millisec = _ping_timeout_millisec;
     momentrtmp_proto = _momentrtmp_proto;
 
     mutex.lock ();
@@ -490,8 +510,8 @@ RtmpPushProtocol::connect (VideoStream * const video_stream,
 
     IpAddress server_addr;
     // TODO Parse application name, channel name.
-    Ref<String> const app_name = grab (new String ("app"));
-    Ref<String> const stream_name = grab (new String ("lecture.desktop"));
+    Ref<String> const app_name = grab (new (std::nothrow) String ("app"));
+    Ref<String> const stream_name = grab (new (std::nothrow) String ("lecture.desktop"));
     bool momentrtmp_proto = false;
     {
       // URI forms:   rtmp://user:password@host:port/foo/bar
@@ -564,7 +584,7 @@ RtmpPushProtocol::connect (VideoStream * const video_stream,
     }
 
   {
-    Ref<RtmpPushConnection> const rtmp_push_conn = grab (new RtmpPushConnection);
+    Ref<RtmpPushConnection> const rtmp_push_conn = grab (new (std::nothrow) RtmpPushConnection);
     rtmp_push_conn->init (moment->getServerApp()->getServerContext()->selectThreadContext(),
                           moment->getPagePool(),
                           video_stream,
@@ -573,6 +593,7 @@ RtmpPushProtocol::connect (VideoStream * const video_stream,
                           password,
                           app_name->mem(),
                           stream_name->mem(),
+                          ping_timeout_millisec,
                           momentrtmp_proto);
 
     return rtmp_push_conn;
@@ -584,9 +605,16 @@ _failure:
 }
 
 mt_const void
-RtmpPushProtocol::init (MomentServer * const mt_nonnull moment)
+RtmpPushProtocol::init (MomentServer * const mt_nonnull moment,
+                        Time           const ping_timeout_millisec)
 {
     this->moment = moment;
+    this->ping_timeout_millisec = ping_timeout_millisec;
+}
+
+RtmpPushProtocol::RtmpPushProtocol ()
+    : ping_timeout_millisec (5 * 60 * 1000)
+{
 }
 
 }
