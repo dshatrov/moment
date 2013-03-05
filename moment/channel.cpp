@@ -37,7 +37,7 @@ Channel::startPlaybackItem (Playlist::Item          * const item,
 			    Playback::AdvanceTicket * const advance_ticket,
 			    void                    * const _self)
 {
-    logD_ (_func_, ", seek: ", seek);
+    logD_ (_func, "seek: ", seek);
 
     Channel * const self = static_cast <Channel*> (_self);
 
@@ -45,9 +45,6 @@ Channel::startPlaybackItem (Playlist::Item          * const item,
                             advance_ticket /* stream_ticket */,
                             advance_ticket /* stream_ticket_ref */,
                             seek);
-
-    logD_ (_func, "firing startItem");
-    self->fireStartItem ();
 }
 
 void
@@ -57,7 +54,6 @@ Channel::stopPlaybackItem (void * const _self)
 
     Channel * const self = static_cast <Channel*> (_self);
     self->endVideoStream ();
-    self->fireStopItem ();
 }
 
 VideoStream::EventHandler const Channel::stream_event_handler = {
@@ -78,6 +74,7 @@ Channel::numWatchersChanged (Count   const num_watchers,
     Channel * const self = stream_data->channel;
 
     self->mutex.lock ();
+#warning Revise usage of stream_closed
     if (stream_data != self->cur_stream_data /* ||
 	stream_data->stream_closed */)
     {
@@ -127,6 +124,8 @@ Channel::connectOnDemandTimerTick (void * const _stream_data)
     StreamData * const stream_data = static_cast <StreamData*> (_stream_data);
     Channel * const self = stream_data->channel;
 
+    Ref<VideoStream> old_stream;
+
     self->mutex.lock ();
     if (stream_data != self->cur_stream_data /* ||
 	stream_data->stream_closed */)
@@ -137,10 +136,12 @@ Channel::connectOnDemandTimerTick (void * const _stream_data)
 
     if (stream_data->num_watchers == 0) {
         logD_ (_func, "disconnecting on timeout");
-        self->closeStream (true /* replace_video_stream */);
+        self->closeStream (&old_stream);
     }
-
     self->mutex.unlock ();
+
+    if (old_stream)
+        old_stream->close ();
 }
 
 mt_mutex (mutex) void
@@ -277,7 +278,7 @@ Channel::streamThreadFunc (gpointer const _media_source)
 }
 
 mt_mutex (mutex) void
-Channel::closeStream (bool const replace_video_stream)
+Channel::closeStream (Ref<VideoStream> * const mt_nonnull ret_old_stream)
 {
     logD (ctl, _this_func_);
 
@@ -304,25 +305,16 @@ Channel::closeStream (bool const replace_video_stream)
     cur_stream_data = NULL;
 
     logD_ (_func, "video_stream: 0x", fmt_hex, (UintPtr) video_stream.ptr(), ", "
-           "replace_video_stream: ", replace_video_stream, ", "
            "keep_video_stream: ", channel_opts->keep_video_stream, ", "
            "continuous_playback: ", channel_opts->continuous_playback);
     if (video_stream) {
-        if (!replace_video_stream) {
-            moment->removeVideoStream (video_stream_key);
-            video_stream->close ();
-            if (video_stream_events_sbn) {
-                video_stream->getEventInformer()->unsubscribe (video_stream_events_sbn);
-                video_stream_events_sbn = NULL;
-            }
-            video_stream = NULL;
-        } else
         if (   !channel_opts->keep_video_stream
             && !channel_opts->continuous_playback)
         {
             // TODO moment->replaceVideoStream() to swap video streams atomically
             moment->removeVideoStream (video_stream_key);
-            video_stream->close ();
+            *ret_old_stream = video_stream;
+
             if (video_stream_events_sbn) {
                 video_stream->getEventInformer()->unsubscribe (video_stream_events_sbn);
                 video_stream_events_sbn = NULL;
@@ -356,24 +348,25 @@ Channel::doRestartStream (bool const from_ondemand_reconnect)
 {
     logD (ctl, _this_func_);
 
+    Ref<VideoStream> old_stream;
     bool new_video_stream = false;
-    if (media_source
-        && !from_ondemand_reconnect)
-    {
-        closeStream (true /* replace_video_stream */);
+#warning 'new_video_stream' setting is likely incorrect.
+    if (media_source && !from_ondemand_reconnect) {
+        closeStream (&old_stream);
         new_video_stream = true;
     }
 
     // TODO FIXME Set correct initial seek
     createStream (0 /* initial_seek */);
 
-//    VirtRef const tmp_stream_ticket_ref = stream_ticket_ref;
-//    void * const tmp_stream_ticket = stream_ticket;
-
+    Ref<VideoStream> const new_stream = video_stream;
     mutex.unlock ();
 
     if (new_video_stream)
-        fireNewVideoStream ();
+        fireNewVideoStream (new_stream);
+
+    if (old_stream)
+        old_stream->close ();
 }
 
 MediaSource::Frontend Channel::media_source_frontend = {
@@ -449,7 +442,8 @@ Channel::noVideo (void * const _stream_data)
 	return;
     }
 
-    logW_ (_func, "restarting stream");
+    logW_ (_func, "channel \"", self->channel_opts->channel_name, "\" (\"", self->channel_opts->channel_title, "\"): "
+           "no video, restarting stream");
     mt_unlocks (mutex) self->doRestartStream ();
 }
 
@@ -505,7 +499,7 @@ Channel::deferredTask (void * const _self)
   }
 
 _return:
-    return false /* Do not reschedule */;
+    return false /* do not reschedule */;
 }
 
 void
@@ -514,12 +508,17 @@ Channel::beginVideoStream (PlaybackItem   * const mt_nonnull item,
                            VirtReferenced * const stream_ticket_ref,
                            Time             const seek)
 {
-    logD (ctl, _this_func_);
+    if (logLevelOn_ (LogLevel::Debug)) {
+        logD (ctl, _this_func_);
+        item->dump ();
+    }
+
+    Ref<VideoStream> old_stream;
 
     mutex.lock ();
 
     if (media_source)
-	closeStream (true /* replace_video_stream */);
+	closeStream (&old_stream);
 
     this->cur_item = item;
 
@@ -528,7 +527,14 @@ Channel::beginVideoStream (PlaybackItem   * const mt_nonnull item,
 
     createStream (seek);
 
+    Ref<VideoStream> const new_stream = video_stream;
     mutex.unlock ();
+
+    if (old_stream)
+        old_stream->close ();
+
+    logD_ (_func, "firing startItem");
+    fireStartItem (new_stream, (old_stream != NULL) /* stream_changed */);
 }
 
 void
@@ -536,14 +542,22 @@ Channel::endVideoStream ()
 {
     logD (ctl, _this_func_);
 
+    Ref<VideoStream> old_stream;
+
     mutex.lock ();
 
     stream_stopped = true;
 
     if (media_source)
-	closeStream (true /* replace_video_stream */);
+	closeStream (&old_stream);
 
+    Ref<VideoStream> const new_stream = video_stream;
     mutex.unlock ();
+
+    if (old_stream)
+        old_stream->close ();
+
+    fireStopItem (new_stream, (old_stream != NULL) /* stream_changed */);
 }
 
 void
@@ -612,23 +626,13 @@ Channel::init (MomentServer   * const mt_nonnull moment,
     this->timers = moment->getServerApp()->getServerContext()->getMainThreadContext()->getTimers();
     this->page_pool = moment->getPagePool();
 
-    deferred_reg.setDeferredProcessor (moment->getServerApp()->getServerContext()->getMainThreadContext()->getDeferredProcessor());
+    deferred_reg.setDeferredProcessor (
+            moment->getServerApp()->getServerContext()->getMainThreadContext()->getDeferredProcessor());
 
     playback.init (CbDesc<Playback::Frontend> (&playback_frontend, this, this),
                    moment->getServerApp()->getServerContext()->getMainThreadContext()->getTimers(),
                    channel_opts->min_playlist_duration_sec);
 }
-
-// TODO Unused?
-#if 0
-void
-GstStreamCtl::release ()
-{
-    mutex.lock ();
-    closeStream (false /* replace_video_stream */);
-    mutex.unlock ();
-}
-#endif
 
 Channel::Channel ()
     : event_informer (this /* coderef_container */, &mutex),
@@ -637,6 +641,8 @@ Channel::Channel ()
       moment    (this /* coderef_container */),
       timers    (this /* coderef_container */),
       page_pool (this /* coderef_container */),
+
+      destroyed (false),
 
       stream_ticket (NULL),
 
@@ -653,39 +659,60 @@ Channel::Channel ()
 {
     logD (ctl, _this_func_);
 
-    deferred_task.cb = CbDesc<DeferredProcessor::TaskCallback> (
-	    deferredTask, this /* cb_data */, this /* coderef_container */);
+    deferred_task.cb = CbDesc<DeferredProcessor::TaskCallback> (deferredTask, this, this);
+}
+
+void
+Channel::doDestroy (bool const from_dtor)
+{
+    mutex.lock ();
+    destroyed = true;
+
+    mt_unlocks_locks (mutex) fireDestroyed_unlocked ();
+
+    stream_stopped = true;
+
+    // If we're in a dtor, then timers and subscription keys are invalid
+    // at this point, since deletion callbacks have already been called.
+    if (!from_dtor) {
+        if (connect_on_demand_timer)
+            timers->deleteTimer (connect_on_demand_timer);
+
+        if (media_source)
+            media_source->releasePipeline ();
+
+        if (video_stream_events_sbn)
+            video_stream->getEventInformer()->unsubscribe (video_stream_events_sbn);
+    }
+
+    media_source = NULL;
+    cur_stream_data = NULL;
+    video_stream_events_sbn = NULL;
+    connect_on_demand_timer = NULL;
+
+    Ref<VideoStream> old_stream = video_stream;
+    if (video_stream) {
+        moment->removeVideoStream (video_stream_key);
+        video_stream = NULL;
+    }
+
+    mutex.unlock ();
+
+    if (old_stream)
+        old_stream->close ();
+}
+
+void
+Channel::destroy ()
+{
+    doDestroy (false /* from_dtor */);
 }
 
 Channel::~Channel ()
 {
     logD (ctl, _this_func_);
 
-    mutex.lock ();
-
-    // Note: Calling closeStream() here would be wrong, because timer and
-    //       subscription keys are invalid at this point, since deletion
-    //       callbacks have already been called.
-//    closeStream (false /* replace_video_stream */);
-    {
-        if (media_source)
-            media_source->releasePipeline ();
-
-        if (video_stream) {
-            moment->removeVideoStream (video_stream_key);
-            video_stream->close ();
-        }
-    }
-
-#if 0
-    if (gst_stream) {
-        gst_stream->releasePipeline ();
-        gst_stream = NULL;
-    }
-#endif
-
-    mutex.unlock ();
-
+    doDestroy (true /* from_dtor */);
     deferred_reg.release ();
 }
 

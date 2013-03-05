@@ -43,38 +43,101 @@ private:
 public:
     struct ChannelEvents
     {
-        void (*startItem)      (void *cb_data);
-        void (*stopItem)       (void *cb_data);
-        void (*newVideoStream) (void *cb_data);
+        void (*startItem)      (VideoStream *stream,
+                                bool         stream_changed,
+                                void        *cb_data);
+
+        void (*stopItem)       (VideoStream *stream,
+                                bool         stream_changed,
+                                void        *cb_data);
+
+        void (*newVideoStream) (VideoStream *stream,
+                                void        *cb_data);
+
+        void (*destroyed)      (void *cb_data);
     };
 
 private:
     Informer_<ChannelEvents> event_informer;
 
+    struct EventData {
+        VideoStream *stream;
+        bool         stream_changed;
+
+        EventData (VideoStream * const stream,
+                   bool          const stream_changed)
+            : stream         (stream),
+              stream_changed (stream_changed)
+        {
+        }
+    };
+
     static void informStartItem (ChannelEvents * const events,
                                  void          * const cb_data,
-                                 void          * const /* inform_data */)
-        { if (events->startItem) events->startItem (cb_data); }
+                                 void          * const _data)
+    {
+        if (events->startItem) {
+            EventData * const data = static_cast <EventData*> (_data);
+            events->startItem (data->stream, data->stream_changed, cb_data);
+        }
+    }
 
     static void informStopItem (ChannelEvents * const events,
                                 void          * const cb_data,
-                                void          * const /* inform_data */)
-        { if (events->stopItem) events->stopItem (cb_data); }
+                                void          * const _data)
+    {
+        if (events->stopItem) {
+            EventData * const data = static_cast <EventData*> (_data);
+            events->stopItem (data->stream, data->stream_changed, cb_data);
+        }
+    }
 
     static void informNewVideoStream (ChannelEvents * const events,
                                       void          * const cb_data,
-                                      void          * const /* inform_data */)
-        { if (events->newVideoStream) events->newVideoStream (cb_data); }
+                                      void          * const _data)
+    {
+        if (events->newVideoStream) {
+            EventData * const data = static_cast <EventData*> (_data);
+            events->newVideoStream (data->stream, cb_data);
+        }
+    }
 
-    void fireStartItem ()
-        { event_informer.informAll (informStartItem, NULL); }
-    void fireStopItem ()
-        { event_informer.informAll (informStopItem, NULL); }
-    void fireNewVideoStream ()
-        { event_informer.informAll (informNewVideoStream, NULL); }
+    static void informDestroyed (ChannelEvents * const events,
+                                 void          * const cb_data,
+                                 void          * const /* inform_data */)
+        { if (events->destroyed) events->destroyed (cb_data); }
+
+    void fireStartItem (VideoStream * const stream,
+                        bool          const stream_changed)
+    {
+        EventData data (stream, stream_changed);
+        event_informer.informAll (informStartItem, &data);
+    }
+
+    void fireStopItem (VideoStream * const stream,
+                       bool          const stream_changed)
+    {
+        EventData data (stream, stream_changed);
+        event_informer.informAll (informStopItem, &data);
+    }
+
+    void fireNewVideoStream (VideoStream * const stream)
+    {
+        EventData data (stream, true /* stream_changed */);
+        event_informer.informAll (informNewVideoStream, &data);
+    }
+
+    mt_unlocks_locks (mutex) void fireDestroyed_unlocked ()
+        { event_informer.informAll_unlocked (informDestroyed, NULL); }
 
 public:
     Informer_<ChannelEvents>* getEventInformer () { return &event_informer; }
+
+    void channelLock ()   { mutex.lock (); }
+    void channelUnlock () { mutex.unlock (); }
+
+    mt_mutex (mutex) Ref<VideoStream> getVideoStream_unlocked () const { return video_stream; }
+    mt_mutex (mutex) bool             isDestroyed_unlocked    () const { return destroyed; }
 
 
   // ________________________________ playback _________________________________
@@ -83,7 +146,6 @@ private:
     Playback playback;
 
     mt_iface (Playback::Frontend)
-    mt_begin
       static Playback::Frontend playback_frontend;
 
       static void startPlaybackItem (Playlist::Item          *item,
@@ -92,7 +154,7 @@ private:
 				     void                    *_self);
 
       static void stopPlaybackItem (void *_self);
-    mt_end
+    mt_iface_end
 
 public:
     Playback* getPlayback () { return &playback; }
@@ -145,6 +207,8 @@ private:
     mt_mutex (mutex) GenericInformer::SubscriptionKey video_stream_events_sbn;
     mt_mutex (mutex) MomentServer::VideoStreamKey video_stream_key;
 
+    mt_mutex (mutex) bool destroyed;
+
     mt_mutex (mutex) void *stream_ticket;
     mt_mutex (mutex) VirtRef stream_ticket_ref;
 
@@ -178,12 +242,11 @@ private:
 
     static gpointer streamThreadFunc (gpointer _media_source);
 
-    mt_mutex (mutex) void closeStream (bool replace_video_stream);
+    mt_mutex (mutex) void closeStream (Ref<VideoStream> * mt_nonnull ret_old_stream);
 
     mt_unlocks (mutex) void doRestartStream (bool from_ondemand_reconnect = false);
 
     mt_iface (MediaSource::Frontend)
-    mt_begin
       static MediaSource::Frontend media_source_frontend;
 
       static void streamError (void *_stream_data);
@@ -191,18 +254,23 @@ private:
       static void noVideo     (void *_stream_data);
       static void gotVideo    (void *_stream_data);
       static void streamStatusEvent (void *_stream_data);
-    mt_end
+    mt_iface_end
 
     static bool deferredTask (void *_self);
 
-public:
+    void doDestroy (bool from_dtor);
+
     void beginVideoStream (PlaybackItem * mt_nonnull item,
 			   void           *stream_ticket,
 			   VirtReferenced *stream_ticket_ref,
 			   Time            seek = 0);
 
     void endVideoStream ();
+
+public:
     void restartStream  ();
+
+    void destroy ();
 
     bool isSourceOnline ();
 
