@@ -35,8 +35,8 @@
 
 
 #define MOMENT_SERVER__HEADERS_DATE \
-	Byte date_buf [timeToString_BufSize]; \
-	Size const date_len = timeToString (Memory::forObject (date_buf), getUnixtime());
+	Byte date_buf [unixtimeToString_BufSize]; \
+	Size const date_len = unixtimeToString (Memory::forObject (date_buf), getUnixtime());
 
 #define MOMENT_SERVER__COMMON_HEADERS \
 	"Server: Moment/1.0\r\n" \
@@ -72,6 +72,8 @@
 namespace Moment {
 
 using namespace M;
+
+class ChannelManager;
 
 // Only one MomentServer object may be initialized during program's lifetime.
 // This limitation comes form loadable modules support.
@@ -332,10 +334,9 @@ public:
     public:
 	struct Events
 	{
-	    void (*rtmpCommandMessage) (RtmpConnection       * mt_nonnull conn,
-//					Uint32                msg_stream_id,
+	    void (*rtmpCommandMessage) (RtmpConnection       * mt_nonnull rtmp_conn,
 					VideoStream::Message * mt_nonnull msg,
-					ConstMemory const    &method_name,
+					ConstMemory           method_name,
 					AmfDecoder           * mt_nonnull amf_decoder,
 					void                 *cb_data);
 
@@ -400,7 +401,7 @@ public:
     private:
 	void fireRtmpCommandMessage (RtmpConnection       * mt_nonnull conn,
 				     VideoStream::Message * mt_nonnull msg,
-				     ConstMemory const    &method_name,
+				     ConstMemory           method_name,
 				     AmfDecoder           * mt_nonnull amf_decoder);
 
 	ClientSession ();
@@ -422,10 +423,10 @@ public:
 
     struct ClientHandler
     {
-	void (*clientConnected) (ClientSession     *client_session,
-				 ConstMemory const &app_name,
-				 ConstMemory const &full_app_name,
-				 void              *cb_data);
+	void (*clientConnected) (ClientSession *client_session,
+				 ConstMemory    app_name,
+				 ConstMemory    full_app_name,
+				 void          *cb_data);
     };
 
 private:
@@ -448,9 +449,9 @@ private:
 					   void          *cb_data,
 					   void          *inform_data);
 
-	void fireClientConnected (ClientSession     *client_session,
-				  ConstMemory const &app_name,
-				  ConstMemory const &full_app_name);
+	void fireClientConnected (ClientSession *client_session,
+				  ConstMemory    app_name,
+				  ConstMemory    full_app_name);
 
     public:
 	Informer_<ClientHandler>* getEventInformer ()
@@ -554,12 +555,14 @@ public:
 
 
 private:
-    mt_const ServerApp *server_app;
-    mt_const PagePool *page_pool;
-    mt_const HttpService *http_service;
-    mt_const HttpService *admin_http_service;
+    mt_const ServerApp        *server_app;
+    mt_const PagePool         *page_pool;
+    mt_const HttpService      *http_service;
+    mt_const HttpService      *admin_http_service;
     mt_const ServerThreadPool *recorder_thread_pool;
-    mt_const Storage *storage;
+    mt_const Storage          *storage;
+
+    mt_const WeakRef<ChannelManager> weak_channel_manager;
 
     mt_const bool publish_all_streams;
 
@@ -607,17 +610,14 @@ private:
 public:
   // Getting pointers to common objects
 
-    ServerApp* getServerApp ();
-
-    PagePool* getPagePool ();
-
-    HttpService* getHttpService ();
-
-    HttpService* getAdminHttpService ();
-
+    ServerApp*        getServerApp ();
+    PagePool*         getPagePool ();
+    HttpService*      getHttpService ();
+    HttpService*      getAdminHttpService ();
     ServerThreadPool* getRecorderThreadPool ();
+    Storage*          getStorage ();
 
-    Storage* getStorage ();
+    Ref<ChannelManager> getChannelManager () { return weak_channel_manager.getRef(); }
 
     static MomentServer* getInstance ();
 
@@ -860,7 +860,8 @@ public:
 		 HttpService      * mt_nonnull admin_http_service,
 		 MConfig::Config  * mt_nonnull config,
 		 ServerThreadPool * mt_nonnull recorder_thread_pool,
-		 Storage          * mt_nonnull storage);
+		 Storage          * mt_nonnull storage,
+                 ChannelManager   *channel_manager);
 
     MomentServer ();
 
@@ -878,6 +879,9 @@ public:
 };
 
 }
+
+
+#include <moment/channel_manager.h>
 
 
 #endif /* MOMENT__SERVER__H__ */

@@ -261,7 +261,7 @@ MomentServer::notifyDeferred_VideoStreamAdded (VideoStream * const mt_nonnull vi
 {
     VideoStreamAddedNotification * const notification = &vs_added_notifications.appendEmpty ()->data;
     notification->video_stream = video_stream;
-    notification->stream_name = grab (new String (stream_name));
+    notification->stream_name = grab (new (std::nothrow) String (stream_name));
 
     vs_inform_reg.scheduleTask (&vs_added_inform_task, false /* permanent */);
 }
@@ -394,7 +394,7 @@ MomentServer::ClientSession::setBackend (CbDesc<Backend> const &cb)
 void
 MomentServer::ClientSession::fireRtmpCommandMessage (RtmpConnection       * const mt_nonnull conn,
 						     VideoStream::Message * const mt_nonnull msg,
-						     ConstMemory const    &method_name,
+						     ConstMemory            const method_name,
 						     AmfDecoder           * const mt_nonnull amf_decoder)
 {
     InformRtmpCommandMessage_Data inform_data (conn, msg, method_name, amf_decoder);
@@ -447,9 +447,9 @@ MomentServer::ClientEntry::informClientConnected (ClientHandler * const client_h
 }
 
 void
-MomentServer::ClientEntry::fireClientConnected (ClientSession     * const client_session,
-						ConstMemory const &app_name,
-						ConstMemory const &full_app_name)
+MomentServer::ClientEntry::fireClientConnected (ClientSession * const client_session,
+						ConstMemory     const app_name,
+						ConstMemory     const full_app_name)
 {
     InformClientConnected_Data inform_data (client_session, app_name, full_app_name);
     event_informer.informAll (informClientConnected, &inform_data);
@@ -512,7 +512,7 @@ MomentServer::loadModules ()
     if (!vfs)
 	return Result::Failure;
 
-    Ref<Vfs::Directory> const dir = vfs->openDirectory (ConstMemory());
+    Ref<Vfs::VfsDirectory> const dir = vfs->openDirectory (ConstMemory());
     if (!dir)
 	return Result::Failure;
 
@@ -853,7 +853,7 @@ MomentServer::rtmpClientConnected (ConstMemory const &path,
     mutex.lock ();
     Ref<ClientEntry> const client_entry = getClientEntry (path, &path_tail, &root_namespace);
 
-    Ref<ClientSession> const client_session = grab (new ClientSession);
+    Ref<ClientSession> const client_session = grab (new (std::nothrow) ClientSession);
     client_session->weak_rtmp_conn = conn;
     client_session->unsafe_rtmp_conn = conn;
     client_session->client_addr = client_addr;
@@ -954,9 +954,10 @@ struct StartWatching_Data : public Referenced
 }
 
 static void startWatching_completeOk (StartWatching_Data * const data,
-                                      bool                 const call_cb = true)
+                                      bool                 const call_cb)
 {
     logA_ ("moment OK ", data->client_addr, " watch ", data->stream_name);
+
     if (call_cb)
         data->cb.call_ (data->video_stream);
 }
@@ -1006,18 +1007,18 @@ MomentServer::startWatching (ClientSession    * const mt_nonnull client_session,
     if (client_session->auth_key && !equal (client_session->auth_key->mem(), auth_key))
         logW_ (_func, "WARNING: Different auth keys for the same client session");
 
-    client_session->auth_key = grab (new String (auth_key));
+    client_session->auth_key = grab (new (std::nothrow) String (auth_key));
     client_session->mutex.unlock ();
 
     Ref<VideoStream> video_stream;
 
-    Ref<StartWatching_Data> const data = grab (new StartWatching_Data);
-    data->stream_name = grab (new String (stream_name));
+    Ref<StartWatching_Data> const data = grab (new (std::nothrow) StartWatching_Data);
+    data->stream_name = grab (new (std::nothrow) String (stream_name));
     data->client_addr = client_session->client_addr;
     data->cb = cb;
 
     if (auth_key.len() > 0)
-        data->auth_key = grab (new String (auth_key));
+        data->auth_key = grab (new (std::nothrow) String (auth_key));
 
     if (client_session->backend
         && client_session->backend->startWatching)
@@ -1094,7 +1095,7 @@ static void startWatching_startWatchingRet (VideoStream * const video_stream,
         return;
     }
 
-    startWatching_completeOk (data);
+    startWatching_completeOk (data, true /* call_cb */);
 }
 
 static void startWatching_checkAuthorizationRet (bool  authorized,
@@ -1143,7 +1144,7 @@ static void startWatching_checkAuthorizationRet (bool   const authorized,
         return;
     }
 
-    startWatching_completeOk (data);
+    startWatching_completeOk (data, true /* call_cb */);
 }
 
 
@@ -1231,19 +1232,19 @@ MomentServer::startStreaming (ClientSession    * const mt_nonnull client_session
     if (client_session->auth_key && !equal (client_session->auth_key->mem(), auth_key))
         logW_ (_func, "WARNING: Different auth keys for the same client session");
 
-    client_session->auth_key = grab (new String (auth_key));
+    client_session->auth_key = grab (new (std::nothrow) String (auth_key));
     client_session->mutex.unlock ();
 
-    Ref<StartStreaming_Data> const data = grab (new StartStreaming_Data);
+    Ref<StartStreaming_Data> const data = grab (new (std::nothrow) StartStreaming_Data);
     data->weak_moment = this;
     data->weak_client_session = client_session;
     data->video_stream = video_stream;
-    data->stream_name = grab (new String (stream_name));
+    data->stream_name = grab (new (std::nothrow) String (stream_name));
     data->client_addr = client_session->client_addr;
     data->cb = cb;
 
     if (auth_key.len() > 0)
-        data->auth_key = grab (new String (auth_key));
+        data->auth_key = grab (new (std::nothrow) String (auth_key));
 
     if (client_session->backend
 	&& client_session->backend->startStreaming)
@@ -1414,7 +1415,7 @@ MomentServer::addClientHandler_rec (CbDesc<ClientHandler> const &cb,
 	{
 	    Namespace::ClientEntryHash::EntryKey client_entry_key = nsp->client_entry_hash.lookup (path);
 	    if (!client_entry_key) {
-		Ref<ClientEntry> new_entry = grab (new ClientEntry);
+		Ref<ClientEntry> const new_entry = grab (new (std::nothrow) ClientEntry);
 		new_entry->parent_nsp = nsp;
 		new_entry->client_entry_key = nsp->client_entry_hash.add (path, new_entry);
 		client_entry = new_entry;
@@ -1436,7 +1437,7 @@ MomentServer::addClientHandler_rec (CbDesc<ClientHandler> const &cb,
     if (next_nsp_key) {
 	next_nsp = next_nsp_key.getData();
     } else {
-	Ref<Namespace> const new_nsp = grab (new Namespace);
+	Ref<Namespace> const new_nsp = grab (new (std::nothrow) Namespace);
 	new_nsp->parent_nsp = nsp;
 	new_nsp->namespace_hash_key = nsp->namespace_hash.add (next_nsp_name, new_nsp);
 	next_nsp = new_nsp;
@@ -1605,7 +1606,7 @@ MomentServer::addPageRequestHandler (CbDesc<PageRequestHandler> const &cb,
     if (hash_key) {
 	handler_entry = hash_key.getData();
     } else {
-	handler_entry = new PageRequestHandlerEntry;
+	handler_entry = new (std::nothrow) PageRequestHandlerEntry;
 	handler_entry->hash_key = page_handler_hash.add (path, handler_entry);
     }
 
@@ -1804,19 +1805,22 @@ MomentServer::init (ServerApp        * const mt_nonnull server_app,
 		    HttpService      * const mt_nonnull admin_http_service,
 		    MConfig::Config  * const mt_nonnull config,
 		    ServerThreadPool * const mt_nonnull recorder_thread_pool,
-		    Storage          * const mt_nonnull storage)
+		    Storage          * const mt_nonnull storage,
+                    ChannelManager   * const channel_manager)
 {
-    this->server_app = server_app;
-    this->page_pool = page_pool;
-    this->http_service = http_service;
-    this->admin_http_service = admin_http_service;
+    this->server_app           = server_app;
+    this->page_pool            = page_pool;
+    this->http_service         = http_service;
+    this->admin_http_service   = admin_http_service;
     this->recorder_thread_pool = recorder_thread_pool;
-    this->storage = storage;
+    this->storage              = storage;
+
+    this->weak_channel_manager = channel_manager;
 
     this->config = config;
     parseDefaultVarlist (config);
 
-    mix_video_stream = grab (new VideoStream);
+    mix_video_stream = grab (new (std::nothrow) VideoStream);
 
     vs_inform_reg.setDeferredProcessor (server_app->getServerContext()->getMainThreadContext()->getDeferredProcessor());
 
@@ -1864,8 +1868,8 @@ MomentServer::MomentServer ()
 {
     instance = this;
 
-    vs_added_inform_task.cb = CbDesc<DeferredProcessor::TaskCallback> (
-            videoStreamAddedInformTask, this /* cb_data */, this /* coderef_container */);
+    vs_added_inform_task.cb =
+            CbDesc<DeferredProcessor::TaskCallback> (videoStreamAddedInformTask, this, this);
 }
 
 MomentServer::~MomentServer ()
