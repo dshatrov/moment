@@ -30,8 +30,8 @@
 
 // TODO These header macros are the same as in rtmpt_server.cpp
 #define MOMENT_FILE__HEADERS_DATE \
-	Byte date_buf [timeToString_BufSize]; \
-	Size const date_len = timeToString (Memory::forObject (date_buf), getUnixtime());
+	Byte date_buf [unixtimeToString_BufSize]; \
+	Size const date_len = unixtimeToString (Memory::forObject (date_buf), getUnixtime());
 
 #define MOMENT_FILE__COMMON_HEADERS \
 	"Server: Moment/1.0\r\n" \
@@ -499,7 +499,7 @@ Result httpRequest (HttpRequest   * const mt_nonnull req,
 
     MOMENT_FILE__HEADERS_DATE;
 
-    Byte mtime_buf [timeToString_BufSize];
+    Byte mtime_buf [unixtimeToString_BufSize];
     Size mtime_len = 0;
     if (got_mtime)
         mtime_len = timeToHttpString (Memory::forObject (mtime_buf), &mtime);
