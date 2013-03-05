@@ -781,7 +781,7 @@ mt_unlocks_locks (mutex) void
 VideoStream::fireNumWatchersChanged (Count const num_watchers)
 {
     InformNumWatchersChanged_Data inform_data (num_watchers);
-    event_informer.informAll_unlocked (informNumWatchersChanged, &inform_data);
+    mt_unlocks_locks (mutex) event_informer.informAll_unlocked (informNumWatchersChanged, &inform_data);
 }
 
 void
@@ -822,14 +822,22 @@ VideoStream::plusOneWatcher_unlocked (Object * const guard_obj)
 
         mutex.lock ();
 
-        logD_ (_func, "--- abind: 0x", fmt_hex, (UintPtr) abind.weak_bind_stream.getTypedWeakPtr(),
-               ", abind_stream: 0x", (UintPtr) abind_stream.ptr());
-
-        if (abind.weak_bind_stream.getTypedWeakPtr() == abind_stream &&
-            vbind.weak_bind_stream.getTypedWeakPtr() == vbind_stream)
         {
-            break;
+            Ref<VideoStream> const new_abind_stream = abind.weak_bind_stream.getRef();
+            Ref<VideoStream> const new_vbind_stream = vbind.weak_bind_stream.getRef();
+            if (new_abind_stream.ptr() == abind_stream.ptr() &&
+                new_vbind_stream.ptr() == vbind_stream.ptr())
+            {
+              // Ok, moving on.
+                break;
+            }
         }
+
+        logD_ (_func, "extra iteration: "
+               "abind: 0x", fmt_hex, (UintPtr) abind.weak_bind_stream.getTypedWeakPtr(), ", "
+               "abind_stream: 0x",   (UintPtr) abind_stream.ptr(), ", "
+               "vbind: 0x", fmt_hex, (UintPtr) vbind.weak_bind_stream.getTypedWeakPtr(), ", "
+               "vbind_stream: 0x",   (UintPtr) vbind_stream.ptr());
 
         mutex.unlock ();
 
@@ -929,14 +937,22 @@ VideoStream::plusWatchers_unlocked (Count const delta)
 
         mutex.lock ();
 
-        if (abind.weak_bind_stream.getTypedWeakPtr() == abind_stream &&
-            vbind.weak_bind_stream.getTypedWeakPtr() == vbind_stream)
         {
-          // Ok, moving on.
-            break;
+            Ref<VideoStream> const new_abind_stream = abind.weak_bind_stream.getRef();
+            Ref<VideoStream> const new_vbind_stream = vbind.weak_bind_stream.getRef();
+            if (new_abind_stream.ptr() == abind_stream.ptr() &&
+                new_vbind_stream.ptr() == vbind_stream.ptr())
+            {
+              // Ok, moving on.
+                break;
+            }
         }
 
-        logD_ (_func, "extra iteration");
+        logD_ (_func, "extra iteration: "
+               "abind: 0x", fmt_hex, (UintPtr) abind.weak_bind_stream.getTypedWeakPtr(), ", "
+               "abind_stream: 0x",   (UintPtr) abind_stream.ptr(), ", "
+               "vbind: 0x", fmt_hex, (UintPtr) vbind.weak_bind_stream.getTypedWeakPtr(), ", "
+               "vbind_stream: 0x",   (UintPtr) vbind_stream.ptr());
 
         mutex.unlock ();
 
@@ -1323,10 +1339,10 @@ VideoStream::bind_messageEnd ()
         logD_ (_this_func, "binding now");
 
         if (abind.pending_bind_ticket)
-            bind_doMessageEnd (&abind);
+            mt_unlocks_locks (mutex) bind_doMessageEnd (&abind);
 
         if (vbind.pending_bind_ticket)
-            bind_doMessageEnd (&vbind);
+            mt_unlocks_locks (mutex) bind_doMessageEnd (&vbind);
 
         assert (bind_inform_counter > 0);
         --bind_inform_counter;
@@ -1660,6 +1676,8 @@ VideoStream::VideoStream ()
 VideoStream::~VideoStream ()
 {
     logD_ (_this_func_);
+
+  // TODO Why not to fire closed() event here? (for debugging?)
 
   // This lock ensures data consistency for 'frame_saver's destructor.
   // TODO ^^^ Does it? A single mutex lock/unlock pair does not (ideally) constitute

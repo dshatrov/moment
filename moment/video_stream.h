@@ -127,7 +127,7 @@ public:
     public:
 	static VideoFrameType fromFlvFrameType (Byte flv_frame_type);
 
-        bool hasTimestamp ()
+        bool hasTimestamp () const
         {
             return isVideoData() ||
                    value == AvcSequenceHeader ||
@@ -332,6 +332,7 @@ public:
 
     // TODO Rename to SavedVideoFrame.
     // TODO Get rid of Saved*Frame in favor of VideoStream::Audio/VideoMessage
+    //      ^^^ Or maybe use IntrusiveList for SavedFrame lists.
     struct SavedFrame
     {
 	VideoStream::VideoMessage msg;
@@ -389,8 +390,13 @@ public:
         Result reportSavedFrames (FrameHandler const * mt_nonnull frame_handler,
                                   void               *cb_data);
 
-	FrameSaver ();
+        VideoMessage* getAvcSequenceHeader ()
+            { return got_saved_avc_seq_hdr ? &saved_avc_seq_hdr.msg : NULL; }
 
+        AudioMessage* getAacSequenceHeader ()
+            { return got_saved_aac_seq_hdr ? &saved_aac_seq_hdr.msg : NULL; }
+
+	 FrameSaver ();
 	~FrameSaver ();
     };
 
@@ -536,7 +542,6 @@ private:
     mt_mutex (mutex) Count bind_inform_counter;
 
   mt_iface (FrameSaver::FrameHandler)
-
     static FrameSaver::FrameHandler const bind_frame_handler;
 
     static mt_unlocks_locks (mutex) Result bind_savedAudioFrame (AudioMessage * mt_nonnull audio_msg,
@@ -544,7 +549,6 @@ private:
 
     static mt_unlocks_locks (mutex) Result bind_savedVideoFrame (VideoMessage * mt_nonnull video_msg,
                                                                  void         *_self);
-
   mt_iface_end
 
     mt_mutex (mutex) bool bind_messageBegin (BindInfo   * mt_nonnull bind_info,
@@ -632,7 +636,6 @@ public:
 
 private:
   mt_iface (VideoStream::EventHandler)
-
     static EventHandler const abind_handler;
     static EventHandler const vbind_handler;
 
@@ -647,7 +650,6 @@ private:
                                          ConstMemory const &method_name,
                                          AmfDecoder        * mt_nonnull amf_decoder,
                                          void              *_bind_ticket);
-
   mt_iface_end
 
 public:
@@ -700,8 +702,7 @@ public:
         this->stream_params = stream_params;
     }
 
-    VideoStream ();
-
+     VideoStream ();
     ~VideoStream ();
 };
 

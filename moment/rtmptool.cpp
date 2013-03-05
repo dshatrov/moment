@@ -129,7 +129,6 @@ private:
 			void      *_self);
 
   mt_iface (VideoStream::EventHandler)
-
     static VideoStream::EventHandler const gen_stream_handler;
 
     static void genAudioMessage (VideoStream::AudioMessage *audio_msg,
@@ -137,7 +136,6 @@ private:
 
     static void genVideoMessage (VideoStream::VideoMessage *video_msg,
                                  void                      *_self);
-
   mt_iface_end
 
 public:
@@ -475,7 +473,8 @@ RtmpClient::init (ServerThreadContext * const thread_ctx,
                     0             /* send_delay_millisec */,
                     5 * 60 * 1000 /* ping_timeout_millisec */,
                     // Note: Set to "false" for hexdumps.
-                    true /* prechunking_enabled */);
+                    true          /* prechunking_enabled */,
+                    false         /* momentrtmp_proto */);
 }
 
 RtmpClient::RtmpClient (Object * const coderef_container,

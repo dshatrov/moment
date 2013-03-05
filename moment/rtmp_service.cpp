@@ -110,7 +110,8 @@ RtmpService::acceptOneConnection ()
                              page_pool,
                              send_delay_millisec,
                              rtmp_ping_timeout_millisec,
-                             prechunking_enabled);
+                             prechunking_enabled,
+                             false /* momentrtmp_proto */);
 
 // TEST
 //    session->traceReferences ();
