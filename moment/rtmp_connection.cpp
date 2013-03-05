@@ -1418,6 +1418,13 @@ RtmpConnection::pingTimerTick (void * const _self)
             logUnlock ();
         }
 
+        self->in_destr_mutex.lock ();
+        if (self->ping_send_timer) {
+            self->timers->deleteTimer (self->ping_send_timer);
+            self->ping_send_timer = NULL;
+        }
+        self->in_destr_mutex.unlock ();
+
 	logD (close, _self_func, "closing");
 	{
 	    InternalException internal_exc (InternalException::ProtocolError);
@@ -2988,12 +2995,12 @@ RtmpConnection::~RtmpConnection ()
     if (frontend)
         frontend.call (frontend->closed, /*(*/ (Exception*) NULL /*)*/);
 
+    in_destr_mutex.lock ();
+
     if (ping_send_timer) {
 	timers->deleteTimer (ping_send_timer);
         ping_send_timer = NULL;
     }
-
-    in_destr_mutex.lock ();
 
     {
 	ChunkStreamTree::Iterator iter (chunk_stream_tree);

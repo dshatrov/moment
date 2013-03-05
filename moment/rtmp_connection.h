@@ -48,8 +48,8 @@ private:
     // It'd be optimal to use a fence just once for each invocation of doProcessInput()
     // and only if there was a change to the part of the state which the destructor
     // needs.
-#warning TODO get rid of in_destr_mutex by malloc'ing part of RtmpConnection which is accessed
-#warning      from receiver's sync domain and using DeferredProcessor to schedule its deletion.
+#warning TODO get rid of in_destr_mutex by malloc'ing' part of RtmpConnection which is accessed
+#warning      from receiver's' sync domain and using DeferredProcessor to schedule its deletion.
     Mutex in_destr_mutex;
 
     // Protects sending state.
@@ -634,7 +634,7 @@ public:
 			Time      send_delay_millisec,
                         Time      ping_timeout_millisec,
                         bool      prechunking_enabled,
-                        bool      momentrtmp_proto = false);
+                        bool      momentrtmp_proto);
 
     RtmpConnection (Object *coderef_container);
 
