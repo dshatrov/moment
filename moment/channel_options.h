@@ -42,7 +42,7 @@ public:
         operator Value () const { return value; }
         SpecKind (Value const value) : value (value) {}
         SpecKind () {}
-        Size toString_ (Memory const &mem, Format const &fmt) const
+        Size toString_ (Memory const &mem, Format const & /* fmt */) const
         {
             switch (value) {
                 case None:     return toString (mem, "SpecKind::None");
@@ -69,6 +69,8 @@ public:
     bool force_transcode_audio;
     bool force_transcode_video;
 
+    bool sync_to_clock;
+
     bool send_metadata;
     bool enable_prechunking;
 
@@ -89,6 +91,7 @@ public:
                      "    force_transcode: ", force_transcode, "\n",
                      "    force_transcode_audio: ", force_transcode_audio, "\n"
                      "    force_transcode_video: ", force_transcode_video, "\n"
+                     "    sync_to_clock: ", sync_to_clock, "\n"
                      "    send_metadata: ", send_metadata, "\n"
                      "    enable_prechunking: ", enable_prechunking, "\n"
                      "    default_width:   ", default_width, "\n"
@@ -108,6 +111,8 @@ public:
           force_transcode (false),
           force_transcode_audio (false),
           force_transcode_video (false),
+
+          sync_to_clock (true),
 
           send_metadata (false),
           enable_prechunking (true),
