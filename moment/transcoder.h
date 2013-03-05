@@ -1,5 +1,5 @@
 /*  Moment Video Server - High performance media server
-    Copyright (C) 2012 Dmitry Shatrov
+    Copyright (C) 2012-2013 Dmitry Shatrov
     e-mail: shatrov@gmail.com
 
     This program is free software: you can redistribute it and/or modify
@@ -17,8 +17,8 @@
 */
 
 
-#ifndef __MOMENT__TRANSCODER_H__
-#define __MOMENT__TRANSCODER_H__
+#ifndef MOMENT__TRANSCODER__H__
+#define MOMENT__TRANSCODER__H__
 
 
 #include <libmary/libmary.h>
@@ -40,24 +40,23 @@ public:
         TranscodingMode_Direct
     };
 
-  // TODO Use pure virtual functions here.
-
-    mt_const virtual void addOutputStream (VideoStream     *out_stream,
+    mt_const virtual void addOutputStream (VideoStream     * mt_nonnull out_stream,
                                            ConstMemory      chain_str,
                                            TranscodingMode  audio_mode,
                                            TranscodingMode  video_mode) = 0;
 
-    mt_const virtual void init (Timers      * const timers,
-                                PagePool    * const page_pool,
-                                VideoStream * const src_stream,
-                                bool          const transcode_on_demand,
-                                Time          const transcode_on_demand_timeout_millisec) = 0;
+    // Must be called only once, *after* init() and addOutputSrteam() are called.
+    virtual void start (VideoStream * mt_nonnull src_stream) = 0;
 
-    virtual ~Transcoder ();
+    mt_const virtual void init (DeferredProcessor * mt_nonnull deferred_processor,
+                                Timers            * mt_nonnull timers,
+                                PagePool          * mt_nonnull page_pool,
+                                bool               transcode_on_demand,
+                                Time               transcode_on_demand_timeout_millisec) = 0;
 };
 
 }
 
 
-#endif /* __MOMENT__TRANSCODER_H__ */
+#endif /* MOMENT__TRANSCODER__H__ */
 

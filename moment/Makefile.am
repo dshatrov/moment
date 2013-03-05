@@ -120,9 +120,7 @@ libmoment_1_0_la_SOURCES =	\
 	hmac/hmac_sha2.c        \
                                 \
         tsmux/tsmux.c           \
-        tsmux/tsmuxstream.c     \
-                                \
-        transcoder.cpp
+        tsmux/tsmuxstream.c
 
 #	flv_file_source.cpp
 
