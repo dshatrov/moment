@@ -76,8 +76,6 @@ private:
     HttpService separate_admin_http_service;
     HttpService *admin_http_service_ptr;
 
-    LinePipe line_pipe;
-
     FixedThreadPool recorder_thread_pool;
 
     LocalStorage storage;
@@ -100,17 +98,18 @@ private:
 
     void ctl_segfault (ConstMemory reason);
 
-  mt_iface (LinePipe::Frontend)
+#ifndef LIBMARY_PLATFORM_WIN32
+    LinePipe line_pipe;
 
+  mt_iface (LinePipe::Frontend)
     static LinePipe::Frontend const ctl_pipe_frontend;
 
     static void ctl_line (ConstMemory  line,
                           void        *_self);
-
   mt_iface_end
+#endif
 
   mt_iface (HttpService::HttpHandler)
-
     static HttpService::HttpHandler const ctl_http_handler;
 
     static Result ctlHttpRequest (HttpRequest   * mt_nonnull req,
@@ -118,16 +117,13 @@ private:
                                   Memory const  & /* msg_body */,
                                   void         ** mt_nonnull /* ret_msg_data */,
                                   void          *_self);
-
   mt_iface_end
 
   mt_iface (MomentServer::Events)
-
     static MomentServer::Events const moment_server_events;
 
     static void configReload (MConfig::Config *new_config,
                               void            *_self);
-
   mt_iface_end
 
 
@@ -181,8 +177,11 @@ public:
           http_service (this /* coderef_container */),
           separate_admin_http_service (this /* coderef_container */),
           admin_http_service_ptr (&separate_admin_http_service),
+#ifndef LIBMARY_PLATFORM_WIN32
           line_pipe    (this /* coderef_container */),
-          recorder_thread_pool (this /* coderef_container */)
+#endif
+          recorder_thread_pool (this /* coderef_container */),
+          storage (this /* coderef_container */)
     {
     }
 
@@ -368,6 +367,7 @@ MomentInstance::ctl_segfault (ConstMemory const reason)
     abort ();
 }
 
+#ifndef LIBMARY_PLATFORM_WIN32
 LinePipe::Frontend const MomentInstance::ctl_pipe_frontend = {
     ctl_line
 };
@@ -426,6 +426,7 @@ void MomentInstance::ctl_line (ConstMemory   const line,
 
     logW_ (_func, "WARNING: Unknown control command: ", line);
 }
+#endif
 
 HttpService::HttpHandler const MomentInstance::ctl_http_handler = {
     ctlHttpRequest,
@@ -846,13 +847,15 @@ MomentInstance::run ()
 	return EXIT_FAILURE;
     }
 
+    Ref<ChannelManager> const channel_manager = grab (new (std::nothrow) ChannelManager);
     if (!moment_server.init (&server_app,
 			     &page_pool,
 			     &http_service,
 			     admin_http_service_ptr,
 			     config,
 			     &recorder_thread_pool,
-			     &storage))
+			     &storage,
+                             channel_manager))
     {
 	logE_ (_func, "moment_server.init() failed: ", exc->toString());
 	ret_res = EXIT_FAILURE;
@@ -874,6 +877,7 @@ MomentInstance::run ()
 	mutex.unlock ();
     }
 
+#ifndef LIBMARY_PLATFORM_WIN32
     if (!line_pipe.init (params->ctl_filename->mem(),
                          CbDesc<LinePipe::Frontend> (&ctl_pipe_frontend, this, this),
                          server_app.getServerContext()->getMainThreadContext()->getPollGroup(),
@@ -883,9 +887,9 @@ MomentInstance::run ()
     {
         logE_ (_func, "could not initialize ctl pipe: ", exc->toString());
     }
+#endif
 
   {
-    Ref<ChannelManager> const channel_manager = grab (new (std::nothrow) ChannelManager);
     channel_manager->init (&moment_server, &page_pool);
     {
         // TODO Parse 'streams' config section for these.
