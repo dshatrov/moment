@@ -944,6 +944,7 @@ namespace {
 struct StartWatching_Data : public Referenced
 {
     Ref<String> stream_name;
+    Ref<String> stream_name_with_params;
     Ref<String> auth_key;
     IpAddress client_addr;
 
@@ -956,7 +957,7 @@ struct StartWatching_Data : public Referenced
 static void startWatching_completeOk (StartWatching_Data * const data,
                                       bool                 const call_cb)
 {
-    logA_ ("moment OK ", data->client_addr, " watch ", data->stream_name);
+    logA_ ("moment OK ", data->client_addr, " watch ", data->stream_name_with_params);
 
     if (call_cb)
         data->cb.call_ (data->video_stream);
@@ -965,7 +966,7 @@ static void startWatching_completeOk (StartWatching_Data * const data,
 static void startWatching_completeNotFound (StartWatching_Data * const data,
                                             bool                 const call_cb = true)
 {
-    logA_ ("moment NOT_FOUND ", data->client_addr, " watch ", data->stream_name);
+    logA_ ("moment NOT_FOUND ", data->client_addr, " watch ", data->stream_name_with_params);
     if (call_cb)
         data->cb.call_ ((VideoStream*) NULL);
 }
@@ -973,7 +974,7 @@ static void startWatching_completeNotFound (StartWatching_Data * const data,
 static void startWatching_completeDenied (StartWatching_Data * const data,
                                           bool                 const call_cb = true)
 {
-    logA_ ("moment DENIED ", data->client_addr, " watch ", data->stream_name);
+    logA_ ("moment DENIED ", data->client_addr, " watch ", data->stream_name_with_params);
     if (call_cb)
         data->cb.call_ ((VideoStream*) NULL);
 }
@@ -981,7 +982,7 @@ static void startWatching_completeDenied (StartWatching_Data * const data,
 static void startWatching_completeGone (StartWatching_Data * const data,
                                         bool                 const call_cb = true)
 {
-    logA_ ("moment GONE ", data->client_addr, " watch ", data->stream_name);
+    logA_ ("moment GONE ", data->client_addr, " watch ", data->stream_name_with_params);
     if (call_cb)
         data->cb.call_ ((VideoStream*) NULL);
 }
@@ -997,6 +998,7 @@ static bool startWatching_checkAuthorization (StartWatching_Data        *data,
 bool
 MomentServer::startWatching (ClientSession    * const mt_nonnull client_session,
                              ConstMemory        const stream_name,
+                             ConstMemory        const stream_name_with_params,
                              ConstMemory        const auth_key,
                              CbDesc<StartWatchingCallback> const &cb,
                              Ref<VideoStream> * const mt_nonnull ret_video_stream)
@@ -1014,6 +1016,7 @@ MomentServer::startWatching (ClientSession    * const mt_nonnull client_session,
 
     Ref<StartWatching_Data> const data = grab (new (std::nothrow) StartWatching_Data);
     data->stream_name = grab (new (std::nothrow) String (stream_name));
+    data->stream_name_with_params = grab (new (std::nothrow) String (stream_name_with_params));
     data->client_addr = client_session->client_addr;
     data->cb = cb;
 
@@ -1031,6 +1034,7 @@ MomentServer::startWatching (ClientSession    * const mt_nonnull client_session,
                     client_session->backend->startWatching,
                     /*(*/
                         stream_name,
+                        stream_name_with_params,
                         client_session->client_addr,
                         CbDesc<StartWatchingCallback> (startWatching_startWatchingRet,
                                                        data,

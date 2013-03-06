@@ -911,6 +911,7 @@ static bool startRtmpWatching (ConstMemory    const _stream_name,
     client_session->watching = true;
 
     ConstMemory stream_name = _stream_name;
+    ConstMemory stream_name_with_params = stream_name;
 
     client_session->mutex.lock ();
     client_session->watching_params.reset ();
@@ -936,6 +937,7 @@ static bool startRtmpWatching (ConstMemory    const _stream_name,
         bool const complete =
                 moment->startWatching (client_session->srv_session,
                                        stream_name,
+                                       stream_name_with_params,
                                        (client_session->watching_params.auth_key ?
                                                client_session->watching_params.auth_key->mem() :
                                                ConstMemory()),

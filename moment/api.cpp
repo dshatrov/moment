@@ -583,6 +583,7 @@ static void client_startWatchingCallback (MomentStream * const ext_stream,
 }
 
 static bool client_startWatching (ConstMemory        const stream_name,
+                                  ConstMemory        const /* stream_name_with_params */,
                                   IpAddress          const client_addr,
                                   CbDesc<MomentServer::StartWatchingCallback> const &cb,
                                   Ref<VideoStream> * const mt_nonnull ret_video_stream,

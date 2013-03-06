@@ -346,6 +346,7 @@ public:
 	struct Backend
 	{
 	    bool (*startWatching) (ConstMemory       stream_name,
+                                   ConstMemory       stream_name_with_params,
                                    IpAddress         client_addr,
                                    CbDesc<StartWatchingCallback> const &cb,
                                    Ref<VideoStream> * mt_nonnull ret_video_stream,
@@ -692,6 +693,7 @@ public:
 
     bool startWatching (ClientSession    * mt_nonnull client_session,
                         ConstMemory       stream_name,
+                        ConstMemory       stream_name_with_params,
                         ConstMemory       auth_key,
                         CbDesc<StartWatchingCallback> const &cb,
                         Ref<VideoStream> * mt_nonnull ret_video_stream);
