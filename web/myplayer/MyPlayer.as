@@ -37,9 +37,17 @@ public class MyPlayer extends Sprite
         }
     }
 
+    private function getPlayheadTime () : Number {
+        if (net_stream != null)
+            return net_stream.time;
+
+        return 0;
+    }
+
     private var show_playlist_button : Boolean;
 
     private var conn : NetConnection;
+    private var net_stream : NetStream;
     private var video : Video;
 
     private var buttons_visible : Boolean;
@@ -51,7 +59,7 @@ public class MyPlayer extends Sprite
     private var fullscreen_button : LoadedElement;
 
     // Toggles horizontal mode. In normal mode, video is scaled in such a way
-    // that it fits the screen both vertically in horizontally. In horizontal
+    // that it fits the screen both vertically and horizontally. In horizontal
     // mode, only horizontal size is considered. This is useful for cutting
     // artificial black fields on top and on bottom of the video for wide
     // screens.
@@ -97,7 +105,7 @@ public class MyPlayer extends Sprite
 
     private function repositionSplash () : void
     {
-        splash.obj.x = (stage_width - splash.obj.width) / 2;
+        splash.obj.x = (stage_width -  splash.obj.width)  / 2;
         splash.obj.y = (stage_height - splash.obj.height) / 2;
     }
 
@@ -106,25 +114,50 @@ public class MyPlayer extends Sprite
 	if (stage_width == 0 || stage_height == 0)
 	    return true;
 
-	var x_aspect : Number = (0.0 + Number (video.videoWidth))  / Number (stage_width);
-	var y_aspect : Number = (0.0 + Number (video.videoHeight)) / Number (stage_height);
+        var width  : Number = video.videoWidth;
+        var height : Number = video.videoHeight;
+
+	if (width == 0 || height == 0) {
+            width  = video.width;
+            height = video.height
+        }
+
+	var x_aspect : Number = (0.0 + width)  / Number (stage_width);
+	var y_aspect : Number = (0.0 + height) / Number (stage_height);
 
 	return x_aspect >= y_aspect;
     }
 
     private function repositionVideo () : void
     {
+        var aspect : Number = 4.0 / 3.0;
+        if (video.videoWidth == 0 || video.videoHeight == 0)
+            aspect = video.width / video.height;
+
 	if (horizontal_mode || videoShouldBeHorizontal()) {
 	    video.width = stage_width;
-	    video.height = stage_width * (video.videoHeight / video.videoWidth);
+
+            if (video.videoWidth == 0 || video.videoHeight == 0)
+                video.height = stage_width * (1.0 / aspect);
+            else
+                video.height = stage_width * (video.videoHeight / video.videoWidth);
+
 	    video.x = 0;
 	    video.y = (stage_height - video.height) / 2;
 	} else {
-	    video.width = stage_height * (video.videoWidth / video.videoHeight);
+            if (video.videoWidth == 0 || video.videoHeight == 0)
+                video.width = stage_height * aspect;
+            else
+                video.width = stage_height * (video.videoWidth / video.videoHeight);
+
 	    video.height = stage_height;
+
 	    video.x = (stage_width - video.width) / 2;
 	    video.y = 0;
 	}
+
+//        ExternalInterface.call ("debug_videoDim", stage_height * (4.0 / 3.0), stage_height,
+//                                (horizontal_mode || videoShouldBeHorizontal()) ? "horiz" : "vert");
     }
 
     private function repositionButtons () : void
@@ -301,13 +334,13 @@ public class MyPlayer extends Sprite
 		reconnect_timer = 0;
 	    }
 
-	    var stream : NetStream = new NetStream (conn);
-	    stream.bufferTime = buffer_time;
-	    stream.client = new MyStreamClient();
+	    net_stream = new NetStream (conn);
+	    net_stream.bufferTime = buffer_time;
+	    net_stream.client = new MyStreamClient();
 
-	    video.attachNetStream (stream);
+	    video.attachNetStream (net_stream);
 
-	    stream.addEventListener (NetStatusEvent.NET_STATUS, onStreamNetStatus);
+	    net_stream.addEventListener (NetStatusEvent.NET_STATUS, onStreamNetStatus);
 
 	    video.addEventListener (NetStatusEvent.NET_STATUS,
 		function (event : NetStatusEvent) : void {
@@ -320,7 +353,7 @@ public class MyPlayer extends Sprite
 	    frame_no = 0;
 	    video.addEventListener (Event.ENTER_FRAME, onEnterFrame);
 
-	    stream.play (stream_name);
+	    net_stream.play (stream_name);
 	} else
 	if (event.info.code == "NetConnection.Connect.Closed") {
 	    video.removeEventListener (Event.ENTER_FRAME, onEnterFrame);
@@ -559,6 +592,7 @@ public class MyPlayer extends Sprite
 	trace ("--- ExternalInterface.available: " + ExternalInterface.available);
 	ExternalInterface.addCallback ("setSource", setSource);
         ExternalInterface.addCallback ("setFirstUri", setFirstUri);
+        ExternalInterface.addCallback ("getPlayheadTime", getPlayheadTime);
 
         /*
         playlist_button = new Sprite();
