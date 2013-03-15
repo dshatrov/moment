@@ -367,7 +367,7 @@ public:
 
         mt_mutex (mutex) Ref<String> auth_key;
 
-	mt_const WeakCodeRef weak_rtmp_conn;
+	mt_const WeakDepRef<RtmpConnection> weak_rtmp_conn;
 	mt_const RtmpConnection *unsafe_rtmp_conn;
 
 	mt_const IpAddress client_addr;
@@ -408,14 +408,7 @@ public:
 	ClientSession ();
 
     public:
-	RtmpConnection* getRtmpConnection (CodeRef * const mt_nonnull ret_code_ref)
-	{
-	    *ret_code_ref = weak_rtmp_conn;
-	    if (*ret_code_ref)
-		return unsafe_rtmp_conn;
-
-	    return NULL;
-	}
+	CodeDepRef<RtmpConnection> getRtmpConnection () { return weak_rtmp_conn; }
 
 	~ClientSession ();
     };

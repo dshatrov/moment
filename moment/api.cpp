@@ -765,8 +765,7 @@ void moment_client_send_rtmp_command_message (MomentClientSession * const api_cl
 					      unsigned char const * const msg_buf,
 					      size_t                const msg_len)
 {
-    CodeRef conn_ref;
-    RtmpConnection * const conn = api_client_session->int_client_session->getRtmpConnection (&conn_ref);
+    CodeDepRef<RtmpConnection> const conn = api_client_session->int_client_session->getRtmpConnection ();
     if (conn)
 	conn->sendCommandMessage_AMF0 (RtmpConnection::CommandMessageStreamId, ConstMemory (msg_buf, msg_len));
 }
@@ -774,8 +773,7 @@ void moment_client_send_rtmp_command_message (MomentClientSession * const api_cl
 void moment_client_send_rtmp_command_message_passthrough (MomentClientSession * const api_client_session,
 							  MomentMessage       * const api_msg)
 {
-    CodeRef conn_ref;
-    RtmpConnection * const conn = api_client_session->int_client_session->getRtmpConnection (&conn_ref);
+    CodeDepRef<RtmpConnection> const conn = api_client_session->int_client_session->getRtmpConnection ();
     if (conn) {
 	conn->sendCommandMessage_AMF0_Pages (RtmpConnection::CommandMessageStreamId,
 					     api_msg->page_list,

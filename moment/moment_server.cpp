@@ -929,8 +929,7 @@ _return:
 void
 MomentServer::disconnect (ClientSession * const mt_nonnull client_session)
 {
-    CodeRef rtmp_conn_ref;
-    RtmpConnection * const rtmp_conn = client_session->getRtmpConnection (&rtmp_conn_ref);
+    CodeDepRef<RtmpConnection> const rtmp_conn = client_session->getRtmpConnection();
     if (!rtmp_conn)
 	return;
 
@@ -1529,8 +1528,8 @@ MomentServer::addVideoStream (VideoStream * const video_stream,
 mt_mutex (mutex) void
 MomentServer::removeVideoStream_unlocked (VideoStreamKey const video_stream_key)
 {
-    logD_ (_func, "name: ", video_stream_key.entry_key.getKey(), ", "
-           "stream 0x", fmt_hex, (UintPtr) video_stream_key.entry_key.getDataPtr());
+//    logD_ (_func, "name: ", video_stream_key.entry_key.getKey(), ", "
+//           "stream 0x", fmt_hex, (UintPtr) video_stream_key.entry_key.getDataPtr());
     video_stream_hash.remove (video_stream_key.entry_key);
 }
 
