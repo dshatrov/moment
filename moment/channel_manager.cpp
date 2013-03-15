@@ -621,10 +621,10 @@ ChannelManager::loadConfigItem (ConstMemory const item_name,
     item->channel_title = st_grab (new (std::nothrow) String (channel_opts->channel_title->mem()));
 
     logD_ (_func, "ChannelOptions: ");
-    channel_opts->dump();
+    channel_opts->dump ();
 
     logD_ (_func, "PlaybackItem: ");
-    playback_item->dump();
+    playback_item->dump ();
 
 #warning Don't substitute existing channel.
 #warning Notify only when a new channel is created.

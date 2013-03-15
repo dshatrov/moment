@@ -428,7 +428,7 @@ VideoStream::FrameSaver::processVideoFrame (VideoMessage * const mt_nonnull msg)
 void
 VideoStream::FrameSaver::copyStateFrom (FrameSaver * const frame_saver)
 {
-    logD_ (_this_func_);
+//    logD_ (_this_func_);
 
     releaseState ();
 
@@ -576,7 +576,7 @@ void
 VideoStream::FrameSaver::releaseState (bool const release_audio,
                                        bool const release_video)
 {
-    logD_ (_this_func_);
+//    logD_ (_this_func_);
 
     if (release_video) {
         if (got_saved_keyframe) {
@@ -1670,12 +1670,12 @@ VideoStream::VideoStream ()
 
       event_informer (this, &mutex)
 {
-    logD_ (_this_func_);
+//    logD_ (_this_func_);
 }
 
 VideoStream::~VideoStream ()
 {
-    logD_ (_this_func_);
+//    logD_ (_this_func_);
 
   // TODO Why not to fire closed() event here? (for debugging?)
 

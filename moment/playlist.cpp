@@ -31,7 +31,7 @@ using namespace M;
 
 namespace Moment {
 
-static LogGroup libMary_logGroup_playlist ("moment.playlist", LogLevel::D);
+static LogGroup libMary_logGroup_playlist ("moment.playlist", LogLevel::I);
 
 Playlist::Item*
 Playlist::getNextItem (Item  * const prv_item,
@@ -42,7 +42,7 @@ Playlist::getNextItem (Item  * const prv_item,
 		       Time  * const mt_nonnull ret_duration,
 		       bool  * const mt_nonnull ret_duration_full)
 {
-    if (logLevelOn_ (LogLevel::Debug)) {
+    if (logLevelOn (playlist, LogLevel::Debug)) {
         logD (playlist, _func, "cur_time: ", cur_time, ", time_offset: ", time_offset);
         dump ();
     }

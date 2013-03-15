@@ -24,7 +24,7 @@ using namespace M;
 
 namespace Moment {
 
-static LogGroup libMary_logGroup_ctl ("moment.channel", LogLevel::D);
+static LogGroup libMary_logGroup_ctl ("moment.channel", LogLevel::I);
 
 Playback::Frontend Channel::playback_frontend = {
     startPlaybackItem,
@@ -37,7 +37,7 @@ Channel::startPlaybackItem (Playlist::Item          * const item,
 			    Playback::AdvanceTicket * const advance_ticket,
 			    void                    * const _self)
 {
-    logD_ (_func, "seek: ", seek);
+//    logD_ (_func, "seek: ", seek);
 
     Channel * const self = static_cast <Channel*> (_self);
 
@@ -50,7 +50,7 @@ Channel::startPlaybackItem (Playlist::Item          * const item,
 void
 Channel::stopPlaybackItem (void * const _self)
 {
-    logD_ (_func_);
+//    logD_ (_func_);
 
     Channel * const self = static_cast <Channel*> (_self);
     self->endVideoStream ();
@@ -304,9 +304,9 @@ Channel::closeStream (Ref<VideoStream> * const mt_nonnull ret_old_stream)
     }
     cur_stream_data = NULL;
 
-    logD_ (_func, "video_stream: 0x", fmt_hex, (UintPtr) video_stream.ptr(), ", "
-           "keep_video_stream: ", channel_opts->keep_video_stream, ", "
-           "continuous_playback: ", channel_opts->continuous_playback);
+//    logD_ (_func, "video_stream: 0x", fmt_hex, (UintPtr) video_stream.ptr(), ", "
+//           "keep_video_stream: ", channel_opts->keep_video_stream, ", "
+//           "continuous_playback: ", channel_opts->continuous_playback);
     if (video_stream) {
         if (   !channel_opts->keep_video_stream
             && !channel_opts->continuous_playback)
@@ -332,7 +332,7 @@ Channel::closeStream (Ref<VideoStream> * const mt_nonnull ret_old_stream)
             video_stream = grab (new (std::nothrow) VideoStream);
             setStreamParameters (video_stream);
 
-            logD_ (_func, "Calling moment->addVideoStream, stream_name: ", channel_opts->channel_name->mem());
+//            logD_ (_func, "calling moment->addVideoStream, stream_name: ", channel_opts->channel_name->mem());
             video_stream_key = moment->addVideoStream (video_stream, channel_opts->channel_name->mem());
 
             // Note: This is correct and essential for connect_on_demand.
@@ -340,7 +340,7 @@ Channel::closeStream (Ref<VideoStream> * const mt_nonnull ret_old_stream)
         }
     }
 
-    logD_ (_func, "done");
+//    logD_ (_func, "done");
 }
 
 mt_unlocks (mutex) void
@@ -508,7 +508,7 @@ Channel::beginVideoStream (PlaybackItem   * const mt_nonnull item,
                            VirtReferenced * const stream_ticket_ref,
                            Time             const seek)
 {
-    if (logLevelOn_ (LogLevel::Debug)) {
+    if (logLevelOn (ctl, LogLevel::Debug)) {
         logD (ctl, _this_func_);
         item->dump ();
     }
@@ -533,7 +533,7 @@ Channel::beginVideoStream (PlaybackItem   * const mt_nonnull item,
     if (old_stream)
         old_stream->close ();
 
-    logD_ (_func, "firing startItem");
+//    logD_ (_func, "firing startItem");
     fireStartItem (new_stream, (old_stream != NULL) /* stream_changed */);
 }
 

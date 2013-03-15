@@ -24,7 +24,7 @@ using namespace M;
 
 namespace Moment {
 
-static LogGroup libMary_logGroup_playback ("moment.playback", LogLevel::D);
+static LogGroup libMary_logGroup_playback ("moment.playback", LogLevel::I);
 
 mt_unlocks_locks (mutex) void
 Playback::advancePlayback ()
