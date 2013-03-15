@@ -591,6 +591,11 @@ public:
 	sender->setFrontend (CbDesc<Sender::Frontend> (&sender_frontend, this, getCoderefContainer()));
     }
 
+    Sender* getSender () const
+    {
+        return sender;
+    }
+
     mt_const void startClient ();
 
     mt_const void startServer ();
