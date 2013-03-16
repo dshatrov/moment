@@ -65,12 +65,12 @@ private:
     mt_begin
       Playlist playlist;
 
-      Playlist::Item *cur_item;
+      StRef<Playlist::Item> cur_item;
 
       Timers::TimerKey playback_timer;
 
       bool got_next;
-      Playlist::Item *next_item;
+      StRef<Playlist::Item> next_item;
       Time next_start_rel;
       Time next_seek;
       Time next_duration;
@@ -94,7 +94,9 @@ private:
 			   bool          keep_cur_item,
                            PlaybackItem * mt_nonnull default_playback_item,
 			   Ref<String>  *ret_err_msg,
-			   bool          is_file);
+			   bool          is_file,
+                           bool          is_dir,
+                           bool          dir_re_read);
 
 public:
     void advance (AdvanceTicket *user_advance_ticket);
@@ -120,6 +122,11 @@ public:
 			    bool          keep_cur_item,
                             PlaybackItem * mt_nonnull default_playback_item,
 			    Ref<String>  *ret_err_msg);
+
+    Result loadPlaylistDirectory (ConstMemory   dirname,
+                                  bool          re_read,
+                                  bool          keep_cur_item,
+                                  PlaybackItem * mt_nonnull default_playback_item);
 
     mt_const void init (CbDesc<Frontend> const &frontend,
                         Timers *timers,

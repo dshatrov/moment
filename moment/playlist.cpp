@@ -34,7 +34,7 @@ namespace Moment {
 static LogGroup libMary_logGroup_playlist ("moment.playlist", LogLevel::I);
 
 Playlist::Item*
-Playlist::getNextItem (Item  * const prv_item,
+Playlist::getNextItem (Item  *prv_item,
 		       Time    const cur_time,
 		       Int64   const time_offset,
 		       Time  * const mt_nonnull ret_start_rel,
@@ -47,11 +47,43 @@ Playlist::getNextItem (Item  * const prv_item,
         dump ();
     }
 
+    if (from_dir) {
+        clear ();
+        if (!doReadDirectory (from_dir->mem(), from_dir_is_relative, from_dir_default_playback_item)) {
+            logE_ (_func, "doReadDirectory() failed");
+            return NULL;
+        }
+
+        if (prv_item) {
+            Item *new_prv_item = NULL;
+            if (prv_item->id) {
+                new_prv_item = item_hash.lookup (prv_item->id->mem());
+                if (!new_prv_item) {
+                    Item *candidate_prv_item = NULL;
+                    ItemHash::iterator iter (item_hash);
+                    while (!iter.done()) {
+                        Item * const item = iter.next ();
+                        if (item->id) {
+                            if (compare (item->id->mem(), prv_item->id->mem()) == ComparisonResult::Greater) {
+                                new_prv_item = candidate_prv_item;
+                                break;
+                            }
+
+                            candidate_prv_item = item;
+                        }
+                    }
+                }
+            }
+
+            prv_item = new_prv_item;
+        }
+    }
+
     Item *item = prv_item;
     for (;;) {
-	if (item)
+	if (item) {
 	    item = ItemList::getNext (item);
-	else {
+	} else {
 	    logD (playlist, _func, "First item");
 	    item = item_list.getFirst();
 	}
@@ -225,7 +257,7 @@ Playlist::clear ()
     ItemList::iter iter (item_list);
     while (!item_list.iter_done (iter)) {
 	Item * const item = item_list.iter_next (iter);
-	delete item;
+        item->unref ();
     }
     item_list.clear ();
 
@@ -721,6 +753,123 @@ Playlist::parsePlaylistMem (ConstMemory    const mem,
     doParsePlaylist (doc, default_playback_item);
 
     xmlFreeDoc (doc);
+    return Result::Success;
+}
+
+mt_throws Result
+Playlist::readDirectory (ConstMemory   from_dir,
+                         bool           const re_read,
+                         PlaybackItem * const mt_nonnull default_playback_item)
+{
+    bool relative = true;
+    {
+        Count i = 0;
+        for (Count i_end = from_dir.len(); i < i_end; ++i) {
+            if (from_dir.mem() [i] != '/')
+                break;
+        }
+
+        if (i > 0) {
+            relative = false;
+            from_dir = from_dir.region (i);
+        }
+    }
+
+    {
+        Count i = from_dir.len();
+        for (; i > 0; --i) {
+            if (from_dir.mem() [i - 1] != '/')
+                break;
+        }
+
+        if (i != from_dir.len())
+            from_dir = from_dir.region (0, i);
+    }
+
+    if (re_read) {
+        this->from_dir = st_grab (new (std::nothrow) String (from_dir));
+        this->from_dir_is_relative = relative;
+
+        this->from_dir_default_playback_item = grab (new (std::nothrow) PlaybackItem);
+        *this->from_dir_default_playback_item = *default_playback_item;
+    }
+
+    return doReadDirectory (from_dir, relative, default_playback_item);
+}
+
+mt_throws Result
+Playlist::doReadDirectory (ConstMemory    const from_dir,
+                           bool           const relative,
+                           PlaybackItem * const mt_nonnull default_playback_item)
+{
+//    logD_ (_func_);
+
+    ConstMemory root;
+    if (relative)
+        root = "./";
+    else
+        root = "/";
+
+    Ref<Vfs> const vfs = Vfs::createDefaultLocalVfs (root);
+    Ref<Vfs::VfsDirectory> const dir = vfs->openDirectory (from_dir);
+    if (!dir) {
+        logE_ (_func, "openDirectory() failed: ", exc->toString());
+        return Result::Failure;
+    }
+
+    typedef AvlTree< Ref<String>,
+                     AccessorExtractor< String,
+                                        Memory,
+                                        &String::mem >,
+                     MemoryComparator<> >
+            EntryTree;
+    EntryTree entry_tree;
+    for (;;) {
+        Ref<String> entry_name;
+        if (!dir->getNextEntry (entry_name)) {
+            logE_ (_func, "getNextEntry() failed: ", exc->toString());
+            return Result::Failure;
+        }
+
+        if (!entry_name)
+            break;
+
+        if (entry_name->len() == 0 || entry_name->mem().mem() [0] == '.')
+            continue;
+
+        entry_tree.add (entry_name);
+    }
+
+    EntryTree::bl_iterator iter (entry_tree);
+    while (!iter.done()) {
+        Ref<String> const &entry_name = iter.next ()->value;
+
+#if 0
+// Unnecessary
+        FileState file_stat;
+        StRef<String> const path = st_makeString (root, from_dir, "/", entry_name);
+        if (!vfs->stat (path->mem())) {
+            logE_ (_func, "stat() failed for path \"", path, "\"");
+            return Result::Failure;
+        }
+#endif
+
+        Item * const item = new (std::nothrow) Item;
+        assert (item);
+        item_list.append (item);
+
+        item->id = grab (new (std::nothrow) String (entry_name->mem()));
+        item_hash.add (item);
+
+        item->playback_item = grab (new (std::nothrow) PlaybackItem);
+        *item->playback_item = *default_playback_item;
+
+        StRef<String> const uri = st_makeString ("file://", root, from_dir, "/", entry_name->mem());
+//        logD_ (_func, "uri: ", uri);
+        item->playback_item->stream_spec = uri;
+        item->playback_item->spec_kind = PlaybackItem::SpecKind::Uri;
+    }
+
     return Result::Success;
 }
 

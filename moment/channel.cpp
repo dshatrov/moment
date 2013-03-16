@@ -649,9 +649,9 @@ Channel::Channel ()
       stream_stopped (false),
       got_video (false),
 
-      connect_on_demand_timer (NULL),
-
       stream_start_time (0),
+
+      connect_on_demand_timer (NULL),
 
       rx_bytes_accum (0),
       rx_audio_bytes_accum (0),

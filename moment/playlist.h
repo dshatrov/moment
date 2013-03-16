@@ -36,7 +36,8 @@ mt_unsafe class Playlist
 {
 // TODO private
 public:
-    class Item : public IntrusiveListElement<>,
+    class Item : public StReferenced,
+                 public IntrusiveListElement<>,
 		 public HashEntry<>
     {
     public:
@@ -96,6 +97,12 @@ public:
     ItemList item_list;
     ItemHash item_hash;
 
+    // If non-null, then the directory should be re-read for every getNextItem() call.
+    // ...possible alternative - re-read after all known files have been played.
+    StRef<String> from_dir;
+    bool from_dir_is_relative;
+    Ref<PlaybackItem> from_dir_default_playback_item;
+
     void doParsePlaylist (xmlDocPtr     doc,
                           PlaybackItem * mt_nonnull default_playback_item);
 
@@ -106,6 +113,10 @@ public:
 
     static void parseItemAttributes (xmlNodePtr  node,
 				     Item       * mt_nonnull item);
+
+    mt_throws Result doReadDirectory (ConstMemory   from_dir,
+                                      bool          relative,
+                                      PlaybackItem * mt_nonnull default_playback_item);
 
 public:
     // @cur_time - Current unixtime.
@@ -134,6 +145,10 @@ public:
     mt_throws Result parsePlaylistMem (ConstMemory   mem,
                                        PlaybackItem * mt_nonnull default_playback_item,
 				       Ref<String>  *ret_err_msg);
+
+    mt_throws Result readDirectory (ConstMemory   from_dir,
+                                    bool          re_read,
+                                    PlaybackItem * mt_nonnull default_playback_item);
 
     void dump ();
 

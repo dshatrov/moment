@@ -61,7 +61,7 @@ Playback::advancePlayback ()
 	// Resetting 'got_next' after a call to frontend->stopItem.
 	got_next = false;
 
-	logD (playback, _func, "next_item: 0x", fmt_hex, (UintPtr) next_item);
+	logD (playback, _func, "next_item: 0x", fmt_hex, (UintPtr) next_item.ptr());
 
 	cur_item = next_item;
 	if (next_item == NULL) {
@@ -201,7 +201,9 @@ Playback::doLoadPlaylist (ConstMemory    const src,
 			  bool           const keep_cur_item,
                           PlaybackItem * const mt_nonnull default_playback_item,
 			  Ref<String>  * const ret_err_msg,
-			  bool           const is_file)
+			  bool           const is_file,
+                          bool           const is_dir,
+                          bool           const dir_re_read)
 {
     logD (playback, _func_);
 
@@ -215,6 +217,9 @@ Playback::doLoadPlaylist (ConstMemory    const src,
     Result res;
     if (is_file)
 	res = playlist.parsePlaylistFile (src, default_playback_item, &err_msg);
+    else
+    if (is_dir)
+        res = playlist.readDirectory (src, dir_re_read, default_playback_item);
     else
 	res = playlist.parsePlaylistMem (src, default_playback_item, &err_msg);
 
@@ -371,7 +376,13 @@ Playback::loadPlaylistFile (ConstMemory    const filename,
                             PlaybackItem * const mt_nonnull default_playback_item,
 			    Ref<String>  * const ret_err_msg)
 {
-    return doLoadPlaylist (filename, keep_cur_item, default_playback_item, ret_err_msg, true /* is_file */);
+    return doLoadPlaylist (filename,
+                           keep_cur_item,
+                           default_playback_item,
+                           ret_err_msg,
+                           true  /* is_file */,
+                           false /* is_dir */,
+                           false /* dir_re_read */);
 }
 
 Result
@@ -380,7 +391,28 @@ Playback::loadPlaylistMem (ConstMemory    const mem,
                            PlaybackItem * const mt_nonnull default_playback_item,
                            Ref<String>  * const ret_err_msg)
 {
-    return doLoadPlaylist (mem, keep_cur_item, default_playback_item, ret_err_msg, false /* is_file */);
+    return doLoadPlaylist (mem,
+                           keep_cur_item,
+                           default_playback_item,
+                           ret_err_msg,
+                           false /* is_file */,
+                           false /* is_dir */,
+                           false /* dir_re_read */);
+}
+
+Result
+Playback::loadPlaylistDirectory (ConstMemory    const dirname,
+                                 bool           const re_read,
+                                 bool           const keep_cur_item,
+                                 PlaybackItem * const mt_nonnull default_playback_item)
+{
+    return doLoadPlaylist (dirname,
+                           keep_cur_item,
+                           default_playback_item,
+                           NULL  /* ret_err_msg */,
+                           false /* is_file */,
+                           true  /* is_dir */,
+                           re_read);
 }
 
 mt_const void
