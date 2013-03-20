@@ -38,6 +38,7 @@ moment_target_headers =		\
         channel_set.h           \
         channel_manager.h       \
         media_source.h          \
+        slave_media_source.h    \
         media_source_provider.h \
         playback.h              \
         playlist.h              \
@@ -58,6 +59,7 @@ moment_target_headers =		\
 	av_recorder.h		\
 	av_muxer.h		\
 	flv_muxer.h		\
+        mp4_muxer.h             \
 				\
 	storage.h		\
 	local_storage.h		\
@@ -88,6 +90,7 @@ libmoment_1_0_la_SOURCES =	\
         channel.cpp             \
         channel_set.cpp         \
         channel_manager.cpp     \
+        slave_media_source.cpp  \
         playback.cpp            \
         playlist.cpp            \
         recorder.cpp            \
@@ -105,6 +108,7 @@ libmoment_1_0_la_SOURCES =	\
 				\
 	av_recorder.cpp		\
 	flv_muxer.cpp		\
+        mp4_muxer.cpp           \
 				\
 	local_storage.cpp	\
 				\
