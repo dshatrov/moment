@@ -256,7 +256,6 @@ public:
   // __________________________ Video stream handlers __________________________
 
 public:
-    // TODO Add a wrapper to api.h
     struct VideoStreamHandler
     {
         void (*videoStreamAdded) (VideoStream * mt_nonnull video_stream,
@@ -768,25 +767,10 @@ public:
                                         VideoStream    *mix_video_stream,
                                         Time            initial_seek,
                                         ChannelOptions *channel_opts,
-                                        PlaybackItem   *playback_item)
-    {
-        if (!media_source_provider)
-            return NULL;
-
-        return media_source_provider->createMediaSource (frontend,
-                                                         timers,
-                                                         page_pool,
-                                                         video_stream,
-                                                         mix_video_stream,
-                                                         initial_seek,
-                                                         channel_opts,
-                                                         playback_item);
-    }
+                                        PlaybackItem   *playback_item);
 
     mt_const void setMediaSourceProvider (MediaSourceProvider * const media_source_provider)
-    {
-        this->media_source_provider = media_source_provider;
-    }
+        { this->media_source_provider = media_source_provider; }
 
 
   // ______________________________ Authorization ______________________________

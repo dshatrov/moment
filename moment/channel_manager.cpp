@@ -305,6 +305,7 @@ parseChannelConfig (MConfig::Section * const mt_nonnull section,
     char const opt_name__chain[]                     = "chain";
     char const opt_name__uri  []                     = "uri";
     char const opt_name__playlist[]                  = "playlist";
+    char const opt_name__master[]                    = "master";
     char const opt_name__keep_video_stream[]         = "keep_video_stream";
     char const opt_name__continuous_playback[]       = "continous_playback";
     char const opt_name__record_path[]               = "record_path";
@@ -390,6 +391,15 @@ parseChannelConfig (MConfig::Section * const mt_nonnull section,
                 ++num_set_opts;
             }
             logD_ (_func, opt_name__playlist, ": ", stream_spec);
+        }
+
+        if (MConfig::Option * const opt = section->getOption (opt_name__master)) {
+            if (opt->getValue()) {
+                stream_spec = opt->getValue()->mem();
+                spec_kind = PlaybackItem::SpecKind::Slave;
+                ++num_set_opts;
+            }
+            logD_ (_func, opt_name__master, ": ", stream_spec);
         }
 
         if (num_set_opts > 1)

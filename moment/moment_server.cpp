@@ -17,6 +17,8 @@
 */
 
 
+#include <moment/slave_media_source.h>
+
 #include <moment/moment_server.h>
 
 
@@ -1723,6 +1725,35 @@ MomentServer::createPushConnection (VideoStream * const video_stream,
         return NULL;
 
     return push_protocol->connect (video_stream, uri, username, password);
+}
+
+Ref<MediaSource>
+MomentServer::createMediaSource (CbDesc<MediaSource::Frontend> const &frontend,
+                                 Timers         * const timers,
+                                 PagePool       * const page_pool,
+                                 VideoStream    * const video_stream,
+                                 VideoStream    * const mix_video_stream,
+                                 Time             const initial_seek,
+                                 ChannelOptions * const channel_opts,
+                                 PlaybackItem   * const playback_item)
+{
+    if (playback_item->spec_kind == PlaybackItem::SpecKind::Slave) {
+        Ref<SlaveMediaSource> const slave = grab (new (std::nothrow) SlaveMediaSource);
+        slave->init (this, playback_item->stream_spec->mem(), video_stream, frontend);
+        return slave;
+    }
+
+    if (!media_source_provider)
+        return NULL;
+
+    return media_source_provider->createMediaSource (frontend,
+                                                     timers,
+                                                     page_pool,
+                                                     video_stream,
+                                                     mix_video_stream,
+                                                     initial_seek,
+                                                     channel_opts,
+                                                     playback_item);
 }
 
 bool

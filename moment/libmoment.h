@@ -31,6 +31,7 @@
 #include <moment/channel_set.h>
 #include <moment/channel_manager.h>
 #include <moment/media_source.h>
+#include <moment/slave_media_source.h>
 #include <moment/playback.h>
 #include <moment/recorder.h>
 

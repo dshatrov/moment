@@ -60,7 +60,7 @@ public:
 	}
     };
 
-    virtual void getTrafficStats (TrafficStats *ret_traffic_stats) = 0;
+    virtual void getTrafficStats (TrafficStats * mt_nonnull ret_traffic_stats) = 0;
     virtual void resetTrafficStats () = 0;
 };
 

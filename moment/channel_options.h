@@ -37,7 +37,8 @@ public:
             None,
             Chain,
             Uri,
-            Playlist
+            Playlist,
+            Slave
         };
         operator Value () const { return value; }
         SpecKind (Value const value) : value (value) {}
@@ -49,6 +50,7 @@ public:
                 case Chain:    return toString (mem, "SpecKind::Chain");
                 case Uri:      return toString (mem, "SpecKind::Uri");
                 case Playlist: return toString (mem, "SpecKind::Playlist");
+                case Slave:    return toString (mem, "SpecKind::Slave");
             }
             unreachable ();
             return 0;
