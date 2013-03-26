@@ -1,5 +1,5 @@
 /*  Moment Video Server - High performance media server
-    Copyright (C) 2011, 2012 Dmitry Shatrov
+    Copyright (C) 2011-2013 Dmitry Shatrov
     e-mail: shatrov@gmail.com
 
     This program is free software: you can redistribute it and/or modify
@@ -17,8 +17,8 @@
 */
 
 
-#ifndef __LIBMOMENT__VIDEO_STREAM__H__
-#define __LIBMOMENT__VIDEO_STREAM__H__
+#ifndef LIBMOMENT__VIDEO_STREAM__H__
+#define LIBMOMENT__VIDEO_STREAM__H__
 
 
 #include <libmary/libmary.h>
@@ -72,9 +72,6 @@ class VideoStream : public Object
 {
 private:
     StateMutex mutex;
-
-    // Protects from concurrent invocations of bindToSrteam()
-    Mutex bind_mutex;
 
 public:
     class AudioFrameType
@@ -215,13 +212,6 @@ public:
     // Must be copyable.
     class Message
     {
-#if 0
-    private:
-        // TODO Remove the "must be copyable" comments
-        Message& operator = (Message const &);
-        Message (Message const &);
-#endif
-
     public:
         Uint64 timestamp_nanosec;
 
@@ -232,6 +222,12 @@ public:
 
 	// Greater than zero for prechunked messages.
 	Uint32 prechunk_size;
+
+        void seize ()
+        {
+            if (page_pool)
+                page_pool->msgRef (page_list.first);
+        }
 
         void release ()
         {
@@ -255,7 +251,7 @@ public:
     };
 
     // Must be copyable.
-    struct AudioMessage : public Message
+    class AudioMessage : public Message
     {
     public:
 	AudioFrameType frame_type;
@@ -268,12 +264,11 @@ public:
               codec_id   (AudioCodecId::Unknown),
               rate       (44100),
               channels   (1)
-	{
-	}
+	{}
     };
 
     // Must be copyable.
-    struct VideoMessage : public Message
+    class VideoMessage : public Message
     {
     public:
       // Note that we ignore AVC composition time for now.
@@ -289,11 +284,10 @@ public:
         bool is_saved_frame;
 
 	VideoMessage ()
-	    : frame_type (VideoFrameType::Unknown),
-	      codec_id (VideoCodecId::Unknown),
+            : frame_type (VideoFrameType::Unknown),
+	      codec_id   (VideoCodecId::Unknown),
               is_saved_frame (false)
-	{
-	}
+	{}
     };
 
     static bool msgHasTimestamp (Message * const msg,
@@ -403,59 +397,54 @@ public:
 private:
     class PendingFrameList_name;
 
-    class PendingFrame : public IntrusiveListElement<PendingFrameList_name>
-    {
+    class PendingFrame : public IntrusiveListElement<PendingFrameList_name> {
     public:
         enum Type {
             t_Audio,
             t_Video
         };
-
     private:
         Type const type;
-
     public:
-        Type getType() const
-        {
-            return type;
-        }
-
-        PendingFrame (Type const type)
-            : type (type)
-        {
-        }
+        Type getType() const { return type; }
+        PendingFrame (Type const type) : type (type) {}
     };
 
     typedef IntrusiveList<PendingFrame, PendingFrameList_name> PendingFrameList;
 
-    class PendingAudioFrame : public PendingFrame
+    struct PendingAudioFrame : public PendingFrame
     {
-    public:
         AudioMessage audio_msg;
 
-        PendingAudioFrame ()
+        PendingAudioFrame (AudioMessage * const mt_nonnull msg)
             : PendingFrame (t_Audio)
         {
+            audio_msg = *msg;
+            msg->seize ();
         }
+
+        ~PendingAudioFrame () { audio_msg.release (); }
     };
 
-    class PendingVideoFrame : public PendingFrame
+    struct PendingVideoFrame : public PendingFrame
     {
-    public:
         VideoMessage video_msg;
 
-        PendingVideoFrame ()
+        PendingVideoFrame (VideoMessage * const mt_nonnull msg)
             : PendingFrame (t_Video)
         {
+            video_msg = *msg;
+            msg->seize ();
         }
+
+        ~PendingVideoFrame () { video_msg.release (); }
     };
 
     mt_const Ref<StreamParameters> stream_params;
 
     mt_mutex (mutex) bool is_closed;
-
     mt_mutex (mutex) FrameSaver frame_saver;
-
+    mt_mutex (mutex) bool msg_inform_in_progress;
     mt_mutex (mutex) Count num_watchers;
 
   // ___________________________ Stream binding data ___________________________
@@ -464,67 +453,30 @@ private:
     {
     public:
         VideoStream *video_stream;
-        VideoStream *bind_stream;
     };
 
-// TODO make private
-public:
     class BindInfo
     {
     public:
+        Ref<BindTicket> cur_bind_ticket;
+
         Uint64 timestamp_offs;
         bool   got_timestamp_offs;
-
-        Uint64 pending_timestamp_offs;
-        bool   pending_got_timestamp_offs;
-
-        Ref<BindTicket> cur_bind_ticket;
-        Ref<BindTicket> pending_bind_ticket;
-
-        FrameSaver pending_frame_saver;
-        PendingFrameList pending_frame_list;
-
         WeakRef<VideoStream> weak_bind_stream;
+
         GenericInformer::SubscriptionKey bind_sbn;
 
         void reset ()
         {
             timestamp_offs = 0;
             got_timestamp_offs = false;
-
-            pending_timestamp_offs = 0;
-            pending_got_timestamp_offs = false;
-
-            cur_bind_ticket = NULL;
-            pending_bind_ticket = NULL;
-
-            pending_frame_saver.releaseState ();
-
-            {
-                PendingFrameList::iter iter (pending_frame_list);
-                while (!pending_frame_list.iter_done (iter)) {
-                    PendingFrame * const pending_frame = pending_frame_list.iter_next (iter);
-                    delete pending_frame;
-                }
-                pending_frame_list.clear ();
-            }
-
             weak_bind_stream = NULL;
             bind_sbn = NULL;
         }
 
-        BindInfo ()
-        {
-            reset ();
-        }
-
-        ~BindInfo ()
-        {
-            reset ();
-        }
+        BindInfo () { reset (); }
     };
 
-private:
     // TODO 1. got_stream_timestamp. 'stream_timestamp' may be unknown.
     //      2. set initial stream timestamp to some shifted value to compensate for possible slight timestamp drift,
     //         like +10 minutes.
@@ -533,34 +485,21 @@ private:
     mt_mutex (mutex) BindInfo abind;
     mt_mutex (mutex) BindInfo vbind;
 
-#if 0
-    // if 'true', then both audio and video are bound to the same stream,
-    // and the binding is described by 'vbind' ('abind' is clear).
-    bool full_bind;
-#endif
-
-    mt_mutex (mutex) Count bind_inform_counter;
+    mt_mutex (mutex) Count msg_infom_counter;
+    mt_mutex (mutex) PendingFrameList pending_frame_list;
 
   mt_iface (FrameSaver::FrameHandler)
     static FrameSaver::FrameHandler const bind_frame_handler;
 
-    static mt_unlocks_locks (mutex) Result bind_savedAudioFrame (AudioMessage * mt_nonnull audio_msg,
-                                                                 void         *_self);
+    static mt_mutex (mutex) Result bind_savedAudioFrame (AudioMessage * mt_nonnull audio_msg,
+                                                         void         *_self);
 
-    static mt_unlocks_locks (mutex) Result bind_savedVideoFrame (VideoMessage * mt_nonnull video_msg,
-                                                                 void         *_self);
+    static mt_mutex (mutex) Result bind_savedVideoFrame (VideoMessage * mt_nonnull video_msg,
+                                                         void         *_self);
   mt_iface_end
 
-    mt_mutex (mutex) bool bind_messageBegin (BindInfo   * mt_nonnull bind_info,
-                                             Message    * mt_nonnull msg,
-                                             BindTicket *bind_ticket,
-                                             bool        is_audio_msg);
-
-    mt_unlocks_locks (mutex) void bind_doMessageEnd (BindInfo * mt_nonnull bind_info);
-
-    mt_unlocks_locks (mutex) void bind_messageEnd ();
-
   // ___________________________________________________________________________
+
 
     Informer_<EventHandler> event_informer;
 
@@ -582,21 +521,34 @@ private:
 
 public:
     // Returned FrameSaver must be synchronized manually with VideoStream::lock/unlock().
-    FrameSaver* getFrameSaver ()
-    {
-	return &frame_saver;
-    }
+    FrameSaver* getFrameSaver () { return &frame_saver; }
 
     // It is guaranteed that the informer can be controlled with
     // VideoStream::lock/unlock() methods.
-    Informer_<EventHandler>* getEventInformer ()
+    Informer_<EventHandler>* getEventInformer () { return &event_informer; }
+
+
+private:
+    mt_mutex (mutex) void reportPendingFrames ();
+    mt_unlocks_locks (mutex) void firePendingFrames_unlocked ();
+
+    mt_unlocks_locks (mutex) void fireAudioMessage_unlocked (AudioMessage * mt_nonnull audio_msg);
+    mt_unlocks_locks (mutex) void fireVideoMessage_unlocked (VideoMessage * mt_nonnull video_msg);
+
+public:
+    void fireAudioMessage (AudioMessage * const mt_nonnull audio_msg)
     {
-	return &event_informer;
+        mutex.lock ();
+        mt_unlocks_locks (mutex) fireAudioMessage_unlocked (audio_msg);
+        mutex.unlock ();
     }
 
-    void fireAudioMessage (AudioMessage * mt_nonnull msg);
-
-    void fireVideoMessage (VideoMessage * mt_nonnull msg);
+    void fireVideoMessage (VideoMessage * const mt_nonnull video_msg)
+    {
+        mutex.lock ();
+        mt_unlocks_locks (mutex) fireVideoMessage_unlocked (video_msg);
+        mutex.unlock ();
+    }
 
     void fireRtmpCommandMessage (RtmpConnection    * mt_nonnull conn,
 				 Message           * mt_nonnull msg,
@@ -629,12 +581,12 @@ public:
     mt_async void minusWatchers (Count delta);
     mt_async mt_unlocks_locks (mutex) void minusWatchers_unlocked (Count delta);
 
-    mt_mutex (mutex) bool getNumWatchers_unlocked ()
-    {
-        return num_watchers;
-    }
+    mt_mutex (mutex) bool getNumWatchers_unlocked () { return num_watchers; }
 
 private:
+    mt_mutex (mutex) void bind_messageBegin (BindInfo * mt_nonnull bind_info,
+                                             Message  * mt_nonnull msg);
+
   mt_iface (VideoStream::EventHandler)
     static EventHandler const abind_handler;
     static EventHandler const vbind_handler;
@@ -660,20 +612,10 @@ public:
 
     void close ();
 
-    mt_mutex (mutex) bool isClosed_unlocked ()
-    {
-        return is_closed;
-    }
+    mt_mutex (mutex) bool isClosed_unlocked () { return is_closed; }
 
-    void lock ()
-    {
-	mutex.lock ();
-    }
-
-    void unlock ()
-    {
-	mutex.unlock ();
-    }
+    void lock   () { mutex.lock   (); }
+    void unlock () { mutex.unlock (); }
 
     bool hasParam (ConstMemory const name)
     {
@@ -712,5 +654,5 @@ public:
 #include <moment/rtmp_connection.h>
 
 
-#endif /* __LIBMOMENT__VIDEO_STREAM__H__ */
+#endif /* LIBMOMENT__VIDEO_STREAM__H__ */
 

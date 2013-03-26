@@ -85,6 +85,8 @@ libmomentinclude_HEADERS = $(moment_target_headers)
 
 lib_LTLIBRARIES = libmoment-1.0.la
 libmoment_1_0_la_SOURCES =	\
+	video_stream.cpp	\
+                                \
 	libmoment.cpp		\
                                 \
         channel.cpp             \
@@ -103,7 +105,6 @@ libmoment_1_0_la_SOURCES =	\
 	rtmp_service.cpp	\
 	rtmpt_service.cpp	\
 				\
-	video_stream.cpp	\
         test_stream_generator.cpp \
 				\
 	av_recorder.cpp		\
