@@ -719,14 +719,14 @@ VideoStream::reportPendingFrames ()
                 PendingAudioFrame * const audio_frame = static_cast <PendingAudioFrame*> (pending_frame);
                 frame_saver.processAudioFrame (&audio_frame->audio_msg);
                 InformAudioMessage_Data inform_data (&audio_frame->audio_msg);
-                logD_ (_func, "audio ts ", audio_frame->audio_msg.timestamp_nanosec);
+//                logD_ (_func, "audio ts ", audio_frame->audio_msg.timestamp_nanosec);
                 mt_unlocks_locks (mutex) event_informer.informAll_unlocked (informAudioMessage, &inform_data);
             } break;
             case PendingFrame::t_Video: {
                 PendingVideoFrame * const video_frame = static_cast <PendingVideoFrame*> (pending_frame);
                 frame_saver.processVideoFrame (&video_frame->video_msg);
                 InformVideoMessage_Data inform_data (&video_frame->video_msg);
-                logD_ (_func, "video ts ", video_frame->video_msg.timestamp_nanosec);
+//                logD_ (_func, "video ts ", video_frame->video_msg.timestamp_nanosec);
                 mt_unlocks_locks (mutex) event_informer.informAll_unlocked (informVideoMessage, &inform_data);
             } break;
         }
@@ -752,8 +752,6 @@ VideoStream::fireAudioMessage_unlocked (AudioMessage * const mt_nonnull audio_ms
     logS_ (_this_func, "ts ", audio_msg->timestamp_nanosec, " ", audio_msg->frame_type);
 
     if (msg_inform_in_progress) {
-        logD_ (_this_func, "to pending list");
-
         PendingAudioFrame * const audio_frame = new (std::nothrow) PendingAudioFrame (audio_msg);
         assert (audio_frame);
         audio_frame->audio_msg = *audio_msg;
@@ -781,8 +779,6 @@ VideoStream::fireVideoMessage_unlocked (VideoMessage * const mt_nonnull video_ms
     logS_ (_this_func, "ts ", video_msg->timestamp_nanosec, " ", video_msg->frame_type);
 
     if (msg_inform_in_progress) {
-        logD_ (_this_func, "to pending list");
-
         PendingVideoFrame * const video_frame = new (std::nothrow) PendingVideoFrame (video_msg);
         assert (video_frame);
         video_frame->video_msg = *video_msg;
@@ -892,11 +888,13 @@ VideoStream::plusOneWatcher_unlocked (Object * const guard_obj)
             }
         }
 
+#if 0
         logD_ (_func, "extra iteration: "
                "abind: 0x", fmt_hex, (UintPtr) abind.weak_bind_stream.getTypedWeakPtr(), ", "
                "abind_stream: 0x",   (UintPtr) abind_stream.ptr(), ", "
                "vbind: 0x", fmt_hex, (UintPtr) vbind.weak_bind_stream.getTypedWeakPtr(), ", "
                "vbind_stream: 0x",   (UintPtr) vbind_stream.ptr());
+#endif
 
         mutex.unlock ();
 
@@ -1005,11 +1003,13 @@ VideoStream::plusWatchers_unlocked (Count const delta)
             }
         }
 
+#if 0
         logD_ (_func, "extra iteration: "
                "abind: 0x", fmt_hex, (UintPtr) abind.weak_bind_stream.getTypedWeakPtr(), ", "
                "abind_stream: 0x",   (UintPtr) abind_stream.ptr(), ", "
                "vbind: 0x", fmt_hex, (UintPtr) vbind.weak_bind_stream.getTypedWeakPtr(), ", "
                "vbind_stream: 0x",   (UintPtr) vbind_stream.ptr());
+#endif
 
         mutex.unlock ();
 
@@ -1072,24 +1072,16 @@ VideoStream::bind_messageBegin (BindInfo * const mt_nonnull bind_info,
                                 Message  * const mt_nonnull msg)
 {
     if (!bind_info->got_timestamp_offs) {
-        logD_ (_func, "!got_timestamp_offs, ", (bind_info == &abind ? "audio" : "video"));
-
         if (msgHasTimestamp (msg, (bind_info == &abind))) {
             bind_info->timestamp_offs = stream_timestamp_nanosec - msg->timestamp_nanosec;
             bind_info->got_timestamp_offs = true;
 
-            logD_ (_func, "setting timestamp_offs: ", bind_info->timestamp_offs);
-
             if (abind.weak_bind_stream.getShadowPtr() == vbind.weak_bind_stream.getShadowPtr()) {
                 if (bind_info == &abind) {
-                    logD_ (_func, "setting same video timestamp_offs");
-
                     // TODO assert (!vbind.got_timestamp_offs)
                     vbind.got_timestamp_offs = true;
                     vbind.timestamp_offs = abind.timestamp_offs;
                 } else {
-                    logD_ (_func, "setting same audio timestamp_offs");
-
                     // TODO assert (!abind.got_timestamp_offs)
                     abind.got_timestamp_offs = true;
                     abind.timestamp_offs = vbind.timestamp_offs;
@@ -1252,12 +1244,12 @@ VideoStream::bindToStream (VideoStream * const bind_audio_stream,
   //   => we can safely assume that no two streams
   //      will cause lock inversion when binding.
 
-    logD_ (_this_func, "bind_audio: ", bind_audio, ", bind_video: ", bind_video);
-    logD_ (_this_func, "bind_audio_stream: 0x", fmt_hex, (UintPtr) bind_audio_stream);
-    logD_ (_this_func, "bind_video_stream: 0x", fmt_hex, (UintPtr) bind_video_stream);
+//    logD_ (_this_func, "bind_audio: ", bind_audio, ", bind_video: ", bind_video);
+//    logD_ (_this_func, "bind_audio_stream: 0x", fmt_hex, (UintPtr) bind_audio_stream);
+//    logD_ (_this_func, "bind_video_stream: 0x", fmt_hex, (UintPtr) bind_video_stream);
 
     if (!bind_video && !bind_audio) {
-        logD_ (_this_func, "no-op");
+//        logD_ (_this_func, "no-op");
         return;
     }
 
@@ -1280,12 +1272,12 @@ VideoStream::bindToStream (VideoStream * const bind_audio_stream,
     }
 
     if (!bind_audio && !bind_video) {
-        logD_ (_this_func, "no-op after self-test");
+//        logD_ (_this_func, "no-op after self-test");
         mutex.unlock ();
         return;
     }
 
-    logD_ (_this_func, "after self-test: bind_audio: ", bind_audio, ", bind_video: ", bind_video);
+//    logD_ (_this_func, "after self-test: bind_audio: ", bind_audio, ", bind_video: ", bind_video);
 
     GenericInformer::SubscriptionKey const prv_abind_sbn = abind.bind_sbn;
     GenericInformer::SubscriptionKey const prv_vbind_sbn = vbind.bind_sbn;
@@ -1295,8 +1287,6 @@ VideoStream::bindToStream (VideoStream * const bind_audio_stream,
     Count vbind_plus_watchers = 0;
 
     if (bind_audio && bind_video && bind_audio_stream == bind_video_stream) {
-        logD_ (_func, "simultaneous a+v bind");
-
         abind.timestamp_offs = 0;
         abind.got_timestamp_offs = false;
 
