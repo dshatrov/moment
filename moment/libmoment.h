@@ -51,6 +51,7 @@
 #include <moment/av_recorder.h>
 #include <moment/av_muxer.h>
 #include <moment/flv_muxer.h>
+#include <moment/mp4_muxer.h>
 
 #include <moment/storage.h>
 #include <moment/local_storage.h>
