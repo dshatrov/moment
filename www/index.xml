@@ -9,12 +9,10 @@
     <eng>Home</eng>
     <rus>Главная</rus>
   </pagename>
-  <!--
   <title>
     <eng>Welcome!</eng>
     <rus>Видеосервер &laquo;Момент&raquo;</rus>
   </title>
-  -->
 
   <p>
     <eng>Moment Video Server lets you organize live video streaming on the Internet with ease.</eng>

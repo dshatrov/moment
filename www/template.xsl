@@ -31,7 +31,7 @@
 
 <head>
   <title>
-    <xsl:text>Moment Video Server - </xsl:text>
+    <xsl:text>Moment - </xsl:text>
     <xsl:choose>
       <xsl:when test="content/pagename">
         <xsl:apply-templates select="content/pagename" mode="title"/>
