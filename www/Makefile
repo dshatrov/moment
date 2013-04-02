@@ -11,12 +11,13 @@ all:	index.html              \
 	doc_desc.html		\
 	doc_install.html	\
 	doc_config.html		\
+        doc_channels.html       \
 	doc_builtin.html	\
 	doc_plugins.html	\
 	doc_cluster.html	\
 	doc_stress.html		\
 	doc_examples.html	\
-				\
+                                \
 	fix
 
 fix: index.html index.ru.html
