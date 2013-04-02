@@ -318,6 +318,7 @@ parseChannelConfig (MConfig::Section * const mt_nonnull section,
     char const opt_name__force_transcode[]           = "force_transcode";
     char const opt_name__force_transcode_audio[]     = "force_transcode_audio";
     char const opt_name__force_transcode_video[]     = "force_transcode_video";
+    char const opt_name__aac_perfect_timestamp[]     = "aac_perfect_timestamp";
     char const opt_name__sync_to_clock[]             = "sync_to_clock";
     char const opt_name__send_metadata[]             = "send_metadata";
     char const opt_name__enable_prechunking[]        = "enable_prechunking";
@@ -515,6 +516,16 @@ parseChannelConfig (MConfig::Section * const mt_nonnull section,
     }
     logD_ (_func, opt_name__force_transcode_video, ": ", force_transcode_video);
 
+    bool aac_perfect_timestamp = default_opts->default_item->aac_perfect_timestamp;
+    if (!configSectionGetBoolean (section,
+                                  opt_name__aac_perfect_timestamp,
+                                  &aac_perfect_timestamp,
+                                  aac_perfect_timestamp))
+    {
+        return Result::Failure;
+    }
+    logD_ (_func, opt_name__aac_perfect_timestamp, ": ", aac_perfect_timestamp);
+
     bool sync_to_clock = default_opts->default_item->sync_to_clock;
     if (!configSectionGetBoolean (section,
                                   opt_name__sync_to_clock,
@@ -571,6 +582,7 @@ parseChannelConfig (MConfig::Section * const mt_nonnull section,
     item->force_transcode_audio = force_transcode_audio;
     item->force_transcode_video = force_transcode_video;
 
+    item->aac_perfect_timestamp = aac_perfect_timestamp;
     item->sync_to_clock = sync_to_clock;
 
     item->send_metadata = /* TODO send_metadata */ false;

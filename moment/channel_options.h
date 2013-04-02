@@ -71,6 +71,7 @@ public:
     bool force_transcode_audio;
     bool force_transcode_video;
 
+    bool aac_perfect_timestamp;
     bool sync_to_clock;
 
     bool send_metadata;
@@ -93,6 +94,7 @@ public:
                      "    force_transcode: ", force_transcode, "\n",
                      "    force_transcode_audio: ", force_transcode_audio, "\n"
                      "    force_transcode_video: ", force_transcode_video, "\n"
+                     "    aac_perfect_timestamp: ", aac_perfect_timestamp, "\n"
                      "    sync_to_clock: ", sync_to_clock, "\n"
                      "    send_metadata: ", send_metadata, "\n"
                      "    enable_prechunking: ", enable_prechunking, "\n"
@@ -114,6 +116,7 @@ public:
           force_transcode_audio (false),
           force_transcode_video (false),
 
+          aac_perfect_timestamp (false),
           sync_to_clock (true),
 
           send_metadata (false),
