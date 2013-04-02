@@ -509,9 +509,10 @@ RtmpPushProtocol::connect (VideoStream * const video_stream,
     logD_ (_func, "uri: ", uri);
 
     IpAddress server_addr;
-    // TODO Parse application name, channel name.
-    Ref<String> const app_name = grab (new (std::nothrow) String ("app"));
-    Ref<String> const stream_name = grab (new (std::nothrow) String ("lecture.desktop"));
+
+    ConstMemory app_name;
+    ConstMemory stream_name;
+
     bool momentrtmp_proto = false;
     {
       // URI forms:   rtmp://user:password@host:port/foo/bar
@@ -525,11 +526,12 @@ RtmpPushProtocol::connect (VideoStream * const video_stream,
         unsigned long pos = 0;
 
         while (pos < uri.len()) {
-            if (uri.mem() [pos] == ':')
+            if (uri.mem() [pos] == ':') {
+                ++pos;
                 break;
+            }
             ++pos;
         }
-        ++pos;
 
         if (pos >= 1
             && equal ("momentrtmp", uri.region (0, pos - 1)))
@@ -538,18 +540,20 @@ RtmpPushProtocol::connect (VideoStream * const video_stream,
         }
 
         while (pos < uri.len()) {
-            if (uri.mem() [pos] == '/')
+            if (uri.mem() [pos] == '/') {
+                ++pos;
                 break;
+            }
             ++pos;
         }
-        ++pos;
 
         while (pos < uri.len()) {
-            if (uri.mem() [pos] == '/')
+            if (uri.mem() [pos] == '/') {
+                ++pos;
                 break;
+            }
             ++pos;
         }
-        ++pos;
 
         // user:password@host:port
         unsigned long const user_addr_begin = pos;
@@ -581,7 +585,26 @@ RtmpPushProtocol::connect (VideoStream * const video_stream,
             logE_ (_func, "Could not extract address from URI: ", uri);
             goto _failure;
         }
+
+        if (pos < uri.len())
+            ++pos;
+
+        unsigned long const app_name_begin = pos;
+        while (pos < uri.len()) {
+            if (uri.mem() [pos] == '/')
+                break;
+            ++pos;
+        }
+
+        app_name = uri.region (app_name_begin, pos - app_name_begin);
+
+        if (pos < uri.len())
+            ++pos;
+
+        stream_name = uri.region (pos, uri.len() - pos);
     }
+
+    logD_ (_func, "app_name: ", app_name, ", stream_name: ", stream_name);
 
   {
     Ref<RtmpPushConnection> const rtmp_push_conn = grab (new (std::nothrow) RtmpPushConnection);
@@ -591,8 +614,8 @@ RtmpPushProtocol::connect (VideoStream * const video_stream,
                           server_addr,
                           username,
                           password,
-                          app_name->mem(),
-                          stream_name->mem(),
+                          app_name,
+                          stream_name,
                           ping_timeout_millisec,
                           momentrtmp_proto);
 
