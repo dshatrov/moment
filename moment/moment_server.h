@@ -553,6 +553,7 @@ private:
     mt_const HttpService      *http_service;
     mt_const HttpService      *admin_http_service;
     mt_const ServerThreadPool *recorder_thread_pool;
+    mt_const ServerThreadPool *reader_thread_pool;
     mt_const Storage          *storage;
 
     mt_const WeakRef<ChannelManager> weak_channel_manager;
@@ -608,6 +609,7 @@ public:
     HttpService*      getHttpService ();
     HttpService*      getAdminHttpService ();
     ServerThreadPool* getRecorderThreadPool ();
+    ServerThreadPool* getReaderThreadPool ();
     Storage*          getStorage ();
 
     Ref<ChannelManager> getChannelManager () { return weak_channel_manager.getRef(); }
@@ -839,6 +841,7 @@ public:
 		 HttpService      * mt_nonnull admin_http_service,
 		 MConfig::Config  * mt_nonnull config,
 		 ServerThreadPool * mt_nonnull recorder_thread_pool,
+                 ServerThreadPool * mt_nonnull reader_thread_pool,
 		 Storage          * mt_nonnull storage,
                  ChannelManager   *channel_manager);
 

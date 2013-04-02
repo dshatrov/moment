@@ -645,47 +645,29 @@ MomentServer::loadModules ()
     return Result::Success;
 }
 
-ServerApp*
-MomentServer::getServerApp ()
-{
-    return server_app;
-}
+ServerApp* MomentServer::getServerApp ()
+    { return server_app; }
 
-PagePool*
-MomentServer::getPagePool ()
-{
-    return page_pool;
-}
+PagePool* MomentServer::getPagePool ()
+    { return page_pool; }
 
-HttpService*
-MomentServer::getHttpService ()
-{
-    return http_service;
-}
+HttpService* MomentServer::getHttpService ()
+    { return http_service; }
 
-HttpService*
-MomentServer::getAdminHttpService ()
-{
-    return admin_http_service;
-}
+HttpService* MomentServer::getAdminHttpService ()
+    { return admin_http_service; }
 
-ServerThreadPool*
-MomentServer::getRecorderThreadPool ()
-{
-    return recorder_thread_pool;
-}
+ServerThreadPool* MomentServer::getRecorderThreadPool ()
+    { return recorder_thread_pool; }
 
-Storage*
-MomentServer::getStorage ()
-{
-    return storage;
-}
+ServerThreadPool* MomentServer::getReaderThreadPool ()
+    { return reader_thread_pool; }
 
-MomentServer*
-MomentServer::getInstance ()
-{
-    return instance;
-}
+Storage* MomentServer::getStorage ()
+    { return storage; }
+
+MomentServer* MomentServer::getInstance ()
+    { return instance; }
 
 
 // __________________________________ Config ___________________________________
@@ -1839,6 +1821,7 @@ MomentServer::init (ServerApp        * const mt_nonnull server_app,
 		    HttpService      * const mt_nonnull admin_http_service,
 		    MConfig::Config  * const mt_nonnull config,
 		    ServerThreadPool * const mt_nonnull recorder_thread_pool,
+                    ServerThreadPool * const mt_nonnull reader_thread_pool,
 		    Storage          * const mt_nonnull storage,
                     ChannelManager   * const channel_manager)
 {
@@ -1847,6 +1830,7 @@ MomentServer::init (ServerApp        * const mt_nonnull server_app,
     this->http_service         = http_service;
     this->admin_http_service   = admin_http_service;
     this->recorder_thread_pool = recorder_thread_pool;
+    this->reader_thread_pool   = reader_thread_pool;
     this->storage              = storage;
 
     this->weak_channel_manager = channel_manager;
@@ -1895,6 +1879,7 @@ MomentServer::MomentServer ()
       page_pool             (NULL),
       http_service          (NULL),
       recorder_thread_pool  (NULL),
+      reader_thread_pool    (NULL),
       storage               (NULL),
       publish_all_streams   (true),
       config                (NULL),

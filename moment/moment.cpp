@@ -77,6 +77,7 @@ private:
     HttpService *admin_http_service_ptr;
 
     FixedThreadPool recorder_thread_pool;
+    FixedThreadPool reader_thread_pool;
 
     LocalStorage storage;
 
@@ -181,6 +182,7 @@ public:
           line_pipe    (this /* coderef_container */),
 #endif
           recorder_thread_pool (this /* coderef_container */),
+          reader_thread_pool   (this /* coderef_container */),
           storage (this /* coderef_container */)
     {
     }
@@ -786,6 +788,7 @@ MomentInstance::run ()
     page_pool.setMinPages (params->min_pages);
     server_app.setNumThreads (params->num_threads);
     recorder_thread_pool.setNumThreads (params->num_file_threads);
+    reader_thread_pool.setNumThreads (params->num_file_threads /* TODO Separate config parameter? */);
 
     if (params->http_bind_valid) {
 	if (!http_service.init (server_app.getServerContext()->getMainThreadContext()->getPollGroup(),
@@ -847,6 +850,12 @@ MomentInstance::run ()
 	return EXIT_FAILURE;
     }
 
+    reader_thread_pool.setMainThreadContext (server_app.getServerContext()->getMainThreadContext());
+    if (!reader_thread_pool.spawn ()) {
+        logE_ (_func, "reader_thread_pool.spawn() failed");
+        return EXIT_FAILURE;
+    }
+
     Ref<ChannelManager> const channel_manager = grab (new (std::nothrow) ChannelManager);
     if (!moment_server.init (&server_app,
 			     &page_pool,
@@ -854,6 +863,7 @@ MomentInstance::run ()
 			     admin_http_service_ptr,
 			     config,
 			     &recorder_thread_pool,
+                             &reader_thread_pool,
 			     &storage,
                              channel_manager))
     {
@@ -919,6 +929,7 @@ MomentInstance::run ()
 
 _stop_recorder:
     recorder_thread_pool.stop ();
+    reader_thread_pool.stop ();
 
     return ret_res;
 }
