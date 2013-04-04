@@ -242,6 +242,9 @@ Result httpRequest (HttpRequest   * const mt_nonnull req,
 	    else
 	    if (equal (ext, "jpg"))
 		mime_type = "image/jpeg";
+            else
+            if (equal (ext, "mp4"))
+                mime_type = "video/mp4";
 	}
     }
 //    logD_ (_func, "try_template: ", try_template);
