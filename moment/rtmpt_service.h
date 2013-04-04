@@ -94,8 +94,11 @@ private:
     public:
       mt_iface (Sender)
 	mt_async void sendMessage (Sender::MessageEntry * mt_nonnull msg_entry,
-				   bool do_flush = false);
+				   bool do_flush);
+        mt_mutex (mutex) void sendMessage_unlocked (Sender::MessageEntry * mt_nonnull msg_entry,
+                                                    bool do_flush);
 	mt_async void flush ();
+        mt_mutex (mutex) void flush_unlocked ();
 	mt_async void closeAfterFlush ();
         mt_async void close ();
         mt_mutex (mutex) bool isClosed_unlocked ();

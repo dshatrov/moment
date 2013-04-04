@@ -71,7 +71,14 @@ RtmptService::RtmptSender::sendMessage (Sender::MessageEntry * const mt_nonnull 
                                         bool                   const do_flush)
 {
     mutex.lock ();
+    sendMessage_unlocked (msg_entry, do_flush);
+    mutex.unlock ();
+}
 
+mt_mutex (mutex) void
+RtmptService::RtmptSender::sendMessage_unlocked (Sender::MessageEntry * const mt_nonnull msg_entry,
+                                                 bool                   const do_flush)
+{
     nonflushed_msg_list.append (msg_entry);
 
     // Counting length of new data.
@@ -87,8 +94,6 @@ RtmptService::RtmptSender::sendMessage (Sender::MessageEntry * const mt_nonnull 
 
     if (do_flush)
 	doFlush ();
-
-    mutex.unlock ();
 }
 
 mt_mutex (mutex) void
@@ -107,6 +112,12 @@ RtmptService::RtmptSender::flush ()
     mutex.lock ();
     doFlush ();
     mutex.unlock ();
+}
+
+mt_mutex (mutex) void
+RtmptService::RtmptSender::flush_unlocked ()
+{
+    doFlush ();
 }
 
 mt_async void
@@ -848,7 +859,11 @@ RtmptService::attachToHttpService (HttpService * const http_service,
                                    // TODO Use path? Does it work with RTMPT?
                                    ConstMemory   const /* path */)
 {
-    ConstMemory const paths [] = { "send", "idle", "open", "close", "fcs" };
+    ConstMemory const paths [] = { ConstMemory ("send"),
+                                   ConstMemory ("idle"),
+                                   ConstMemory ("open"),
+                                   ConstMemory ("close"),
+                                   ConstMemory ("fcs") };
     Size const num_paths = sizeof (paths) / sizeof (ConstMemory);
 
     for (unsigned i = 0; i < num_paths; ++i) {
