@@ -26,7 +26,9 @@ using namespace M;
 
 namespace Moment {
 
-mt_sync_domain (pass1) void
+static LogGroup libMary_logGroup_mp4mux   ("moment.mp4mux", LogLevel::I);
+
+mt_sync_domain (pass1) PagePool::PageListHead
 Mp4Muxer::writeMoovAtom ()
 {
   // TODO Сжатие таблиц в stbl
@@ -423,23 +425,23 @@ Mp4Muxer::writeMoovAtom ()
     Size const stbl_size = 8 + stsd_size + sizeof (stsc_data) + sizeof (stco_data) +
                            stts_size + stss_size + stsz_size + ctts_size;
 
-    logD_ (_func, "sizeof (stsc_data): ", sizeof (stsc_data));
-    logD_ (_func, "sizeof (stco_data): ", sizeof (stco_data));
-    logD_ (_func, "stts: ", PagePool::countPageListDataLen (stts_pages.first, 0 /* msg_offset */), " = ", stts_size);
-    logD_ (_func, "stss: ", PagePool::countPageListDataLen (stss_pages.first, 0 /* msg_offset */), " = ", stss_size);
-    logD_ (_func, "stsz: ", PagePool::countPageListDataLen (stsz_pages.first, 0 /* msg_offset */), " = ", stsz_size);
-    logD_ (_func, "ctts: ", PagePool::countPageListDataLen (ctts_pages.first, 0 /* msg_offset */), " = ", ctts_size);
+    logD (mp4mux, _func, "sizeof (stsc_data): ", sizeof (stsc_data));
+    logD (mp4mux, _func, "sizeof (stco_data): ", sizeof (stco_data));
+    logD (mp4mux, _func, "stts: ", PagePool::countPageListDataLen (stts_pages.first, 0 /* msg_offset */), " = ", stts_size);
+    logD (mp4mux, _func, "stss: ", PagePool::countPageListDataLen (stss_pages.first, 0 /* msg_offset */), " = ", stss_size);
+    logD (mp4mux, _func, "stsz: ", PagePool::countPageListDataLen (stsz_pages.first, 0 /* msg_offset */), " = ", stsz_size);
+    logD (mp4mux, _func, "ctts: ", PagePool::countPageListDataLen (ctts_pages.first, 0 /* msg_offset */), " = ", ctts_size);
 
     Size const minf_size = 0x14 /* vmhd */ + 0x21 /* hdlr */ + 0x24 /* dinf */ + stbl_size + 8 /* minf header */;
     Size const mdia_size = 0x20 /* mdhd */ + 0x2d /* mdia_hdlr */ + minf_size + 8 /* mdia header */;
-    Size const trak_size = 0x5c /* tkhd */ + mdia_size + 8 /* trak_header */;
+    Size const trak_size = 0x5c /* tkhd */ + mdia_size + 8 /* trak header */;
     Size const moov_size = sizeof (moov_data) + trak_size;
 
-    logD_ (_func, "stbl_size: ", stbl_size);
-    logD_ (_func, "minf_size: ", minf_size);
-    logD_ (_func, "mdia_size: ", mdia_size);
-    logD_ (_func, "trak_size: ", trak_size);
-    logD_ (_func, "moov_size: ", moov_size);
+    logD (mp4mux, _func, "stbl_size: ", stbl_size);
+    logD (mp4mux, _func, "minf_size: ", minf_size);
+    logD (mp4mux, _func, "mdia_size: ", mdia_size);
+    logD (mp4mux, _func, "trak_size: ", trak_size);
+    logD (mp4mux, _func, "moov_size: ", moov_size);
 
     stbl_data [0] = (Byte) (stbl_size >> 24);
     stbl_data [1] = (Byte) (stbl_size >> 16);
@@ -511,52 +513,43 @@ Mp4Muxer::writeMoovAtom ()
 
     page_pool->getFillPages (&pages, ConstMemory::forObject (mdat_data));
 
-    logD_ (_func, "result: ", PagePool::countPageListDataLen (pages.first, 0 /* msg_offset */), " bytes:");
-    PagePool::dumpPages (logs, &pages);
-
-    {
-        Size const max_header_len = RtmpConnection::MaxHeaderLen; /* FIXME Ugly */
-        Sender::MessageEntry_Pages * const msg_pages =
-                Sender::MessageEntry_Pages::createNew (max_header_len);
-
-        msg_pages->page_pool = page_pool;
-        msg_pages->first_page = pages.first;
-        msg_pages->msg_offset = 0;
-        msg_pages->header_len = 0;
-
-        sender->sendMessage (msg_pages, true /* do_flush */);
+    if (logLevelOn (mp4mux, LogLevel::Debug)) {
+        logD (mp4mux, _func, "result: ", PagePool::countPageListDataLen (pages.first, 0 /* msg_offset */), " bytes:");
+        PagePool::dumpPages (logs, &pages);
     }
+
+    return pages;
 }
 
-mt_sync_domain (pass1) Result
-Mp4Muxer::pass1_avcSequenceHeader (PagePool::Page * const msg,
+void
+Mp4Muxer::pass1_avcSequenceHeader (PagePool       * const mt_nonnull msg_page_pool,
+                                   PagePool::Page * const msg,
                                    Size             const msg_offs,
                                    Size             const frame_size)
 {
     if (avc_seq_hdr_msg) {
-        logW_ (_func, "duplicate invocation");
+        logW (mp4mux, _func, "duplicate invocation");
         page_pool->msgUnref (avc_seq_hdr_msg);
     }
 
-    /* TODO FIXME Use msg's page_pool */
-    page_pool->msgRef (msg);
+    msg_page_pool->msgRef (msg);
+
+    avc_seq_hdr_page_pool = msg_page_pool;
     avc_seq_hdr_msg = msg;
     avc_seq_hdr_offs = msg_offs;
     avc_seq_hdr_size = frame_size;
-
-    return Result::Success;
 }
 
-mt_sync_domain (pass1) Result
+void
 Mp4Muxer::pass1_frame (FrameType const frame_type,
                        Time      const timestamp_nanosec,
                        Size      const frame_size,
                        bool      const is_sync_sample)
 {
     if (frame_type == FrameType_Audio)
-        return Result::Success;
+        return;
 
-    logD_ (_func, " ts ", timestamp_nanosec, " len ", frame_size);
+    logD (mp4mux, _func, " ts ", timestamp_nanosec, " len ", frame_size);
 
     ++num_video_frames;
     total_video_frame_size += frame_size;
@@ -570,7 +563,7 @@ Mp4Muxer::pass1_frame (FrameType const frame_type,
         };
         page_pool->getFillPages (&stsz_pages, ConstMemory::forObject (stsz_entry));
         stsz_pos += sizeof (stsz_entry);
-        logD_ (_func, "stsz_pos: ", stsz_pos);
+        logD (mp4mux, _func, "stsz_pos: ", stsz_pos);
     }
 
     if (is_sync_sample) {
@@ -748,11 +741,9 @@ Mp4Muxer::pass1_frame (FrameType const frame_type,
 
         prv_pts = pts;
     }
-
-    return Result::Success;
 }
 
-mt_sync_domain (pass1) Result
+PagePool::PageListHead
 Mp4Muxer::pass1_complete ()
 {
     if (num_video_frames > 0) {
@@ -765,60 +756,40 @@ Mp4Muxer::pass1_complete ()
         stts_pos += sizeof (stts_entry);
     }
 
-    writeMoovAtom ();
-    return Result::Success;
-}
-
-mt_mutex (mutex) Result
-Mp4Muxer::pass2_frame (FrameType        const frame_type,
-                       Time             const timestamp_nanosec,
-                       PagePool::Page * const msg,
-                       Size             const msg_offs,
-                       Size             const frame_size)
-{
-    if (frame_type == FrameType_Audio)
-        return Result::Success;
-
-    {
-        Size const max_header_len = RtmpConnection::MaxHeaderLen; /* FIXME Ugly */
-        Sender::MessageEntry_Pages * const msg_pages =
-                Sender::MessageEntry_Pages::createNew (max_header_len);
-        page_pool->msgRef (msg);
-
-        msg_pages->page_pool = page_pool /* TODO FIXME Use msg's page_pool */;
-        msg_pages->first_page = msg;
-        msg_pages->msg_offset = msg_offs;
-        msg_pages->header_len = 0;
-
-        sender->sendMessage (msg_pages, true /* do_flush */);
-    }
-
-    return Result::Success;
-}
-
-mt_mutex (mutex) Result
-Mp4Muxer::pass2_complete ()
-{
-    return Result::Success;
+    return writeMoovAtom ();
 }
 
 void
-Mp4Muxer::init (PagePool * const mt_nonnull page_pool,
-                Sender   * const mt_nonnull sender,
-                CbDesc<Frontend> const &frontend)
+Mp4Muxer::clear ()
+{
+    if (avc_seq_hdr_page_pool) {
+        avc_seq_hdr_page_pool->msgUnref (avc_seq_hdr_msg);
+        avc_seq_hdr_page_pool = NULL;
+        avc_seq_hdr_msg = NULL;
+    }
+
+    page_pool->msgUnref (stsz_pages.first);
+    stsz_pages.reset ();
+
+    page_pool->msgUnref (stss_pages.first);
+    stss_pages.reset ();
+
+    page_pool->msgUnref (stts_pages.first);
+    stts_pages.reset ();
+
+    page_pool->msgUnref (ctts_pages.first);
+    ctts_pages.reset ();
+}
+
+void
+Mp4Muxer::init (PagePool * const mt_nonnull page_pool)
 {
     this->page_pool = page_pool;
-    this->sender = sender;
-    this->frontend = frontend;
 }
 
 Mp4Muxer::~Mp4Muxer ()
 {
-    /* TODO FIXME Use msg's page_pool */
-    if (page_pool) {
-        page_pool->msgUnref (avc_seq_hdr_msg);
-        avc_seq_hdr_msg = NULL;
-    }
+    clear ();
 }
 
 }

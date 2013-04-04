@@ -28,115 +28,78 @@ namespace Moment {
 
 using namespace M;
 
-class Mp4Muxer : public DependentCodeReferenced
+mt_unsafe class Mp4Muxer
 {
-private:
-    StateMutex mutex;
-
 public:
-    enum MuxState {
-        MuxState_Ready,
-        MuxState_Overloaded,
-        MuxState_Error,
-        MuxState_Complete
-    };
-
     enum FrameType {
         FrameType_Audio,
         FrameType_Video
     };
 
-    struct Frontend {
-        void (*muxStateChanged) (MuxState  mux_state,
-                                 void     *cb_data);
-    };
-
 private:
-    mt_const DataDepRef<PagePool> page_pool;
-    mt_const DataDepRef<Sender> sender;
+    mt_const CodeDepRef<PagePool> page_pool;
 
-    mt_const Cb<Frontend> frontend;
+    PagePool *avc_seq_hdr_page_pool;
+    PagePool::Page *avc_seq_hdr_msg;
+    Size avc_seq_hdr_offs;
+    Size avc_seq_hdr_size;
 
-// TODO FIXME Synchronize page lists for dtor.
+    Size num_video_frames;
+    Size total_video_frame_size;
 
-    mt_sync_domain (pass1) PagePool::Page *avc_seq_hdr_msg;
-    mt_sync_domain (pass1) Size avc_seq_hdr_offs;
-    mt_sync_domain (pass1) Size avc_seq_hdr_size;
+    PagePool::PageListHead stsz_pages;
+    Size stsz_pos;
 
-    mt_sync_domain (pass1) Size num_video_frames;
-    mt_sync_domain (pass1) Size total_video_frame_size;
+    PagePool::PageListHead stss_pages;
+    Size stss_pos;
+    Count num_stss_entries;
 
-    mt_sync_domain (pass1) PagePool::PageListHead header;
-    mt_sync_domain (pass1) Size header_pos;
+    PagePool::PageListHead stts_pages;
+    Size stts_pos;
+    Time prv_stts_value;
 
-    mt_sync_domain (pass1) PagePool::PageListHead stsz_pages;
-    mt_sync_domain (pass1) Size stsz_pos;
+    PagePool::PageListHead ctts_pages;
+    Size ctts_pos;
 
-    mt_sync_domain (pass1) PagePool::PageListHead stss_pages;
-    mt_sync_domain (pass1) Size stss_pos;
-    mt_sync_domain (pass1) Count num_stss_entries;
+    Time prv_pts;
+    Time min_pts;
 
-    mt_sync_domain (pass1) PagePool::PageListHead stts_pages;
-    mt_sync_domain (pass1) Size stts_pos;
-    mt_sync_domain (pass1) Time prv_stts_value;
-
-    mt_sync_domain (pass1) PagePool::PageListHead ctts_pages;
-    mt_sync_domain (pass1) Size ctts_pos;
-
-    mt_sync_domain (pass1) Time prv_pts;
-    mt_sync_domain (pass1) Time min_pts;
-
-    mt_mutex (mutex) MuxState mux_state;
-
-    mt_sync_domain (pass1) void writeMoovAtom ();
+    PagePool::PageListHead writeMoovAtom ();
 
 public:
-    mt_sync_domain (pass1) Result pass1_avcSequenceHeader (PagePool::Page *msg,
-                                                           Size            msg_offs,
-                                                           Size            frame_size);
+    void pass1_avcSequenceHeader (PagePool       * mt_nonnull msg_page_pool,
+                                  PagePool::Page *msg,
+                                  Size            msg_offs,
+                                  Size            frame_size);
 
-    mt_sync_domain (pass1) Result pass1_frame (FrameType frame_type,
-                                               Time      timestamp_nanosec,
-                                               Size      frame_size,
-                                               bool      is_sync_sample);
+    void pass1_frame (FrameType frame_type,
+                      Time      timestamp_nanosec,
+                      Size      frame_size,
+                      bool      is_sync_sample);
 
-    mt_sync_domain (pass1) Result pass1_complete ();
+    PagePool::PageListHead pass1_complete ();
 
-    mt_mutex (mutex) Result pass2_frame (FrameType       frame_type,
-                                         Time            timestamp_nanosec,
-                                         PagePool::Page *msg,
-                                         Size            msg_offs,
-                                         Size            frame_size);
+    Size getTotalDataSize () const { return total_video_frame_size; }
 
-    mt_mutex (mutex) Result pass2_complete ();
+    void clear ();
 
-    mt_locks   (mutex) void lock   () { mutex.lock   (); }
-    mt_unlocks (mutex) void unlock () { mutex.unlock (); }
+    mt_const void init (PagePool * mt_nonnull page_pool);
 
-    mt_mutex (mutex) MuxState getMuxState_unlocked () { return mux_state; }
-
-    mt_const void init (PagePool * mt_nonnull page_pool,
-                        Sender   * mt_nonnull sender,
-                        CbDesc<Frontend> const &frontend);
-
-    Mp4Muxer (Object * const coderef_container)
-        : DependentCodeReferenced (coderef_container),
-          page_pool  (coderef_container),
-          sender     (coderef_container),
+    Mp4Muxer ()
+        : avc_seq_hdr_page_pool (NULL),
           avc_seq_hdr_msg (NULL),
           avc_seq_hdr_offs (0),
           avc_seq_hdr_size (0),
           num_video_frames (0),
           total_video_frame_size (0),
-          header_pos (0),
-          stsz_pos (0),
-          stss_pos (0),
+          stsz_pos   (0),
+          stss_pos   (0),
           num_stss_entries (0),
-          stts_pos (0),
+          stts_pos   (0),
           prv_stts_value (0),
-          ctts_pos (0),
-          prv_pts (0),
-          min_pts (0)
+          ctts_pos   (0),
+          prv_pts    (0),
+          min_pts    (0)
     {}
 
     ~Mp4Muxer ();
