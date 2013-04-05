@@ -38,6 +38,7 @@ public:
 
 private:
     mt_const CodeDepRef<PagePool> page_pool;
+    mt_const Time duration_millisec;
 
     PagePool *avc_seq_hdr_page_pool;
     PagePool::Page *avc_seq_hdr_msg;
@@ -83,10 +84,12 @@ public:
 
     void clear ();
 
-    mt_const void init (PagePool * mt_nonnull page_pool);
+    mt_const void init (PagePool * mt_nonnull page_pool,
+                        Time       const duration_millisec);
 
     Mp4Muxer ()
-        : avc_seq_hdr_page_pool (NULL),
+        : duration_millisec (0),
+          avc_seq_hdr_page_pool (NULL),
           avc_seq_hdr_msg (NULL),
           avc_seq_hdr_offs (0),
           avc_seq_hdr_size (0),

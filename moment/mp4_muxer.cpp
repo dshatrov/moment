@@ -66,8 +66,13 @@ Mp4Muxer::writeMoovAtom ()
         // timescale (1000)
         0x00, 0x00, 0x03, 0xe8,
 #warning TODO duration
-        // duration (10000)
-        0x00, 0x00, 0x27, 0x10,
+//        // duration (10000)
+//        0x00, 0x00, 0x27, 0x10,
+        // duration
+        (Byte) (duration_millisec >> 24),
+        (Byte) (duration_millisec >> 16),
+        (Byte) (duration_millisec >>  8),
+        (Byte) (duration_millisec >>  0),
         // rate (1.0)
         0x00, 0x01, 0x00, 0x00,
         // volume (1.0)
@@ -127,8 +132,13 @@ Mp4Muxer::writeMoovAtom ()
         // reserved
         0x00, 0x00, 0x00, 0x00,
 #warning TODO duration
-        // duration (10000)
-        0x00, 0x00, 0x27, 0x10,
+//        // duration (10000)
+//        0x00, 0x00, 0x27, 0x10,
+        // duration
+        (Byte) (duration_millisec >> 24),
+        (Byte) (duration_millisec >> 16),
+        (Byte) (duration_millisec >>  8),
+        (Byte) (duration_millisec >>  0),
         // reserved
         0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00,
@@ -171,8 +181,13 @@ Mp4Muxer::writeMoovAtom ()
         (Byte) (mactime >>  0),
         // time scale (3000)
         0x00, 0x00, 0x0b, 0xb8,
-        // duration (30000)
-        0x00, 0x00, 0x75, 0x30,
+//        // duration (30000)
+//        0x00, 0x00, 0x75, 0x30,
+        // duration
+        (Byte) ((duration_millisec * 3) >> 24),
+        (Byte) ((duration_millisec * 3) >> 16),
+        (Byte) ((duration_millisec * 3) >>  8),
+        (Byte) ((duration_millisec * 3) >>  0),
         // language, quality
         0x00, 0x00, 0x00, 0x00
     };
@@ -747,9 +762,17 @@ PagePool::PageListHead
 Mp4Muxer::pass1_complete ()
 {
     if (num_video_frames > 0) {
+        // (total duration) - (last frame timestamp)
+        Time last_duration = 0;
+        if (duration_millisec * 3 > prv_pts)
+            last_duration = duration_millisec * 3 - prv_pts;
+
         Byte const stts_entry [] = {
             0, 0, 0, 1,
-            0, 0, 0, 0 // TODO Total duration - last frame timestamp.
+            (Byte) (last_duration >> 24),
+            (Byte) (last_duration >> 16),
+            (Byte) (last_duration >>  8),
+            (Byte) (last_duration >>  0),
         };
 
         page_pool->getFillPages (&stts_pages, ConstMemory::forObject (stts_entry));
@@ -782,9 +805,11 @@ Mp4Muxer::clear ()
 }
 
 void
-Mp4Muxer::init (PagePool * const mt_nonnull page_pool)
+Mp4Muxer::init (PagePool * const mt_nonnull page_pool,
+                Time       const duration_millisec)
 {
     this->page_pool = page_pool;
+    this->duration_millisec = duration_millisec;
 }
 
 Mp4Muxer::~Mp4Muxer ()
