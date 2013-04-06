@@ -37,37 +37,83 @@ public:
     };
 
 private:
+    struct TrackInfo
+    {
+        PagePool       *hdr_page_pool;
+        PagePool::Page *hdr_msg;
+        Size            hdr_offs;
+        Size            hdr_size;
+
+        Size num_frames;
+        Size total_frame_size;
+
+        PagePool::PageListHead stsz_pages;
+        Size stsz_pos;
+
+        PagePool::PageListHead stss_pages;
+        Size stss_pos;
+        Count num_stss_entries;
+
+        PagePool::PageListHead stts_pages;
+        Size stts_pos;
+        Time prv_stts_value;
+
+        PagePool::PageListHead ctts_pages;
+        Size ctts_pos;
+
+        PagePool::PageListHead stco_pages;
+        Size stco_pos;
+
+        Time prv_pts;
+        Time min_pts;
+
+        void clear (PagePool * mt_nonnull page_pool);
+
+        TrackInfo ()
+            : hdr_page_pool    (NULL),
+              hdr_msg          (NULL),
+              hdr_offs         (0),
+              hdr_size         (0),
+              num_frames       (0),
+              total_frame_size (0),
+              stsz_pos         (0),
+              stss_pos         (0),
+              num_stss_entries (0),
+              stts_pos         (0),
+              prv_stts_value   (0),
+              ctts_pos         (0),
+              stco_pos         (0),
+              prv_pts          (0),
+              min_pts          (0)
+        {}
+    };
+
     mt_const CodeDepRef<PagePool> page_pool;
     mt_const Time duration_millisec;
 
-    PagePool *avc_seq_hdr_page_pool;
-    PagePool::Page *avc_seq_hdr_msg;
-    Size avc_seq_hdr_offs;
-    Size avc_seq_hdr_size;
+    TrackInfo audio_track;
+    TrackInfo video_track;
 
-    Size num_video_frames;
-    Size total_video_frame_size;
+    Uint64 mdat_pos;
 
-    PagePool::PageListHead stsz_pages;
-    Size stsz_pos;
-
-    PagePool::PageListHead stss_pages;
-    Size stss_pos;
-    Count num_stss_entries;
-
-    PagePool::PageListHead stts_pages;
-    Size stts_pos;
-    Time prv_stts_value;
-
-    PagePool::PageListHead ctts_pages;
-    Size ctts_pos;
-
-    Time prv_pts;
-    Time min_pts;
+    void patchTrackStco (TrackInfo * mt_nonnull track,
+                         Uint32     offset);
 
     PagePool::PageListHead writeMoovAtom ();
 
+    void processFrame (TrackInfo * mt_nonnull track,
+                       Time       timestamp_nanosec,
+                       Size       frame_size,
+                       bool       is_sync_sample);
+
+    void finalizeTrack (TrackInfo * mt_nonnull track);
+
 public:
+    void pass1_aacSequenceHeader (PagePool       * mt_nonnull msg_page_pool,
+                                  PagePool::Page *msg,
+                                  Size            msg_offs,
+                                  Size            frame_size);
+
     void pass1_avcSequenceHeader (PagePool       * mt_nonnull msg_page_pool,
                                   PagePool::Page *msg,
                                   Size            msg_offs,
@@ -80,7 +126,8 @@ public:
 
     PagePool::PageListHead pass1_complete ();
 
-    Size getTotalDataSize () const { return total_video_frame_size; }
+    Size getTotalDataSize () const
+        { return audio_track.total_frame_size + video_track.total_frame_size; }
 
     void clear ();
 
@@ -89,20 +136,7 @@ public:
 
     Mp4Muxer ()
         : duration_millisec (0),
-          avc_seq_hdr_page_pool (NULL),
-          avc_seq_hdr_msg (NULL),
-          avc_seq_hdr_offs (0),
-          avc_seq_hdr_size (0),
-          num_video_frames (0),
-          total_video_frame_size (0),
-          stsz_pos   (0),
-          stss_pos   (0),
-          num_stss_entries (0),
-          stts_pos   (0),
-          prv_stts_value (0),
-          ctts_pos   (0),
-          prv_pts    (0),
-          min_pts    (0)
+          mdat_pos (0)
     {}
 
     ~Mp4Muxer ();
