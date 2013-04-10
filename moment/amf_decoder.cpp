@@ -900,22 +900,21 @@ Result
 AmfDecoder::skipObjectProperty (bool   const dump,
                                 bool * const ret_object_end)
 {
-    if (msg_len - cur_offset < 2) {
-        logE_ (_func, "no field name length");
-        return Result::Failure;
-    }
+    {
+        Byte str [128];
+        Size len;
+        Size full_len;
+        if (!decodeFieldName (dump ? Memory::forObject (str) : Memory(),
+                              &len,
+                              &full_len))
+        {
+            logD_ (_func, "no field name");
+            return Result::Failure;
+        }
 
-    Byte fnamelen_arr [2];
-    array->get (cur_offset, Memory::forObject (fnamelen_arr));
-    Uint32 const field_name_len = ((Uint32) fnamelen_arr [0] << 8) |
-                                  ((Uint32) fnamelen_arr [1] << 0);
-    cur_offset += 2;
-
-    if (msg_len - cur_offset < field_name_len) {
-        logE_ (_func, "no field name");
-        return Result::Failure;
+        if (dump)
+            logD_ (_func, "field name [", full_len, "]: ", ConstMemory (str, len));
     }
-    cur_offset += field_name_len;
 
     if (!doSkipValue (dump, ret_object_end))
         return Result::Failure;
@@ -952,6 +951,16 @@ AmfDecoder::isObjectEnd ()
         return true;
 
     return false;
+}
+
+void
+AmfDecoder::dump ()
+{
+    AmfEncoding const tmp_encoding = encoding;
+    Size tmp_offset = cur_offset;
+    while (dumpValue ());
+    encoding = tmp_encoding;
+    cur_offset = tmp_offset;
 }
 
 }

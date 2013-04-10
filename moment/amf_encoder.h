@@ -101,6 +101,16 @@ public:
     operator Value () const { return value; }
     AmfEncoding (Value const value) : value (value) {}
     AmfEncoding () {}
+    Size toString_ (Memory const &mem, Format const & /* fmt */) const
+    {
+        switch (value) {
+            case AMF0:    return toString (mem, "AmfEncoding::AMF0");
+            case AMF3:    return toString (mem, "AmfEncoding::AMF3");
+            case Unknown: return toString (mem, "AmfEncoding::Unknown");
+        }
+        unreachable ();
+        return 0;
+    }
 private:
     Value value;
 };

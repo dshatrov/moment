@@ -81,8 +81,6 @@ public:
     Result skipValue () { return doSkipValue (false /* dump */, NULL /* ret_object_end */); }
     Result dumpValue () { return doSkipValue (true  /* dump */, NULL /* ret_object_end */); }
 
-    void dump () { while (dumpValue ());  }
-
     Result skipObject (bool dump = false);
 
     Result skipObjectProperty (bool  dump = false,
@@ -93,6 +91,8 @@ public:
     bool isObjectEnd ();
 
     Size getCurOffset () { return cur_offset; }
+
+    void dump ();
 
     void reset (AmfEncoding   const encoding,
 		Array       * const array,

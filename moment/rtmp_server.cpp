@@ -659,16 +659,6 @@ RtmpServer::doPublish (Uint32       const msg_stream_id,
 {
     logD (rtmp_server, _func_);
 
-// TEST (uncomment)
-#if 0
-    // XXX Ugly
-    if (playing.get()) {
-	logW_ (_func, "already playing");
-	return Result::Success;
-    }
-    playing.set (1);
-#endif
-
     double transaction_id;
     if (!decoder->decodeNumber (&transaction_id)) {
 	logE_ (_func, "could not decode transaction_id");
@@ -818,10 +808,12 @@ RtmpServer::commandMessage (VideoStream::Message * const mt_nonnull msg,
             return Result::Success;
     }
 
-    PagePool::PageListArray pl_array (msg->page_list.first,
-                                      amf_encoding == AmfEncoding::AMF3 ? 1 : 0 /* offset */,
-                                      amf_encoding == AmfEncoding::AMF3 ? msg->msg_len - 1 : msg->msg_len);
-    AmfDecoder decoder (AmfEncoding::AMF0, &pl_array, msg->msg_len);
+    Size const decoder_offset = (amf_encoding == AmfEncoding::AMF3 ? 1 : 0);
+    PagePool::PageListArray pl_array (msg->page_list.first, decoder_offset, msg->msg_len - decoder_offset);
+    AmfDecoder decoder (AmfEncoding::AMF0, &pl_array, msg->msg_len - decoder_offset);
+//    // DEBUG
+//    logD_ (_func, "msg dump (", amf_encoding, "):");
+//    decoder.dump ();
 
     Byte method_name [256];
     Size method_name_len;
@@ -837,10 +829,6 @@ RtmpServer::commandMessage (VideoStream::Message * const mt_nonnull msg,
 
     ConstMemory method_mem (method_name, method_name_len);
     if (equal (method_mem, "connect")) {
-//	decoder.decodeNumber ();
-//	decoder.beginObject ();
-	// TODO Decode URL
-
 	return doConnect (msg_stream_id, &decoder);
     } else
     if (equal (method_mem, "createStream")) {
@@ -875,23 +863,8 @@ RtmpServer::commandMessage (VideoStream::Message * const mt_nonnull msg,
 	return doPublish (msg_stream_id, &decoder, conn_info);
     } else
     if (equal (method_mem, "@setDataFrame")) {
-#if 0
-	logD_ (_func, method_mem);
-
-	{
-	    PagePool::Page * const page = msg->page_list->first;
-	    logD_ (_func, "page: 0x", fmt_hex, (UintPtr) page);
-	    if (page) {
-                logLock ();
-		hexdump (logs, page->mem());
-                logUnlock ():
-            }
-	}
-#endif
-
-	Size const msg_offset = decoder.getCurOffset ();
+	Size const msg_offset = decoder.getCurOffset () + decoder_offset;
 	assert (msg_offset <= msg->msg_len);
-//	logD_ (_func, "msg_offset: ", msg_offset);
 
 	VideoStream::VideoMessage video_msg;
 	video_msg.timestamp_nanosec = msg->timestamp_nanosec;
@@ -901,26 +874,13 @@ RtmpServer::commandMessage (VideoStream::Message * const mt_nonnull msg,
 
 	video_msg.page_pool = msg->page_pool;
 	video_msg.page_list = msg->page_list;
-	video_msg.msg_len = msg->msg_len - msg->msg_offset;
-	video_msg.msg_offset = msg->msg_offset;
+	video_msg.msg_len = msg->msg_len - msg_offset;
+	video_msg.msg_offset = msg_offset;
 
 	return rtmp_conn->fireVideoMessage (&video_msg);
     } else
     if (equal (method_mem, "@clearDataFrame")) {
-#if 0
-	logD_ (_func, method_mem);
-
-	{
-	    PagePool::Page * const page = msg->page_list->first;
-	    if (page) {
-                logLock ();
-		hexdump (logs, page->mem());
-                logUnlock ();
-            }
-	}
-#endif
-
-	Size const msg_offset = decoder.getCurOffset ();
+	Size const msg_offset = decoder.getCurOffset () + decoder_offset;
 	assert (msg_offset <= msg->msg_len);
 
 	VideoStream::VideoMessage video_msg;
@@ -931,15 +891,15 @@ RtmpServer::commandMessage (VideoStream::Message * const mt_nonnull msg,
 
 	video_msg.page_pool = msg->page_pool;
 	video_msg.page_list = msg->page_list;
-	video_msg.msg_len = msg->msg_len - msg->msg_offset;
-	video_msg.msg_offset = msg->msg_offset;
+	video_msg.msg_len = msg->msg_len - msg_offset;
+	video_msg.msg_offset = msg_offset;
 
 	return rtmp_conn->fireVideoMessage (&video_msg);
     } else {
 	if (frontend && frontend->commandMessage) {
 	    CommandResult res;
-	    if (!frontend.call_ret<CommandResult> (&res, frontend->commandMessage, /*(*/
-			 rtmp_conn, msg_stream_id, method_mem, msg, &decoder /*)*/))
+	    if (!frontend.call_ret<CommandResult> (&res, frontend->commandMessage,
+			 /*(*/ rtmp_conn, msg_stream_id, method_mem, msg, &decoder /*)*/))
 	    {
 		logE_ (_func, "frontend gone");
 		return Result::Failure;
@@ -973,7 +933,6 @@ RtmpServer::encodeMetaData (MetaData                  * const mt_nonnull metadat
     AmfEncoder encoder (atoms);
 
     encoder.addString ("onMetaData");
-// Unnecessary    encoder.addNumber (1.0);
 
     encoder.beginEcmaArray (0 /* num_entries */);
     AmfAtom * const toplevel_array_atom = encoder.getLastAtom ();
@@ -1073,7 +1032,7 @@ RtmpServer::encodeMetaData (MetaData                  * const mt_nonnull metadat
 					     page_pool,
 					     &page_list,
 					     RtmpConnection::DefaultDataChunkStreamId,
-					     0 /* timestamp */,
+					     0    /* timestamp */,
 					     true /* first_chunk */);
     }
 
