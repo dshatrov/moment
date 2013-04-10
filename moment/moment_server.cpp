@@ -1141,13 +1141,24 @@ Result MomentServer::setClientSessionVideoStream (ClientSession * const client_s
                                                   VideoStream   * const video_stream,
                                                   ConstMemory     const stream_name)
 {
+    client_session->mutex.lock ();
+    // Checking 'disconnected' first to avoid calling addVideoStream
+    // for streams from disconnected clients, which is a likely thing
+    // to do if we add before checking. If we check first, then the
+    // likelihood is much smaller.
+    if (client_session->disconnected) {
+        client_session->mutex.unlock ();
+        return Result::Failure;
+    }
+    client_session->mutex.unlock ();
+
     VideoStreamKey const video_stream_key = addVideoStream (video_stream, stream_name);
 
     client_session->mutex.lock ();
     if (client_session->disconnected) {
 	client_session->mutex.unlock ();
-	removeVideoStream (video_stream_key);
 
+	removeVideoStream (video_stream_key);
         return Result::Failure;
     }
     client_session->video_stream_key = video_stream_key;
@@ -1239,7 +1250,6 @@ MomentServer::startStreaming (ClientSession    * const mt_nonnull client_session
 	logD (session, _func, "calling backend->startStreaming()");
 
         Result res;
-
         bool complete = false;
 	if (!client_session->backend.call_ret<bool> (
                     &complete,
@@ -1250,9 +1260,9 @@ MomentServer::startStreaming (ClientSession    * const mt_nonnull client_session
                         video_stream,
                         rec_mode,
                         CbDesc<StartStreamingCallback> (startStreaming_startStreamingRet,
-                                                       data,
-                                                       NULL,
-                                                       data),
+                                                        data,
+                                                        NULL,
+                                                        data),
                         &res
                     /*)*/))
 	{

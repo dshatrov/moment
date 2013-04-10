@@ -258,17 +258,18 @@ ClientSession::doResume ()
 
 void destroyClientSession (ClientSession * const client_session)
 {
-    client_session->recorder.stop();
-
     client_session->mutex.lock ();
-
     if (!client_session->valid) {
 	client_session->mutex.unlock ();
 	logD (mod_rtmp, _func, "invalid session");
 	return;
     }
     client_session->valid = false;
+    client_session->mutex.unlock ();
 
+    client_session->recorder.stop();
+
+    client_session->mutex.lock ();
     getStat()->addInt (stat_num_sessions, -1);
 
     {
@@ -287,7 +288,6 @@ void destroyClientSession (ClientSession * const client_session)
 
     client_session->mutex.unlock ();
 
-    // TODO class MomentRtmpModule
     MomentServer * const moment = MomentServer::getInstance();
 
     if (srv_session)
@@ -365,8 +365,6 @@ startTranscoder (ClientSession * const client_session)
 void streamAudioMessage (VideoStream::AudioMessage * const mt_nonnull msg,
 			 void                      * const _session)
 {
-//    logD_ (_func, "ts: ", msg->timestamp_nanosec);
-
     ClientSession * const client_session = static_cast <ClientSession*> (_session);
 
     client_session->mutex.lock ();
@@ -552,6 +550,8 @@ Result connect (ConstMemory const &app_name,
     if (!client_session->valid) {
 	assert (!client_session->srv_session);
 	client_session->mutex.unlock ();
+
+        moment->clientDisconnected (srv_session);
 	return Result::Failure;
     }
     client_session->srv_session = srv_session;
@@ -632,6 +632,13 @@ static void completeStartStreaming (ClientSession * const client_session,
                                     RecordingMode   const rec_mode,
                                     VideoStream   * const video_stream)
 {
+    client_session->mutex.lock ();
+    if (!client_session->valid) {
+        client_session->mutex.unlock ();
+        return;
+    }
+    client_session->mutex.unlock ();
+
     if (record_all) {
 	logD_ (_func, "rec_mode: ", (Uint32) rec_mode);
 	if (rec_mode == RecordingMode::Replace ||
@@ -646,13 +653,13 @@ static void completeStartStreaming (ClientSession * const client_session,
     }
 
     client_session->mutex.lock ();
-
-    client_session->video_stream = video_stream;
-
-    logD_ (_func, "client_session: ", (UintPtr) client_session, ", video_stream: ", (UintPtr) video_stream);
+    if (!client_session->valid) {
+        client_session->mutex.unlock ();
+        client_session->recorder.stop();
+        return;
+    }
 
     startTranscoder (client_session);
-
     client_session->mutex.unlock ();
 }
 
@@ -681,7 +688,29 @@ bool startRtmpStreaming (ConstMemory     const _stream_name,
 
     ConstMemory stream_name = _stream_name;
 
+    // 'srv_session' is created in connect(), which is synchronized with
+    // startStreaming(). No locking needed.
+    Ref<StreamParameters> const stream_params = grab (new (std::nothrow) StreamParameters);
+    stream_params->setParam ("source", momentrtmp_proto ? ConstMemory ("momentrtmp") : ConstMemory ("rtmp"));
+    if (!momentrtmp_proto) {
+        // TODO nellymoser? Use "source" param from above instead.
+        stream_params->setParam ("audio_codec", "speex");
+    }
+
+    Ref<VideoStream> const video_stream = grab (new (std::nothrow) VideoStream);
+    video_stream->setStreamParameters (stream_params);
+
+    logD_ (_func, "client_session: 0x", fmt_hex, (UintPtr) client_session, ", "
+           "video_stream: 0x", (UintPtr) video_stream.ptr());
+
     client_session->mutex.lock ();
+    if (!client_session->valid) {
+        client_session->mutex.unlock ();
+        *ret_res = Result::Failure;
+        return true;
+    }
+
+    client_session->video_stream = video_stream;
     client_session->streaming_params.reset ();
     {
 	Byte const * const name_sep = (Byte const *) memchr (stream_name.mem(), '?', stream_name.len());
@@ -696,18 +725,6 @@ bool startRtmpStreaming (ConstMemory     const _stream_name,
     }
     client_session->stream_name = grab (new (std::nothrow) String (stream_name));
     client_session->mutex.unlock ();
-
-    // 'srv_session' is created in connect(), which is synchronized with
-    // startStreaming(). No locking needed.
-    Ref<StreamParameters> const stream_params = grab (new (std::nothrow) StreamParameters);
-    stream_params->setParam ("source", momentrtmp_proto ? ConstMemory ("momentrtmp") : ConstMemory ("rtmp"));
-    if (!momentrtmp_proto) {
-        // TODO nellymoser? Use "source" param from above instead.
-        stream_params->setParam ("audio_codec", "speex");
-    }
-
-    Ref<VideoStream> const video_stream = grab (new (std::nothrow) VideoStream);
-    video_stream->setStreamParameters (stream_params);
 
     Result res = Result::Failure;
     {
@@ -895,7 +912,6 @@ static bool startRtmpWatching (ConstMemory    const _stream_name,
 {
     *ret_res = Result::Failure;
 
-    // TODO class MomentRtmpModule
     MomentServer * const moment = MomentServer::getInstance();
 
     logD (mod_rtmp, _func, "client_session 0x", fmt_hex, (UintPtr) _client_session);
@@ -914,6 +930,12 @@ static bool startRtmpWatching (ConstMemory    const _stream_name,
     ConstMemory stream_name_with_params = stream_name;
 
     client_session->mutex.lock ();
+    if (!client_session->valid) {
+        client_session->mutex.unlock ();
+        *ret_res = Result::Failure;
+        return true;
+    }
+
     client_session->watching_params.reset ();
     {
 	Byte const * const name_sep = (Byte const *) memchr (stream_name.mem(), '?', stream_name.len());
@@ -1155,7 +1177,6 @@ Result clientConnected (RtmpConnection  * const mt_nonnull rtmp_conn,
     rtmp_conn->startServer ();
 
     client_session->ref ();
-
     return Result::Success;
 }
 
