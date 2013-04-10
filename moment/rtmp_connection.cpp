@@ -493,8 +493,6 @@ RtmpConnection::fillPrechunkedPages (PrechunkContext        * const  prechunk_ct
     // contexts for distinct messages.
 
     while (total_filled < mem.len ()) {
-//	logD_ (_func, "total_filled: ", total_filled);
-
 	if (prechunk_ctx->prechunk_offset == 0 &&
 		!(first_chunk && total_filled == 0))
 	{
@@ -548,11 +546,6 @@ RtmpConnection::sendMessage (MessageDesc const * const mt_nonnull mdesc,
 			     chunk_stream->chunk_stream_id,
 			     mdesc->timestamp,
 			     true /* first_chunk */);
-#if 0
-	logD (chunk, _func, "prechunked 1st page:");
-	if (page_list.first)
-	    hexdump (logs, ConstMemory (page_list.first->getData(), page_list.first->data_len));
-#endif
     }
 
     sendMessagePages (mdesc,

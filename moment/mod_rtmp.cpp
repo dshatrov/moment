@@ -30,8 +30,8 @@ namespace Moment {
 
 namespace {
 
-static LogGroup libMary_logGroup_mod_rtmp ("mod_rtmp", LogLevel::I);
-static LogGroup libMary_logGroup_session ("mod_rtmp.session", LogLevel::I);
+static LogGroup libMary_logGroup_mod_rtmp  ("mod_rtmp", LogLevel::I);
+static LogGroup libMary_logGroup_session   ("mod_rtmp.session", LogLevel::I);
 static LogGroup libMary_logGroup_framedrop ("mod_rtmp.framedrop", LogLevel::I);
 
 class MomentRtmpModule : public Object

@@ -332,11 +332,6 @@ int moment_amf_decoder_skip_value (MomentAmfDecoder *decoder);
 
 int moment_amf_decoder_skip_object (MomentAmfDecoder *decoder);
 
-size_t moment_amf_decoder_get_position (MomentAmfDecoder *decoder);
-
-void moment_amf_decoder_set_position (MomentAmfDecoder *decoder,
-				      size_t            pos);
-
 
 // ________________________________ AMF Encoder ________________________________
 

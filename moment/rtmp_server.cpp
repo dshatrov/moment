@@ -78,8 +78,9 @@ RtmpServer::doConnect (Uint32       const msg_stream_id,
     }
 
     Byte app_name_buf [1024];
-    Size app_name_len;
-    for (;;) {
+    Size app_name_len = 0;
+    double object_encoding = 0.0;
+    while (!decoder->isObjectEnd()) {
 	Byte field_name_buf [512];
 	Size field_name_len;
 	Size field_name_full_len;
@@ -98,9 +99,15 @@ RtmpServer::doConnect (Uint32       const msg_stream_id,
 		logW_ (_func, "app name length exceeds limit "
 		       "(length ", app_name_full_len, " bytes, limit ", sizeof (app_name_buf), " bytes)");
 	    }
-	    break;
-	}
-
+	} else
+        if (equal (ConstMemory (field_name_buf, field_name_len), "objectEncoding")) {
+            double number;
+            if (!decoder->decodeNumber (&number)) {
+                logE_ (_func, "could not decode objectEncoding");
+                return Result::Failure;
+            }
+            object_encoding = number;
+        } else
 	if (!decoder->skipValue ()) {
 	    logE_ (_func, "could not skip field value");
 	    return Result::Failure;
@@ -124,6 +131,9 @@ RtmpServer::doConnect (Uint32       const msg_stream_id,
 	    encoder.beginObject ();
 
 	    encoder.addFieldName ("fmsVer");
+            // TODO FMLE doesn't allow DVR if we don't pretend to be FMS>=3.5.
+            //      Make this configurable and default to 'FMS' when rtmp recording
+            //      is enabled.
 	    encoder.addString ("MMNT/0,1,0,0");
 //	    encoder.addString ("FMS/3,5,7,7009");
 
@@ -150,7 +160,7 @@ RtmpServer::doConnect (Uint32       const msg_stream_id,
 	    encoder.addString ("Connection succeeded.");
 
 	    encoder.addFieldName ("objectEncoding");
-	    encoder.addNumber (0.0);
+	    encoder.addNumber (object_encoding);
 
 #if 0
 // This seems to be unnecessary
@@ -788,7 +798,7 @@ RtmpServer::sendInitialMessages_unlocked (VideoStream::FrameSaver * const mt_non
 Result
 RtmpServer::commandMessage (VideoStream::Message * const mt_nonnull msg,
 			    Uint32                 const msg_stream_id,
-			    AmfEncoding            const /* amf_encoding */,
+			    AmfEncoding            const amf_encoding,
                             RtmpConnection::ConnectionInfo * const mt_nonnull conn_info)
 {
     logD (rtmp_server, _func_);
@@ -796,7 +806,21 @@ RtmpServer::commandMessage (VideoStream::Message * const mt_nonnull msg,
     if (msg->msg_len == 0)
 	return Result::Success;
 
-    PagePool::PageListArray pl_array (msg->page_list.first, msg->msg_len);
+    if (amf_encoding == AmfEncoding::AMF3) {
+        // AMF3 command messages have an extra leading (dummy?) byte.
+        if (msg->msg_len < 1) {
+            logW_ (_func, "AMF3 message is too short (no leading byte)");
+            return Result::Success;
+        }
+
+        // empty message with a leading byte
+        if (msg->msg_len == 1)
+            return Result::Success;
+    }
+
+    PagePool::PageListArray pl_array (msg->page_list.first,
+                                      amf_encoding == AmfEncoding::AMF3 ? 1 : 0 /* offset */,
+                                      amf_encoding == AmfEncoding::AMF3 ? msg->msg_len - 1 : msg->msg_len);
     AmfDecoder decoder (AmfEncoding::AMF0, &pl_array, msg->msg_len);
 
     Byte method_name [256];

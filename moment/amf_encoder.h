@@ -1,5 +1,5 @@
 /*  Moment Video Server - High performance media server
-    Copyright (C) 2011 Dmitry Shatrov
+    Copyright (C) 2011-2013 Dmitry Shatrov
     e-mail: shatrov@gmail.com
 
     This program is free software: you can redistribute it and/or modify
@@ -17,8 +17,8 @@
 */
 
 
-#ifndef __LIBMOMENT__AMF_ENCODER__H__
-#define __LIBMOMENT__AMF_ENCODER__H__
+#ifndef LIBMOMENT__AMF_ENCODER__H__
+#define LIBMOMENT__AMF_ENCODER__H__
 
 
 #include <libmary/types.h>
@@ -39,23 +39,53 @@ public:
 	Boolean       = 0x01,
 	String        = 0x02,
 	Object        = 0x03,
-	MovieClip     = 0x04,
+	MovieClip     = 0x04, // reserved
 	Null          = 0x05,
 	Undefined     = 0x06,
 	Reference     = 0x07,
 	EcmaArray     = 0x08,
 	ObjectEnd     = 0x09,
-	StringArray   = 0x0a,
+	StrictArray   = 0x0a,
 	Date          = 0x0b,
 	LongString    = 0x0c,
 	Unsupported   = 0x0d,
-	RecordSet     = 0x0e,
+	RecordSet     = 0x0e, // reserved
 	XmlDocument   = 0x0f,
 	TypedObject   = 0x10,
+        // "Switch to AMF3" marker
 	AvmPlusObject = 0x11
     };
     AmfMarker (Value const value) : value (value) {}
     AmfMarker () {}
+private:
+    Value value;
+};
+
+class Amf3Marker
+{
+public:
+    enum Value {
+        Undefined    = 0x00,
+        Null         = 0x01,
+        False        = 0x02,
+        True         = 0x03,
+        Integer      = 0x04,
+        Double       = 0x05,
+        String       = 0x06,
+        XmlDoc       = 0x07,
+        Date         = 0x08,
+        Array        = 0x09,
+        Object       = 0x0a,
+        Xml          = 0x0b,
+        ByteArray    = 0x0c,
+        VectorInt    = 0x0d,
+        VectorUint   = 0x0e,
+        VectorDouble = 0x0f,
+        VectorObject = 0x10,
+        Dictionary   = 0x11
+    };
+    Amf3Marker (Value const value) : value (value) {}
+    Amf3Marker () {}
 private:
     Value value;
 };
@@ -151,7 +181,7 @@ public:
     }
 };
 
-class AmfEncoder
+mt_unsafe class AmfEncoder
 {
 private:
     AmfAtom *atoms;
@@ -274,5 +304,5 @@ public:
 }
 
 
-#endif /* __LIBMOMENT__AMF_ENCODER__H__ */
+#endif /* LIBMOMENT__AMF_ENCODER__H__ */
 

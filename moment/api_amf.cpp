@@ -164,17 +164,6 @@ int moment_amf_decoder_skip_object (MomentAmfDecoder * const ext_decoder)
     return ext_decoder->int_decoder.skipObject () ? 0 : -1;
 }
 
-size_t moment_amf_decoder_get_position (MomentAmfDecoder * const ext_decoder)
-{
-    return (size_t) ext_decoder->int_decoder.getCurOffset ();
-}
-
-void moment_amf_decoder_set_position (MomentAmfDecoder * const ext_decoder,
-				      size_t             const pos)
-{
-    ext_decoder->int_decoder.setOffset ((Size) pos);
-}
-
 
 // ________________________________ AMF Encoder ________________________________
 
