@@ -164,7 +164,7 @@ RtmptService::RtmptSender::sendPendingData (Sender * const mt_nonnull sender)
     MessageList::iter iter (pending_msg_list);
     while (!pending_msg_list.iter_done (iter)) {
 	MessageEntry * const msg_entry = pending_msg_list.iter_next (iter);
-	sender->sendMessage (msg_entry);
+	sender->sendMessage (msg_entry, false /* do_flush */);
     }
 
     pending_msg_list.clear ();

@@ -105,7 +105,7 @@ MomentServer::adminHttpRequest (HttpRequest   * const mt_nonnull req,
                 false /* do_flush */,
                 MOMENT_SERVER__OK_HEADERS ("text/html", data_len),
                 "\r\n");
-        conn_sender->sendPages (self->page_pool, &page_list, true /* do_flush */);
+        conn_sender->sendPages (self->page_pool, page_list.first, true /* do_flush */);
 
         logA_ ("file 200 ", req->getClientAddress(), " ", req->getRequestLine());
     } else {

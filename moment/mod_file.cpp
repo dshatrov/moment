@@ -573,7 +573,7 @@ Result httpRequest (HttpRequest   * const mt_nonnull req,
     }
 #endif
 
-    conn_sender->sendPages (page_pool, &page_list, true /* do_flush */);
+    conn_sender->sendPages (page_pool, page_list.first, true /* do_flush */);
 
     assert (total_sent <= stat.size);
     if (total_sent != stat.size) {
@@ -831,7 +831,7 @@ static Result momentFile_sendMemory (ConstMemory   const mem,
     PagePool::PageListHead page_list;
     page_pool->getFillPages (&page_list, mem);
     // TODO pages of zero length => (behavior - ?)
-    sender->sendPages (page_pool, &page_list, true /* do_flush */);
+    sender->sendPages (page_pool, page_list.first, true /* do_flush */);
 
     return Result::Success;
 }

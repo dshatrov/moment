@@ -690,6 +690,7 @@ RtmpConnection::sendMessagePages (MessageDesc const      * const mt_nonnull mdes
         if (msg_offset > 0) {
             assert (page_list->first && page_list->first->data_len >= msg_offset);
             if (page_list->first->data_len == msg_offset) {
+                logD (send, _func, "stripping first page: covered by msg_offset (", msg_offset, ")");
                 msg_pages->first_page = page_list->first->getNextMsgPage();
                 msg_pages->msg_offset = 0;
             }

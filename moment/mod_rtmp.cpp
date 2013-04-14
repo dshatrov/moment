@@ -409,7 +409,8 @@ void streamVideoMessage (VideoStream::VideoMessage * const mt_nonnull msg,
     logS_ (_func, "ts ", msg->timestamp_nanosec, " ", msg->frame_type, (msg->is_saved_frame ? " SAVED" : ""));
     logS_ (_func, "fks: ", client_session->first_keyframe_sent, ", "
            "ks: ", client_session->keyframe_sent, ", "
-           "nkfk: ", client_session->no_keyframe_counter);
+           "nkfk: ", client_session->no_keyframe_counter, ", "
+           "moff: ", msg->msg_offset);
 /**/
 
     client_session->mutex.lock ();
@@ -1357,7 +1358,7 @@ MomentRtmpModule::adminHttpRequest (HttpRequest   * const mt_nonnull req,
                 false /* do_flush */,
                 MOMENT_SERVER__OK_HEADERS ("text/html", data_len),
                 "\r\n");
-        conn_sender->sendPages (page_pool, &page_list, true /* do_flush */);
+        conn_sender->sendPages (page_pool, page_list.first, true /* do_flush */);
 
         logA_ ("file 200 ", req->getClientAddress(), " ", req->getRequestLine());
     } else {
