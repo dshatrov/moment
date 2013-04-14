@@ -145,7 +145,7 @@ public:
 			   AmfEncoding           amf_encoding,
                            RtmpConnection::ConnectionInfo * mt_nonnull conn_info);
 
-    void setFrontend (Cb<Frontend> const &frontend)
+    void setFrontend (CbDesc<Frontend> const &frontend)
     {
 	this->frontend = frontend;
     }

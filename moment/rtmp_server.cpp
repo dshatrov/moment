@@ -193,7 +193,7 @@ RtmpServer::doConnect (Uint32       const msg_stream_id,
 #endif
     }
 
-    if (frontend->connect) {
+    if (frontend && frontend->connect) {
 	Result res;
 	if (!frontend.call_ret<Result> (&res, frontend->connect, /*(*/ ConstMemory (app_name_buf, app_name_len) /*)*/)) {
 	    logE_ (_func, "frontend gone");

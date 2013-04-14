@@ -152,8 +152,7 @@ public:
                         Time                 _ping_timeout_millisec,
                         bool                 _momentrtmp_proto);
 
-    RtmpPushConnection ();
-
+     RtmpPushConnection ();
     ~RtmpPushConnection ();
 };
 

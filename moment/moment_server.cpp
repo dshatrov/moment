@@ -113,7 +113,7 @@ MomentServer::adminHttpRequest (HttpRequest   * const mt_nonnull req,
         while (!iter.done()) {
             HttpHandlerEntry * const handler_entry = iter.next ();
 
-            if (handler_entry->cb->httpRequest) {
+            if (handler_entry->cb && handler_entry->cb->httpRequest) {
                 HttpRequestResult res;
                 if (!handler_entry->cb.call_ret (&res, handler_entry->cb->httpRequest, req, conn_sender, msg_body))
                     continue;
@@ -166,7 +166,7 @@ MomentServer::serverHttpRequest (HttpRequest   * const mt_nonnull req,
         while (!iter.done()) {
             HttpHandlerEntry * const handler_entry = iter.next ();
 
-            if (handler_entry->cb->httpRequest) {
+            if (handler_entry->cb && handler_entry->cb->httpRequest) {
                 HttpRequestResult res;
                 if (!handler_entry->cb.call_ret (&res, handler_entry->cb->httpRequest, req, conn_sender, msg_body))
                     continue;
@@ -1085,8 +1085,9 @@ static void startWatching_startWatchingRet (VideoStream * const video_stream,
     startWatching_completeOk (data, true /* call_cb */);
 }
 
-static void startWatching_checkAuthorizationRet (bool  authorized,
-                                                 void *_data);
+static void startWatching_checkAuthorizationRet (bool         authorized,
+                                                 ConstMemory  reply_str,
+                                                 void        *_data);
 
 static bool startWatching_checkAuthorization (StartWatching_Data        * const data,
                                               MomentServer              * const moment,
@@ -1096,6 +1097,7 @@ static bool startWatching_checkAuthorization (StartWatching_Data        * const 
     *ret_authorized = false;
 
     bool authorized = false;
+    StRef<String> reply_str;
     bool const complete =
             moment->checkAuthorization (
                     auth_session,
@@ -1108,7 +1110,8 @@ static bool startWatching_checkAuthorization (StartWatching_Data        * const 
                             data,
                             NULL,
                             data),
-                    &authorized);
+                    &authorized,
+                    &reply_str);
     if (!complete)
         return false;
 
@@ -1121,8 +1124,9 @@ static bool startWatching_checkAuthorization (StartWatching_Data        * const 
     return true;
 }
 
-static void startWatching_checkAuthorizationRet (bool   const authorized,
-                                                 void * const _data)
+static void startWatching_checkAuthorizationRet (bool          const authorized,
+                                                 ConstMemory   const /* reply_str */,
+                                                 void        * const _data)
 {
     StartWatching_Data * const data = static_cast <StartWatching_Data*> (_data);
 
@@ -1330,8 +1334,9 @@ static void startStreaming_startStreamingRet (Result   const res,
     startStreaming_completeOk (data);
 }
 
-static void startStreaming_checkAuthorizationRet (bool  authorized,
-                                                  void *_data);
+static void startStreaming_checkAuthorizationRet (bool         authorized,
+                                                  ConstMemory  reply_str,
+                                                  void        *_data);
 
 static bool startStreaming_checkAuthorization (StartStreaming_Data       * const data,
                                                MomentServer              * const moment,
@@ -1341,16 +1346,20 @@ static bool startStreaming_checkAuthorization (StartStreaming_Data       * const
     *ret_authorized = false;
 
     bool authorized = false;
-    bool const complete = moment->checkAuthorization (auth_session,
-                                                      MomentServer::AuthAction_Stream,
-                                                      data->stream_name->mem(),
-                                                      (data->auth_key ? data->auth_key->mem() : ConstMemory()),
-                                                      data->client_addr,
-                                                      CbDesc<MomentServer::CheckAuthorizationCallback> (startStreaming_checkAuthorizationRet,
-                                                                                                        data,
-                                                                                                        NULL,
-                                                                                                        data),
-                                                      &authorized);
+    StRef<String> reply_str;
+    bool const complete =
+            moment->checkAuthorization (
+                    auth_session,
+                    MomentServer::AuthAction_Stream,
+                    data->stream_name->mem(),
+                    (data->auth_key ? data->auth_key->mem() : ConstMemory()),
+                    data->client_addr,
+                    CbDesc<MomentServer::CheckAuthorizationCallback> (startStreaming_checkAuthorizationRet,
+                                                                      data,
+                                                                      NULL,
+                                                                      data),
+                    &authorized,
+                    &reply_str);
     if (!complete)
         return false;
 
@@ -1363,8 +1372,9 @@ static bool startStreaming_checkAuthorization (StartStreaming_Data       * const
     return true;
 }
 
-static void startStreaming_checkAuthorizationRet (bool   const authorized,
-                                                  void * const _data)
+static void startStreaming_checkAuthorizationRet (bool          const authorized,
+                                                  ConstMemory   const /* reply_str */,
+                                                  void        * const _data)
 {
     StartStreaming_Data * const data = static_cast <StartStreaming_Data*> (_data);
 
@@ -1671,6 +1681,15 @@ MomentServer::addPushProtocol (ConstMemory    const protocol_name,
     mutex.unlock ();
 }
 
+void
+MomentServer::addFetchProtocol (ConstMemory     const protocol_name,
+                                FetchProtocol * const mt_nonnull fetch_protocol)
+{
+    mutex.lock ();
+    fetch_protocol_hash.add (protocol_name, fetch_protocol);
+    mutex.unlock ();
+}
+
 Ref<PushProtocol>
 MomentServer::getPushProtocolForUri (ConstMemory const uri)
 {
@@ -1683,18 +1702,16 @@ MomentServer::getPushProtocolForUri (ConstMemory const uri)
             if (uri.mem() [i] == ':')
                 break;
         }
-
         protocol_name = uri.region (0, i);
     }
 
     Ref<PushProtocol> push_protocol;
     {
         mutex.lock ();
-
         PushProtocolHash::EntryKey const push_protocol_key = push_protocol_hash.lookup (protocol_name);
-        if (push_protocol_key)
+        if (push_protocol_key) {
             push_protocol = push_protocol_key.getData();
-
+        }
         mutex.unlock ();
     }
 
@@ -1706,17 +1723,35 @@ MomentServer::getPushProtocolForUri (ConstMemory const uri)
     return push_protocol;
 }
 
-Ref<PushConnection>
-MomentServer::createPushConnection (VideoStream * const video_stream,
-                                    ConstMemory   const uri,
-                                    ConstMemory   const username,
-                                    ConstMemory   const password)
+Ref<FetchProtocol>
+MomentServer::getFetchProtocolForUri (ConstMemory const uri)
 {
-    Ref<PushProtocol> const push_protocol = getPushProtocolForUri (uri);
-    if (!push_protocol)
-        return NULL;
+    ConstMemory protocol_name;
+    {
+        Count i = 0;
+        for (Count const i_end = uri.len(); i < i_end; ++i) {
+            if (uri.mem() [i] == ':')
+                break;
+        }
+        protocol_name = uri.region (0, i);
+    }
 
-    return push_protocol->connect (video_stream, uri, username, password);
+    Ref<FetchProtocol> fetch_protocol;
+    {
+        mutex.lock ();
+        FetchProtocolHash::EntryKey const fetch_protocol_key = fetch_protocol_hash.lookup (protocol_name);
+        if (fetch_protocol_key) {
+            fetch_protocol = fetch_protocol_key.getData();
+        }
+        mutex.unlock ();
+    }
+
+    if (!fetch_protocol) {
+        logE_ (_func, "Fetch protocol not found: ", protocol_name);
+        return NULL;
+    }
+
+    return fetch_protocol;
 }
 
 Ref<MediaSource>
@@ -1749,13 +1784,14 @@ MomentServer::createMediaSource (CbDesc<MediaSource::Frontend> const &frontend,
 }
 
 bool
-MomentServer::checkAuthorization (AuthSession * const auth_session,
-                                  AuthAction    const auth_action,
-                                  ConstMemory   const stream_name,
-                                  ConstMemory   const auth_key,
-                                  IpAddress     const client_addr,
+MomentServer::checkAuthorization (AuthSession   * const auth_session,
+                                  AuthAction      const auth_action,
+                                  ConstMemory     const stream_name,
+                                  ConstMemory     const auth_key,
+                                  IpAddress       const client_addr,
                                   CbDesc<CheckAuthorizationCallback> const &cb,
-                                  bool        * const mt_nonnull ret_authorized)
+                                  bool          * const mt_nonnull ret_authorized,
+                                  StRef<String> * const mt_nonnull ret_reply_str)
 {
     *ret_authorized = false;
 
@@ -1779,7 +1815,8 @@ MomentServer::checkAuthorization (AuthSession * const auth_session,
                                               auth_key,
                                               client_addr,
                                               cb,
-                                              &authorized
+                                              &authorized,
+                                              ret_reply_str
                                           /*)*/))
     {
         logW_ ("authorization backend gone");

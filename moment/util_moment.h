@@ -1,5 +1,5 @@
 /*  Moment Video Server - High performance media server
-    Copyright (C) 2012 Dmitry Shatrov
+    Copyright (C) 2013 Dmitry Shatrov
     e-mail: shatrov@gmail.com
 
     This program is free software: you can redistribute it and/or modify
@@ -17,38 +17,25 @@
 */
 
 
-#ifndef MOMENT__PUSH_PROTOCOL__H__
-#define MOMENT__PUSH_PROTOCOL__H__
+#ifndef MOMENT__UTIL_MOMENT__H__
+#define MOMENT__UTIL_MOMENT__H__
 
 
 #include <libmary/libmary.h>
-#include <moment/video_stream.h>
 
 
 namespace Moment {
 
 using namespace M;
 
-class PushConnection : public virtual Object
-{
-public:
-  // Nothing here.
-};
-
-class PushProtocol : public virtual Object
-{
-public:
-  // 1. Connect (protocol-specific, +auth)
-  // 2. Push messages: audio, video
-
-    virtual Ref<PushConnection> connect (VideoStream * mt_nonnull video_stream,
-                                         ConstMemory  uri,
-                                         ConstMemory  username,
-                                         ConstMemory  password) = 0;
-};
+Result parseMomentRtmpUri (ConstMemory  uri,
+                           IpAddress   * mt_nonnull ret_server_addr,
+                           ConstMemory * mt_nonnull ret_app_name,
+                           ConstMemory * mt_nonnull ret_stream_name,
+                           bool        * mt_nonnull ret_momentrtmp_proto);
 
 }
 
 
-#endif /* MOMENT__PUSH_PROTOCOL__H__ */
+#endif /* MOMENT__UTIL_MOMENT__H__ */
 

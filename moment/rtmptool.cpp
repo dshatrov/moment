@@ -462,11 +462,11 @@ RtmpClient::init (ServerThreadContext * const thread_ctx,
     conn_receiver.init (&tcp_conn, thread_ctx->getDeferredProcessor());
     conn_receiver.setFrontend (rtmp_conn.getReceiverFrontend());
 
-    rtmp_conn.setBackend (Cb<RtmpConnection::Backend> (&rtmp_conn_backend, NULL /* cb_data */, NULL /* coderef_container */));
-    rtmp_conn.setFrontend (Cb<RtmpConnection::Frontend> (&rtmp_conn_frontend, this, getCoderefContainer()));
+    rtmp_conn.setBackend  (CbDesc<RtmpConnection::Backend>  (&rtmp_conn_backend, NULL, NULL));
+    rtmp_conn.setFrontend (CbDesc<RtmpConnection::Frontend> (&rtmp_conn_frontend, this, getCoderefContainer()));
     rtmp_conn.setSender (&conn_sender);
 
-    tcp_conn.setFrontend (Cb<TcpConnection::Frontend> (&tcp_conn_frontend, &rtmp_conn, rtmp_conn.getCoderefContainer()));
+    tcp_conn.setFrontend (CbDesc<TcpConnection::Frontend> (&tcp_conn_frontend, &rtmp_conn, rtmp_conn.getCoderefContainer()));
 
     rtmp_conn.init (thread_ctx->getTimers(),
                     page_pool,

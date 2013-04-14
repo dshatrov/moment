@@ -149,7 +149,7 @@ RtmpService::acceptOneConnection ()
     session->conn_sender.setQueue (thread_ctx->getDeferredConnectionSenderQueue());
 #endif
 
-    session->rtmp_conn.setBackend (Cb<RtmpConnection::Backend> (&rtmp_conn_backend, session, session));
+    session->rtmp_conn.setBackend (CbDesc<RtmpConnection::Backend> (&rtmp_conn_backend, session, session));
     session->rtmp_conn.setSender (&session->conn_sender);
 
     session->conn_receiver.setFrontend (session->rtmp_conn.getReceiverFrontend());

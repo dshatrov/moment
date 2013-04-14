@@ -1,5 +1,5 @@
 /*  Moment Video Server - High performance media server
-    Copyright (C) 2012 Dmitry Shatrov
+    Copyright (C) 2012-2013 Dmitry Shatrov
     e-mail: shatrov@gmail.com
 
     This program is free software: you can redistribute it and/or modify
@@ -17,8 +17,8 @@
 */
 
 
-#ifndef __MOMENT__PUSH_AGENT__H__
-#define __MOMENT__PUSH_AGENT__H__
+#ifndef MOMENT__PUSH_AGENT__H__
+#define MOMENT__PUSH_AGENT__H__
 
 
 #include <libmary/libmary.h>
@@ -30,11 +30,14 @@ namespace Moment {
 
 using namespace M;
 
+// PushAgent забирает видеопоток из VideoStream с определённым именем
+// и проксит его в заданный приёмник. Первый приёмник - RTMP-сервер.
+// Протоколы для push'инга регистрируются в хэше, который есть в MomentServer.
+//
 class PushAgent : public Object
 {
 private:
-    mt_const MomentServer *moment;
-    mt_const Ref<String> stream_name;
+    mt_const StRef<String> stream_name;
 
     mt_const Ref<PushConnection> push_conn;
     mt_const Ref<VideoStream> bound_stream;
@@ -42,20 +45,14 @@ private:
     void doVideoStreamAdded (VideoStream * mt_nonnull video_stream);
 
   mt_iface (MomentServer::VideoStreamHandler)
-
     static MomentServer::VideoStreamHandler moment_stream_handler;
 
     static void videoStreamAdded (VideoStream * mt_nonnull video_stream,
                                   ConstMemory  stream_name,
                                   void        *_self);
-
   mt_iface_end
 
 public:
-  // TODO PushAgent забирает видеопоток из VideoStream с определённым именем
-  //      и проксит его в заданный приёмник. Первый приёмник - RTMP-сервер.
-  //      Протоколы для push'инга регистрируются в хэше, который есть в MomentServer.
-
     mt_const void init (ConstMemory   _stream_name,
                         PushProtocol * mt_nonnull push_protocol,
                         ConstMemory   uri,
@@ -66,5 +63,5 @@ public:
 }
 
 
-#endif /* __MOMENT__PUSH_AGENT__H__ */
+#endif /* MOMENT__PUSH_AGENT__H__ */
 

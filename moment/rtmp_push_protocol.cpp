@@ -17,6 +17,8 @@
 */
 
 
+#include <moment/util_moment.h>
+
 #include <moment/rtmp_push_protocol.h>
 
 
@@ -95,17 +97,17 @@ RtmpPushConnection::startNewSession (Session * const old_session)
 
     // 'session' is surely referenced when a callback is called, because it serves
     // as a coderef container for 'rtmp_conn'. Same for 'tcp_conn'.
-    session->rtmp_conn.setBackend (Cb<RtmpConnection::Backend> (&rtmp_conn_backend,
-                                                                session /* cb_data */,
-                                                                this /* coderef_container */));
-    session->rtmp_conn.setFrontend (Cb<RtmpConnection::Frontend> (&rtmp_conn_frontend,
-                                                                  session /* cb_data */,
-                                                                  this /* coderef_container */));
+    session->rtmp_conn.setBackend (CbDesc<RtmpConnection::Backend> (&rtmp_conn_backend,
+                                                                    session /* cb_data */,
+                                                                    this /* coderef_container */));
+    session->rtmp_conn.setFrontend (CbDesc<RtmpConnection::Frontend> (&rtmp_conn_frontend,
+                                                                      session /* cb_data */,
+                                                                      this /* coderef_container */));
     session->rtmp_conn.setSender (&session->conn_sender);
 
-    session->tcp_conn.setFrontend (Cb<TcpConnection::Frontend> (&tcp_conn_frontend,
-                                                                session /* cb_data */,
-                                                                this /* coderef_container */));
+    session->tcp_conn.setFrontend (CbDesc<TcpConnection::Frontend> (&tcp_conn_frontend,
+                                                                    session /* cb_data */,
+                                                                    this /* coderef_container */));
 
     {
         TcpConnection::ConnectResult const connect_res = session->tcp_conn.connect (server_addr);
@@ -483,23 +485,6 @@ RtmpPushConnection::~RtmpPushConnection ()
     mutex.unlock ();
 }
 
-#if 0
-// Unused
-static void skipUriWhitespace (ConstMemory     const uri,
-                               unsigned long * const mt_nonnull ret_pos)
-{
-    unsigned long pos = *ret_pos;
-
-    while (pos < uri.len()) {
-        if (uri.mem() [pos] != ' ' && uri.mem() [pos] != '\t')
-            break;
-        ++pos;
-    }
-
-    *ret_pos = pos;
-}
-#endif
-
 mt_throws Ref<PushConnection>
 RtmpPushProtocol::connect (VideoStream * const video_stream,
                            ConstMemory   const uri,
@@ -508,102 +493,14 @@ RtmpPushProtocol::connect (VideoStream * const video_stream,
 {
     logD_ (_func, "uri: ", uri);
 
-    IpAddress server_addr;
-
+    IpAddress   server_addr;
     ConstMemory app_name;
     ConstMemory stream_name;
-
-    bool momentrtmp_proto = false;
-    {
-      // URI forms:   rtmp://user:password@host:port/foo/bar
-      //              rtmp://host:port/foo/bar
-      //
-      // Note that we do not extract user:password from the URI but rather
-      // accept them as separate function parameters. This is inconsistent.
-      // It might be convenient to parse user:password and use them
-      // instead of explicit parameters when the latter are null.
-
-        unsigned long pos = 0;
-
-        while (pos < uri.len()) {
-            if (uri.mem() [pos] == ':') {
-                ++pos;
-                break;
-            }
-            ++pos;
-        }
-
-        if (pos >= 1
-            && equal ("momentrtmp", uri.region (0, pos - 1)))
-        {
-            momentrtmp_proto = true;
-        }
-
-        while (pos < uri.len()) {
-            if (uri.mem() [pos] == '/') {
-                ++pos;
-                break;
-            }
-            ++pos;
-        }
-
-        while (pos < uri.len()) {
-            if (uri.mem() [pos] == '/') {
-                ++pos;
-                break;
-            }
-            ++pos;
-        }
-
-        // user:password@host:port
-        unsigned long const user_addr_begin = pos;
-
-        while (pos < uri.len()) {
-            if (uri.mem() [pos] == '/')
-                break;
-            ++pos;
-        }
-
-        ConstMemory const user_addr = uri.region (user_addr_begin, pos - user_addr_begin);
-        logD_ (_func, "user_addr_begin: ", user_addr_begin, ", pos: ", pos, ", user_addr: ", user_addr);
-        unsigned long at_pos = 0;
-        bool got_at = false;
-        while (at_pos < user_addr.len()) {
-            if (user_addr.mem() [at_pos] == '@') {
-                got_at = true;
-                break;
-            }
-            ++at_pos;
-        }
-
-        ConstMemory addr_mem = user_addr;
-        if (got_at)
-            addr_mem = user_addr.region (at_pos + 1, user_addr.len() - (at_pos + 1));
-
-        logD_ (_func, "addr_mem: ", addr_mem);
-        if (!setIpAddress (addr_mem, &server_addr)) {
-            logE_ (_func, "Could not extract address from URI: ", uri);
-            goto _failure;
-        }
-
-        if (pos < uri.len())
-            ++pos;
-
-        unsigned long const app_name_begin = pos;
-        while (pos < uri.len()) {
-            if (uri.mem() [pos] == '/')
-                break;
-            ++pos;
-        }
-
-        app_name = uri.region (app_name_begin, pos - app_name_begin);
-
-        if (pos < uri.len())
-            ++pos;
-
-        stream_name = uri.region (pos, uri.len() - pos);
+    bool        momentrtmp_proto;
+    if (!parseMomentRtmpUri (uri, &server_addr, &app_name, &stream_name, &momentrtmp_proto)) {
+        logE_ (_func, "Could not parse uri: ", uri);
+        goto _failure;
     }
-
     logD_ (_func, "app_name: ", app_name, ", stream_name: ", stream_name);
 
   {

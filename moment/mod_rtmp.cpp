@@ -21,6 +21,7 @@
 
 #include <moment/libmoment.h>
 #include <moment/rtmp_push_protocol.h>
+#include <moment/rtmp_fetch_protocol.h>
 
 
 #define MOMENT_RTMP__FLOW_CONTROL
@@ -1167,11 +1168,11 @@ Result clientConnected (RtmpConnection  * const mt_nonnull rtmp_conn,
 	// TODO recorder frontend + error reporting
     }
 
-    client_session->rtmp_server.setFrontend (Cb<RtmpServer::Frontend> (
+    client_session->rtmp_server.setFrontend (CbDesc<RtmpServer::Frontend> (
 	    &rtmp_server_frontend, client_session, client_session));
     client_session->rtmp_server.setRtmpConnection (rtmp_conn);
 
-    rtmp_conn->setFrontend (Cb<RtmpConnection::Frontend> (
+    rtmp_conn->setFrontend (CbDesc<RtmpConnection::Frontend> (
 	    &rtmp_frontend, client_session, client_session));
 
     rtmp_conn->startServer ();
@@ -1787,6 +1788,12 @@ static Result momentRtmpInit ()
         rtmp_push_proto->init (moment, rtmp_ping_timeout_millisec);
         moment->addPushProtocol ("rtmp", rtmp_push_proto);
         moment->addPushProtocol ("momentrtmp", rtmp_push_proto);
+    }
+    {
+        Ref<RtmpFetchProtocol> const rtmp_fetch_proto = grab (new (std::nothrow) RtmpFetchProtocol);
+        rtmp_fetch_proto->init (moment, rtmp_ping_timeout_millisec);
+        moment->addFetchProtocol ("rtmp", rtmp_fetch_proto);
+        moment->addFetchProtocol ("momentrtmp", rtmp_fetch_proto);
     }
 
     return Result::Success;

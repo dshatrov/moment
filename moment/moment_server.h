@@ -30,6 +30,7 @@
 #include <moment/video_stream.h>
 #include <moment/storage.h>
 #include <moment/push_protocol.h>
+#include <moment/fetch_protocol.h>
 #include <moment/transcoder.h>
 #include <moment/media_source_provider.h>
 
@@ -90,8 +91,7 @@ private:
 
 	VideoStreamEntry (VideoStream * const video_stream)
 	    : video_stream (video_stream)
-	{
-	}
+	{}
     };
 
     typedef StringHash<VideoStreamEntry> VideoStreamHash;
@@ -740,20 +740,21 @@ public:
   // Push protocols
 
 private:
-    typedef StringHash< Ref<PushProtocol> > PushProtocolHash;
+    typedef StringHash< Ref<PushProtocol> >  PushProtocolHash;
+    typedef StringHash< Ref<FetchProtocol> > FetchProtocolHash;
 
-    mt_mutex (mutex) PushProtocolHash push_protocol_hash;
+    mt_mutex (mutex) PushProtocolHash  push_protocol_hash;
+    mt_mutex (mutex) FetchProtocolHash fetch_protocol_hash;
 
 public:
     void addPushProtocol (ConstMemory   protocol_name,
                           PushProtocol * mt_nonnull push_protocol);
 
-    Ref<PushProtocol> getPushProtocolForUri (ConstMemory uri);
+    void addFetchProtocol (ConstMemory    protocol_name,
+                           FetchProtocol * mt_nonnull fetch_protocol);
 
-    Ref<PushConnection> createPushConnection (VideoStream *video_stream,
-                                              ConstMemory  uri,
-                                              ConstMemory  username,
-                                              ConstMemory  password);
+    Ref<PushProtocol>  getPushProtocolForUri  (ConstMemory uri);
+    Ref<FetchProtocol> getFetchProtocolForUri (ConstMemory uri);
 
 
   // _________________________ media source providers __________________________
@@ -785,24 +786,27 @@ public:
     enum AuthAction
     {
         AuthAction_Watch,
+        AuthAction_WatchRestream,
         AuthAction_Stream
     };
 
-    typedef void CheckAuthorizationCallback (bool  authorized,
-                                             void *cb_data);
+    typedef void CheckAuthorizationCallback (bool         authorized,
+                                             ConstMemory  reply_str,
+                                             void        *cb_data);
 
     struct AuthBackend
     {
         Ref<AuthSession> (*newAuthSession) (void *cb_data);
 
-        bool (*checkAuthorization) (AuthSession *auth_session,
-                                    AuthAction   auth_action,
-                                    ConstMemory  stream_name,
-                                    ConstMemory  auth_key,
-                                    IpAddress    client_addr,
+        bool (*checkAuthorization) (AuthSession   *auth_session,
+                                    AuthAction     auth_action,
+                                    ConstMemory    stream_name,
+                                    ConstMemory    auth_key,
+                                    IpAddress      client_addr,
                                     CbDesc<CheckAuthorizationCallback> const &cb,
-                                    bool        * mt_nonnull ret_authorized,
-                                    void        *cb_data);
+                                    bool          * mt_nonnull ret_authorized,
+                                    StRef<String> * mt_nonnull ret_reply_str,
+                                    void          *cb_data);
 
         void (*authSessionDisconnected) (AuthSession *auth_session,
                                          ConstMemory  auth_key,
@@ -818,13 +822,14 @@ public:
         this->auth_backend = auth_backend;
     }
 
-    bool checkAuthorization (AuthSession *auth_session,
-                             AuthAction   auth_action,
-                             ConstMemory  stream_name,
-                             ConstMemory  auth_key,
-                             IpAddress    client_addr,
+    bool checkAuthorization (AuthSession   *auth_session,
+                             AuthAction     auth_action,
+                             ConstMemory    stream_name,
+                             ConstMemory    auth_key,
+                             IpAddress      client_addr,
                              CbDesc<CheckAuthorizationCallback> const &cb,
-                             bool        * mt_nonnull ret_authorized);
+                             bool          * mt_nonnull ret_authorized,
+                             StRef<String> * mt_nonnull ret_reply_str);
 
   // ___________________________________________________________________________
 

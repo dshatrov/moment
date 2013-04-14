@@ -571,19 +571,13 @@ private:
 public:
     // TODO setReceiver()
     CbDesc<Receiver::Frontend> getReceiverFrontend ()
-    {
-	return CbDesc<Receiver::Frontend> (&receiver_frontend, this, getCoderefContainer());
-    }
+        { return CbDesc<Receiver::Frontend> (&receiver_frontend, this, getCoderefContainer()); }
 
-    mt_const void setFrontend (Cb<Frontend> const &frontend)
-    {
-	this->frontend = frontend;
-    }
+    mt_const void setFrontend (CbDesc<Frontend> const &frontend)
+        { this->frontend = frontend; }
 
-    mt_const void setBackend (Cb<Backend> const &backend)
-    {
-	this->backend = backend;
-    }
+    mt_const void setBackend (CbDesc<Backend> const &backend)
+        { this->backend = backend; }
 
     mt_const void setSender (Sender * const sender)
     {
@@ -591,26 +585,16 @@ public:
 	sender->setFrontend (CbDesc<Sender::Frontend> (&sender_frontend, this, getCoderefContainer()));
     }
 
-    Sender* getSender () const
-    {
-        return sender;
-    }
+    Sender* getSender () const { return sender; }
 
     mt_const void startClient ();
-
     mt_const void startServer ();
 
     // Should be called from frontend->commandMessage() callback only.
-    Uint32 getLocalWackSize () const
-    {
-	return local_wack_size;
-    }
+    Uint32 getLocalWackSize () const { return local_wack_size; }
 
     // Should be called from frontend->commandMessage() callback only.
-    Uint32 getRemoteWackSize () const
-    {
-	return remote_wack_size;
-    }
+    Uint32 getRemoteWackSize () const { return remote_wack_size; }
 
   // TODO doConnect(), doCreateStream(), etc. belong to RtmpServer.
 

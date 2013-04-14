@@ -1,5 +1,5 @@
 /*  Moment Video Server - High performance media server
-    Copyright (C) 2012 Dmitry Shatrov
+    Copyright (C) 2012-2013 Dmitry Shatrov
     e-mail: shatrov@gmail.com
 
     This program is free software: you can redistribute it and/or modify
@@ -57,10 +57,10 @@ PushAgent::init (ConstMemory    const _stream_name,
                  ConstMemory    const username,
                  ConstMemory    const password)
 {
-    moment = MomentServer::getInstance();
-    stream_name = grab (new String (_stream_name));
+    MomentServer * const moment = MomentServer::getInstance();
+    stream_name = st_grab (new (std::nothrow) String (_stream_name));
 
-    bound_stream = grab (new VideoStream);
+    bound_stream = grab (new (std::nothrow) VideoStream);
 
     {
       // Getting video stream by name, bind the stream, subscribe for video_stream_handler *atomically*.

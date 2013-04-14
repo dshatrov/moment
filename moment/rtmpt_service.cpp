@@ -417,7 +417,7 @@ RtmptService::doOpen (Sender * const mt_nonnull conn_sender,
                              prechunking_enabled,
                              false /* momentrtmp_proto */);
     session->rtmp_conn.setBackend (
-            Cb<RtmpConnection::Backend> (&rtmp_conn_backend, session, session));
+            CbDesc<RtmpConnection::Backend> (&rtmp_conn_backend, session, session));
     session->rtmp_conn.setSender (&session->rtmpt_sender);
 
     {

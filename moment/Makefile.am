@@ -33,6 +33,7 @@ moment_target_headers =		\
         libmoment_gst.h         \
 				\
 	moment_types.h		\
+        util_moment.h           \
         channel.h               \
         channel_options.h       \
         channel_set.h           \
@@ -48,6 +49,7 @@ moment_target_headers =		\
 	amf_encoder.h		\
 	amf_decoder.h		\
 	rtmp_connection.h	\
+        rtmp_client.h           \
 	rtmp_server.h		\
 	rtmp_video_service.h	\
 	rtmp_service.h		\
@@ -67,6 +69,10 @@ moment_target_headers =		\
         push_protocol.h         \
         rtmp_push_protocol.h    \
         push_agent.h            \
+                                \
+        fetch_protocol.h        \
+        rtmp_fetch_protocol.h   \
+        fetch_agent.h           \
                                 \
 	moment_server.h		\
 				\
@@ -89,6 +95,7 @@ libmoment_1_0_la_SOURCES =	\
                                 \
 	libmoment.cpp		\
                                 \
+        util_moment.cpp         \
         channel.cpp             \
         channel_set.cpp         \
         channel_manager.cpp     \
@@ -101,6 +108,7 @@ libmoment_1_0_la_SOURCES =	\
 	amf_encoder.cpp		\
 	amf_decoder.cpp		\
 	rtmp_connection.cpp	\
+        rtmp_client.cpp         \
 	rtmp_server.cpp		\
 	rtmp_service.cpp	\
 	rtmpt_service.cpp	\
@@ -115,6 +123,9 @@ libmoment_1_0_la_SOURCES =	\
 				\
         rtmp_push_protocol.cpp  \
         push_agent.cpp          \
+                                \
+        rtmp_fetch_protocol.cpp \
+        fetch_agent.cpp         \
                                 \
 	moment_server.cpp	\
 				\

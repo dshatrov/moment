@@ -40,6 +40,7 @@
 #include <moment/amf_decoder.h>
 
 #include <moment/rtmp_connection.h>
+#include <moment/rtmp_client.h>
 #include <moment/rtmp_server.h>
 #include <moment/rtmp_service.h>
 #include <moment/rtmpt_service.h>
@@ -58,6 +59,9 @@
 
 #include <moment/push_protocol.h>
 #include <moment/push_agent.h>
+
+#include <moment/fetch_protocol.h>
+#include <moment/fetch_agent.h>
 
 #include <moment/moment_server.h>
 
