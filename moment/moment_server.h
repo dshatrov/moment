@@ -81,9 +81,10 @@ class ChannelManager;
 //
 class MomentServer : public Object
 {
-private:
+public: /* private: */
     StateMutex mutex;
 
+private:
     class VideoStreamEntry
     {
     public:
@@ -95,6 +96,14 @@ private:
     };
 
     typedef StringHash<VideoStreamEntry> VideoStreamHash;
+
+    class RestreamInfo;
+
+    class StreamInfo : public Referenced
+    {
+    public:
+        mt_mutex (mutex) Ref<RestreamInfo> restream_info;
+    };
 
 public:
     class VideoStreamKey
@@ -559,6 +568,7 @@ private:
     mt_const WeakRef<ChannelManager> weak_channel_manager;
 
     mt_const bool publish_all_streams;
+    mt_const bool enable_restreaming;
 
     mt_mutex (mutex) ClientSessionList client_session_list;
 
@@ -700,6 +710,8 @@ public:
                          CbDesc<StartStreamingCallback> const &cb,
                          Result        * mt_nonnull ret_res);
 
+    void decStreamUseCount (VideoStream *stream);
+
     struct ClientHandlerKey
     {
 	ClientEntry *client_entry;
@@ -724,10 +736,13 @@ public:
     // But overcoming it requires more complex synchronization.
     Ref<VideoStream> getVideoStream (ConstMemory path);
 
-    Ref<VideoStream> getVideoStream_unlocked (ConstMemory path);
+    mt_mutex (mutex) Ref<VideoStream> getVideoStream_unlocked (ConstMemory path);
 
-    VideoStreamKey addVideoStream (VideoStream *video_stream,
+    VideoStreamKey addVideoStream (VideoStream *stream,
 				   ConstMemory  path);
+
+    mt_mutex (mutex) VideoStreamKey addVideoStream_unlocked (VideoStream *stream,
+                                                             ConstMemory  path);
 
 private:
     mt_mutex (mutex) void removeVideoStream_unlocked (VideoStreamKey video_stream_key);
@@ -737,7 +752,39 @@ public:
 
     Ref<VideoStream> getMixVideoStream ();
 
-  // Push protocols
+
+  // _______________________________ Restreaming _______________________________
+
+private:
+    class RestreamInfo : public Object
+    {
+    public:
+        mt_const WeakRef<MomentServer> weak_moment;
+
+        mt_mutex (mutex) VideoStreamKey stream_key;
+        // Valid when 'stream_key' is non-null, which means that
+        // video_stream_hash holds a reference to the stream.
+        mt_mutex (mutex) VideoStream *unsafe_stream;
+
+        mt_mutex (mutex) Ref<FetchConnection> fetch_conn;
+    };
+
+    static FetchConnection::Frontend const restream__fetch_conn_frontend;
+
+    static void restreamFetchConnDisconnected (bool             * mt_nonnull ret_reconnect,
+                                               Time             * mt_nonnull ret_reconnect_after_millisec,
+                                               Ref<VideoStream> * mt_nonnull ret_new_stream,
+                                               void             *_restream_info);
+
+public:
+    Ref<VideoStream> startRestreaming (ConstMemory stream_name,
+                                       ConstMemory uri);
+
+private:
+    mt_unlocks (mutex) void stopRestreaming (RestreamInfo * mt_nonnull restream_info);
+
+
+  // __________________________ Push/fetch protocols ___________________________
 
 private:
     typedef StringHash< Ref<PushProtocol> >  PushProtocolHash;

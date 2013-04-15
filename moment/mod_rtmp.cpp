@@ -858,14 +858,15 @@ static void startWatchingCallback (VideoStream * const video_stream,
     StartWatchingCallback_Data * const data = static_cast <StartWatchingCallback_Data*> (_data);
     Ref<ClientSession> const client_session = data->weak_client_session.getRef ();
 
-    if (!client_session) {
-        logD_ (_func, "client session gone");
+    if (!video_stream) {
+        logD_ (_func, "video stream not found: ", data->stream_name);
         data->cb.call_ (Result::Failure);
         return;
     }
 
-    if (!video_stream) {
-        logD_ (_func, "video stream not found: ", data->stream_name);
+    if (!client_session) {
+        MomentServer::getInstance()->decStreamUseCount (video_stream);
+        logD_ (_func, "client session gone");
         data->cb.call_ (Result::Failure);
         return;
     }
@@ -874,10 +875,20 @@ static void startWatchingCallback (VideoStream * const video_stream,
     data->cb.call_ (res);
 }
 
+static void clientSessionDeletionCallback (void * const _stream)
+{
+    VideoStream * const stream = static_cast <VideoStream*> (_stream);
+    MomentServer * const moment = MomentServer::getInstance();
+    moment->decStreamUseCount (stream);
+}
+
 static Result completeStartWatching (VideoStream   * const video_stream,
                                      ClientSession * const client_session,
                                      ConstMemory     const stream_name)
 {
+    client_session->addDeletionCallback (
+            CbDesc<Object::DeletionCallback> (clientSessionDeletionCallback, video_stream, video_stream));
+
     client_session->mutex.lock ();
     // TODO Set watching_video_stream to NULL when it's not needed anymore.
     client_session->watching_video_stream = video_stream;

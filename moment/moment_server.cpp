@@ -926,6 +926,8 @@ MomentServer::disconnect (ClientSession * const mt_nonnull client_session)
 namespace {
 struct StartWatching_Data : public Referenced
 {
+    WeakRef<MomentServer> weak_moment;
+
     Ref<String> stream_name;
     Ref<String> stream_name_with_params;
     Ref<String> auth_key;
@@ -937,21 +939,49 @@ struct StartWatching_Data : public Referenced
 };
 }
 
-static void startWatching_completeOk (StartWatching_Data * const data,
-                                      bool                 const call_cb)
-{
-    logA_ ("moment OK ", data->client_addr, " watch ", data->stream_name_with_params);
-
-    if (call_cb)
-        data->cb.call_ (data->video_stream);
-}
-
 static void startWatching_completeNotFound (StartWatching_Data * const data,
                                             bool                 const call_cb = true)
 {
     logA_ ("moment NOT_FOUND ", data->client_addr, " watch ", data->stream_name_with_params);
     if (call_cb)
         data->cb.call_ ((VideoStream*) NULL);
+}
+
+static void startWatching_completeOk (StartWatching_Data * const data,
+                                      ConstMemory          const restream_reply,
+                                      bool                 const call_cb,
+                                      Ref<VideoStream>   * const ret_stream)
+{
+    if (!data->video_stream) {
+        if (!restream_reply.len())
+            return startWatching_completeNotFound (data, call_cb);
+
+        {
+            Ref<MomentServer> const self = data->weak_moment.getRef();
+            if (!self)
+                return startWatching_completeNotFound (data, call_cb);
+
+            data->video_stream = self->startRestreaming (data->stream_name->mem(), restream_reply);
+            if (!data->video_stream)
+                return startWatching_completeNotFound (data, call_cb);
+
+            if (ret_stream)
+                *ret_stream = data->video_stream;
+        }
+    } else {
+        Ref<MomentServer> const self = data->weak_moment.getRef();
+        if (!self)
+            return startWatching_completeNotFound (data, call_cb);
+
+        self->mutex.lock ();
+        ++data->video_stream->moment_data.use_count;
+        self->mutex.unlock ();
+    }
+
+    logA_ ("moment OK ", data->client_addr, " watch ", data->stream_name_with_params);
+
+    if (call_cb)
+        data->cb.call_ (data->video_stream);
 }
 
 static void startWatching_completeDenied (StartWatching_Data * const data,
@@ -973,10 +1003,12 @@ static void startWatching_completeGone (StartWatching_Data * const data,
 static void startWatching_startWatchingRet (VideoStream *video_stream,
                                             void        *_data);
 
-static bool startWatching_checkAuthorization (StartWatching_Data        *data,
-                                              MomentServer              *moment,
-                                              MomentServer::AuthSession *auth_session,
-                                              bool                      *ret_authorized);
+static bool startWatching_checkAuthorization (bool                       restream,
+                                              StartWatching_Data        * mt_nonnull data,
+                                              MomentServer              * mt_nonnull moment,
+                                              MomentServer::AuthSession * mt_nonnull auth_session,
+                                              bool                      * mt_nonnull ret_authorized,
+                                              StRef<String>             * mt_nonnull ret_restream_reply);
 
 bool
 MomentServer::startWatching (ClientSession    * const mt_nonnull client_session,
@@ -998,6 +1030,7 @@ MomentServer::startWatching (ClientSession    * const mt_nonnull client_session,
     Ref<VideoStream> video_stream;
 
     Ref<StartWatching_Data> const data = grab (new (std::nothrow) StartWatching_Data);
+    data->weak_moment = this;
     data->stream_name = grab (new (std::nothrow) String (stream_name));
     data->stream_name_with_params = grab (new (std::nothrow) String (stream_name_with_params));
     data->client_addr = client_session->client_addr;
@@ -1040,7 +1073,11 @@ MomentServer::startWatching (ClientSession    * const mt_nonnull client_session,
             return true;
         }
 
-        startWatching_completeOk (data, false /* call_cb */);
+        startWatching_completeOk (data,
+                                  ConstMemory() /* restream_reply */,
+                                  false         /* call_cb */,
+                                  NULL          /* ret_stream */);
+
         *ret_video_stream = video_stream;
         return true;
     }
@@ -1048,7 +1085,7 @@ MomentServer::startWatching (ClientSession    * const mt_nonnull client_session,
     logD (session, _func, "default path");
 
     video_stream = getVideoStream (stream_name);
-    if (!video_stream) {
+    if (!video_stream && !enable_restreaming) {
         startWatching_completeNotFound (data, false /* call_cb */);
         *ret_video_stream = NULL;
         return true;
@@ -1057,8 +1094,16 @@ MomentServer::startWatching (ClientSession    * const mt_nonnull client_session,
     data->video_stream = video_stream;
 
     bool authorized = false;
-    if (!startWatching_checkAuthorization (data, this, client_session->auth_session, &authorized))
+    StRef<String> restream_reply;
+    if (!startWatching_checkAuthorization (!video_stream /* restream */,
+                                           data,
+                                           this,
+                                           client_session->auth_session,
+                                           &authorized,
+                                           &restream_reply))
+    {
         return false;
+    }
 
     if (!authorized) {
         startWatching_completeDenied (data, false /* call_cb */);
@@ -1066,7 +1111,11 @@ MomentServer::startWatching (ClientSession    * const mt_nonnull client_session,
         return true;
     }
 
-    startWatching_completeOk (data, false /* call_cb */);
+    startWatching_completeOk (data,
+                              (restream_reply ? restream_reply->mem() : ConstMemory()),
+                              false /* call_cb */,
+                              &video_stream);
+
     *ret_video_stream = video_stream;
     return true;
 }
@@ -1082,26 +1131,32 @@ static void startWatching_startWatchingRet (VideoStream * const video_stream,
         return;
     }
 
-    startWatching_completeOk (data, true /* call_cb */);
+    startWatching_completeOk (data,
+                              ConstMemory() /* restream_reply */,
+                              true          /* call_cb */,
+                              NULL          /* ret_stream */);
 }
 
 static void startWatching_checkAuthorizationRet (bool         authorized,
                                                  ConstMemory  reply_str,
                                                  void        *_data);
 
-static bool startWatching_checkAuthorization (StartWatching_Data        * const data,
-                                              MomentServer              * const moment,
-                                              MomentServer::AuthSession * const auth_session,
-                                              bool                      * const ret_authorized)
+static bool startWatching_checkAuthorization (bool                        const restream,
+                                              StartWatching_Data        * const mt_nonnull data,
+                                              MomentServer              * const mt_nonnull moment,
+                                              MomentServer::AuthSession * const mt_nonnull auth_session,
+                                              bool                      * const mt_nonnull ret_authorized,
+                                              StRef<String>             * const mt_nonnull ret_restream_reply)
 {
-    *ret_authorized = false;
+    logD_ (_func, "restream: ", restream);
 
-    bool authorized = false;
-    StRef<String> reply_str;
+    *ret_authorized = false;
+    *ret_restream_reply = NULL;
+
     bool const complete =
             moment->checkAuthorization (
                     auth_session,
-                    MomentServer::AuthAction_Watch,
+                    (restream ? MomentServer::AuthAction_WatchRestream : MomentServer::AuthAction_Watch),
                     data->stream_name->mem(),
                     (data->auth_key ? data->auth_key->mem() : ConstMemory()),
                     data->client_addr,
@@ -1110,22 +1165,16 @@ static bool startWatching_checkAuthorization (StartWatching_Data        * const 
                             data,
                             NULL,
                             data),
-                    &authorized,
-                    &reply_str);
+                    ret_authorized,
+                    ret_restream_reply);
     if (!complete)
         return false;
 
-    if (!authorized) {
-        *ret_authorized = false;
-        return true;
-    }
-
-    *ret_authorized = true;
     return true;
 }
 
 static void startWatching_checkAuthorizationRet (bool          const authorized,
-                                                 ConstMemory   const /* reply_str */,
+                                                 ConstMemory   const reply_str,
                                                  void        * const _data)
 {
     StartWatching_Data * const data = static_cast <StartWatching_Data*> (_data);
@@ -1135,7 +1184,7 @@ static void startWatching_checkAuthorizationRet (bool          const authorized,
         return;
     }
 
-    startWatching_completeOk (data, true /* call_cb */);
+    startWatching_completeOk (data, reply_str, true /* call_cb */, NULL /* ret_stream */);
 }
 
 
@@ -1405,6 +1454,36 @@ static void startStreaming_checkAuthorizationRet (bool          const authorized
 // _____________________________________________________________________________
 
 
+void
+MomentServer::decStreamUseCount (VideoStream * const stream)
+{
+    logD_ (_func, "stream 0x", fmt_hex, (UintPtr) stream);
+
+    if (!stream)
+        return;
+
+    VideoStream::MomentServerData * const stream_data = &stream->moment_data;
+
+    mutex.lock ();
+    if (!stream_data->stream_info) {
+        mutex.unlock ();
+        return;
+    }
+
+    assert (stream_data->use_count > 0);
+    --stream_data->use_count;
+
+    if (stream_data->use_count == 0) {
+        StreamInfo * const stream_info = static_cast <StreamInfo*> (stream_data->stream_info.ptr());
+        if (RestreamInfo * const restream_info = stream_info->restream_info) {
+            mt_unlocks (mutex) stopRestreaming (restream_info);
+            return;
+        }
+    }
+
+    mutex.unlock ();
+}
+
 mt_mutex (mutex) MomentServer::ClientHandlerKey
 MomentServer::addClientHandler_rec (CbDesc<ClientHandler> const &cb,
 				    ConstMemory const           &path_,
@@ -1516,17 +1595,24 @@ MomentServer::getVideoStream_unlocked (ConstMemory const path)
     return entry.getData().video_stream;
 }
 
+mt_mutex (mutex) MomentServer::VideoStreamKey
+MomentServer::addVideoStream_unlocked (VideoStream * const stream,
+                                       ConstMemory   const path)
+{
+    logD_ (_func, "name: ", path, ", stream 0x", fmt_hex, (UintPtr) stream);
+    MomentServer::VideoStreamKey const vs_key = video_stream_hash.add (path, stream);
+    notifyDeferred_VideoStreamAdded (stream, path);
+    return vs_key;
+}
+
 MomentServer::VideoStreamKey
-MomentServer::addVideoStream (VideoStream * const video_stream,
+MomentServer::addVideoStream (VideoStream * const stream,
 			      ConstMemory   const path)
 {
-    logD_ (_func, "name: ", path, ", stream 0x", fmt_hex, (UintPtr) video_stream);
-
-  StateMutexLock l (&mutex);
-
-    MomentServer::VideoStreamKey const vs_key = video_stream_hash.add (path, video_stream);
-    notifyDeferred_VideoStreamAdded (video_stream, path);
-    return vs_key;
+    mutex.lock ();
+    MomentServer::VideoStreamKey const stream_key = addVideoStream_unlocked (stream, path);
+    mutex.unlock ();
+    return stream_key;
 }
 
 mt_mutex (mutex) void
@@ -1541,7 +1627,6 @@ void
 MomentServer::removeVideoStream (VideoStreamKey const video_stream_key)
 {
     mutex.lock ();
-// TODO Is deferred notification about stream removal necessary?
     removeVideoStream_unlocked (video_stream_key);
     mutex.unlock ();
 }
@@ -1550,6 +1635,103 @@ Ref<VideoStream>
 MomentServer::getMixVideoStream ()
 {
     return mix_video_stream;
+}
+
+FetchConnection::Frontend const MomentServer::restream__fetch_conn_frontend = {
+    restreamFetchConnDisconnected
+};
+
+void
+MomentServer::restreamFetchConnDisconnected (bool             * const mt_nonnull ret_reconnect,
+                                             Time             * const mt_nonnull /* ret_reconnect_after_millisec */,
+                                             Ref<VideoStream> * const mt_nonnull /* ret_new_stream */,
+                                             void             * const _restream_info)
+{
+    logD_ (_func_);
+
+    *ret_reconnect = false;
+
+    RestreamInfo * const restream_info = static_cast <RestreamInfo*> (_restream_info);
+    Ref<MomentServer> const self = restream_info->weak_moment.getRef ();
+    if (!self)
+        return;
+
+    self->mutex.lock ();
+    mt_unlocks (mutex) self->stopRestreaming (restream_info);
+}
+
+Ref<VideoStream>
+MomentServer::startRestreaming (ConstMemory const stream_name,
+                                ConstMemory const uri)
+{
+    logD_ (_func, "stream_name: ", stream_name, ", uri: ", uri);
+
+    Ref<FetchProtocol> const fetch_proto = getFetchProtocolForUri (uri);
+    if (!fetch_proto) {
+        logE_ (_func, "Could not get fetch protocol for uri: ", uri);
+        return NULL;
+    }
+
+    mutex.lock ();
+
+    Ref<VideoStream> stream = getVideoStream_unlocked (stream_name);
+    if (stream) {
+        logD_ (_func, "Stream \"", stream_name, "\" already exists");
+        ++stream->moment_data.use_count;
+        mutex.unlock ();
+        return stream;
+    }
+
+    stream = grab (new (std::nothrow) VideoStream);
+    logD_ (_func, "Created stream 0x", fmt_hex, (UintPtr) stream.ptr(), ", "
+           "stream_name: ", stream_name);
+
+    VideoStream::MomentServerData * const stream_data = &stream->moment_data;
+    stream_data->use_count = 1;
+    stream_data->stream_info = grab (new (std::nothrow) StreamInfo);
+    StreamInfo * const stream_info = static_cast <StreamInfo*> (stream_data->stream_info.ptr());
+    stream_info->restream_info = grab (new (std::nothrow) RestreamInfo);
+    stream_info->restream_info->weak_moment = this;
+    stream_info->restream_info->unsafe_stream = stream;
+    stream_info->restream_info->stream_key = addVideoStream_unlocked (stream, stream_name);
+    stream_info->restream_info->fetch_conn =
+            fetch_proto->connect (stream,
+                                  uri,
+                                  CbDesc<FetchConnection::Frontend> (
+                                          &restream__fetch_conn_frontend,
+                                          stream_info->restream_info,
+                                          stream_info->restream_info));
+    mutex.unlock ();
+
+    return stream;
+}
+
+mt_unlocks (mutex) void
+MomentServer::stopRestreaming (RestreamInfo * const mt_nonnull restream_info)
+{
+    logD_ (_func_);
+
+    Ref<VideoStream> stream;
+
+    if (restream_info->stream_key) {
+        stream = restream_info->unsafe_stream;
+        removeVideoStream_unlocked (restream_info->stream_key);
+        restream_info->stream_key = VideoStreamKey();
+    }
+    restream_info->fetch_conn = NULL;
+
+    if (stream && stream->moment_data.stream_info) {
+        if (StreamInfo * const stream_info =
+                    static_cast <StreamInfo*> (stream->moment_data.stream_info.ptr()))
+        {
+            stream_info->restream_info = NULL;
+        }
+    }
+
+    mutex.unlock ();
+
+    if (stream)
+        stream->close ();
 }
 
 namespace {
@@ -1905,6 +2087,22 @@ MomentServer::init (ServerApp        * const mt_nonnull server_app,
 	}
     }
 
+    {
+        ConstMemory const opt_name = "moment/restreaming";
+        MConfig::BooleanValue const value = config->getBoolean (opt_name);
+        if (value == MConfig::Boolean_Invalid) {
+            logE_ (_func, "Invalid value for ", opt_name, ": ", config->getString (opt_name),
+                   ", assuming \"", enable_restreaming, "\"");
+        } else {
+            if (value == MConfig::Boolean_True)
+                enable_restreaming = true;
+            else
+                enable_restreaming = false;
+
+            logD_ (_func, opt_name, ": ", enable_restreaming);
+        }
+    }
+
     admin_http_service->addHttpHandler (
 	    CbDesc<HttpService::HttpHandler> (&admin_http_handler, this, this),
 	    "admin");
@@ -1929,6 +2127,7 @@ MomentServer::MomentServer ()
       reader_thread_pool    (NULL),
       storage               (NULL),
       publish_all_streams   (true),
+      enable_restreaming    (false),
       config                (NULL),
       media_source_provider (this /* coderef_container */)
 {

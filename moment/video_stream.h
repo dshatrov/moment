@@ -74,6 +74,20 @@ private:
     StateMutex mutex;
 
 public:
+    class MomentServerData
+    {
+    public:
+        Count use_count;
+        Ref<Referenced> stream_info;
+
+        MomentServerData ()
+            : use_count (0)
+        {}
+    };
+
+    // Should be used by MomentServer only.
+    mt_mutex (MomentServer::mutex) MomentServerData moment_data;
+
     class AudioFrameType
     {
     public:
