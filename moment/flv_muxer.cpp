@@ -56,13 +56,8 @@ FlvMuxer::beginMuxing ()
 
     PagePool::PageListHead page_list;
 
-//    page_pool->getFillPages (&page_list, ConstMemory::forObject (flv_header));
-
-    Size const max_header_len = RtmpConnection::MaxHeaderLen; /* FIXME Ugly */
-    assert (max_header_len >= sizeof (flv_header));
-
     Sender::MessageEntry_Pages * const msg_pages =
-	    Sender::MessageEntry_Pages::createNew (max_header_len);
+            Sender::MessageEntry_Pages::createNew (sizeof (flv_header));
 
     memcpy (msg_pages->getHeaderData(), flv_header, sizeof (flv_header));
     msg_pages->header_len = sizeof (flv_header);
@@ -112,11 +107,8 @@ FlvMuxer::doMuxMessage (VideoStream::Message * const mt_nonnull msg,
     };
 
     {
-	Size const max_header_len = RtmpConnection::MaxHeaderLen; /* FIXME Ugly */
-	assert (max_header_len >= sizeof (tag_header));
-
 	Sender::MessageEntry_Pages * const msg_pages =
-		Sender::MessageEntry_Pages::createNew (max_header_len);
+		Sender::MessageEntry_Pages::createNew (sizeof (tag_header));
 
 	memcpy (msg_pages->getHeaderData(), tag_header, sizeof (tag_header));
 	msg_pages->header_len = sizeof (tag_header);
@@ -157,11 +149,8 @@ FlvMuxer::doMuxMessage (VideoStream::Message * const mt_nonnull msg,
 	    (Byte) ((tag_size >>  0) & 0xff)
 	};
 
-	Size const max_header_len = RtmpConnection::MaxHeaderLen; /* FIXME Ugly */
-	assert (max_header_len >= sizeof (tag_footer));
-
 	Sender::MessageEntry_Pages * const msg_pages =
-		Sender::MessageEntry_Pages::createNew (max_header_len);
+		Sender::MessageEntry_Pages::createNew (sizeof (tag_footer));
 
 	memcpy (msg_pages->getHeaderData(), tag_footer, sizeof (tag_footer));
 	msg_pages->header_len = sizeof (tag_footer);
