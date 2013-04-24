@@ -14,8 +14,8 @@ endif
 
 if PLATFORM_DEFAULT
     COMMON_CFLAGS += -DPLATFORM_DEFAULT -pthread
-    # For backtraces
-    COMMON_CFLAGS += -rdynamic
+#    # For backtraces
+#    COMMON_CFLAGS += -rdynamic
 endif
 
 COMMON_LDFLAGS =
