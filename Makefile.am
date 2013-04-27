@@ -1,4 +1,4 @@
-SUBDIRS = moment web
+SUBDIRS = moment
 
 EXTRA_DIST = \
         local_config.h.in       \
