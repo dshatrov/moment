@@ -60,7 +60,7 @@ using namespace M;
 
 namespace Moment {
 
-static LogGroup libMary_logGroup_rtmpt ("rtmpt", LogLevel::D);
+static LogGroup libMary_logGroup_rtmpt ("rtmpt", LogLevel::I);
 
 RtmpConnection::Backend const RtmptService::rtmp_conn_backend = {
     rtmpClosed
@@ -836,6 +836,8 @@ RtmptService::acceptOneConnection ()
     ++num_valid_connections;
     mutex.unlock ();
 
+    rtmpt_conn->conn_receiver.start ();
+
     return true;
 }
 
@@ -901,6 +903,17 @@ RtmptService::start ()
 	return Result::Failure;
     }
     mutex.unlock ();
+
+    if (!tcp_server.start ()) {
+        logF_ (_func, "tcp_server.start() failed: ", exc->toString());
+
+        mutex.lock ();
+        server_ctx->getMainThreadContext()->getPollGroup()->removePollable (server_pollable_key);
+        server_pollable_key = NULL;
+        mutex.unlock ();
+
+        return Result::Failure;
+    }
 
     return Result::Success;
 }
@@ -978,6 +991,7 @@ RtmptService::init (ServerContext * const mt_nonnull server_ctx,
 
     if (enable_standalone_tcp_server) {
         tcp_server.init (CbDesc<TcpServer::Frontend> (&tcp_server_frontend, this, getCoderefContainer()),
+                         server_ctx->getMainThreadContext()->getDeferredProcessor(),
                          server_ctx->getMainThreadContext()->getTimers());
 
         if (!tcp_server.open ())

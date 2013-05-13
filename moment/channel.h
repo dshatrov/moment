@@ -165,12 +165,10 @@ public:
 private:
     mt_const Ref<ChannelOptions> channel_opts;
 
-    mt_const DataDepRef<MomentServer> moment;
-    mt_const DataDepRef<Timers>       timers;
-    mt_const DataDepRef<PagePool>     page_pool;
-
-    DeferredProcessor::Task deferred_task;
-    DeferredProcessor::Registration deferred_reg;
+    mt_const DataDepRef<MomentServer>      moment;
+    mt_const DataDepRef<Timers>            timers;
+    mt_const DataDepRef<DeferredProcessor> deferred_processor;
+    mt_const DataDepRef<PagePool>          page_pool;
 
     mt_mutex (mutex) Ref<PlaybackItem> cur_item;
 
@@ -253,10 +251,7 @@ private:
       static void streamEos   (void *_stream_data);
       static void noVideo     (void *_stream_data);
       static void gotVideo    (void *_stream_data);
-      static void streamStatusEvent (void *_stream_data);
     mt_iface_end
-
-    static bool deferredTask (void *_self);
 
     void doDestroy (bool from_dtor);
 

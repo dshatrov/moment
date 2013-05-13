@@ -411,6 +411,10 @@ public:
 private:
     class PendingFrameList_name;
 
+    // TODO PendingFrame looks like a bad idea.
+    //      It adds quite a lot of extra malloc/free pairs
+    //      when streaming video+audio from gstreamer
+    //      (when video and audio come from separate threads).
     class PendingFrame : public IntrusiveListElement<PendingFrameList_name> {
     public:
         enum Type {
@@ -422,6 +426,7 @@ private:
     public:
         Type getType() const { return type; }
         PendingFrame (Type const type) : type (type) {}
+        virtual ~PendingFrame () {}
     };
 
     typedef IntrusiveList<PendingFrame, PendingFrameList_name> PendingFrameList;
@@ -458,7 +463,6 @@ private:
 
     mt_mutex (mutex) bool is_closed;
     mt_mutex (mutex) FrameSaver frame_saver;
-    mt_mutex (mutex) bool msg_inform_in_progress;
     mt_mutex (mutex) Count num_watchers;
 
   // ___________________________ Stream binding data ___________________________
@@ -499,7 +503,8 @@ private:
     mt_mutex (mutex) BindInfo abind;
     mt_mutex (mutex) BindInfo vbind;
 
-    mt_mutex (mutex) Count msg_infom_counter;
+    mt_mutex (mutex) bool  pending_report_in_progress;
+    mt_mutex (mutex) Count msg_inform_counter;
     mt_mutex (mutex) PendingFrameList pending_frame_list;
 
   mt_iface (FrameSaver::FrameHandler)

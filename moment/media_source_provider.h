@@ -33,13 +33,14 @@ class MediaSourceProvider : public virtual CodeReferenced
 {
 public:
     virtual Ref<MediaSource> createMediaSource (CbDesc<MediaSource::Frontend> const &frontend,
-                                                Timers         *timers,
-                                                PagePool       *page_pool,
-                                                VideoStream    *video_stream,
-                                                VideoStream    *mix_video_stream,
-                                                Time            initial_seek,
-                                                ChannelOptions *channel_opts,
-                                                PlaybackItem   *playback_item) = 0;
+                                                Timers            *timers,
+                                                DeferredProcessor *deferred_processor,
+                                                PagePool          *page_pool,
+                                                VideoStream       *video_stream,
+                                                VideoStream       *mix_video_stream,
+                                                Time               initial_seek,
+                                                ChannelOptions    *channel_opts,
+                                                PlaybackItem      *playback_item) = 0;
 };
 
 }

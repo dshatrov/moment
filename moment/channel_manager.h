@@ -92,6 +92,8 @@ private:
     mt_const DataDepRef<PagePool> page_pool;
 
     mt_const StRef<String> confd_dirname;
+    mt_const bool          serve_playlist_json;
+    mt_const StRef<String> playlist_json_protocol;
 
     typedef StringHash< StRef<ConfigItem> > ItemHash;
     mt_mutex (mutex) ItemHash item_hash;

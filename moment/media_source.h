@@ -37,8 +37,6 @@ public:
         void (*eos)         (void *cb_data);
         void (*noVideo)     (void *cb_data);
         void (*gotVideo)    (void *cb_data);
-        // Called with gstreamer locks held.
-        void (*statusEvent) (void *cb_data);
     };
 
     virtual void createPipeline () = 0;

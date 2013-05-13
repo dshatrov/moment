@@ -38,7 +38,6 @@ static LogGroup libMary_logGroup_time      ("rtmp_time",       LogLevel::I);
 static LogGroup libMary_logGroup_close     ("rtmp_conn_close", LogLevel::I);
 static LogGroup libMary_logGroup_proto_in  ("rtmp_proto_in",   LogLevel::I);
 static LogGroup libMary_logGroup_proto_out ("rtmp_proto_out",  LogLevel::I);
-static LogGroup libMary_logGroup_flush     ("rtmp_flush",      LogLevel::I);
 
 Sender::Frontend const RtmpConnection::sender_frontend = {
     senderStateChanged,
@@ -135,13 +134,6 @@ RtmpConnection::releaseChunkStream (ChunkStream * const mt_nonnull chunk_stream)
 mt_mutex (send_mutex) Uint32
 RtmpConnection::mangleOutTimestamp (MessageDesc const * const mt_nonnull mdesc)
 {
-//    logD_ (_func, "timestamp: 0x", fmt_hex, timestamp);
-
-// TEST
-//    return timestamp + 0x00ffffff;
-
-//    return timestamp;
-
     if (!out_got_first_timestamp) {
         if (mdesc->adjustable_timestamp) {
             out_first_timestamp = mdesc->timestamp;
@@ -212,7 +204,7 @@ RtmpConnection::fillMessageHeader (MessageDesc const * const mt_nonnull mdesc,
     bool fix_header = false;
 
     // TODO cs_hdr_comp is probably unnecessary, because all messages
-    // for which we explicitly set cs_hdr_comp to 0 fit into a single 128-byte
+    // for which we explicitly set cs_hdr_comp to 'false' fit into a single 128-byte
     // chunk anyway. Is 128 bytes a minimum size for a chunk?
     if (mdesc->cs_hdr_comp &&
 	chunk_stream->out_header_valid)
@@ -615,6 +607,7 @@ RtmpConnection::sendMessagePages (MessageDesc const      * const mt_nonnull mdes
                                                chunk_stream,
                                                msg_pages->getHeaderData(),
                                                timestamp,
+#warning We use prechunk_size here, then change it below.
                                                prechunk_size);
 
 #if 0
@@ -629,6 +622,7 @@ RtmpConnection::sendMessagePages (MessageDesc const      * const mt_nonnull mdes
 
     msg_pages->page_pool = page_pool;
 
+#warning TODO Short (single-chunk) messages can be considered prechunked.
     if (prechunk_size == 0) {
 	msg_pages->msg_offset = 0;
 
@@ -639,7 +633,6 @@ RtmpConnection::sendMessagePages (MessageDesc const      * const mt_nonnull mdes
 
         bool first_chunk = true;
         if (extra_header_len > 0) {
-//            logD_ (_func, "prechunking extra_header");
             fillPrechunkedPages (&prechunk_ctx,
                                  ConstMemory (extra_header_buf, extra_header_len),
                                  page_pool,
@@ -672,12 +665,13 @@ RtmpConnection::sendMessagePages (MessageDesc const      * const mt_nonnull mdes
 	    page = page->getNextMsgPage();
 	}
 
-	msg_pages->first_page = prechunked_pages.first;
+	msg_pages->setFirstPage (prechunked_pages.first);
 
 	if (take_ownership)
 	    page_pool->msgUnref (page_list->first);
     } else {
         if (extra_header_len > 0) {
+#warning This is total bullshit. Figure out all the ways in which this is wrong, then fix.
           // Message body is prechunked in assumption that FLV a/v headers are
           // re-created when needed before sending.
             assert (msg_pages->header_len + extra_header_len <= MaxHeaderLen);
@@ -685,14 +679,16 @@ RtmpConnection::sendMessagePages (MessageDesc const      * const mt_nonnull mdes
             msg_pages->header_len += extra_header_len;
         }
 
-        msg_pages->first_page = page_list->first;
+        msg_pages->setFirstPage (page_list->first);
         msg_pages->msg_offset = msg_offset;
         if (msg_offset > 0) {
             assert (page_list->first && page_list->first->data_len >= msg_offset);
             if (page_list->first->data_len == msg_offset) {
                 logD (send, _func, "stripping first page: covered by msg_offset (", msg_offset, ")");
-                msg_pages->first_page = page_list->first->getNextMsgPage();
+                msg_pages->setFirstPage (page_list->first->getNextMsgPage());
                 msg_pages->msg_offset = 0;
+#warning Memory leak (!)
+                logF_ (_func, "MEMORY LEAK");
             }
         }
 
@@ -711,26 +707,16 @@ RtmpConnection::sendMessagePages (MessageDesc const      * const mt_nonnull mdes
 	if (mdesc->msg_type_id == RtmpMessageType::AudioMessage ||
 	    mdesc->msg_type_id == RtmpMessageType::VideoMessage)
 	{
-//	    logD (flush, _func, "A/V message");
-
-//	    logD (flush, _func, "cur_time: ", cur_time, ", out_last_flush_time: ", out_last_flush_time);
 	    if (cur_time >= out_last_flush_time
 		&& cur_time - out_last_flush_time < send_delay_millisec)
 	    {
-		logD (flush, _func, "cs 0x", fmt_hex, (UintPtr) chunk_stream, ": Delaying flush, ts 0x", fmt_hex, timestamp);
 		do_flush = false;
 	    }
-	} else {
-	    logD (flush, _func, "Not an A/V message: ", mdesc->msg_type_id);
 	}
 
-	if (do_flush) {
-	    logD (flush, _func, "cs 0x", fmt_hex, (UintPtr) chunk_stream, ": Flushing, ts 0x", fmt_hex, timestamp);
+	if (do_flush)
 	    out_last_flush_time = cur_time;
-	}
     }
-
-//    logD_ (_func, "total msg len: ", msg_pages->getTotalMsgLen());
 
     sender->sendMessage (msg_pages, do_flush);
 
@@ -739,8 +725,7 @@ RtmpConnection::sendMessagePages (MessageDesc const      * const mt_nonnull mdes
 }
 
 void
-RtmpConnection::sendRawPages (PagePool::Page * const first_page,
-			      Size const msg_offset)
+RtmpConnection::sendRawPages (PagePool::Page * const first_page)
 {
     logD (send, _func_);
 
@@ -748,16 +733,8 @@ RtmpConnection::sendRawPages (PagePool::Page * const first_page,
 	    Sender::MessageEntry_Pages::createNew (0 /* max_header_len */);
     msg_pages->header_len = 0;
     msg_pages->page_pool = page_pool;
-
-    msg_pages->first_page = first_page;
-    msg_pages->msg_offset = msg_offset;
-    if (msg_offset > 0) {
-        assert (first_page && first_page->data_len >= msg_offset);
-        if (first_page->data_len == msg_offset) {
-            msg_pages->first_page = first_page->getNextMsgPage();
-            msg_pages->msg_offset = 0;
-        }
-    }
+    msg_pages->setFirstPage (first_page);
+    msg_pages->msg_offset = 0;
 
     sender->sendMessage (msg_pages, true /* do_flush */);
 }
@@ -1137,6 +1114,10 @@ RtmpConnection::sendVideoMessage (VideoStream::VideoMessage * const mt_nonnull m
 	chunk_stream = video_chunk_stream;
 
         flv_video_header_len = fillFlvVideoHeader (msg, Memory::forObject (flv_video_header));
+        if (flv_video_header_len == 0 && msg->msg_len != 0) {
+            logD_ (_func, "Ignoring non-empty video message: couldn't fill video header");
+            return;
+        }
     }
 
     mdesc.msg_stream_id = DefaultMessageStreamId;
@@ -1174,6 +1155,10 @@ RtmpConnection::sendAudioMessage (VideoStream::AudioMessage * const mt_nonnull m
 
     Byte flv_audio_header [FlvAudioHeader_MaxLen];
     unsigned const flv_audio_header_len = fillFlvAudioHeader (msg, Memory::forObject (flv_audio_header));
+    if (flv_audio_header_len == 0 && msg->msg_len != 0) {
+        logD_ (_func, "Ignoring non-empty audio message: couldn't fill audio header");
+        return;
+    }
 
     MessageDesc mdesc;
     if (!momentrtmp_proto)
@@ -1245,6 +1230,7 @@ RtmpConnection::sendConnect (ConstMemory const &app_name)
 	encoder.addFieldName ("swfUrl");
 	encoder.addString ("file:///my.swf");
 
+#warning Hard-coded values on the wire - bad
 	encoder.addFieldName ("tcUrl");
 	encoder.addString ("rtmp://172.16.0.17:1935/oflaDemo");
 
@@ -1383,8 +1369,6 @@ RtmpConnection::close_noBackendCb ()
 mt_const void
 RtmpConnection::beginPings ()
 {
-    logI_ (_this_func_);
-
     assert (!ping_send_timer);
     ping_send_timer =
             timers->addTimer_microseconds (CbDesc<Timers::TimerCallback> (pingTimerTick,
@@ -1428,6 +1412,7 @@ RtmpConnection::pingTimerTick (void * const _self)
 	return;
     }
 
+#warning TODO Send ping request only after handshake is complete.
     self->sendUserControl_PingRequest ();
 }
 
@@ -1596,6 +1581,7 @@ RtmpConnection::processMessage (ChunkStream * const chunk_stream)
 			    }
                         }
 		    } else {
+                        // Flash sends empty audio messages when going silent with Speex.
 			audio_msg.frame_type = VideoStream::AudioFrameType::Unknown;
 			audio_msg.codec_id = VideoStream::AudioCodecId::Unknown;
 		    }
@@ -1639,15 +1625,6 @@ RtmpConnection::processMessage (ChunkStream * const chunk_stream)
 			video_msg.frame_type = VideoStream::VideoFrameType::fromFlvFrameType (frame_type);
 			video_msg.codec_id = VideoStream::VideoCodecId::fromFlvCodecId (codec_id);
 
-#if 0
-			// TEST
-			if (video_msg.frame_type == VideoStream::VideoFrameType::InterFrame ||
-			    video_msg.frame_type == VideoStream::VideoFrameType::DisposableInterFrame)
-			{
-			    video_msg.frame_type = VideoStream::VideoFrameType::KeyFrame;
-			}
-#endif
-
                         flv_video_header_len = 1;
 			if (video_msg.codec_id == VideoStream::VideoCodecId::AVC) {
 			    if (page->data_len >= 2) {
@@ -1677,6 +1654,7 @@ RtmpConnection::processMessage (ChunkStream * const chunk_stream)
 		video_msg.page_pool = page_pool;
 		video_msg.page_list = chunk_stream->page_list;
 
+#warning Prechunking: how's it possible that this works with HLS?
                 // Cutting away FLV video packet header. Note that this doesn't break prechunking
                 // for the purpose of sending data to RTMP clients, because the same header will be
                 // appended to the message before sending the data.
@@ -1722,9 +1700,9 @@ RtmpConnection::processMessage (ChunkStream * const chunk_stream)
 	default: {
             logLock ();
 	    logW_unlocked_ (_func, "unknown message type: 0x", fmt_hex, chunk_stream->in_msg_type_id);
-//            if (logLevelOn (proto_in, LogLevel::Debug)) {
-//                PagePool::dumpPages (logs, &chunk_stream->page_list);
-//            }
+            if (logLevelOn (proto_in, LogLevel::Stream)) {
+                PagePool::dumpPages (logs, &chunk_stream->page_list);
+            }
             logUnlock ();
         }
     }
@@ -1969,7 +1947,7 @@ RtmpConnection::doProcessInput (ConstMemory   const mem,
 		    }
 
 		    memcpy (msg_c2 + 8, data, 1536 - 8);
-		    sendRawPages (page_list.first, 0 /* msg_offset */);
+		    sendRawPages (page_list.first);
 		}
 
 		{
@@ -2046,7 +2024,7 @@ RtmpConnection::doProcessInput (ConstMemory   const mem,
 		    msg_pages->header_len = 1;
 
 		    msg_pages->page_pool  = NULL;
-		    msg_pages->first_page = NULL;
+		    msg_pages->setFirstPage (NULL);
 		    msg_pages->msg_offset = 0;
 
 		    sender->sendMessage (msg_pages, true /* do_flush */);
@@ -2077,7 +2055,7 @@ RtmpConnection::doProcessInput (ConstMemory   const mem,
 			}
 		    }
 
-		    sendRawPages (page_list.first, 0 /* msg_offset */);
+		    sendRawPages (page_list.first);
 		}
 #endif
 
@@ -2113,8 +2091,6 @@ RtmpConnection::doProcessInput (ConstMemory   const mem,
 
 		    {
 			Uint32 const time = getTimeMilliseconds ();
-//			Uint32 const time = getTime ();
-//			Uint32 const time = 0;
 			msg [0] = (time >>  0) & 0xff;
 			msg [1] = (time >>  8) & 0xff;
 			msg [2] = (time >> 16) & 0xff;
@@ -2170,7 +2146,7 @@ RtmpConnection::doProcessInput (ConstMemory   const mem,
 
                     logD (proto_out, _func, "Sending S1+S2");
 
-		    sendRawPages (page_list.first, 0 /* msg_offset */);
+		    sendRawPages (page_list.first);
 		}
 
 
@@ -2185,7 +2161,7 @@ RtmpConnection::doProcessInput (ConstMemory   const mem,
 		    memset (msg_s2 + 4, 0, 4);
 
 		    memcpy (msg_s2 + 8, data, 1536 - 8);
-		    sendRawPages (page_list.first, 0 /* msg_offset */);
+		    sendRawPages (page_list.first);
 		}
 #endif
 
@@ -2712,8 +2688,6 @@ RtmpConnection::reportError ()
 mt_const void
 RtmpConnection::startClient ()
 {
-//    logD_ (_func_);
-
     conn_state = ReceiveState::ClientWaitS0;
 
     PagePool::PageListHead page_list;
@@ -2738,7 +2712,7 @@ RtmpConnection::startClient ()
 	}
     }
 
-    sendRawPages (page_list.first, 0 /* msg_offset */);
+    sendRawPages (page_list.first);
 
     beginPings ();
 }
@@ -2747,7 +2721,6 @@ mt_const void
 RtmpConnection::startServer ()
 {
     conn_state = ReceiveState::ServerWaitC0;
-
     beginPings ();
 }
 
@@ -2764,8 +2737,6 @@ RtmpConnection::doCreateStream (Uint32       const msg_stream_id,
     // TODO Perhaps a unique message stream id should be allocated.
     //      (a simple increment of a counter would do).
     double const reply_msg_stream_id = DefaultMessageStreamId;
-
-//    logD_ (_this_func, msg_stream_id, ", ", reply_msg_stream_id);
 
     {
 	AmfAtom atoms [4];
@@ -3007,6 +2978,7 @@ RtmpConnection::~RtmpConnection ()
     in_destr_mutex.unlock ();
 }
 
+#warning UGH, UGLY - fix flv header prechunking (!)
 // TODO FIXME Take cut FLV audio/video headers into consideration when normalizing.
 //            Currently, lack of this breaks writing to a file when prechunking
 //            is enabled.

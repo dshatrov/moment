@@ -1073,6 +1073,7 @@ MomentServer::startWatching (ClientSession    * const mt_nonnull client_session,
             return true;
         }
 
+        data->video_stream = video_stream;
         startWatching_completeOk (data,
                                   ConstMemory() /* restream_reply */,
                                   false         /* call_cb */,
@@ -1938,13 +1939,14 @@ MomentServer::getFetchProtocolForUri (ConstMemory const uri)
 
 Ref<MediaSource>
 MomentServer::createMediaSource (CbDesc<MediaSource::Frontend> const &frontend,
-                                 Timers         * const timers,
-                                 PagePool       * const page_pool,
-                                 VideoStream    * const video_stream,
-                                 VideoStream    * const mix_video_stream,
-                                 Time             const initial_seek,
-                                 ChannelOptions * const channel_opts,
-                                 PlaybackItem   * const playback_item)
+                                 Timers            * const timers,
+                                 DeferredProcessor * const deferred_processor,
+                                 PagePool          * const page_pool,
+                                 VideoStream       * const video_stream,
+                                 VideoStream       * const mix_video_stream,
+                                 Time                const initial_seek,
+                                 ChannelOptions    * const channel_opts,
+                                 PlaybackItem      * const playback_item)
 {
     if (playback_item->spec_kind == PlaybackItem::SpecKind::Slave) {
         Ref<SlaveMediaSource> const slave = grab (new (std::nothrow) SlaveMediaSource);
@@ -1957,6 +1959,7 @@ MomentServer::createMediaSource (CbDesc<MediaSource::Frontend> const &frontend,
 
     return media_source_provider->createMediaSource (frontend,
                                                      timers,
+                                                     deferred_processor,
                                                      page_pool,
                                                      video_stream,
                                                      mix_video_stream,

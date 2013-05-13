@@ -46,8 +46,8 @@ unsigned fillFlvAudioHeader (VideoStream::AudioMessage * const mt_nonnull audio_
 
     switch (audio_msg->codec_id) {
         case VideoStream::AudioCodecId::Unknown:
-            logW_ (_func, "unknown audio codec id");
-            break;
+            logD_ (_func, "unknown audio codec id");
+            return 0;
         case VideoStream::AudioCodecId::LinearPcmPlatformEndian:
             audio_hdr = 0x00;
             break;
@@ -167,7 +167,7 @@ unsigned fillFlvVideoHeader (VideoStream::VideoMessage * const mt_nonnull video_
     switch (video_msg->codec_id) {
         case VideoStream::VideoCodecId::Unknown:
             logW_ (_func, "unknown video codec id");
-            break;
+            return 0;
         case VideoStream::VideoCodecId::SorensonH263:
             video_hdr [0] = 0x02;
             break;

@@ -1,5 +1,5 @@
 /*  Moment Video Server - High performance media server
-    Copyright (C) 2012 Dmitry Shatrov
+    Copyright (C) 2012-2013 Dmitry Shatrov
     e-mail: shatrov@gmail.com
 
     This program is free software: you can redistribute it and/or modify
@@ -54,7 +54,7 @@ RtmpPushConnection::destroySession (Session * const mt_nonnull session)
     }
 }
 
-mt_unlocks (mutex) void
+mt_mutex (mutex) void
 RtmpPushConnection::startNewSession (Session * const old_session)
 {
     logD_ (_func_);
@@ -109,31 +109,46 @@ RtmpPushConnection::startNewSession (Session * const old_session)
                                                                     session /* cb_data */,
                                                                     this /* coderef_container */));
 
+    if (!session->tcp_conn.open ()) {
+        logE_ (_func, "tcp_conn.open() failed: ", exc->toString());
+        goto _failure;
+    }
+
+    if (!thread_ctx->getPollGroup()->addPollable_beforeConnect (session->tcp_conn.getPollable(),
+                                                                &session->pollable_key))
+    {
+        logE_ (_func, "addPollable() failed: ", exc->toString());
+        goto _failure;
+    }
+
     {
         TcpConnection::ConnectResult const connect_res = session->tcp_conn.connect (server_addr);
         if (connect_res == TcpConnection::ConnectResult_Error) {
             logE_ (_func, "Could not connect to server: ", exc->toString());
+            goto _failure;
+        }
 
-            destroySession (session);
-            cur_session = NULL;
-
-            setReconnectTimer ();
-            mutex.unlock ();
-            return;
+        if (!thread_ctx->getPollGroup()->addPollable_afterConnect (session->tcp_conn.getPollable(),
+                                                                   &session->pollable_key))
+        {
+            logE_ (_func, "addPollable() failed: ", exc->toString());
+            goto _failure;
         }
 
         if (connect_res == TcpConnection::ConnectResult_Connected)
             session->rtmp_conn.startClient ();
         else
             assert (connect_res == TcpConnection::ConnectResult_InProgress);
-
-        // TODO Possible "connected" event loss because we do addPollable() too late - ?
     }
 
-    if (cur_session.ptr() /* TODO Why doesn't plain '==' work? */ == session) {
-        session->pollable_key = thread_ctx->getPollGroup()->addPollable (session->tcp_conn.getPollable());
-    }
-    mutex.unlock ();
+    session->conn_receiver.start ();
+    return;
+
+_failure:
+    destroySession (session);
+    cur_session = NULL;
+
+    setReconnectTimer ();
 }
 
 mt_mutex (mutex) void
@@ -180,7 +195,8 @@ RtmpPushConnection::reconnectTimerTick (void * const _self)
         return;
     }
 
-    mt_unlocks (mutex) self->startNewSession (NULL /* old_session */);
+    self->startNewSession (NULL /* old_session */);
+    self->mutex.unlock ();
 }
 
 void
@@ -456,7 +472,8 @@ RtmpPushConnection::init (ServerThreadContext * const mt_nonnull _thread_ctx,
     momentrtmp_proto = _momentrtmp_proto;
 
     mutex.lock ();
-    mt_unlocks (mutex) startNewSession (NULL /* old_session */);
+    startNewSession (NULL /* old_session */);
+    mutex.unlock ();
 
     video_stream->getEventInformer()->subscribe (
             CbDesc<VideoStream::EventHandler> (&video_event_handler,

@@ -17,6 +17,9 @@
 */
 
 
+#include <libmary/types.h>
+#include <cctype>
+
 #include <mconfig/mconfig.h>
 #include <moment/libmoment.h>
 
@@ -107,7 +110,8 @@ ChannelManager::serverHttpRequest (HttpRequest * const mt_nonnull req,
     MOMENT_SERVER__HEADERS_DATE
 
     if (req->getNumPathElems() >= 2
-        && equal (req->getPath (1), "playlist.json"))
+        && equal (req->getPath (1), "playlist.json")
+        && self->serve_playlist_json)
     {
         logD_ (_func, "playlist.json");
 
@@ -120,12 +124,6 @@ ChannelManager::serverHttpRequest (HttpRequest * const mt_nonnull req,
 
         self->mutex.lock ();
 	{
-            bool use_rtmpt_proto = false;
-// TODO serve_playlist_json, playlist_json_protocol config parameters
-//
-//            if (equal (self->playlist_json_protocol->mem(), "rtmpt"))
-//                use_rtmpt_proto = true;
-
             // TODO Update once on config reload.
             StRef<String> this_rtmp_server_addr;
             StRef<String> this_rtmpt_server_addr;
@@ -146,21 +144,27 @@ ChannelManager::serverHttpRequest (HttpRequest * const mt_nonnull req,
                 self->moment->configUnlock ();
             }
 
-	    ItemHash::iterator iter (self->item_hash);
-	    while (!iter.done()) {
-		ConfigItem * const item = iter.next ()->ptr();
+            {
+                bool use_rtmpt_proto = false;
+                if (equal (self->playlist_json_protocol->mem(), "rtmpt"))
+                    use_rtmpt_proto = true;
 
-		StRef<String> const channel_line = st_makeString (
-                        "[ \"", item->channel_title, "\", "
-                        "\"", (use_rtmpt_proto ? ConstMemory ("rtmpt://") : ConstMemory ("rtmp://")),
-                                (use_rtmpt_proto ? this_rtmpt_server_addr->mem() : this_rtmp_server_addr->mem()),
-                                "/live/", item->channel_name->mem(), "\", "
-                        "\"", item->channel_name->mem(), "\" ],\n");
+                ItemHash::iterator iter (self->item_hash);
+                while (!iter.done()) {
+                    ConfigItem * const item = iter.next ()->ptr();
 
-		self->page_pool->getFillPages (&page_list, channel_line->mem());
+                    StRef<String> const channel_line = st_makeString (
+                            "[ \"", item->channel_title, "\", "
+                            "\"", (use_rtmpt_proto ? ConstMemory ("rtmpt://") : ConstMemory ("rtmp://")),
+                                    (use_rtmpt_proto ? this_rtmpt_server_addr->mem() : this_rtmp_server_addr->mem()),
+                                    "/live/", item->channel_name->mem(), "\", "
+                            "\"", item->channel_name->mem(), "\" ],\n");
 
-                logD_ (_func, "playlist.json line: ", channel_line->mem());
-	    }
+                    self->page_pool->getFillPages (&page_list, channel_line->mem());
+
+                    logD_ (_func, "playlist.json line: ", channel_line->mem());
+                }
+            }
 	}
         self->mutex.unlock ();
 
@@ -268,6 +272,10 @@ ChannelManager::loadConfigFull ()
             break;
 
         if (equal (filename->mem(), ".") || equal (filename->mem(), ".."))
+            continue;
+
+        // Don't process hidden files (e.g. vim tmp files).
+        if (filename->len() > 0 && filename->mem().mem() [0] == '.')
             continue;
 
         StRef<String> const path = st_makeString (dir_name, "/", filename->mem());
@@ -698,6 +706,38 @@ ChannelManager::init (MomentServer * const mt_nonnull moment,
         Ref<MConfig::Config> const config = moment->getConfig();
         confd_dirname = st_grab (new (std::nothrow) String (
                                 config->getString_default ("moment/confd_dir", "/opt/moment/conf.d")));
+
+        {
+            ConstMemory const opt_name = "moment/playlist_json";
+            MConfig::BooleanValue const val = config->getBoolean (opt_name);
+            logI_ (_func, opt_name, ": ", config->getString (opt_name));
+            if (val == MConfig::Boolean_Invalid)
+                logE_ (_func, "Invalid value for ", opt_name, ": ", config->getString (opt_name));
+
+            if (val == MConfig::Boolean_False)
+                serve_playlist_json = false;
+            else
+                serve_playlist_json = true;
+        }
+
+        {
+            ConstMemory const opt_name = "moment/playlist_json_protocol";
+            ConstMemory opt_val = config->getString (opt_name);
+            if (opt_val.len() == 0)
+                opt_val = "rtmp";
+
+            StRef<String> val_lowercase = st_grab (new (std::nothrow) String (opt_val));
+            Byte * const buf = val_lowercase->mem().mem();
+            for (Size i = 0, i_end = val_lowercase->len(); i < i_end; ++i)
+                buf [i] = (Byte) tolower (buf [i]);
+
+            if (!equal (val_lowercase->mem(), "rtmpt"))
+                val_lowercase = st_grab (new (std::nothrow) String ("rtmp"));
+
+            logI_ (_func, opt_name, ": ", val_lowercase->mem());
+
+            playlist_json_protocol = val_lowercase;
+        }
     }
 
     deferred_reg.setDeferredProcessor (
@@ -710,8 +750,9 @@ ChannelManager::init (MomentServer * const mt_nonnull moment,
 }
 
 ChannelManager::ChannelManager ()
-    : event_informer (this, &mutex),
-      page_pool (this)
+    : event_informer (this /* coderef_container */, &mutex),
+      page_pool      (this /* coderef_container */),
+      serve_playlist_json (true)
 {
     channel_created_task.cb = CbDesc<DeferredProcessor::TaskCallback> (channelCreatedTask, this, this);
 }

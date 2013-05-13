@@ -811,13 +811,14 @@ private:
 
 public:
     Ref<MediaSource> createMediaSource (CbDesc<MediaSource::Frontend> const &frontend,
-                                        Timers         *timers,
-                                        PagePool       *page_pool,
-                                        VideoStream    *video_stream,
-                                        VideoStream    *mix_video_stream,
-                                        Time            initial_seek,
-                                        ChannelOptions *channel_opts,
-                                        PlaybackItem   *playback_item);
+                                        Timers            *timers,
+                                        DeferredProcessor *deferred_processor,
+                                        PagePool          *page_pool,
+                                        VideoStream       *video_stream,
+                                        VideoStream       *mix_video_stream,
+                                        Time               initial_seek,
+                                        ChannelOptions    *channel_opts,
+                                        PlaybackItem      *playback_item);
 
     mt_const void setMediaSourceProvider (MediaSourceProvider * const media_source_provider)
         { this->media_source_provider = media_source_provider; }

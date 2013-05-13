@@ -31,6 +31,9 @@ using namespace M;
 
 class RtmpClient : public DependentCodeReferenced
 {
+private:
+    StateMutex mutex;
+
 public:
     struct Frontend
     {
@@ -61,6 +64,8 @@ private:
     mt_const bool          momentrtmp_proto;
 
     mt_const Cb<Frontend> frontend;
+
+    mt_mutex (mutex) PollGroup::PollableKey pollable_key;
 
     mt_sync_domain (rtmp_conn_frontend) ConnectionState conn_state;
 
@@ -117,7 +122,8 @@ public:
                         Time                 send_delay_millisec,
                         CbDesc<Frontend> const &frontend);
 
-    RtmpClient (Object *coderef_container);
+     RtmpClient (Object *coderef_container);
+    ~RtmpClient ();
 };
 
 }

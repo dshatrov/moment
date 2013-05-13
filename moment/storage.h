@@ -34,7 +34,7 @@ using namespace M;
 class Storage : public virtual CodeReferenced
 {
 public:
-    class StorageFile : public Referenced
+    class StorageFile : public Object
     {
     public:
         virtual Connection* getConnection () = 0;

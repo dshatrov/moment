@@ -449,8 +449,7 @@ public:
                            Byte const             *extra_header_buf,
                            unsigned                extra_header_len);
 
-    void sendRawPages (PagePool::Page *first_page,
-		       Size msg_offset);
+    void sendRawPages (PagePool::Page *first_page);
 
   // Send utility methods.
 

@@ -484,7 +484,6 @@ VideoStream::FrameSaver::reportSavedFrames (FrameHandler const * const mt_nonnul
         }
     }
 
-    // TODO AAC end of sequence - ?
     if (got_saved_avc_seq_hdr
         && frame_handler->videoFrame)
     {
@@ -519,6 +518,8 @@ VideoStream::FrameSaver::reportSavedFrames (FrameHandler const * const mt_nonnul
                 return Result::Failure;
         }
     }
+
+#warning TODO Make saved data frames reporting configurable (at least for RTMP)
 
     if (got_saved_keyframe) {
         if (frame_handler->videoFrame)
@@ -719,14 +720,12 @@ VideoStream::reportPendingFrames ()
                 PendingAudioFrame * const audio_frame = static_cast <PendingAudioFrame*> (pending_frame);
                 frame_saver.processAudioFrame (&audio_frame->audio_msg);
                 InformAudioMessage_Data inform_data (&audio_frame->audio_msg);
-//                logD_ (_func, "audio ts ", audio_frame->audio_msg.timestamp_nanosec);
                 mt_unlocks_locks (mutex) event_informer.informAll_unlocked (informAudioMessage, &inform_data);
             } break;
             case PendingFrame::t_Video: {
                 PendingVideoFrame * const video_frame = static_cast <PendingVideoFrame*> (pending_frame);
                 frame_saver.processVideoFrame (&video_frame->video_msg);
                 InformVideoMessage_Data inform_data (&video_frame->video_msg);
-//                logD_ (_func, "video ts ", video_frame->video_msg.timestamp_nanosec);
                 mt_unlocks_locks (mutex) event_informer.informAll_unlocked (informVideoMessage, &inform_data);
             } break;
         }
@@ -738,12 +737,14 @@ VideoStream::reportPendingFrames ()
 mt_unlocks_locks (mutex) void
 VideoStream::firePendingFrames_unlocked ()
 {
-    if (msg_inform_in_progress) {
+    if (pending_report_in_progress)
         return;
+
+    pending_report_in_progress = true;
+    if (msg_inform_counter == 0) {
+        mt_unlocks_locks (mutex) reportPendingFrames ();
+        pending_report_in_progress = false;
     }
-    msg_inform_in_progress = true;
-    mt_unlocks_locks (mutex) reportPendingFrames ();
-    msg_inform_in_progress = false;
 }
 
 mt_unlocks_locks (mutex) void
@@ -751,15 +752,14 @@ VideoStream::fireAudioMessage_unlocked (AudioMessage * const mt_nonnull audio_ms
 {
     logS_ (_this_func, "ts ", audio_msg->timestamp_nanosec, " ", audio_msg->frame_type);
 
-    if (msg_inform_in_progress) {
+    if (pending_report_in_progress) {
         PendingAudioFrame * const audio_frame = new (std::nothrow) PendingAudioFrame (audio_msg);
         assert (audio_frame);
-        audio_frame->audio_msg = *audio_msg;
-        audio_msg->seize ();
         pending_frame_list.append (audio_frame);
         return;
     }
-    msg_inform_in_progress = true;
+
+    ++msg_inform_counter;
     assert (pending_frame_list.isEmpty());
 
     frame_saver.processAudioFrame (audio_msg);
@@ -768,9 +768,11 @@ VideoStream::fireAudioMessage_unlocked (AudioMessage * const mt_nonnull audio_ms
         mt_unlocks_locks (mutex) event_informer.informAll_unlocked (informAudioMessage, &inform_data);
     }
 
-    mt_unlocks_locks (mutex) reportPendingFrames ();
-
-    msg_inform_in_progress = false;
+    --msg_inform_counter;
+    if (pending_report_in_progress && msg_inform_counter == 0) {
+        mt_unlocks_locks (mutex) reportPendingFrames ();
+        pending_report_in_progress = false;
+    }
 }
 
 mt_unlocks_locks (mutex) void
@@ -778,15 +780,14 @@ VideoStream::fireVideoMessage_unlocked (VideoMessage * const mt_nonnull video_ms
 {
     logS_ (_this_func, "ts ", video_msg->timestamp_nanosec, " ", video_msg->frame_type);
 
-    if (msg_inform_in_progress) {
+    if (pending_report_in_progress) {
         PendingVideoFrame * const video_frame = new (std::nothrow) PendingVideoFrame (video_msg);
         assert (video_frame);
-        video_frame->video_msg = *video_msg;
-        video_msg->seize ();
         pending_frame_list.append (video_frame);
         return;
     }
-    msg_inform_in_progress = true;
+
+    ++msg_inform_counter;
     assert (pending_frame_list.isEmpty());
 
     frame_saver.processVideoFrame (video_msg);
@@ -795,9 +796,11 @@ VideoStream::fireVideoMessage_unlocked (VideoMessage * const mt_nonnull video_ms
         mt_unlocks_locks (mutex) event_informer.informAll_unlocked (informVideoMessage, &inform_data);
     }
 
-    mt_unlocks_locks (mutex) reportPendingFrames ();
-
-    msg_inform_in_progress = false;
+    --msg_inform_counter;
+    if (pending_report_in_progress && msg_inform_counter == 0) {
+        mt_unlocks_locks (mutex) reportPendingFrames ();
+        pending_report_in_progress = false;
+    }
 }
 
 void
@@ -1078,11 +1081,11 @@ VideoStream::bind_messageBegin (BindInfo * const mt_nonnull bind_info,
 
             if (abind.weak_bind_stream.getShadowPtr() == vbind.weak_bind_stream.getShadowPtr()) {
                 if (bind_info == &abind) {
-                    // TODO assert (!vbind.got_timestamp_offs)
+                    assert (!vbind.got_timestamp_offs);
                     vbind.got_timestamp_offs = true;
                     vbind.timestamp_offs = abind.timestamp_offs;
                 } else {
-                    // TODO assert (!abind.got_timestamp_offs)
+                    assert (!abind.got_timestamp_offs);
                     abind.got_timestamp_offs = true;
                     abind.timestamp_offs = vbind.timestamp_offs;
                 }
@@ -1126,7 +1129,6 @@ VideoStream::bind_savedAudioFrame (AudioMessage * const mt_nonnull audio_msg,
     assert (audio_frame);
     audio_frame->audio_msg = *audio_msg;
     audio_frame->audio_msg.timestamp_nanosec = self->stream_timestamp_nanosec;
-    audio_msg->seize ();
     self->pending_frame_list.append (audio_frame);
 
     return Result::Success;
@@ -1150,7 +1152,6 @@ VideoStream::bind_savedVideoFrame (VideoMessage * const mt_nonnull video_msg,
     assert (video_frame);
     video_frame->video_msg = *video_msg;
     video_frame->video_msg.timestamp_nanosec = self->stream_timestamp_nanosec;
-    video_msg->seize ();
     self->pending_frame_list.append (video_frame);
 
     return Result::Success;
@@ -1184,7 +1185,10 @@ VideoStream::bind_audioMessage (AudioMessage * const mt_nonnull audio_msg,
         self->bind_messageBegin (&self->abind, audio_msg);
 
         AudioMessage tmp_audio_msg = *audio_msg;
-        tmp_audio_msg.timestamp_nanosec += self->abind.timestamp_offs;
+        if (self->abind.got_timestamp_offs)
+            tmp_audio_msg.timestamp_nanosec += self->abind.timestamp_offs;
+        else
+            tmp_audio_msg.timestamp_nanosec = self->stream_timestamp_nanosec;
 
         logS_ (_func, "ts: ", tmp_audio_msg.timestamp_nanosec, " (off ", self->abind.timestamp_offs, ")");
 
@@ -1205,7 +1209,10 @@ VideoStream::bind_videoMessage (VideoMessage * const mt_nonnull video_msg,
         self->bind_messageBegin (&self->vbind, video_msg);
 
         VideoMessage tmp_video_msg = *video_msg;
-        tmp_video_msg.timestamp_nanosec += self->vbind.timestamp_offs;
+        if (self->vbind.got_timestamp_offs)
+            tmp_video_msg.timestamp_nanosec += self->vbind.timestamp_offs;
+        else
+            tmp_video_msg.timestamp_nanosec = self->stream_timestamp_nanosec;
 
         logS_ (_func, "ts: ", tmp_video_msg.timestamp_nanosec, " (off ", self->vbind.timestamp_offs, ")");
 
@@ -1241,17 +1248,10 @@ VideoStream::bindToStream (VideoStream * const bind_audio_stream,
 {
   // Note: Binding two streams to one another doesn't make _any_ sense (!)
   //   => it *will* break anyway in this case
-  //   => we can safely assume that no two streams
-  //      will cause lock inversion when binding.
+  //   => we can safely assume that no two streams will cause lock inversion when binding.
 
-//    logD_ (_this_func, "bind_audio: ", bind_audio, ", bind_video: ", bind_video);
-//    logD_ (_this_func, "bind_audio_stream: 0x", fmt_hex, (UintPtr) bind_audio_stream);
-//    logD_ (_this_func, "bind_video_stream: 0x", fmt_hex, (UintPtr) bind_video_stream);
-
-    if (!bind_video && !bind_audio) {
-//        logD_ (_this_func, "no-op");
+    if (!bind_video && !bind_audio)
         return;
-    }
 
     // Cannot bind to self.
     assert (bind_audio_stream != this);
@@ -1272,12 +1272,9 @@ VideoStream::bindToStream (VideoStream * const bind_audio_stream,
     }
 
     if (!bind_audio && !bind_video) {
-//        logD_ (_this_func, "no-op after self-test");
         mutex.unlock ();
         return;
     }
-
-//    logD_ (_this_func, "after self-test: bind_audio: ", bind_audio, ", bind_video: ", bind_video);
 
     GenericInformer::SubscriptionKey const prv_abind_sbn = abind.bind_sbn;
     GenericInformer::SubscriptionKey const prv_vbind_sbn = vbind.bind_sbn;
@@ -1287,42 +1284,51 @@ VideoStream::bindToStream (VideoStream * const bind_audio_stream,
     Count vbind_plus_watchers = 0;
 
     if (bind_audio && bind_video && bind_audio_stream == bind_video_stream) {
-        abind.timestamp_offs = 0;
-        abind.got_timestamp_offs = false;
-
-        abind.cur_bind_ticket = grab (new (std::nothrow) BindTicket);
-        abind.cur_bind_ticket->video_stream = this;
-
-        abind.weak_bind_stream = bind_audio_stream;
-
-        vbind.timestamp_offs = 0;
-        vbind.got_timestamp_offs = false;
-
-        vbind.cur_bind_ticket = grab (new (std::nothrow) BindTicket);
-        vbind.cur_bind_ticket->video_stream = this;
-
-        vbind.weak_bind_stream = bind_video_stream;
-
-        bind_audio_stream->mutex.lock ();
         {
-            BindFrameHandlerData bind_handler_data;
-            bind_handler_data.self = this;
-            bind_handler_data.report_audio = true;
-            bind_handler_data.report_video = true;
+            abind.timestamp_offs = 0;
+            abind.got_timestamp_offs = false;
+            abind.weak_bind_stream = bind_audio_stream;
 
-            bind_audio_stream->getFrameSaver()->reportSavedFrames (&bind_frame_handler, &bind_handler_data);
+            abind.cur_bind_ticket = grab (new (std::nothrow) BindTicket);
+            abind.cur_bind_ticket->video_stream = this;
         }
-        abind.bind_sbn = bind_audio_stream->getEventInformer()->subscribe_unlocked (
-                                 CbDesc<EventHandler> (
-                                         &abind_handler, abind.cur_bind_ticket, this, abind.cur_bind_ticket));
-        vbind.bind_sbn = bind_video_stream->getEventInformer()->subscribe_unlocked (
-                                 CbDesc<EventHandler> (
-                                         &vbind_handler, vbind.cur_bind_ticket, this, vbind.cur_bind_ticket));
-        bind_audio_stream->mutex.unlock ();
 
-        abind_plus_watchers = num_watchers;
-        // TODO Don't add/subtract watchers twice for the same stream.
-        vbind_plus_watchers = num_watchers;
+        {
+            vbind.timestamp_offs = 0;
+            vbind.got_timestamp_offs = false;
+            vbind.weak_bind_stream = bind_video_stream;
+
+            vbind.cur_bind_ticket = grab (new (std::nothrow) BindTicket);
+            vbind.cur_bind_ticket->video_stream = this;
+        }
+
+        if (VideoStream * const bind_stream = bind_audio_stream /* == bind_video_stream */) {
+            bind_stream->mutex.lock ();
+
+            {
+                BindFrameHandlerData bind_handler_data;
+                bind_handler_data.self = this;
+                bind_handler_data.report_audio = true;
+                bind_handler_data.report_video = true;
+
+                bind_stream->getFrameSaver()->reportSavedFrames (&bind_frame_handler, &bind_handler_data);
+            }
+
+            abind.bind_sbn = bind_stream->getEventInformer()->subscribe_unlocked (
+                    CbDesc<EventHandler> (&abind_handler, abind.cur_bind_ticket, this, abind.cur_bind_ticket));
+
+            vbind.bind_sbn = bind_video_stream->getEventInformer()->subscribe_unlocked (
+                    CbDesc<EventHandler> (&vbind_handler, vbind.cur_bind_ticket, this, vbind.cur_bind_ticket));
+
+            bind_stream->mutex.unlock ();
+
+            // TODO Don't add/subtract watchers twice for the same stream.
+            abind_plus_watchers = num_watchers;
+            vbind_plus_watchers = num_watchers;
+        } else {
+            abind.bind_sbn = NULL;
+            vbind.bind_sbn = NULL;
+        }
     } else {
         if (bind_audio) {
             if (bind_audio_stream) {
@@ -1349,8 +1355,7 @@ VideoStream::bindToStream (VideoStream * const bind_audio_stream,
                     bind_audio_stream->getFrameSaver()->reportSavedFrames (&bind_frame_handler, &bind_handler_data);
                 }
                 abind.bind_sbn = bind_audio_stream->getEventInformer()->subscribe_unlocked (
-                                         CbDesc<EventHandler> (
-                                                 &abind_handler, abind.cur_bind_ticket, this, abind.cur_bind_ticket));
+                        CbDesc<EventHandler> (&abind_handler, abind.cur_bind_ticket, this, abind.cur_bind_ticket));
                 bind_audio_stream->mutex.unlock ();
 
                 abind_plus_watchers = num_watchers;
@@ -1384,8 +1389,7 @@ VideoStream::bindToStream (VideoStream * const bind_audio_stream,
                     bind_video_stream->getFrameSaver()->reportSavedFrames (&bind_frame_handler, &bind_handler_data);
                 }
                 vbind.bind_sbn = bind_video_stream->getEventInformer()->subscribe_unlocked (
-                                         CbDesc<EventHandler> (
-                                                 &vbind_handler, vbind.cur_bind_ticket, this, vbind.cur_bind_ticket));
+                        CbDesc<EventHandler> (&vbind_handler, vbind.cur_bind_ticket, this, vbind.cur_bind_ticket));
                 bind_video_stream->mutex.unlock ();
 
                 vbind_plus_watchers = num_watchers;
@@ -1444,9 +1448,10 @@ VideoStream::close ()
 
 VideoStream::VideoStream ()
     : is_closed (false),
-      msg_inform_in_progress (false),
       num_watchers (0),
       stream_timestamp_nanosec (0),
+      pending_report_in_progress (false),
+      msg_inform_counter (0),
       event_informer (this, &mutex)
 {
 }

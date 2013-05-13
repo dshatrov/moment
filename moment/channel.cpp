@@ -243,6 +243,7 @@ Channel::createStream (Time const initial_seek)
                                    this            /* coderef_container */,
                                    cur_stream_data /* ref_data */),
                            timers,
+                           deferred_processor,
                            page_pool,
                            bind_stream,
                            moment->getMixVideoStream(),
@@ -373,8 +374,7 @@ MediaSource::Frontend Channel::media_source_frontend = {
     streamError,
     streamEos,
     noVideo,
-    gotVideo,
-    streamStatusEvent
+    gotVideo
 };
 
 void
@@ -468,41 +468,6 @@ Channel::gotVideo (void * const _stream_data)
 }
 
 void
-Channel::streamStatusEvent (void * const _stream_data)
-{
-    StreamData * const stream_data = static_cast <StreamData*> (_stream_data);
-    Channel * const self = stream_data->channel;
-
-    logD (ctl, _self_func_);
-
-    self->deferred_reg.scheduleTask (&self->deferred_task, false /* permanent */);
-}
-
-bool
-Channel::deferredTask (void * const _self)
-{
-    Channel * const self = static_cast <Channel*> (_self);
-
-    logD (ctl, _self_func_);
-
-  {
-    self->mutex.lock ();
-    if (!self->media_source) {
-	self->mutex.unlock ();
-	goto _return;
-    }
-
-    Ref<MediaSource> const tmp_media_source = self->media_source;
-    self->mutex.unlock ();
-
-    tmp_media_source->reportStatusEvents ();
-  }
-
-_return:
-    return false /* do not reschedule */;
-}
-
-void
 Channel::beginVideoStream (PlaybackItem   * const mt_nonnull item,
                            void           * const stream_ticket,
                            VirtReferenced * const stream_ticket_ref,
@@ -581,7 +546,7 @@ Channel::isSourceOnline ()
 void
 Channel::getTrafficStats (TrafficStats * const ret_traffic_stats)
 {
-  StateMutexLock l (&mutex);
+    mutex.lock ();
 
     MediaSource::TrafficStats stream_tstat;
     if (media_source)
@@ -599,12 +564,14 @@ Channel::getTrafficStats (TrafficStats * const ret_traffic_stats)
 	else
 	    ret_traffic_stats->time_elapsed = 0;
     }
+
+    mutex.unlock ();
 }
 
 void
 Channel::resetTrafficStats ()
 {
-  StateMutexLock l (&mutex);
+    mutex.lock ();
 
     if (media_source)
 	media_source->resetTrafficStats ();
@@ -614,6 +581,8 @@ Channel::resetTrafficStats ()
     rx_video_bytes_accum = 0;
 
     stream_start_time = getTime();
+
+    mutex.unlock ();
 }
 
 mt_const void
@@ -624,10 +593,8 @@ Channel::init (MomentServer   * const mt_nonnull moment,
 
     this->moment = moment;
     this->timers = moment->getServerApp()->getServerContext()->getMainThreadContext()->getTimers();
+    this->deferred_processor = moment->getServerApp()->getServerContext()->getMainThreadContext()->getDeferredProcessor();
     this->page_pool = moment->getPagePool();
-
-    deferred_reg.setDeferredProcessor (
-            moment->getServerApp()->getServerContext()->getMainThreadContext()->getDeferredProcessor());
 
     playback.init (CbDesc<Playback::Frontend> (&playback_frontend, this, this),
                    moment->getServerApp()->getServerContext()->getMainThreadContext()->getTimers(),
@@ -638,9 +605,10 @@ Channel::Channel ()
     : event_informer (this /* coderef_container */, &mutex),
       playback       (this /* coderef_container */),
         
-      moment    (this /* coderef_container */),
-      timers    (this /* coderef_container */),
-      page_pool (this /* coderef_container */),
+      moment             (this /* coderef_container */),
+      timers             (this /* coderef_container */),
+      deferred_processor (this /* coderef_container */),
+      page_pool          (this /* coderef_container */),
 
       destroyed (false),
 
@@ -658,8 +626,6 @@ Channel::Channel ()
       rx_video_bytes_accum (0)
 {
     logD (ctl, _this_func_);
-
-    deferred_task.cb = CbDesc<DeferredProcessor::TaskCallback> (deferredTask, this, this);
 }
 
 void
@@ -713,7 +679,6 @@ Channel::~Channel ()
     logD (ctl, _this_func_);
 
     doDestroy (true /* from_dtor */);
-    deferred_reg.release ();
 }
 
 }

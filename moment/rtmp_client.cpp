@@ -218,18 +218,48 @@ RtmpClient::closed (Exception * const exc_,
 Result
 RtmpClient::start ()
 {
+    if (!tcp_conn.open ()) {
+        logE_ (_func, "tcp_conn.open() failed: ", exc->toString());
+        return Result::Failure;
+    }
+
+    mutex.lock ();
+
+    if (!thread_ctx->getPollGroup()->addPollable_beforeConnect (tcp_conn.getPollable(),
+                                                                &pollable_key))
+    {
+        mutex.unlock ();
+        logE_ (_func, "addPollable() failed: ", exc->toString());
+        return Result::Failure;
+    }
+
     TcpConnection::ConnectResult const connect_res = tcp_conn.connect (server_addr);
     if (connect_res == TcpConnection::ConnectResult_Error) {
+        if (pollable_key) {
+            thread_ctx->getPollGroup()->removePollable (pollable_key);
+            pollable_key = NULL;
+        }
+        mutex.unlock ();
 	logE_ (_func, "tcp_conn.connect() failed: ", exc->toString());
 	return Result::Failure;
     }
 
-    thread_ctx->getPollGroup()->addPollable (tcp_conn.getPollable());
+    if (!thread_ctx->getPollGroup()->addPollable_afterConnect (tcp_conn.getPollable(),
+                                                               &pollable_key))
+    {
+        mutex.unlock ();
+        logE_ (_func, "addPollable() failed: ", exc->toString());
+        return Result::Failure;
+    }
+
+    mutex.unlock ();
 
     if (connect_res == TcpConnection::ConnectResult_Connected)
         rtmp_conn.startClient ();
     else
         assert (connect_res == TcpConnection::ConnectResult_InProgress);
+
+    conn_receiver.start ();
 
     return Result::Success;
 }
@@ -284,6 +314,13 @@ RtmpClient::RtmpClient (Object * const coderef_container)
       momentrtmp_proto (false),
       conn_state       (ConnectionState_Connect)
 {
+}
+
+RtmpClient::~RtmpClient ()
+{
+    mutex.lock ();
+    thread_ctx->getPollGroup()->removePollable (pollable_key);
+    mutex.unlock ();
 }
 
 }

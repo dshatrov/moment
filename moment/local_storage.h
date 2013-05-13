@@ -43,6 +43,10 @@ private:
       mt_iface (Storage::StorageFile)
         Connection* getConnection () { return &conn; }
       mt_iface_end
+
+        LocalStorageFile ()
+            : conn (this /* coderef_container */)
+        {}
     };
 
 public:

@@ -105,7 +105,9 @@ static Result momentFile_sendTemplate (HttpRequest *http_req,
 				       Sender      * mt_nonnull sender,
 				       ConstMemory  mime_type,
                                        MConfig::Varlist *varlist,
-                                       bool         enable_varlist_defaults);
+                                       bool         enable_varlist_defaults,
+                                       ConstMemory  strings_filename,
+                                       ConstMemory  stringvars_filename);
 
 static Result momentFile_sendMemory (ConstMemory  mem,
 				     Sender      * mt_nonnull sender,
@@ -189,6 +191,7 @@ Result httpRequest (HttpRequest   * const mt_nonnull req,
 
     ConstMemory mime_type = "text/plain";
     bool try_template = false;
+    bool try_lang = false;
     Size ext_length = 0;
     ConstMemory ext;
     {
@@ -220,6 +223,7 @@ Result httpRequest (HttpRequest   * const mt_nonnull req,
 	    if (equal (ext, "html")) {
 		mime_type = "text/html";
 		try_template = true;
+                try_lang = true;
 		ext_length = 5;
 	    } else
 	    if (equal (ext, "json")) {
@@ -249,22 +253,149 @@ Result httpRequest (HttpRequest   * const mt_nonnull req,
     }
 //    logD_ (_func, "try_template: ", try_template);
 
-    Ref<String> const filename =
-            makeString (path_entry->path->mem(), !path_entry->path->isNull() ? "/" : "", file_path);
-//    logD_ (_func, "Opening ", filename);
-#if 0
-// Deprecated form.
-    NativeFile native_file (filename->mem(),
-			    0 /* open_flags */,
-			    File::AccessMode::ReadOnly);
-    if (exc) {
-#endif
+    StRef<String> const filename = st_makeString (path_entry->path->mem(),
+                                                  !path_entry->path->isNull() ? "/" : "",
+                                                  file_path);
     NativeFile native_file;
     logD_ (_func, "Trying ", filename->mem());
     if (!native_file.open (filename->mem(),
                            0 /* open_flags */,
                            File::AccessMode::ReadOnly))
     {
+        struct AcceptedLanguage {
+            ConstMemory lang;
+            double      weight;
+            bool        extra;
+        };
+
+        struct AcceptedLanguageComparator {
+            static bool greater (AcceptedLanguage const &left,
+                                 AcceptedLanguage const &right)
+            {
+                return (left.weight > right.weight)
+                       || (left.weight == right.weight && left.extra < right.extra);
+            }
+
+            static bool equals (AcceptedLanguage const &left,
+                                AcceptedLanguage const &right)
+                { return left.weight == right.weight && left.extra == right.extra; }
+        };
+
+        typedef AvlTree< AcceptedLanguage,
+                         DirectExtractor<AcceptedLanguage>,
+                         AcceptedLanguageComparator >
+                AcceptedLanguageTree;
+
+        typedef AvlTree< AcceptedLanguageTree::Node*,
+                         MemberExtractor< AcceptedLanguageTree::Node,
+                                          AcceptedLanguage,
+                                          &AcceptedLanguageTree::Node::value,
+                                          ConstMemory,
+                                          MemberExtractor< AcceptedLanguage,
+                                                           ConstMemory,
+                                                           &AcceptedLanguage::lang > >,
+                         MemoryComparator<> >
+                AcceptedLanguageSet;
+
+        // Keep 'langs' around, because it holds string references.
+        List<HttpRequest::AcceptedLanguage> langs;
+        AcceptedLanguageTree lang_tree;
+        AcceptedLanguageSet  lang_set;
+        StRef<String> strings_filename;
+        StRef<String> stringvars_filename;
+        if (try_lang) {
+          // TODO Set default language in config etc.
+
+            HttpRequest::parseAcceptLanguage (req->getAcceptLanguage(), &langs);
+
+            logD_ (_func, "accepted languages (", req->getAcceptLanguage(), "):");
+            {
+                List<HttpRequest::AcceptedLanguage>::iter iter (langs);
+                while (!langs.iter_done (iter)) {
+                    List<HttpRequest::AcceptedLanguage>::Element * const el = langs.iter_next (iter);
+                    HttpRequest::AcceptedLanguage * const req_alang = &el->data;
+                    logD_ (req_alang->lang, ", weight ", req_alang->weight);
+
+                    AcceptedLanguage alang;
+                    alang.lang   = req_alang->lang->mem();
+                    alang.weight = req_alang->weight;
+                    alang.extra  = false;
+                    {
+                        AcceptedLanguageSet::Node * const node = lang_set.lookup (alang.lang);
+                        if (!node) {
+                            lang_set.add (lang_tree.add (alang));
+                        } else
+                        if (node->value->value.extra) {
+                            AcceptedLanguageTree::Node * const tmp_node = node->value;
+                            lang_set.remove (node);
+                            lang_tree.remove (tmp_node);
+                            lang_set.add (lang_tree.add (alang));
+                        }
+                    }
+
+                    Byte const * const dash = (Byte const *) memchr (alang.lang.mem(), '-', alang.lang.len());
+                    if (dash && dash != alang.lang.mem()) {
+                        AcceptedLanguage extra_alang;
+                        extra_alang.lang   = ConstMemory (alang.lang.mem(), dash - alang.lang.mem());
+                        extra_alang.weight = alang.weight;
+                        extra_alang.extra  = true;
+                        if (!lang_set.lookup (extra_alang.lang))
+                            lang_set.add (lang_tree.add (extra_alang));
+                    }
+                }
+            }
+
+            if (!lang_set.lookup (ConstMemory ("en"))) {
+              // Default language with the lowest priority.
+                AcceptedLanguage alang;
+                alang.lang = ConstMemory ("en");
+                // HTTP allows only positive weights, so '-1.0' is always the lowest.
+                alang.weight = -1.0;
+                alang.extra = true;
+                lang_tree.add (alang);
+            }
+
+            {
+                AcceptedLanguageTree::BottomRightIterator iter (lang_tree);
+                while (!iter.done()) {
+                    AcceptedLanguage * const alang = &iter.next ().value;
+                    logD_ (_func, "Trying strings for language \"", alang->lang, "\"");
+
+                    // TODO Use Vfs::stat instead.
+                    StRef<String> const tmp_filename =
+                            st_makeString (path_entry->path->mem(),
+                                           path_entry->path->len() ? "/" : "", "strings.",
+                                           alang->lang,
+                                           ".tpl");
+                    NativeFile tmp_file;
+                    if (tmp_file.open (tmp_filename->mem(), 0 /* open_flags */, File::AccessMode::ReadOnly)) {
+                        strings_filename = tmp_filename;
+                        break;
+                    }
+                }
+            }
+
+            {
+                AcceptedLanguageTree::BottomRightIterator iter (lang_tree);
+                while (!iter.done()) {
+                    AcceptedLanguage * const alang = &iter.next ().value;
+                    logD_ (_func, "Trying stringvars for language \"", alang->lang, "\"");
+
+                    // TODO Use Vfs::stat instead.
+                    StRef<String> const tmp_filename =
+                            st_makeString (path_entry->path->mem(),
+                                           path_entry->path->len() ? "/" : "", "strings.",
+                                           alang->lang,
+                                           ".var");
+                    NativeFile tmp_file;
+                    if (tmp_file.open (tmp_filename->mem(), 0 /* open_flags */, File::AccessMode::ReadOnly)) {
+                        stringvars_filename = tmp_filename;
+                        break;
+                    }
+                }
+            }
+        }
+
 #ifdef MOMENT_CTEMPLATE
 	if (try_template) {
             logD_ (_func, "Trying .tpl");
@@ -272,12 +403,14 @@ Result httpRequest (HttpRequest   * const mt_nonnull req,
 			req,
                         path_entry->path->mem(),
 			req->getFullPath(),
-			makeString (filename->mem().region (0, filename->mem().len() - ext_length),
-				    ".tpl")->mem(),
+			st_makeString (filename->mem().region (0, filename->mem().len() - ext_length),
+                                       ".tpl")->mem(),
 			conn_sender,
 			mime_type,
                         &path_entry->varlist,
-                        path_entry->enable_varlist_defaults))
+                        path_entry->enable_varlist_defaults,
+                        strings_filename ? strings_filename->mem() : ConstMemory(),
+                        stringvars_filename ? stringvars_filename->mem() : ConstMemory()))
 	    {
 		if (!req->getKeepalive())
 		    conn_sender->closeAfterFlush();
@@ -291,60 +424,27 @@ Result httpRequest (HttpRequest   * const mt_nonnull req,
 
         bool opened = false;
         if (equal (ext, "html")) {
-          // TODO Set default language in config etc.
-
-            List<HttpRequest::AcceptedLanguage> langs;
-            HttpRequest::parseAcceptLanguage (req->getAcceptLanguage(), &langs);
-
-            {
-              // Default language with the lowest priority.
-                langs.appendEmpty ();
-                HttpRequest::AcceptedLanguage * const alang = &langs.getLast();
-                alang->lang = grab (new String ("en"));
-                // HTTP allows only positive weights, so '-1.0' is always the lowest.
-                alang->weight = -1.0;
-            }
-
-            typedef AvlTree< HttpRequest::AcceptedLanguage,
-                             MemberExtractor< HttpRequest::AcceptedLanguage const,
-                                              double const,
-                                              &HttpRequest::AcceptedLanguage::weight >,
-                             DirectComparator<double> >
-                    AcceptedLanguageTree;
-
-            AcceptedLanguageTree tree;
-
-            logD_ (_func, "accepted languages:");
-            {
-                List<HttpRequest::AcceptedLanguage>::iter iter (langs);
-                while (!langs.iter_done (iter)) {
-                    List<HttpRequest::AcceptedLanguage>::Element * const el = langs.iter_next (iter);
-                    HttpRequest::AcceptedLanguage * const alang = &el->data;
-                    logD_ (alang->lang, ", weight ", alang->weight);
-
-                    tree.add (*alang);
-                }
-            }
-
 #ifdef MOMENT_CTEMPLATE
             if (try_template) {
-                AcceptedLanguageTree::BottomRightIterator iter (tree);
+                AcceptedLanguageTree::BottomRightIterator iter (lang_tree);
                 while (!iter.done()) {
-                    HttpRequest::AcceptedLanguage * const alang = &iter.next ().value;
+                    AcceptedLanguage * const alang = &iter.next ().value;
                     logD_ (_func, "Trying .tpl for language \"", alang->lang, "\"");
 
                     if (momentFile_sendTemplate (
                                 req,
                                 path_entry->path->mem(),
                                 req->getFullPath(),
-                                makeString (filename->mem().region (0, filename->mem().len() - ext_length),
-                                            ".",
-                                            alang->lang->mem(),
-                                            ".tpl")->mem(),
+                                st_makeString (filename->mem().region (0, filename->mem().len() - ext_length),
+                                               ".",
+                                               alang->lang,
+                                               ".tpl")->mem(),
                                 conn_sender,
                                 mime_type,
                                 &path_entry->varlist,
-                                path_entry->enable_varlist_defaults))
+                                path_entry->enable_varlist_defaults,
+                                strings_filename ? strings_filename->mem() : ConstMemory(),
+                                stringvars_filename ? stringvars_filename->mem() : ConstMemory()))
                     {
                         if (!req->getKeepalive())
                             conn_sender->closeAfterFlush();
@@ -358,15 +458,15 @@ Result httpRequest (HttpRequest   * const mt_nonnull req,
 #endif
 
             {
-                AcceptedLanguageTree::BottomRightIterator iter (tree);
+                AcceptedLanguageTree::BottomRightIterator iter (lang_tree);
                 while (!iter.done()) {
-                    HttpRequest::AcceptedLanguage * const alang = &iter.next ().value;
+                    AcceptedLanguage * const alang = &iter.next ().value;
                     logD_ (_func, "Trying .html for language \"", alang->lang, "\"");
 
-                    if (native_file.open (makeString (filename->mem().region (0, filename->mem().len() - ext_length),
-                                                      ".",
-                                                      alang->lang->mem(),
-                                                      ".html")->mem(),
+                    if (native_file.open (st_makeString (filename->mem().region (0, filename->mem().len() - ext_length),
+                                                         ".",
+                                                         alang->lang,
+                                                         ".html")->mem(),
                                           0 /* open_flags */,
                                           File::AccessMode::ReadOnly))
                     {
@@ -399,7 +499,8 @@ Result httpRequest (HttpRequest   * const mt_nonnull req,
 
     bool got_mtime = false;
     struct tm mtime;
-// TODO Get file modification time on Win32 + enable "304 Not Modified".
+
+#warning Get file modification time on Win32 + enable "304 Not Modified".
 #ifndef PLATFORM_WIN32
     if (native_file.getModificationTime (&mtime))
         got_mtime = true;
@@ -688,15 +789,13 @@ static void fillDictionaryFromVarlist (ctemplate::TemplateDictionary * const mt_
     }
 }
 
-static void loadDefaultsVarlist (ConstMemory        const path,
-                                 MConfig::Varlist * const varlist)
+static void loadVarlist (ConstMemory        const path,
+                         MConfig::Varlist * const varlist)
 {
-    Ref<String> const defaults_path = makeString (path, path.len() ? "/" : "", "var.defaults");
-
     // TODO Create varlist_parser only once.
     MConfig::VarlistParser varlist_parser;
-    if (!varlist_parser.parseVarlist (defaults_path->mem(), varlist))
-        logE_ (_func, "Could not parse ", defaults_path);
+    if (!varlist_parser.parseVarlist (path, varlist))
+        logD_ (_func, "Could not parse varlist ", path);
 }
 
 static Result momentFile_sendTemplate (HttpRequest * const http_req,
@@ -706,7 +805,9 @@ static Result momentFile_sendTemplate (HttpRequest * const http_req,
 				       Sender      * const mt_nonnull sender,
 				       ConstMemory   const mime_type,
                                        MConfig::Varlist * const varlist,
-                                       bool          const enable_varlist_defaults)
+                                       bool          const enable_varlist_defaults,
+                                       ConstMemory   const strings_filename,
+                                       ConstMemory   const stringvars_filename)
 {
     logD_ (_func, "full_path: ", full_path, ", filename: ", filename);
 
@@ -716,6 +817,11 @@ static Result momentFile_sendTemplate (HttpRequest * const http_req,
     ctemplate::mutable_default_template_cache()->ReloadAllIfChanged (ctemplate::TemplateCache::LAZY_RELOAD);
 
     ctemplate::TemplateDictionary dict ("tmpl");
+
+    if (strings_filename.len()) {
+        ctemplate::TemplateDictionary * const inc_dict = dict.AddIncludeDictionary ("STRINGS");
+        inc_dict->SetFilename (ctemplate::TemplateString ((char const *) strings_filename.mem(), strings_filename.len()));
+    }
 
     {
         char const val_name [] = "ThisHttpServerAddr";
@@ -746,10 +852,16 @@ static Result momentFile_sendTemplate (HttpRequest * const http_req,
         // We have to filter sections in a separate hash because of this.
         VarlistSectionHash sect_hash;
 
+        if (stringvars_filename.len()) {
+            MConfig::Varlist varlist;
+            loadVarlist (stringvars_filename, &varlist);
+            fillDictionaryFromVarlist (&dict, &varlist, &sect_hash);
+        }
+
         if (enable_varlist_defaults) {
-            MConfig::Varlist defaults_varlist;
-            loadDefaultsVarlist (path_dir, &defaults_varlist);
-            fillDictionaryFromVarlist (&dict, &defaults_varlist, &sect_hash);
+            MConfig::Varlist varlist;
+            loadVarlist (st_makeString (path_dir, path_dir.len() ? "/" : "", "var.defaults")->mem(), &varlist);
+            fillDictionaryFromVarlist (&dict, &varlist, &sect_hash);
         }
 
         {
@@ -803,12 +915,12 @@ static Result momentFile_sendTemplate (HttpRequest * const http_req,
     }
 
     std::string str;
-    if (!ctemplate::ExpandTemplate (grab (new String (filename))->cstr(),
+    if (!ctemplate::ExpandTemplate (grab (new (std::nothrow) String (filename))->cstr(),
 				    ctemplate::DO_NOT_STRIP,
 				    &dict,
 				    &str))
     {
-	logE_ ("could not expand template \"", filename, "\": ", str.c_str());
+	logD_ ("could not expand template \"", filename, "\": ", str.c_str());
 	return Result::Failure;
     }
 
@@ -858,9 +970,9 @@ void momentFile_addPath (ConstMemory   const path,
 			 ConstMemory   const prefix,
 			 HttpService * const http_service)
 {
-    Ref<PathEntry> const path_entry = grab (new PathEntry);
-    path_entry->path = grab (new String (path));
-    path_entry->prefix = grab (new String (prefix));
+    Ref<PathEntry> const path_entry = grab (new (std::nothrow) PathEntry);
+    path_entry->path = grab (new (std::nothrow) String (path));
+    path_entry->prefix = grab (new (std::nothrow) String (prefix));
     path_entry->enable_varlist_defaults = glob_enable_varlist_defaults;
 
     momentFile_addPathEntry (path_entry, http_service);
@@ -901,9 +1013,9 @@ void momentFile_addPathForSection (MConfig::Section * const section,
 	}
     }
 
-    Ref<PathEntry> const path_entry = grab (new PathEntry);
-    path_entry->path = grab (new String (path));
-    path_entry->prefix = grab (new String (prefix));
+    Ref<PathEntry> const path_entry = grab (new (std::nothrow) PathEntry);
+    path_entry->path = grab (new (std::nothrow) String (path));
+    path_entry->prefix = grab (new (std::nothrow) String (prefix));
     path_entry->enable_varlist_defaults = glob_enable_varlist_defaults;
 
     if (MConfig::Section * const vars_section = section->getSection ("vars")) {
@@ -971,9 +1083,9 @@ void momentFileInit ()
 	ConstMemory const opt_val = config->getString (opt_name);
 	logI_ (_func, opt_name, ":  ", opt_val);
 	if (!opt_val.isNull()) {
-	    this_http_server_addr = grab (new String (opt_val));
+	    this_http_server_addr = grab (new (std::nothrow) String (opt_val));
 	} else {
-	    this_http_server_addr = grab (new String ("127.0.0.1:8080"));
+	    this_http_server_addr = grab (new (std::nothrow) String ("127.0.0.1:8080"));
 	    logI_ (_func, opt_name, " config parameter is not set. "
 		   "Defaulting to ", this_http_server_addr);
 	}
@@ -984,9 +1096,9 @@ void momentFileInit ()
 	ConstMemory const opt_val = config->getString (opt_name);
 	logI_ (_func, opt_name, ":  ", opt_val);
 	if (!opt_val.isNull()) {
-	    this_rtmp_server_addr = grab (new String (opt_val));
+	    this_rtmp_server_addr = grab (new (std::nothrow) String (opt_val));
 	} else {
-	    this_rtmp_server_addr = grab (new String ("127.0.0.1:1935"));
+	    this_rtmp_server_addr = grab (new (std::nothrow) String ("127.0.0.1:1935"));
 	    logI_ (_func, opt_name, " config parameter is not set. "
 		   "Defaulting to ", this_rtmp_server_addr);
 	}
@@ -997,9 +1109,9 @@ void momentFileInit ()
 	ConstMemory const opt_val = config->getString (opt_name);
 	logI_ (_func, opt_name, ": ", opt_val);
 	if (!opt_val.isNull()) {
-	    this_rtmpt_server_addr = grab (new String (opt_val));
+	    this_rtmpt_server_addr = grab (new (std::nothrow) String (opt_val));
 	} else {
-	    this_rtmpt_server_addr = grab (new String ("127.0.0.1:8080"));
+	    this_rtmpt_server_addr = grab (new (std::nothrow) String ("127.0.0.1:8080"));
 	    logI_ (_func, opt_name, " config parameter is not set. "
 		   "Defaulting to ", this_rtmpt_server_addr);
 	}

@@ -54,8 +54,6 @@ FlvMuxer::beginMuxing ()
 {
     got_first_timestamp = false;
 
-    PagePool::PageListHead page_list;
-
     Sender::MessageEntry_Pages * const msg_pages =
             Sender::MessageEntry_Pages::createNew (sizeof (flv_header));
 
@@ -63,7 +61,7 @@ FlvMuxer::beginMuxing ()
     msg_pages->header_len = sizeof (flv_header);
 
     msg_pages->page_pool = page_pool;
-    msg_pages->first_page = /* page_list.first */ NULL;
+    msg_pages->setFirstPage (NULL);
     msg_pages->msg_offset = 0;
 
     sender->sendMessage (msg_pages, true /* do_flush */);
@@ -115,7 +113,7 @@ FlvMuxer::doMuxMessage (VideoStream::Message * const mt_nonnull msg,
 
 	if (msg->prechunk_size == 0) {
 	    msg_pages->page_pool  = msg->page_pool;
-	    msg_pages->first_page = msg->page_list.first;
+	    msg_pages->setFirstPage (msg->page_list.first);
 	    msg_pages->msg_offset = msg->msg_offset;
 
 	    msg->page_pool->msgRef (msg->page_list.first);
@@ -132,7 +130,7 @@ FlvMuxer::doMuxMessage (VideoStream::Message * const mt_nonnull msg,
 						     &norm_page_list,
 						     &norm_msg_offs);
 	    msg_pages->page_pool  = norm_page_pool;
-	    msg_pages->first_page = norm_page_list.first;
+	    msg_pages->setFirstPage (norm_page_list.first);
 	    msg_pages->msg_offset = norm_msg_offs;
 	}
 
@@ -156,7 +154,7 @@ FlvMuxer::doMuxMessage (VideoStream::Message * const mt_nonnull msg,
 	msg_pages->header_len = sizeof (tag_footer);
 
 	msg_pages->page_pool = NULL;
-	msg_pages->first_page = NULL;
+	msg_pages->setFirstPage (NULL);
 	msg_pages->msg_offset = 0;
 
 	sender->sendMessage (msg_pages, true /* do_flush */);

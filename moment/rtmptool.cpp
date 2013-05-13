@@ -40,6 +40,7 @@ public:
     IpAddress server_addr;
 
     bool publish;
+    bool play;
     TestStreamGenerator::Options gen_opts;
     Ref<TestStreamGenerator> test_stream_generator;
 
@@ -61,6 +62,7 @@ public:
 	  num_clients (1),
 	  got_server_addr (false),
           publish (false),
+          play (false),
 	  nonfatal_errors (false),
 	  app_name (grab (new (std::nothrow) String ("app"))),
 	  channel (grab (new (std::nothrow) String ("video"))),
@@ -207,7 +209,7 @@ RtmpClient::commandMessage (VideoStream::Message   * const mt_nonnull msg,
                             void                   * const _self)
 {
     if (options.dump_frames)
-        logD (frame_dump, _func, "ts: 0x", fmt_hex, msg->timestamp_nanosec / 1000000, " (", fmt_def, msg->timestamp_nanosec / 1000000, ")");
+        logI (frame_dump, _func, "ts: 0x", fmt_hex, msg->timestamp_nanosec / 1000000, " (", fmt_def, msg->timestamp_nanosec / 1000000, ")");
 
     RtmpClient * const self = static_cast <RtmpClient*> (_self);
 
@@ -228,7 +230,7 @@ RtmpClient::commandMessage (VideoStream::Message   * const mt_nonnull msg,
     }
 
     if (options.dump_frames)
-        logD (frame_dump, _func, "method: ", ConstMemory (method_name, method_name_len));
+        logI (frame_dump, _func, "method: ", ConstMemory (method_name, method_name_len));
 
     ConstMemory method (method_name, method_name_len);
     if (!compare (method, "_result")) {
@@ -243,6 +245,10 @@ RtmpClient::commandMessage (VideoStream::Message   * const mt_nonnull msg,
 		    logE_ (_func, "Could not decode stream_id");
 		    return Result::Failure;
 		}
+
+                if (!options.publish || options.play) {
+                    self->rtmp_conn.sendPlay (options.channel->mem());
+                }
 
                 if (options.publish) {
                     self->rtmp_conn.sendPublish (options.channel->mem());
@@ -259,8 +265,6 @@ RtmpClient::commandMessage (VideoStream::Message   * const mt_nonnull msg,
                                                        video_stream,
                                                        &options.gen_opts);
                     self->test_stream_generator->start ();
-                } else {
-                    self->rtmp_conn.sendPlay (options.channel->mem());
                 }
 
 		self->conn_state = ConnectionState_Streaming;
@@ -334,8 +338,8 @@ RtmpClient::audioMessage (VideoStream::AudioMessage * const mt_nonnull msg,
 			  void                      * const /* _self */)
 {
     if (options.dump_frames) {
-        logD (frame_dump, _func, "ts: 0x", fmt_hex, msg->timestamp_nanosec / 1000000, " (", fmt_def, msg->timestamp_nanosec / 1000000, ") ",
-              msg->codec_id, " ", msg->frame_type, ", rate ", msg->rate, ", ", msg->channels, " channels");
+        logI (frame_dump, _func, "ts: 0x", fmt_hex, msg->timestamp_nanosec / 1000000, " (", fmt_def, msg->timestamp_nanosec / 1000000, ") ",
+              msg->codec_id, " ", msg->frame_type, ", rate ", msg->rate, ", ", msg->channels, " channels, len ", msg->msg_len);
 
 #if 0
         logLock ();
@@ -363,7 +367,7 @@ RtmpClient::videoMessage (VideoStream::VideoMessage * const mt_nonnull msg,
 			  void                      * const _self)
 {
     if (options.dump_frames) {
-        logD (frame_dump, _func, "ts: 0x", fmt_hex, msg->timestamp_nanosec / 1000000, " (", fmt_def, msg->timestamp_nanosec / 1000000, ") ",
+        logI (frame_dump, _func, "ts: 0x", fmt_hex, msg->timestamp_nanosec / 1000000, " (", fmt_def, msg->timestamp_nanosec / 1000000, ") ",
               msg->codec_id, " ", msg->frame_type);
     }
 
@@ -433,19 +437,33 @@ RtmpClient::genVideoMessage (VideoStream::VideoMessage * const video_msg,
 Result
 RtmpClient::start (IpAddress const &addr)
 {
+    if (!tcp_conn.open ()) {
+        logE_ (_func, "tcp_conn.open() failed: ", exc->toString());
+        return Result::Failure;
+    }
+
+    if (!thread_ctx->getPollGroup()->addPollable_beforeConnect (tcp_conn.getPollable(), NULL /* ret_pollable_key */)) {
+        logE_ (_func, "addPollable() failed: ", exc->toString());
+        return Result::Failure;
+    }
+
     TcpConnection::ConnectResult const connect_res = tcp_conn.connect (addr);
     if (connect_res == TcpConnection::ConnectResult_Error) {
 	logE_ (_func, "tcp_conn.connect() failed: ", exc->toString());
 	return Result::Failure;
     }
 
-    thread_ctx->getPollGroup()->addPollable (tcp_conn.getPollable());
+    if (!thread_ctx->getPollGroup()->addPollable_afterConnect (tcp_conn.getPollable(), NULL /* ret_pollable_key */)) {
+        logE_ (_func, "addPollable() failed: ", exc->toString());
+        return Result::Failure;
+    }
 
     if (connect_res == TcpConnection::ConnectResult_Connected)
         rtmp_conn.startClient ();
     else
         assert (connect_res == TcpConnection::ConnectResult_InProgress);
 
+    conn_receiver.start ();
     return Result::Success;
 }
 
@@ -645,6 +663,7 @@ printUsage ()
 		 "  -a --app <string>              Application name. Default: app\n"
 		 "  -c --channel <string>          Name of the channel to subscribe to. Default: video\n"
                  "  -p --publish                   Publish a dummy stream instead of playing it.\n"
+                 "  --play                         When publishing, play the stream as well.\n"
                  "  --frame-duration               Duration of a single frame in milliseconds. Default: 40 (25 frames per second)\n"
                  "  --frame-size                   Frame size in bytes. Default: 2500 bytes.\n"
                  "  --start-timestamp              Timestamp of the first generated video message. Default: 0\n"
@@ -793,6 +812,16 @@ bool cmdline_publish (char const * /* short_name */,
     return true;
 }
 
+bool cmdline_play (char const * /* short_name */,
+                   char const * /* long_name */,
+                   char const * /* value */,
+                   void       * /* opt_data */,
+                   void       * /* cb_data */)
+{
+    options.play = true;
+    return true;
+}
+
 bool cmdline_frame_duration (char const * /* short_name */,
                              char const * const long_name,
                              char const * const value,
@@ -885,7 +914,7 @@ int main (int argc, char **argv)
     libMaryInit ();
 
     {
-	unsigned const num_opts = 17;
+	unsigned const num_opts = 18;
 	CmdlineOption opts [num_opts];
 
 	opts [0].short_name = "h";
@@ -989,6 +1018,12 @@ int main (int argc, char **argv)
         opts [16].with_value = true;
         opts [16].opt_data   = NULL;
         opts [16].opt_callback = cmdline_loglevel;
+
+        opts [17].short_name = NULL;
+        opts [17].long_name  = "play";
+        opts [17].with_value = false;
+        opts [17].opt_data   = NULL;
+        opts [17].opt_callback = cmdline_play;
 
 	ArrayIterator<CmdlineOption> opts_iter (opts, num_opts);
 	parseCmdline (&argc, &argv, opts_iter, NULL /* callback */, NULL /* callback_data */);

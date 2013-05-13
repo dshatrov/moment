@@ -1,5 +1,5 @@
 /*  Moment Video Server - High performance media server
-    Copyright (C) 2012 Dmitry Shatrov
+    Copyright (C) 2012-2013 Dmitry Shatrov
     e-mail: shatrov@gmail.com
 
     This program is free software: you can redistribute it and/or modify
@@ -15,6 +15,10 @@
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
+
+
+#ifndef MOMENT__RTMP_PUSH_PROTOCOL__H__
+#define MOMENT__RTMP_PUSH_PROTOCOL__H__
 
 
 #include <libmary/libmary.h>
@@ -80,12 +84,10 @@ private:
     mt_mutex (mutex) Ref<Session> cur_session;
     mt_mutex (mutex) Timers::TimerKey reconnect_timer;
 
-    mt_mutex (mutex) void destroySession (Session * mt_nonnull session);
-
-    mt_unlocks (mutex) void startNewSession (Session *old_session);
+    mt_mutex (mutex) void destroySession  (Session * mt_nonnull session);
+    mt_mutex (mutex) void startNewSession (Session *old_session);
 
     mt_mutex (mutex) void setReconnectTimer ();
-
     mt_mutex (mutex) void deleteReconnectTimer ();
 
     static void reconnectTimerTick (void *_self);
@@ -177,4 +179,7 @@ public:
 };
 
 }
+
+
+#endif /* MOMENT__RTMP_PUSH_PROTOCOL__H__ */
 
