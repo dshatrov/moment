@@ -45,7 +45,7 @@
 
   <p>
     <eng>Video Player app allows users to watch video from Moment Video Server in a web browser.
-    It is available by default with <tt>/moment</tt> URI suffix.</eng>
+    It is available by default with <tt>/moment/</tt> URI suffix.</eng>
     <rus>Приложение &laquo;Видеоплеер&raquo; позволяет пользователям смотреть видео
     с сервера &laquo;Момент&raquo; через веб-браузер.
     По умолчанию &laquo;Видеоплеер&raquo; доступен по URI с суффиксом <tt>/moment</tt></rus>
@@ -86,7 +86,7 @@
 
   <p>
     <eng>Video Phone app lets two users talk to each other with live video, audio and text messages.
-    It is available by default with <tt>/mychat</tt> URI suffix.</eng>
+    It is available by default with <tt>/mychat/</tt> URI suffix.</eng>
     <rus>Приложение &laquo;Видеозвонки&raquo; позволяет двум пользователям общаться между сообой с передачей видео, звука и
     текстовых сообщений. По умолчанию &laquo;Видеозвонки&raquo; доступны по URI с суффиксом <tt>/mychat</tt> .</rus>
   </p>

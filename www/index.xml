@@ -79,7 +79,7 @@
   <eng>
   <p>
     <eng>To start streaming with Moment Video Server, follow the <a href="quickstart.html">quick start guide</a>.</eng><br/>
-    <eng>Moment VS works under Linux and FreeBSD. A port to Windows is under development.</eng>
+    <eng>Moment VS works under Linux, Windows and FreeBSD.</eng>
   </p>
   </eng>
 
@@ -87,7 +87,7 @@
   <p>
     <rus>Чтобы начать вещание с помощью сервера &laquo;Момент&raquo;, следуйте
     <a href="quickstart.ru.html">краткой инструкции</a> по установке.</rus>
-    <rus>&laquo;Момент&raquo; работает под управлением ОС Linux и FreeBSD. Версия для Windows находится в разработке.</rus>
+    <rus>&laquo;Момент&raquo; работает под управлением ОС Linux, Windows и FreeBSD.</rus>
   </p>
   </rus>
   </div>

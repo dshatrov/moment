@@ -496,14 +496,20 @@
       </div>
       <div class="download">
 	 <div style="padding-bottom: 1.25ex">
-	   Moment Video Server 1.2
+	   Moment Video Server 1.4
 	 </div>
 	 <div style="padding-bottom: 1.75ex">
 	   <div style="padding-bottom: 1.0ex">
-	     <a href="http://downloads.sourceforge.net/moment/moment-bin-1.2.0_32bit.tar.gz"><big>Linux 32-bit</big></a>
+<!--	     <a href="http://downloads.sourceforge.net/moment/moment-bin-1.2.0_32bit.tar.gz"><big>Linux 32-bit</big></a> -->
+	     <a href="http://momentvideo.org/dist/moment_13-05-13_linux32.tar.gz"><big>Linux 32-bit</big></a>
 	   </div>
 
-	   <a href="http://downloads.sourceforge.net/moment/moment-bin-1.2.0_64bit.tar.gz"><big>Linux 64-bit</big></a><br/>
+<!--	   <a href="http://downloads.sourceforge.net/moment/moment-bin-1.2.0_64bit.tar.gz"><big>Linux 64-bit</big></a><br/> -->
+	   <div style="padding-bottom: 1.6ex">
+               <a href="http://momentvideo.org/dist/moment_13-05-13_linux64.tar.gz"><big>Linux 64-bit</big></a>
+	   </div>
+
+           <a href="http://momentvideo.org/dist/moment_13-05-13_win32.zip"><small>Windows 32-bit</small></a>
 	 </div>
     <!--
 	<table>
@@ -537,12 +543,12 @@
   <div class="footer">
     <xsl:choose>
       <xsl:when test="not ($moment_welcome)">
-	<eng>Copyright (c) 2011&ndash;2012 <a href="mailto:shatrov@gmail.com">Dmitry Shatrov</a></eng>
-	<rus>(c) 2011&ndash;2012 <a href="mailto:shatrov@gmail.com">Дмитрий Шатров</a></rus>
+	<eng>Copyright (c) 2011&ndash;2013 <a href="mailto:shatrov@gmail.com">Dmitry Shatrov</a></eng>
+	<rus>(c) 2011&ndash;2013 <a href="mailto:shatrov@gmail.com">Дмитрий Шатров</a></rus>
       </xsl:when>
       <xsl:otherwise>
-        <eng>Moment Video Server, version 1.2.0</eng>
-	<rus>Видеосервер &laquo;Момент&raquo;, версия 1.2.0</rus>
+        <eng>Moment Video Server, version 1.4.0</eng>
+	<rus>Видеосервер &laquo;Момент&raquo;, версия 1.4.0</rus>
       </xsl:otherwise>
     </xsl:choose>
   </div>
@@ -551,6 +557,12 @@
 </body>
 
 </html>
+</xsl:template>
+
+<xsl:template match="ttt">
+  <span style="white-space: nowrap"><tt>
+    <xsl:apply-templates slect="@*|node()"/>
+  </tt></span>
 </xsl:template>
 
 <xsl:template match="moment_toc">

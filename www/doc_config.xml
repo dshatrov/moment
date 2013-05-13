@@ -919,11 +919,13 @@ mod_gst {
   </p>
     
   <moment_params>
+    <span style="word-wrap: break-word">
     <p>
       http://<eng>host:port</eng><rus>хост:порт</rus>/moment_admin/<b>update_playlist</b>
       <eng>or</eng><rus>или</rus>
       <b>update_playlist_now</b>/<b><eng>channel_name</eng><rus>название_канала</rus></b>
     </p>
+    </span>
   </moment_params>
 
   <p>
@@ -945,12 +947,14 @@ http://localhost:8082/moment_admin/update_playlist_now/my_video
   </p>
 
   <moment_params>
+    <span style="word-wrap: break-word">
     <p>
       http://<eng>host:port</eng><rus>хост:порт</rus>/moment_admin/set_position/<!--
       --><b><eng>channel_name</eng><rus>название_канала</rus></b>/<!--
       --><b><eng>element number or id</eng><rus>номер либо id элемента</rus></b>/<!--
       --><b><eng>time</eng><rus>время</rus></b>
     </p>
+    </span>
   </moment_params>
 
   <p>

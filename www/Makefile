@@ -4,6 +4,7 @@ all:	index.html              \
         quickstart.html         \
         licensing.html          \
         developers.html         \
+        build.html              \
         gpl.html		\
 	feed.xml		\
 				\
@@ -12,11 +13,14 @@ all:	index.html              \
 	doc_install.html	\
 	doc_config.html		\
         doc_channels.html       \
+        doc_auth.html           \
 	doc_builtin.html	\
 	doc_plugins.html	\
 	doc_cluster.html	\
 	doc_stress.html		\
 	doc_examples.html	\
+				\
+        nvr.html                \
                                 \
 	fix
 
