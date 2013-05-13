@@ -18,9 +18,9 @@
       <param name="quality" value="high"/>
       <param name="allowfullscreen" value="true"/>
       <param name="allowscriptaccess" value="always"/>
-      <param name="FlashVars" value="uri=rtmp://{{ThisRtmpServerAddr}}/live&stream=test?transcode"/>
+      <param name="FlashVars" value="uri=rtmp://{{ThisRtmpServerAddr}}/live&stream={{Publisher_StreamName}}%26transcode&auth=123"/>
       <embed src="Publisher.swf"
-          FlashVars="uri=rtmp://{{ThisRtmpServerAddr}}/live&stream=test?transcode"
+          FlashVars="uri=rtmp://{{ThisRtmpServerAddr}}/live&stream={{Publisher_StreamName}}?transcode%26auth=123"
 	  name="Publisher"
 	  align="Default"
 	  width="100%"

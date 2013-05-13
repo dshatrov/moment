@@ -1,6 +1,8 @@
 package {
 
 import flash.display.Sprite;
+import flash.display.StageScaleMode;
+import flash.display.StageAlign;
 import flash.media.Camera;
 import flash.media.Microphone;
 import flash.media.Video;
@@ -33,6 +35,9 @@ public class Publisher extends Sprite
 
     public function Publisher ()
     {
+        stage.scaleMode = StageScaleMode.NO_SCALE;
+        stage.align = StageAlign.TOP_LEFT;
+
         reconnect_interval = 3000;
 
         server_uri  = loaderInfo.parameters ["uri"];
@@ -41,22 +46,25 @@ public class Publisher extends Sprite
         video = new Video();
         video.width  = 640;
         video.height = 480;
+        video.x = 0;
+        video.y = 0;
         addChild (video);
 
 //        camera = null;
         /**/
         camera = Camera.getCamera();
         if (camera) {
-            camera.setMode (320, 240, 30);
-            camera.setQuality (200000, 80);
-//            camera.setQuality (500000, 80);
+//            camera.setMode (320, 240, 15);
+            camera.setMode (160, 120, 15);
+//            camera.setQuality (200000, 80);
+            camera.setQuality (256000, 80);
             video.attachCamera (camera);
         }
         /**/
 
-//        microphone = Microphone.getEnhancedMicrophone();
-        microphone = Microphone.getMicrophone();
         /**/
+        microphone = Microphone.getEnhancedMicrophone();
+//        microphone = Microphone.getMicrophone();
         if (microphone) {
             microphone.codec = SoundCodec.SPEEX;
             microphone.framesPerPacket = 1;
@@ -114,19 +122,23 @@ public class Publisher extends Sprite
 
             video.attachCamera (camera);
 
-//            stream.addEventListener (NetStatusEvent.NET_STATUS, onStreamNetStatus);
-
+            /*
             {
                 var avc_opts : H264VideoStreamSettings = new H264VideoStreamSettings ();
                 avc_opts.setProfileLevel (H264Profile.BASELINE, H264Level.LEVEL_3_1);
 // This has no effect                avc_opts.setQuality (1000000, 100);
+//                avc_opts.setQuality (100000, 50);
                 stream.videoStreamSettings = avc_opts;
             }
+            */
 
             stream.publish (stream_name);
 
-            stream.attachCamera (camera);
-            stream.attachAudio (microphone);
+            if (camera)
+                stream.attachCamera (camera);
+
+            if (microphone)
+                stream.attachAudio (microphone);
         } else
         if (event.info.code == "NetConnection.Connect.Closed") {
             if (!reconnect_timer) {
