@@ -133,10 +133,7 @@ libmoment_1_0_la_SOURCES =	\
 	api_amf.cpp		\
 				\
 	hmac/sha2.c		\
-	hmac/hmac_sha2.c        \
-                                \
-        tsmux/tsmux.c           \
-        tsmux/tsmuxstream.c
+	hmac/hmac_sha2.c
 
 #	flv_file_source.cpp
 
