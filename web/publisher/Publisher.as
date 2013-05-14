@@ -20,8 +20,11 @@ import flash.utils.clearInterval;
 [SWF(backgroundColor=0)]
 public class Publisher extends Sprite
 {
-    private var server_uri : String;
+    private var server_uri  : String;
     private var stream_name : String;
+    private var enable_cam  : Boolean;
+    private var enable_mic  : Boolean;
+    private var enable_aec  : Boolean;
 
     private var conn : NetConnection;
     private var stream : NetStream;
@@ -42,6 +45,9 @@ public class Publisher extends Sprite
 
         server_uri  = loaderInfo.parameters ["uri"];
         stream_name = loaderInfo.parameters ["stream"];
+        enable_cam  = loaderInfo.parameters ["enable_cam"] == "true";
+        enable_mic  = loaderInfo.parameters ["enable_mic"] == "true";
+        enable_aec  = loaderInfo.parameters ["enable_aec"] == "true";
 
         video = new Video();
         video.width  = 640;
@@ -50,31 +56,35 @@ public class Publisher extends Sprite
         video.y = 0;
         addChild (video);
 
-//        camera = null;
-        /**/
-        camera = Camera.getCamera();
-        if (camera) {
-//            camera.setMode (320, 240, 15);
-            camera.setMode (160, 120, 15);
-//            camera.setQuality (200000, 80);
-            camera.setQuality (256000, 80);
-            video.attachCamera (camera);
+        if (enable_cam) {
+            camera = Camera.getCamera();
+            if (camera) {
+//                camera.setMode (320, 240, 15);
+                camera.setMode (160, 120, 15);
+//                camera.setQuality (200000, 80);
+                camera.setQuality (256000 / 8.0, 80);
+                video.attachCamera (camera);
+            }
         }
-        /**/
 
-        /**/
-        microphone = Microphone.getEnhancedMicrophone();
-//        microphone = Microphone.getMicrophone();
-        if (microphone) {
-            microphone.codec = SoundCodec.SPEEX;
-            microphone.framesPerPacket = 1;
-            microphone.enableVAD = true;
-            microphone.setSilenceLevel (0, 2000);
-            microphone.setUseEchoSuppression (true);
-            microphone.setLoopBack (false);
-            microphone.gain = 50;
+        if (enable_mic) {
+            if (enable_aec)
+                microphone = Microphone.getEnhancedMicrophone();
+            else
+                microphone = Microphone.getMicrophone();
+
+            if (microphone) {
+                microphone.codec = SoundCodec.SPEEX;
+                microphone.framesPerPacket = 1;
+                microphone.enableVAD = true;
+                if (enable_aec) {
+                    microphone.setSilenceLevel (0, 2000);
+                }
+                microphone.setUseEchoSuppression (true);
+                microphone.setLoopBack (false);
+                microphone.gain = 50;
+            }
         }
-        /**/
 
         doConnect ();
     }
@@ -120,7 +130,8 @@ public class Publisher extends Sprite
             stream = new NetStream (conn);
             stream.bufferTime = 0.0;
 
-            video.attachCamera (camera);
+            if (camera)
+                video.attachCamera (camera);
 
             /*
             {
