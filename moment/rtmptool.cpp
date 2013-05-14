@@ -51,7 +51,10 @@ public:
     Ref<String> out_file;
 
     Uint32 num_threads;
+
     Uint32 report_interval;
+    bool report_audio;
+    bool report_video;
 
     bool dump_frames;
 
@@ -68,6 +71,8 @@ public:
 	  channel (grab (new (std::nothrow) String ("video"))),
 	  num_threads (0),
 	  report_interval (0),
+          report_audio (false),
+          report_video (true),
           dump_frames (false),
           loglevel (LogLevel::Debug)
     {
@@ -330,13 +335,17 @@ RtmpClient::commandMessage (VideoStream::Message   * const mt_nonnull msg,
     return Result::Success;
 }
 
+static Uint32 debug_counter = 0;
+
 // TEST
 Uint64 last_timestamp = 0;
 
 Result
 RtmpClient::audioMessage (VideoStream::AudioMessage * const mt_nonnull msg,
-			  void                      * const /* _self */)
+			  void                      * const _self)
 {
+    RtmpClient * const self = static_cast <RtmpClient*> (_self);
+
     if (options.dump_frames) {
         logI (frame_dump, _func, "ts: 0x", fmt_hex, msg->timestamp_nanosec / 1000000, " (", fmt_def, msg->timestamp_nanosec / 1000000, ") ",
               msg->codec_id, " ", msg->frame_type, ", rate ", msg->rate, ", ", msg->channels, " channels, len ", msg->msg_len);
@@ -346,6 +355,18 @@ RtmpClient::audioMessage (VideoStream::AudioMessage * const mt_nonnull msg,
         PagePool::dumpPages (logs, &msg->page_list, msg->msg_offset);
         logUnlock ();
 #endif
+    }
+
+    if (options.report_audio && options.report_interval) {
+	++debug_counter;
+	if (debug_counter >= options.report_interval) {
+	    debug_counter = 0;
+
+            logLock ();
+	    logs->print (ConstMemory::forObject (self->id_char));
+	    logs->flush ();
+            logUnlock ();
+	}
     }
 
 #if 0
@@ -366,15 +387,14 @@ Result
 RtmpClient::videoMessage (VideoStream::VideoMessage * const mt_nonnull msg,
 			  void                      * const _self)
 {
+    RtmpClient * const self = static_cast <RtmpClient*> (_self);
+
     if (options.dump_frames) {
         logI (frame_dump, _func, "ts: 0x", fmt_hex, msg->timestamp_nanosec / 1000000, " (", fmt_def, msg->timestamp_nanosec / 1000000, ") ",
               msg->codec_id, " ", msg->frame_type);
     }
 
-    RtmpClient * const self = static_cast <RtmpClient*> (_self);
-
-    if (options.report_interval) {
-	static Uint32 debug_counter = options.report_interval;
+    if (options.report_video && options.report_interval) {
 	++debug_counter;
 	if (debug_counter >= options.report_interval) {
 	    debug_counter = 0;
@@ -782,6 +802,26 @@ bool cmdline_report_interval (char const * /* short_name */,
     return true;
 }
 
+bool cmdline_report_audio (char const * /* short_name */,
+			   char const * /* long_name */,
+			   char const * /* value */,
+			   void       * /* opt_data */,
+			   void       * /* cb_data */)
+{
+    options.report_audio = true;
+    return true;
+}
+
+bool cmdline_report_video (char const * /* short_name */,
+			   char const * /* long_name */,
+			   char const * /* value */,
+			   void       * /* opt_data */,
+			   void       * /* cb_data */)
+{
+    options.report_video = true;
+    return true;
+}
+
 bool cmdline_nonfatal_errors (char const * /* short_name */,
 			      char const * /* long_name */,
 			      char const * /* value */,
@@ -914,7 +954,7 @@ int main (int argc, char **argv)
     libMaryInit ();
 
     {
-	unsigned const num_opts = 18;
+	unsigned const num_opts = 20;
 	CmdlineOption opts [num_opts];
 
 	opts [0].short_name = "h";
@@ -1024,6 +1064,18 @@ int main (int argc, char **argv)
         opts [17].with_value = false;
         opts [17].opt_data   = NULL;
         opts [17].opt_callback = cmdline_play;
+
+        opts [18].short_name   = NULL;
+        opts [18].long_name    = "report-audio";
+        opts [18].with_value   = false;
+        opts [18].opt_data     = NULL;
+        opts [18].opt_callback = cmdline_report_audio;
+
+        opts [19].short_name   = NULL;
+        opts [19].long_name    = "report-video";
+        opts [19].with_value   = false;
+        opts [19].opt_data     = NULL;
+        opts [19].opt_callback = cmdline_report_video;
 
 	ArrayIterator<CmdlineOption> opts_iter (opts, num_opts);
 	parseCmdline (&argc, &argv, opts_iter, NULL /* callback */, NULL /* callback_data */);
