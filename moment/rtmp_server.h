@@ -1,5 +1,5 @@
 /*  Moment Video Server - High performance media server
-    Copyright (C) 2011 Dmitry Shatrov
+    Copyright (C) 2011-2013 Dmitry Shatrov
     e-mail: shatrov@gmail.com
 
     This program is free software: you can redistribute it and/or modify
@@ -17,8 +17,8 @@
 */
 
 
-#ifndef __LIBMOMENT__RTMP_SERVER__H__
-#define __LIBMOMENT__RTMP_SERVER__H__
+#ifndef LIBMOMENT__RTMP_SERVER__H__
+#define LIBMOMENT__RTMP_SERVER__H__
 
 
 #include <libmary/libmary.h>
@@ -243,33 +243,22 @@ public:
 
 	MetaData ()
 	    : got_flags (0)
-	{
-	}
+	{}
     };
 
     static Result encodeMetaData (MetaData                  * mt_nonnull metadata,
 				  PagePool                  * mt_nonnull page_pool,
 				  VideoStream::VideoMessage *ret_msg);
 
-#if 0
-    // TODO Deprecated constructor, delete.
-    RtmpServer (RtmpConnection * const rtmp_conn)
-	: rtmp_conn (rtmp_conn),
-	  playing (0)
-    {
-    }
-#endif
-
     RtmpServer (Object * const coderef_container)
 	: DependentCodeReferenced (coderef_container),
           rtmp_conn (coderef_container),
 	  playing (0)
-    {
-    }
+    {}
 };
 
 }
 
 
-#endif /* __LIBMOMENT__RTMP_SERVER__H__ */
+#endif /* LIBMOMENT__RTMP_SERVER__H__ */
 

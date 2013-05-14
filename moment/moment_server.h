@@ -374,6 +374,7 @@ public:
 	mt_mutex (mutex) bool disconnected;
 
         mt_mutex (mutex) Ref<String> auth_key;
+        mt_mutex (mutex) Ref<String> stream_name;
 
 	mt_const WeakDepRef<RtmpConnection> weak_rtmp_conn;
 	mt_const RtmpConnection *unsafe_rtmp_conn;
@@ -858,6 +859,8 @@ public:
 
         void (*authSessionDisconnected) (AuthSession *auth_session,
                                          ConstMemory  auth_key,
+                                         IpAddress    client_addr,
+                                         ConstMemory  stream_name,
                                          void        *cb_data);
     };
 

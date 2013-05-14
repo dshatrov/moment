@@ -880,7 +880,8 @@ MomentServer::clientDisconnected (ClientSession * const mt_nonnull client_sessio
                 ClientSession::informClientDisconnected, NULL /* inform_data */);
     }
 
-    Ref<String> const auth_key = client_session->auth_key;
+    Ref<String> const auth_key    = client_session->auth_key;
+    Ref<String> const stream_name = client_session->stream_name;
 
     client_session->mutex.unlock ();
 
@@ -897,7 +898,9 @@ MomentServer::clientDisconnected (ClientSession * const mt_nonnull client_sessio
         if (!tmp_auth_backend.call (tmp_auth_backend->authSessionDisconnected,
                                     /*(*/
                                         client_session->auth_session,
-                                        (auth_key ? auth_key->mem() : ConstMemory())
+                                        (auth_key ? auth_key->mem() : ConstMemory()),
+                                        client_session->client_addr,
+                                        (stream_name ? stream_name->mem() : ConstMemory())
                                     /*)*/))
         {
             logW_ ("authorization backend gone");
@@ -1024,7 +1027,8 @@ MomentServer::startWatching (ClientSession    * const mt_nonnull client_session,
     if (client_session->auth_key && !equal (client_session->auth_key->mem(), auth_key))
         logW_ (_func, "WARNING: Different auth keys for the same client session");
 
-    client_session->auth_key = grab (new (std::nothrow) String (auth_key));
+    client_session->auth_key    = grab (new (std::nothrow) String (auth_key));
+    client_session->stream_name = grab (new (std::nothrow) String (stream_name));
     client_session->mutex.unlock ();
 
     Ref<VideoStream> video_stream;
@@ -1282,7 +1286,8 @@ MomentServer::startStreaming (ClientSession    * const mt_nonnull client_session
     if (client_session->auth_key && !equal (client_session->auth_key->mem(), auth_key))
         logW_ (_func, "WARNING: Different auth keys for the same client session");
 
-    client_session->auth_key = grab (new (std::nothrow) String (auth_key));
+    client_session->auth_key    = grab (new (std::nothrow) String (auth_key));
+    client_session->stream_name = grab (new (std::nothrow) String (stream_name));
     client_session->mutex.unlock ();
 
     Ref<StartStreaming_Data> const data = grab (new (std::nothrow) StartStreaming_Data);

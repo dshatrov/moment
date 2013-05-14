@@ -565,7 +565,7 @@ startClients (PagePool  * const page_pool,
     return Result::Success;
 }
 
-class ClientThreadData : public Referenced
+class ClientThreadData : public Object
 {
 public:
     DataDepRef<PagePool>  page_pool;
@@ -574,10 +574,9 @@ public:
     IpAddress server_addr;
 
     ClientThreadData ()
-        : page_pool  (NULL /* coderef_container */),
-          server_app (NULL /* coderef_container */)
-    {
-    }
+        : page_pool  (this /* coderef_container */),
+          server_app (this /* coderef_container */)
+    {}
 };
 
 void clientThreadFunc (void * const _client_thread_data)

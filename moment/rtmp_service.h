@@ -53,8 +53,7 @@ public:
             : creation_unixtime  (0),
               last_send_unixtime (0),
               last_recv_unixtime (0)
-        {
-        }
+        {}
     };
 
 private:
@@ -90,8 +89,7 @@ private:
 	      conn_sender   (this /* coderef_container */),
 	      conn_receiver (this /* coderef_container */),
 	      rtmp_conn     (this /* coderef_container */)
-	{
-	}
+	{}
 
 	~ClientSession ();
     };
@@ -195,8 +193,7 @@ public:
                                     bool           prechunking_enabled,
                                     Time           accept_watchdog_timeout_sec);
 
-    RtmpService (Object *coderef_container);
-
+     RtmpService (Object *coderef_container);
     ~RtmpService ();
 };
 

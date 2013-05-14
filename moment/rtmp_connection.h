@@ -538,7 +538,6 @@ private:
     mt_sync_domain (receiver) Result processUserControlMessage (ChunkStream *chunk_stream);
 
     mt_iface (Sender::Frontend)
-    mt_begin
       static Sender::Frontend const sender_frontend;
 
       static void senderStateChanged (Sender::SendState  send_state,
@@ -546,10 +545,9 @@ private:
 
       static void senderClosed (Exception *exc_,
 				void      *_self);
-    mt_end
+    mt_iface_end
 
     mt_iface (Receiver::Frontend)
-    mt_begin
       static Receiver::Frontend const receiver_frontend;
 
       mt_sync_domain (receiver)
@@ -563,7 +561,7 @@ private:
 	static void processError (Exception *exc_,
 				  void      *_self);
       mt_end
-    mt_end
+    mt_iface_end
 
     void doError (Exception *exc_);
 
