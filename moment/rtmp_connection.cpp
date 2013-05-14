@@ -679,21 +679,26 @@ RtmpConnection::sendMessagePages (MessageDesc const      * const mt_nonnull mdes
             msg_pages->header_len += extra_header_len;
         }
 
-        msg_pages->setFirstPage (page_list->first);
+        PagePool::Page *first_page = page_list->first;
+        msg_pages->setFirstPage (first_page);
         msg_pages->msg_offset = msg_offset;
         if (msg_offset > 0) {
             assert (page_list->first && page_list->first->data_len >= msg_offset);
             if (page_list->first->data_len == msg_offset) {
                 logD (send, _func, "stripping first page: covered by msg_offset (", msg_offset, ")");
-                msg_pages->setFirstPage (page_list->first->getNextMsgPage());
+                PagePool::Page * const tmp_page = page_list->first;
+
+                first_page = page_list->first->getNextMsgPage();
+                msg_pages->setFirstPage (first_page);
                 msg_pages->msg_offset = 0;
-#warning Memory leak (!)
-                logF_ (_func, "MEMORY LEAK");
+
+                if (take_ownership)
+                    page_pool->pageUnref (page_list->first);
             }
         }
 
 	if (!take_ownership)
-	    page_pool->msgRef (page_list->first);
+	    page_pool->msgRef (first_page);
     }
 
     if (prechunk_size != out_chunk_size) {

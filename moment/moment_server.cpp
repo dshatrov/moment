@@ -1149,8 +1149,6 @@ static bool startWatching_checkAuthorization (bool                        const 
                                               bool                      * const mt_nonnull ret_authorized,
                                               StRef<String>             * const mt_nonnull ret_restream_reply)
 {
-    logD_ (_func, "restream: ", restream);
-
     *ret_authorized = false;
     *ret_restream_reply = NULL;
 
