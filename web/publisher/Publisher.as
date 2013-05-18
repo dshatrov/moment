@@ -24,6 +24,7 @@ public class Publisher extends Sprite
     private var stream_name : String;
     private var enable_cam  : Boolean;
     private var enable_mic  : Boolean;
+    private var enable_h264 : Boolean;
     private var enable_aec  : Boolean;
 
     private var conn : NetConnection;
@@ -45,9 +46,10 @@ public class Publisher extends Sprite
 
         server_uri  = loaderInfo.parameters ["uri"];
         stream_name = loaderInfo.parameters ["stream"];
-        enable_cam  = loaderInfo.parameters ["enable_cam"] == "true";
-        enable_mic  = loaderInfo.parameters ["enable_mic"] == "true";
-        enable_aec  = loaderInfo.parameters ["enable_aec"] == "true";
+        enable_cam  = loaderInfo.parameters ["enable_cam"]  == "true";
+        enable_mic  = loaderInfo.parameters ["enable_mic"]  == "true";
+        enable_h264 = loaderInfo.parameters ["enable_h264"] == "true";
+        enable_aec  = loaderInfo.parameters ["enable_aec"]  == "true";
 
         video = new Video();
         video.width  = 640;
@@ -133,15 +135,13 @@ public class Publisher extends Sprite
             if (camera)
                 video.attachCamera (camera);
 
-            /*
-            {
+            if (enable_h264) {
                 var avc_opts : H264VideoStreamSettings = new H264VideoStreamSettings ();
                 avc_opts.setProfileLevel (H264Profile.BASELINE, H264Level.LEVEL_3_1);
 // This has no effect                avc_opts.setQuality (1000000, 100);
 //                avc_opts.setQuality (100000, 50);
                 stream.videoStreamSettings = avc_opts;
             }
-            */
 
             stream.publish (stream_name);
 
