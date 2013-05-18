@@ -1,5 +1,5 @@
 /*  Moment Video Server - High performance media server
-    Copyright (C) 2011 Dmitry Shatrov
+    Copyright (C) 2011-2013 Dmitry Shatrov
     e-mail: shatrov@gmail.com
 
     This program is free software: you can redistribute it and/or modify
@@ -31,30 +31,31 @@
 #endif
 
 #include <moment/libmoment.h>
+#include <moment/inc.h>
 
 
 using namespace M;
 using namespace Moment;
 
+
 namespace {
 
 struct Options {
-    bool help;
-    bool daemonize;
+    bool        help;
+    bool        daemonize;
     Ref<String> config_filename;
     Ref<String> log_filename;
-    LogLevel loglevel;
-    Uint64 exit_after;
-    bool gst_debug;
+    LogLevel    loglevel;
+    Uint64      exit_after;
+    bool        gst_debug;
 
     Options ()
-	: help (false),
-	  daemonize (false),
-	  loglevel (LogLevel::Info),
+	: help       (false),
+	  daemonize  (false),
+	  loglevel   (LogLevel::Info),
 	  exit_after ((Uint64) -1),
-          gst_debug (false)
-    {
-    }
+          gst_debug  (false)
+    {}
 };
 
 Options options;
@@ -90,13 +91,10 @@ private:
     static void exitTimerTick (void *_self);
 
     void ctl_startProfiler (ConstMemory filename);
+    void ctl_stopProfiler  ();
 
-    void ctl_stopProfiler ();
-
-    void ctl_exit (ConstMemory reason);
-
-    void ctl_abort (ConstMemory reason);
-
+    void ctl_exit     (ConstMemory reason);
+    void ctl_abort    (ConstMemory reason);
     void ctl_segfault (ConstMemory reason);
 
 #ifndef LIBMARY_PLATFORM_WIN32
@@ -178,18 +176,13 @@ public:
           http_service (this /* coderef_container */),
           separate_admin_http_service (this /* coderef_container */),
           admin_http_service_ptr (&separate_admin_http_service),
-#ifndef LIBMARY_PLATFORM_WIN32
-          line_pipe    (this /* coderef_container */),
-#endif
           recorder_thread_pool (this /* coderef_container */),
           reader_thread_pool   (this /* coderef_container */),
           storage (this /* coderef_container */)
-    {
-    }
-
-    ~MomentInstance ()
-    {
-    }
+#ifndef LIBMARY_PLATFORM_WIN32
+          , line_pipe    (this /* coderef_container */)
+#endif
+    {}
 };
 
 static void
@@ -292,6 +285,20 @@ cmdline_gst_debug (char const * /* short_name */,
                    void       * /* cb_data */)
 {
     options.gst_debug = true;
+    return true;
+}
+
+static bool
+cmdline_keyfile (char const * /* short_name */,
+                 char const * /* long_name */,
+                 char const * const value,
+                 void       * const opt_data,
+                 void       * /* cb_data */)
+{
+    if (opt_data) {
+        StRef<String> * const str = static_cast < StRef<String>* > (opt_data);
+        *str = st_grab (new (std::nothrow) String (value));
+    }
     return true;
 }
 
@@ -756,10 +763,12 @@ MomentInstance::run ()
 	}
     }
 
+    MOMENT__PREINIT
+
     Ref<MConfig::Config> const config = loadConfig ();
     if (!config) {
         logE_ (_func, "Could not load config");
-        return Result::Failure;
+        return EXIT_FAILURE;
     }
 
     if (logLevelOn_ (LogLevel::High)) {
@@ -768,6 +777,8 @@ MomentInstance::run ()
         config->dump (logs);
         logUnlock ();
     }
+
+    MOMENT__INIT
 
     Ref<MomentConfigParams> const params = grab (new (std::nothrow) MomentConfigParams);
     if (!processConfig (config, params)) {
@@ -941,7 +952,7 @@ int main (int argc, char **argv)
     libMaryInit ();
 
     {
-	unsigned const num_opts = 7;
+	unsigned const num_opts = 8;
 	CmdlineOption opts [num_opts];
 
 	opts [0].short_name = "h";
@@ -969,22 +980,28 @@ int main (int argc, char **argv)
 	opts [3].opt_callback = cmdline_log;
 
 	opts [4].short_name = "NULL";
-	opts [4].long_name = "loglevel";
+	opts [4].long_name  = "loglevel";
 	opts [4].with_value = true;
-	opts [4].opt_data = NULL;
+	opts [4].opt_data   = NULL;
 	opts [4].opt_callback = cmdline_loglevel;
 
 	opts [5].short_name = NULL;
-	opts [5].long_name = "exit-after";
+	opts [5].long_name  = "exit-after";
 	opts [5].with_value = true;
-	opts [5].opt_data = NULL;
+	opts [5].opt_data   = NULL;
 	opts [5].opt_callback = cmdline_exit_after;
 
         opts [6].short_name = NULL;
-        opts [6].long_name = "gst-debug";
+        opts [6].long_name  = "gst-debug";
         opts [6].with_value = false;
-        opts [6].opt_data = NULL;
+        opts [6].opt_data   = NULL;
         opts [6].opt_callback = cmdline_gst_debug;
+
+        opts [7].short_name = NULL;
+        opts [7].long_name  = "keyfile";
+        opts [7].with_value = true;
+        opts [7].opt_data   = MOMENT__KEYFILE_DATA;
+        opts [7].opt_callback = cmdline_keyfile;
 
 	ArrayIterator<CmdlineOption> opts_iter (opts, num_opts);
 	parseCmdline (&argc, &argv, opts_iter, NULL /* callback */, NULL /* callbackData */);

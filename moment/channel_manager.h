@@ -68,9 +68,7 @@ private:
     }
 
     void fireChannelCreated (ChannelInfo * const mt_nonnull channel_info)
-    {
-        event_informer.informAll (informChannelCreated, channel_info);
-    }
+        { event_informer.informAll (informChannelCreated, channel_info); }
 
 public:
     Informer_<Events>* getEventInformer () { return &event_informer; }

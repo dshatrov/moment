@@ -19,6 +19,7 @@
 
 #include <moment/amf_encoder.h>
 #include <moment/amf_decoder.h>
+#include <moment/inc.h>
 
 #include <moment/rtmp_server.h>
 
@@ -28,6 +29,8 @@ using namespace M;
 namespace Moment {
 
 static LogGroup libMary_logGroup_rtmp_server ("rtmp_server", LogLevel::I);
+
+MOMENT__RTMP_SERVER
 
 void
 RtmpServer::sendRtmpSampleAccess (Uint32 const msg_stream_id,

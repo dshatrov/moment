@@ -17,8 +17,8 @@
 */
 
 
-#ifndef __LIBMOMENT__MOMENT_TYPES__H__
-#define __LIBMOMENT__MOMENT_TYPES__H__
+#ifndef LIBMOMENT__MOMENT_TYPES__H__
+#define LIBMOMENT__MOMENT_TYPES__H__
 
 
 namespace Moment {
@@ -41,5 +41,5 @@ private:
 }
 
 
-#endif /* __LIBMOMENT__MOMENT_TYPES__H__ */
+#endif /* LIBMOMENT__MOMENT_TYPES__H__ */
 

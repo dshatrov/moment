@@ -26,8 +26,11 @@ AM_CXXFLAGS += $(COMMON_CFLAGS)
 INCLUDES = -I$(top_srcdir) -I$(top_builddir)
 
 moment_private_headers =
+moment_target_headers  =
+moment_target_sources  =
+include Makefile.inc.am
 
-moment_target_headers =		\
+moment_target_headers +=        \
         libmoment_config.h      \
 	libmoment.h		\
         libmoment_gst.h         \
@@ -76,6 +79,7 @@ moment_target_headers =		\
                                 \
 	moment_server.h		\
 				\
+        inc.h                   \
 	api.h			\
 				\
 	module_init.h           \
@@ -133,7 +137,9 @@ libmoment_1_0_la_SOURCES =	\
 	api_amf.cpp		\
 				\
 	hmac/sha2.c		\
-	hmac/hmac_sha2.c
+	hmac/hmac_sha2.c        \
+                                \
+        $(moment_target_sources)
 
 #	flv_file_source.cpp
 
@@ -147,6 +153,9 @@ endif
 
 libmoment_1_0_la_LDFLAGS = -no-undefined -version-info "0:0:0" $(COMMON_LDFLAGS)
 libmoment_1_0_la_LIBADD = $(THIS_LIBS)
+if MOMENT_NETTLE
+libmoment_1_0_la_LIBADD += -lgmp
+endif
 if PLATFORM_WIN32
 libmoment_1_0_la_LIBADD += -lws2_32
 endif

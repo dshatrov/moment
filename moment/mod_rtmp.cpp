@@ -1394,7 +1394,7 @@ MomentRtmpModule::adminHttpRequest (HttpRequest   * const mt_nonnull req,
 // _____________________________________________________________________________
 
 
-static char const opt_name__ping_timeout[]               = "mod_rtmp/ping_timeout";
+static char const opt_name__ping_timeout[] = "mod_rtmp/ping_timeout";
 
 static Result momentRtmpInit ()
 {

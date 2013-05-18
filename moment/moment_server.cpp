@@ -2145,7 +2145,7 @@ MomentServer::MomentServer ()
 
 MomentServer::~MomentServer ()
 {
-    logH_ (_func_);
+    logD_ (_func_);
 
     mutex.lock ();
     mutex.unlock ();

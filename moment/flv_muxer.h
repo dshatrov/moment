@@ -17,8 +17,8 @@
 */
 
 
-#ifndef __MOMENT__FLV_MUXER__H__
-#define __MOMENT__FLV_MUXER__H__
+#ifndef MOMENT__FLV_MUXER__H__
+#define MOMENT__FLV_MUXER__H__
 
 
 #include <libmary/libmary.h>
@@ -41,19 +41,14 @@ private:
 		       Byte msg_type);
 public:
     mt_throws Result beginMuxing ();
+    mt_throws Result endMuxing   ();
 
     mt_throws Result muxAudioMessage (VideoStream::AudioMessage * mt_nonnull msg);
-
     mt_throws Result muxVideoMessage (VideoStream::VideoMessage * mt_nonnull msg);
-
-    mt_throws Result endMuxing ();
 
     void reset ();
 
-    void setPagePool (PagePool * const page_pool)
-    {
-	this->page_pool = page_pool;
-    }
+    void setPagePool (PagePool * const page_pool) { this->page_pool = page_pool; }
 
     FlvMuxer ();
 };
@@ -61,5 +56,5 @@ public:
 }
 
 
-#endif /* __MOMENT__FLV_MUXER__H__ */
+#endif /* MOMENT__FLV_MUXER__H__ */
 

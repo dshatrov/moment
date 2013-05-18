@@ -17,6 +17,8 @@
 */
 
 
+#include <moment/inc.h>
+
 #include <moment/playback.h>
 
 
@@ -25,6 +27,8 @@ using namespace M;
 namespace Moment {
 
 static LogGroup libMary_logGroup_playback ("moment.playback", LogLevel::I);
+
+MOMENT__PLAYBACK
 
 mt_unlocks_locks (mutex) void
 Playback::advancePlayback ()

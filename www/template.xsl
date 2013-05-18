@@ -509,7 +509,7 @@
                <a href="http://momentvideo.org/dist/moment_13-05-13_linux64.tar.gz"><big>Linux 64-bit</big></a>
 	   </div>
 
-           <a href="http://momentvideo.org/dist/moment_13-05-13_win32.zip"><small>Windows 32-bit</small></a>
+           <a href="http://momentvideo.org/dist/moment_13-05-13_win32.zip" style="text-decoration: none"><small>Windows 32-bit<sub>alpha</sub></small></a>
 	 </div>
     <!--
 	<table>

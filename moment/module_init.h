@@ -17,8 +17,8 @@
 */
 
 
-#ifndef __MOMENT__MODULE_INIT__H__
-#define __MOMENT__MODULE_INIT__H__
+#ifndef MOMENT__MODULE_INIT__H__
+#define MOMENT__MODULE_INIT__H__
 
 
 #include <gmodule.h>
@@ -49,5 +49,5 @@ G_MODULE_EXPORT void g_module_unload (GModule * const /* module */)
 }
 
 
-#endif /* __MOMENT__MODULE_INIT__H__ */
+#endif /* MOMENT__MODULE_INIT__H__ */
 

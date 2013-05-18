@@ -612,7 +612,6 @@ ChannelManager::loadConfigItem (ConstMemory const item_name,
         mutex.lock ();
         if (ItemHash::EntryKey const old_item_key = item_hash.lookup (item_name)) {
             StRef<ConfigItem> const item = old_item_key.getData();
-// DEPRECATED            item->channel->endVideoStream ();
             item->channel->getPlayback()->stop ();
             item_hash.remove (old_item_key);
         }
@@ -628,7 +627,6 @@ ChannelManager::loadConfigItem (ConstMemory const item_name,
     StRef<ConfigItem> item;
     if (ItemHash::EntryKey const old_item_key = item_hash.lookup (item_name)) {
         item = old_item_key.getData();
-// DEPRECATED        item->channel->endVideoStream ();
         item->channel->getPlayback()->stop ();
     } else {
         item = st_grab (new (std::nothrow) ConfigItem);
@@ -664,13 +662,6 @@ ChannelManager::loadConfigItem (ConstMemory const item_name,
     item->config = config;
 
     // Calling with 'mutex' locked for extra safety.
-#if 0
-// DEPRECATED
-    item->channel->beginVideoStream (
-            playback_item,
-            NULL /* stream_ticket */,
-            NULL /* stream_ticket_ref */);
-#endif
     item->channel->getPlayback()->setSingleItem (playback_item);
 
     mutex.unlock ();

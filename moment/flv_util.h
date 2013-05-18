@@ -17,8 +17,8 @@
 */
 
 
-#ifndef __LIBMOMENT__FLV_UTIL__H__
-#define __LIBMOMENT__FLV_UTIL__H__
+#ifndef LIBMOMENT__FLV_UTIL__H__
+#define LIBMOMENT__FLV_UTIL__H__
 
 
 #include <moment/video_stream.h>
@@ -75,5 +75,5 @@ static inline unsigned numericSamplingRateToFlv (unsigned const rate)
 }
 
 
-#endif /* __LIBMOMENT__FLV_UTIL__H__ */
+#endif /* LIBMOMENT__FLV_UTIL__H__ */
 

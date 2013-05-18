@@ -17,6 +17,8 @@
 */
 
 
+#include <moment/inc.h>
+
 #include <moment/video_stream.h>
 
 
@@ -26,6 +28,8 @@ static LogGroup libMary_logGroup_frames ("VideoStream.frames", LogLevel::I);
 static LogGroup libMary_logGroup_frame_saver ("frame_saver", LogLevel::I);
 
 namespace Moment {
+
+MOMENT__VIDEO_STREAM
 
 Size
 VideoStream::AudioFrameType::toString_ (Memory const &mem,
