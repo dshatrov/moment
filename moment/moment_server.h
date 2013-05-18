@@ -85,17 +85,30 @@ public: /* private: */
     StateMutex mutex;
 
 private:
-    class VideoStreamEntry
+    class VideoStreamEntry;
+    class StreamList_name;
+    typedef IntrusiveList< VideoStreamEntry, StreamList_name, DeleteAction<VideoStreamEntry> > StreamList;
+
+    class StreamHashEntry : public StReferenced
+    {
+    public:
+        StreamList stream_list;
+    };
+
+    typedef StringHash< StRef<StreamHashEntry> > VideoStreamHash;
+
+    class VideoStreamEntry : public IntrusiveListElement< StreamList_name >
     {
     public:
 	Ref<VideoStream> video_stream;
+        VideoStreamHash::EntryKey entry_key;
+        bool displaced;
 
 	VideoStreamEntry (VideoStream * const video_stream)
-	    : video_stream (video_stream)
+	    : video_stream (video_stream),
+              displaced (false)
 	{}
     };
-
-    typedef StringHash<VideoStreamEntry> VideoStreamHash;
 
     class RestreamInfo;
 
@@ -108,18 +121,18 @@ private:
 public:
     class VideoStreamKey
     {
-	friend class MomentServer;
+        friend class MomentServer;
     private:
-	VideoStreamHash::EntryKey entry_key;
-	VideoStreamKey (VideoStreamHash::EntryKey entry_key) : entry_key (entry_key) {}
+        VideoStreamEntry *stream_entry;
+        VideoStreamKey (VideoStreamEntry * const stream_entry) : stream_entry (stream_entry) {}
     public:
-	operator bool () const { return entry_key; }
-	VideoStreamKey () {}
+        operator bool () const { return stream_entry; }
+        VideoStreamKey () : stream_entry (NULL) {}
 
-	// Methods for C API binding.
-	void *getAsVoidPtr () const { return entry_key.getAsVoidPtr(); }
-	static VideoStreamKey fromVoidPtr (void *ptr) {
-		return VideoStreamKey (VideoStreamHash::EntryKey::fromVoidPtr (ptr)); }
+        // Methods for C API binding.
+        void *getAsVoidPtr () const { return stream_entry; }
+        static VideoStreamKey fromVoidPtr (void *ptr)
+            { return VideoStreamKey (static_cast <VideoStreamEntry*> (ptr)); }
     };
 
 
@@ -287,12 +300,19 @@ private:
         Ref<String> stream_name;
     };
 
+    struct StreamClosedNotification
+    {
+        Ref<VideoStream> stream;
+    };
+
     Informer_<VideoStreamHandler> video_stream_informer;
 
     DeferredProcessor::Task vs_added_inform_task;
+    DeferredProcessor::Task vs_closed_inform_task;
     DeferredProcessor::Registration vs_inform_reg;
 
     mt_mutex (mutex) List<VideoStreamAddedNotification> vs_added_notifications;
+    mt_mutex (mutex) List<StreamClosedNotification> vs_closed_notifications;
 
     static void informVideoStreamAdded (VideoStreamHandler *vs_handler,
                                         void               *cb_data,
@@ -306,7 +326,10 @@ private:
     mt_mutex (mutex) void notifyDeferred_VideoStreamAdded (VideoStream * mt_nonnull video_stream,
                                                            ConstMemory  stream_name);
 
+    mt_mutex (mutex) void notifyDeferred_StreamClosed (VideoStream * mt_nonnull video_stream);
+
     static bool videoStreamAddedInformTask (void *_self);
+    static bool streamClosedInformTask (void *_self);
 
 public:
     VideoStreamHandlerKey addVideoStreamHandler (CbDesc<VideoStreamHandler> const &vs_handler);
@@ -575,6 +598,7 @@ private:
 
     static MomentServer *instance;
 
+    mt_const bool new_streams_on_top;
     mt_mutex (mutex) VideoStreamHash video_stream_hash;
 
     mt_const Ref<VideoStream> mix_video_stream;

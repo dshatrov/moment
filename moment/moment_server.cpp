@@ -261,11 +261,20 @@ mt_mutex (mutex) void
 MomentServer::notifyDeferred_VideoStreamAdded (VideoStream * const mt_nonnull video_stream,
                                                ConstMemory  const stream_name)
 {
-    VideoStreamAddedNotification * const notification = &vs_added_notifications.appendEmpty ()->data;
+    VideoStreamAddedNotification * const notification = &vs_added_notifications.appendEmpty()->data;
     notification->video_stream = video_stream;
     notification->stream_name = grab (new (std::nothrow) String (stream_name));
 
     vs_inform_reg.scheduleTask (&vs_added_inform_task, false /* permanent */);
+}
+
+mt_mutex (mutex) void
+MomentServer::notifyDeferred_StreamClosed (VideoStream * const mt_nonnull stream)
+{
+    StreamClosedNotification * const notification = &vs_closed_notifications.appendEmpty()->data;
+    notification->stream = stream;
+
+    vs_inform_reg.scheduleTask (&vs_closed_inform_task, false /* permanent */);
 }
 
 bool
@@ -274,7 +283,6 @@ MomentServer::videoStreamAddedInformTask (void * const _self)
     MomentServer * const self = static_cast <MomentServer*> (_self);
 
     self->mutex.lock ();
-
     while (!self->vs_added_notifications.isEmpty()) {
         VideoStreamAddedNotification * const notification = &self->vs_added_notifications.getFirst();
 
@@ -291,7 +299,31 @@ MomentServer::videoStreamAddedInformTask (void * const _self)
         InformVideoStreamAdded_Data inform_data (video_stream, stream_name->mem());
         mt_unlocks_locks (self->mutex) self->video_stream_informer.informAll_unlocked (informVideoStreamAdded, &inform_data);
     }
+    self->mutex.unlock ();
 
+    return false /* Do not reschedule */;
+}
+
+bool
+MomentServer::streamClosedInformTask (void * const _self)
+{
+    MomentServer * const self = static_cast <MomentServer*> (_self);
+
+    self->mutex.lock ();
+    while (!self->vs_closed_notifications.isEmpty()) {
+        StreamClosedNotification * const notification = &self->vs_closed_notifications.getFirst();
+
+        Ref<VideoStream> stream;
+        stream.setNoRef ((VideoStream*) notification->stream);
+        notification->stream.setNoUnref ((VideoStream*) NULL);
+
+        self->vs_closed_notifications.remove (self->vs_closed_notifications.getFirstElement());
+        self->mutex.unlock ();
+
+        stream->close ();
+
+        self->mutex.lock ();
+    }
     self->mutex.unlock ();
 
     return false /* Do not reschedule */;
@@ -1589,14 +1621,20 @@ MomentServer::getVideoStream (ConstMemory const path)
     return getVideoStream_unlocked (path);
 }
 
-Ref<VideoStream>
+mt_mutex (mutex) Ref<VideoStream>
 MomentServer::getVideoStream_unlocked (ConstMemory const path)
 {
-    VideoStreamHash::EntryKey const entry = video_stream_hash.lookup (path);
-    if (!entry)
+    VideoStreamHash::EntryKey const entry_key = video_stream_hash.lookup (path);
+    if (!entry_key)
 	return NULL;
 
-    return entry.getData().video_stream;
+    VideoStreamEntry * const stream_entry = (*entry_key.getDataPtr())->stream_list.getFirst();
+    assert (stream_entry);
+
+    if (stream_entry->displaced)
+        return NULL;
+
+    return stream_entry->video_stream;
 }
 
 mt_mutex (mutex) MomentServer::VideoStreamKey
@@ -1604,9 +1642,33 @@ MomentServer::addVideoStream_unlocked (VideoStream * const stream,
                                        ConstMemory   const path)
 {
     logD_ (_func, "name: ", path, ", stream 0x", fmt_hex, (UintPtr) stream);
-    MomentServer::VideoStreamKey const vs_key = video_stream_hash.add (path, stream);
+
+    VideoStreamEntry * const stream_entry = new (std::nothrow) VideoStreamEntry (stream);
+    assert (stream_entry);
+
+    {
+        VideoStreamHash::EntryKey const entry_key = video_stream_hash.lookup (path);
+        if (entry_key) {
+            stream_entry->entry_key = entry_key;
+
+            StRef<StreamHashEntry> * const hash_entry = entry_key.getDataPtr();
+            assert (!(*hash_entry)->stream_list.isEmpty());
+            if (new_streams_on_top) {
+                (*hash_entry)->stream_list.getFirst()->displaced = true;
+                notifyDeferred_StreamClosed ((*hash_entry)->stream_list.getFirst()->video_stream);
+                (*hash_entry)->stream_list.prepend (stream_entry);
+            } else
+                (*hash_entry)->stream_list.append (stream_entry);
+        } else {
+            StRef<StreamHashEntry> const hash_entry = st_grab (new (std::nothrow) StreamHashEntry);
+            hash_entry->stream_list.append (stream_entry);
+
+            stream_entry->entry_key = video_stream_hash.add (path, hash_entry);
+        }
+    }
+
     notifyDeferred_VideoStreamAdded (stream, path);
-    return vs_key;
+    return VideoStreamKey (stream_entry);
 }
 
 MomentServer::VideoStreamKey
@@ -1620,11 +1682,18 @@ MomentServer::addVideoStream (VideoStream * const stream,
 }
 
 mt_mutex (mutex) void
-MomentServer::removeVideoStream_unlocked (VideoStreamKey const video_stream_key)
+MomentServer::removeVideoStream_unlocked (VideoStreamKey const vs_key)
 {
-//    logD_ (_func, "name: ", video_stream_key.entry_key.getKey(), ", "
-//           "stream 0x", fmt_hex, (UintPtr) video_stream_key.entry_key.getDataPtr());
-    video_stream_hash.remove (video_stream_key.entry_key);
+    logD_ (_func, "name: ", vs_key.stream_entry->entry_key.getKey(), ", "
+           "stream 0x", fmt_hex, (UintPtr) vs_key.stream_entry->video_stream.ptr());
+
+    VideoStreamHash::EntryKey const hash_key = vs_key.stream_entry->entry_key;
+    StreamHashEntry * const hash_entry = *hash_key.getDataPtr();
+    hash_entry->stream_list.remove (vs_key.stream_entry);
+    if (hash_entry->stream_list.isEmpty()) {
+        logD_ (_func, "last stream ", hash_key.getKey());
+        video_stream_hash.remove (hash_key);
+    }
 }
 
 void
@@ -2022,6 +2091,9 @@ MomentServer::checkAuthorization (AuthSession   * const auth_session,
 void
 MomentServer::dumpStreamList ()
 {
+#if 0
+// Deprecated
+
     log__ (_func_);
 
     {
@@ -2035,6 +2107,7 @@ MomentServer::dumpStreamList ()
     }
 
     log__ (_func_, "done");
+#endif
 }
 
 mt_locks (mutex) void
@@ -2109,6 +2182,23 @@ MomentServer::init (ServerApp        * const mt_nonnull server_app,
         }
     }
 
+    {
+        ConstMemory const opt_name = "moment/new_streams_on_top";
+        MConfig::BooleanValue const value = config->getBoolean (opt_name);
+        if (value == MConfig::Boolean_Invalid) {
+            logE_ (_func, "Invalid value for ", opt_name, ":", config->getString (opt_name),
+                   ", assuming \"", new_streams_on_top, "\"");
+        } else {
+            if (value == MConfig::Boolean_True)
+                new_streams_on_top = true;
+            else
+            if (value == MConfig::Boolean_False)
+                new_streams_on_top = false;
+
+            logD_ (_func, opt_name, ": ", new_streams_on_top);
+        }
+    }
+
     admin_http_service->addHttpHandler (
 	    CbDesc<HttpService::HttpHandler> (&admin_http_handler, this, this),
 	    "admin");
@@ -2134,6 +2224,7 @@ MomentServer::MomentServer ()
       storage               (NULL),
       publish_all_streams   (true),
       enable_restreaming    (false),
+      new_streams_on_top    (true),
       config                (NULL),
       media_source_provider (this /* coderef_container */)
 {
@@ -2141,6 +2232,8 @@ MomentServer::MomentServer ()
 
     vs_added_inform_task.cb =
             CbDesc<DeferredProcessor::TaskCallback> (videoStreamAddedInformTask, this, this);
+    vs_closed_inform_task.cb =
+            CbDesc<DeferredProcessor::TaskCallback> (streamClosedInformTask, this, this);
 }
 
 MomentServer::~MomentServer ()
