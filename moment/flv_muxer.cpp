@@ -121,10 +121,7 @@ FlvMuxer::doMuxMessage (VideoStream::Message * const mt_nonnull msg,
 	    PagePool *norm_page_pool;
 	    PagePool::PageListHead norm_page_list;
 	    Size norm_msg_offs;
-	    RtmpConnection::normalizePrechunkedData (msg->page_pool,
-						     &msg->page_list,
-						     msg->msg_offset,
-						     msg->prechunk_size,
+	    RtmpConnection::normalizePrechunkedData (msg,
 						     page_pool,
 						     &norm_page_pool,
 						     &norm_page_list,

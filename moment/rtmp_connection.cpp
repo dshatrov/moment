@@ -671,7 +671,6 @@ RtmpConnection::sendMessagePages (MessageDesc const      * const mt_nonnull mdes
 	    page_pool->msgUnref (page_list->first);
     } else {
         if (extra_header_len > 0) {
-#warning This is total bullshit. Figure out all the ways in which this is wrong, then fix.
           // Message body is prechunked in assumption that FLV a/v headers are
           // re-created when needed before sending.
             assert (msg_pages->header_len + extra_header_len <= MaxHeaderLen);
@@ -1658,7 +1657,6 @@ RtmpConnection::processMessage (ChunkStream * const chunk_stream)
 		video_msg.page_pool = page_pool;
 		video_msg.page_list = chunk_stream->page_list;
 
-#warning Prechunking: how's it possible that this works with HLS?
                 // Cutting away FLV video packet header. Note that this doesn't break prechunking
                 // for the purpose of sending data to RTMP clients, because the same header will be
                 // appended to the message before sending the data.
@@ -1801,8 +1799,16 @@ RtmpConnection::processUserControlMessage (ChunkStream * const chunk_stream)
 
 	    ping_reply_received.set (1);
 	} break;
+        case UserControlMessageType::BufferEmpty: {
+            logD (proto_in, _func, "BufferEmpty");
+          // No-op
+        } break;
+        case UserControlMessageType::BufferReady: {
+            logD (proto_in, _func, "BufferReady");
+          // No-op
+        } break;
 	default:
-	    logW_ (_func, "unknown message type: ", uc_type);
+	    logD_ (_func, "unknown message type: ", uc_type);
     }
 
     return Result::Success;
@@ -2982,25 +2988,35 @@ RtmpConnection::~RtmpConnection ()
     in_destr_mutex.unlock ();
 }
 
-#warning UGH, UGLY - fix flv header prechunking (!)
-// TODO FIXME Take cut FLV audio/video headers into consideration when normalizing.
-//            Currently, lack of this breaks writing to a file when prechunking
-//            is enabled.
 Size
-RtmpConnection::normalizePrechunkedData (PagePool                * const msg_page_pool,
-					 PagePool::PageListHead  * const mt_nonnull page_list,
-					 Size                      const msg_offs,
-					 Size                      const prechunk_size,
-					 PagePool                * const mt_nonnull page_pool,
-					 PagePool               ** const mt_nonnull ret_page_pool,
-					 PagePool::PageListHead  * const mt_nonnull ret_page_list,
-					 Size                    * const mt_nonnull ret_msg_offs)
+RtmpConnection::normalizePrechunkedData (VideoStream::Message    * const mt_nonnull msg,
+                                         PagePool                * const mt_nonnull page_pool,
+                                         PagePool               ** const mt_nonnull ret_page_pool,
+                                         PagePool::PageListHead  * const mt_nonnull ret_page_list,
+                                         Size                    * const mt_nonnull ret_msg_offs)
 {
+    Size header_offs = 0;
+    if (msg->msg_type == VideoStream::Message::Type_Audio) {
+        VideoStream::AudioMessage * const audio_msg = static_cast <VideoStream::AudioMessage*> (msg);
+        if (audio_msg->codec_id == VideoStream::AudioCodecId::AAC)
+            header_offs = 2;
+        else
+            header_offs = 1;
+    } else
+    if (msg->msg_type == VideoStream::Message::Type_Video) {
+        VideoStream::VideoMessage * const video_msg = static_cast <VideoStream::VideoMessage*> (msg);
+        if (video_msg->codec_id == VideoStream::VideoCodecId::AVC)
+            header_offs = 5;
+        else
+            header_offs = 1;
+    }
+    assert (header_offs <= msg->prechunk_size);
+
     {
 	Size total_len = 0;
-	if (prechunk_size > 0) {
-	    Size cur_page_offs = msg_offs;
-	    PagePool::Page *page = page_list->first;
+	if (msg->prechunk_size > 0) {
+	    Size cur_page_offs = msg->msg_offset;
+	    PagePool::Page *page = msg->page_list.first;
 	    while (page) {
 		total_len += page->data_len - cur_page_offs;
 		cur_page_offs = 0;
@@ -3008,11 +3024,12 @@ RtmpConnection::normalizePrechunkedData (PagePool                * const msg_pag
 	    }
 	}
 
-	if (total_len <= prechunk_size) {
-	    *ret_page_pool = msg_page_pool;
-	    *ret_page_list = *page_list;
-	    *ret_msg_offs = msg_offs;
-	    msg_page_pool->msgRef (page_list->first);
+#warning TODO extra msg_len < ... check would spare page list walk
+	if (total_len + header_offs <= msg->prechunk_size) {
+	    *ret_page_pool = msg->page_pool;
+	    *ret_page_list = msg->page_list;
+	    *ret_msg_offs = msg->msg_offset;
+	    msg->page_pool->msgRef (msg->page_list.first);
 	    return total_len;
 	}
     }
@@ -3022,18 +3039,18 @@ RtmpConnection::normalizePrechunkedData (PagePool                * const msg_pag
 
     Size normalized_len = 0;
 
-    Size chunk_offs = 0;
-    Size page_offs = msg_offs;
+    Size chunk_offs = header_offs;
+    Size page_offs  = msg->msg_offset;
 
-    PagePool::Page *page = page_list->first;
+    PagePool::Page *page = msg->page_list.first;
     if (page) {
-	assert (msg_offs <= page->data_len);
-	if (msg_offs == page->data_len)
+	assert (msg->msg_offset <= page->data_len);
+	if (msg->msg_offset == page->data_len)
 	    page = page->getNextMsgPage();
     }
 
     while (page) {
-	if (chunk_offs == prechunk_size) {
+	if (chunk_offs == msg->prechunk_size) {
 	    chunk_offs = 0;
 	    assert (page->data_len - page_offs > 0);
 	    ++page_offs;
@@ -3042,13 +3059,13 @@ RtmpConnection::normalizePrechunkedData (PagePool                * const msg_pag
 	Size const data_remain = page->data_len - page_offs;
 
 	Size tocopy;
-	if (chunk_offs + data_remain >= prechunk_size) {
+	if (chunk_offs + data_remain >= msg->prechunk_size) {
 	  // Full chunk.
-	    tocopy = prechunk_size - chunk_offs;
-	    chunk_offs = prechunk_size;
+	    tocopy = msg->prechunk_size - chunk_offs;
+	    chunk_offs = msg->prechunk_size;
 	} else {
 	  // Incomplete chunk.
-	    tocopy = prechunk_size - chunk_offs;
+	    tocopy = msg->prechunk_size - chunk_offs;
 	    if (tocopy > data_remain)
 		tocopy = data_remain;
 

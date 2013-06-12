@@ -213,7 +213,9 @@ private:
 	    SetBufferLength  = 3,
 	    StreamIsRecorded = 4,
 	    PingRequest      = 6,
-	    PingResponse     = 7
+	    PingResponse     = 7,
+            BufferEmpty      = 31,
+            BufferReady      = 32
 	};
 	operator Value () const { return value; }
 	UserControlMessageType (Value const value) : value (value) {}
@@ -238,15 +240,11 @@ public:
 	Size prechunk_offset;
 
     public:
-	void reset ()
-	{
-	    prechunk_offset = 0;
-	}
+	void reset () {  prechunk_offset = 0; }
 
 	PrechunkContext (Size const initial_offset = 0)
 	    : prechunk_offset (initial_offset)
-	{
-	}
+	{}
     };
 
     class ChunkStream : public BasicReferenced
@@ -282,10 +280,7 @@ public:
 	mt_end
 
     public:
-	Uint32 getChunkStreamId () const
-	{
-	    return chunk_stream_id;
-	}
+	Uint32 getChunkStreamId () const { return chunk_stream_id; }
     };
 
 private:
@@ -293,7 +288,6 @@ private:
     mt_const DataDepRef<PagePool> page_pool;
     mt_const DataDepRef<Sender>   sender;
 
-    // Prechunking is always enabled currently.
     mt_const bool prechunking_enabled;
     mt_const Time send_delay_millisec;
     mt_const Time ping_timeout_millisec;
@@ -628,10 +622,7 @@ public:
 
   // Utility functions
 
-    static Size normalizePrechunkedData (PagePool                *msg_page_pool,
-					 PagePool::PageListHead  * mt_nonnull page_list,
-					 Size                     msg_offs,
-					 Size                     prechunk_size,
+    static Size normalizePrechunkedData (VideoStream::Message    * mt_nonnull msg,
 					 PagePool                * mt_nonnull page_pool,
 					 PagePool               ** mt_nonnull ret_page_pool,
 					 PagePool::PageListHead  * mt_nonnull ret_page_list,

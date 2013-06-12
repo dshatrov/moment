@@ -519,10 +519,7 @@ static void client_rtmpCommandMessage (RtmpConnection       * const mt_nonnull c
     } else {
 	unref_normalized_pages = true;
 
-	RtmpConnection::normalizePrechunkedData (int_msg->page_pool,
-						 &int_msg->page_list,
-						 int_msg->msg_offset,
-						 int_msg->prechunk_size,
+	RtmpConnection::normalizePrechunkedData (int_msg,
 						 int_msg->page_pool,
 						 &normalized_page_pool,
 						 &normalized_pages,
