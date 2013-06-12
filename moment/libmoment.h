@@ -65,6 +65,8 @@
 
 #include <moment/moment_server.h>
 
+#include <moment/util_config.h>
+
 #ifdef MOMENT_GSTREAMER
 #include <moment/libmoment_gst.h>
 #endif

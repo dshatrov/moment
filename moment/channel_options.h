@@ -131,6 +131,19 @@ public:
     }
 };
 
+class OverlayDesc : public Referenced
+{
+public:
+    Ref<String> overlay_channel_name;
+    bool        pause_on_overlay;
+};
+
+class OverlayOptions : public Referenced
+{
+public:
+    List< Ref<OverlayDesc> > overlay_list;
+};
+
 class ChannelOptions : public Referenced
 {
 public:
@@ -141,6 +154,8 @@ public:
     StRef<String> channel_desc;
 
     Ref<PlaybackItem> default_item;
+
+    Ref<OverlayOptions> overlay_opts;
 
     bool          keep_video_stream;
     bool          continuous_playback;
