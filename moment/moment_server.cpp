@@ -669,6 +669,12 @@ MomentServer::loadModules ()
         if (!loadModule ("../lib/bin/libmoment-test-1.0-0.dll"))
             logE_ (_func, "Could not load mychat module (win32)");
 
+        if (!loadModule ("../lib/bin/libmoment-auth-1.0-0.dll"))
+            logE_ (_func, "Could not load mod_auth (win32)");
+
+        if (!loadModule ("../lib/bin/libmoment-nvr-1.0-0.dll"))
+            logE_ (_func, "Could not load mod_nvr (win32)");
+
         if (!loadModule ("../lib/bin/libmoment-lectorium-1.0-0.dll"))
             logE_ (_func, "Could not load lectorium (win32)");
     }
