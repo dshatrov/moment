@@ -63,9 +63,7 @@ public:
 
     void setParam (ConstMemory const name,
                    ConstMemory const value)
-    {
-        params.add (name, grab (new String (value)));
-    }
+        { params.add (name, grab (new String (value))); }
 };
 
 class VideoStream : public Object
@@ -106,9 +104,7 @@ public:
 
     public:
 	bool isAudioData () const
-	{
-	    return value == RawData;
-	}
+            { return value == RawData; }
     };
 
     class VideoFrameType
@@ -154,14 +150,10 @@ public:
 	}
 
 	bool isKeyFrame () const
-	{
-	    return isVideoData() && (value == KeyFrame || value == GeneratedKeyFrame);
-	}
+            { return isVideoData() && (value == KeyFrame || value == GeneratedKeyFrame); }
 
 	bool isInterFrame () const
-	{
-	    return isVideoData() && (value == InterFrame || value == DisposableInterFrame);
-	}
+            { return isVideoData() && (value == InterFrame || value == DisposableInterFrame); }
 
 	Byte toFlvFrameType () const;
     };
@@ -227,6 +219,15 @@ public:
     class Message
     {
     public:
+        enum Type
+        {
+            Type_None,
+            Type_Audio,
+            Type_Video
+        };
+
+        Type msg_type;
+
         Uint64 timestamp_nanosec;
 
         PagePool *page_pool;
@@ -252,16 +253,16 @@ public:
             page_list.reset ();
         }
 
-	Message ()
-	    : timestamp_nanosec (0),
+        Message () : msg_type (Type_None) {}
 
-	      page_pool (NULL),
-	      msg_len (0),
-	      msg_offset (0),
-
-	      prechunk_size (0)
-	{
-	}
+	Message (Type const msg_type)
+	    : msg_type          (msg_type),
+              timestamp_nanosec (0),
+	      page_pool         (NULL),
+	      msg_len           (0),
+	      msg_offset        (0),
+	      prechunk_size     (0)
+	{}
     };
 
     // Must be copyable.
@@ -274,7 +275,8 @@ public:
         unsigned channels;
 
 	AudioMessage ()
-            : frame_type (AudioFrameType::Unknown),
+            : Message    (Message::Type_Audio),
+              frame_type (AudioFrameType::Unknown),
               codec_id   (AudioCodecId::Unknown),
               rate       (44100),
               channels   (1)
@@ -298,7 +300,8 @@ public:
         bool is_saved_frame;
 
 	VideoMessage ()
-            : frame_type (VideoFrameType::Unknown),
+            : Message    (Message::Type_Video),
+              frame_type (VideoFrameType::Unknown),
 	      codec_id   (VideoCodecId::Unknown),
               is_saved_frame (false)
 	{}
@@ -330,12 +333,23 @@ public:
 				    AmfDecoder        * mt_nonnull amf_decoder,
 				    void              *cb_data);
 
+//        void (*playbackStart) (void *cb_data);
+
+//        void (*playbackStop) (void *cb_data);
+
 	// FIXME getVideoStream() and closed() imply a race condition.
 	// Add isClosed() method to VideoStream as a workaround.
 	void (*closed) (void *cb_data);
 
         void (*numWatchersChanged) (Count  num_watchers,
                                     void  *cb_data);
+    };
+
+    struct StreamFeedback
+    {
+#warning TODO StreamFeedback
+        void (*feedbackPausePlayback)  (void *cb_data);
+        void (*feedbackResumePlayback) (void *cb_data);
     };
 
     // TODO Rename to SavedVideoFrame.
@@ -465,61 +479,6 @@ private:
     mt_mutex (mutex) FrameSaver frame_saver;
     mt_mutex (mutex) Count num_watchers;
 
-  // ___________________________ Stream binding data ___________________________
-
-    class BindTicket : public Referenced
-    {
-    public:
-        VideoStream *video_stream;
-    };
-
-    class BindInfo
-    {
-    public:
-        Ref<BindTicket> cur_bind_ticket;
-
-        Uint64 timestamp_offs;
-        bool   got_timestamp_offs;
-        WeakRef<VideoStream> weak_bind_stream;
-
-        GenericInformer::SubscriptionKey bind_sbn;
-
-        void reset ()
-        {
-            timestamp_offs = 0;
-            got_timestamp_offs = false;
-            weak_bind_stream = NULL;
-            bind_sbn = NULL;
-        }
-
-        BindInfo () { reset (); }
-    };
-
-    // TODO 1. got_stream_timestamp. 'stream_timestamp' may be unknown.
-    //      2. set initial stream timestamp to some shifted value to compensate for possible slight timestamp drift,
-    //         like +10 minutes.
-    mt_mutex (mutex) Uint64 stream_timestamp_nanosec;
-
-    mt_mutex (mutex) BindInfo abind;
-    mt_mutex (mutex) BindInfo vbind;
-
-    mt_mutex (mutex) bool  pending_report_in_progress;
-    mt_mutex (mutex) Count msg_inform_counter;
-    mt_mutex (mutex) PendingFrameList pending_frame_list;
-
-  mt_iface (FrameSaver::FrameHandler)
-    static FrameSaver::FrameHandler const bind_frame_handler;
-
-    static mt_mutex (mutex) Result bind_savedAudioFrame (AudioMessage * mt_nonnull audio_msg,
-                                                         void         *_self);
-
-    static mt_mutex (mutex) Result bind_savedVideoFrame (VideoMessage * mt_nonnull video_msg,
-                                                         void         *_self);
-  mt_iface_end
-
-  // ___________________________________________________________________________
-
-
     Informer_<EventHandler> event_informer;
 
     static void informAudioMessage (EventHandler *event_handler,
@@ -537,6 +496,16 @@ private:
     static void informClosed (EventHandler *event_handler,
 			      void *cb_data,
 			      void *inform_data);
+
+//    Informer_<StreamFeedback> feedback_informer;
+
+    static void informFeedbackPausePlayback (StreamFeedback *feedback,
+                                             void *cb_data,
+                                             void *inform_data);
+
+    static void informFeedbackResumePlayback (StreamFeedback *feedback,
+                                              void *cb_data,
+                                              void *inform_data);
 
 public:
     // Returned FrameSaver must be synchronized manually with VideoStream::lock/unlock().
@@ -602,9 +571,83 @@ public:
 
     mt_mutex (mutex) bool getNumWatchers_unlocked () { return num_watchers; }
 
+
+  // _____________________________ Stream binding ______________________________
+
 private:
+    class BindLayer : public Referenced
+    {
+    public:
+        bool valid;
+        Uint64 priority;
+
+        List< Ref<BindLayer> >::Element *list_el;
+
+        WeakRef<VideoStream> weak_audio_stream;
+        WeakRef<VideoStream> weak_video_stream;
+        bool bind_audio;
+        bool bind_video;
+    };
+
+    typedef List< Ref<BindLayer> > BindLayerList;
+
+    BindLayerList bind_layer_list;
+    BindLayerList::Element *cur_bind_el;
+
+    class BindTicket : public Referenced
+    {
+    public:
+        VideoStream *video_stream;
+
+        Ref<BindLayer> bind_layer;
+    };
+
+    class BindInfo
+    {
+    public:
+        Ref<BindTicket> cur_bind_ticket;
+
+        Uint64 timestamp_offs;
+        bool   got_timestamp_offs;
+        WeakRef<VideoStream> weak_bind_stream;
+
+        GenericInformer::SubscriptionKey bind_sbn;
+
+        void reset ()
+        {
+            timestamp_offs = 0;
+            got_timestamp_offs = false;
+            weak_bind_stream = NULL;
+            bind_sbn = NULL;
+        }
+
+        BindInfo () { reset (); }
+    };
+
+    // TODO 1. got_stream_timestamp. 'stream_timestamp' may be unknown.
+    //      2. set initial stream timestamp to some shifted value to compensate for possible slight timestamp drift,
+    //         like +10 minutes.
+    mt_mutex (mutex) Uint64 stream_timestamp_nanosec;
+
+    mt_mutex (mutex) BindInfo abind;
+    mt_mutex (mutex) BindInfo vbind;
+
+    mt_mutex (mutex) bool  pending_report_in_progress;
+    mt_mutex (mutex) Count msg_inform_counter;
+    mt_mutex (mutex) PendingFrameList pending_frame_list;
+
     mt_mutex (mutex) void bind_messageBegin (BindInfo * mt_nonnull bind_info,
                                              Message  * mt_nonnull msg);
+
+  mt_iface (FrameSaver::FrameHandler)
+    static FrameSaver::FrameHandler const bind_frame_handler;
+
+    static mt_mutex (mutex) Result bind_savedAudioFrame (AudioMessage * mt_nonnull audio_msg,
+                                                         void         *_self);
+
+    static mt_mutex (mutex) Result bind_savedVideoFrame (VideoMessage * mt_nonnull video_msg,
+                                                         void         *_self);
+  mt_iface_end
 
   mt_iface (VideoStream::EventHandler)
     static EventHandler const abind_handler;
@@ -621,13 +664,32 @@ private:
                                          ConstMemory const &method_name,
                                          AmfDecoder        * mt_nonnull amf_decoder,
                                          void              *_bind_ticket);
+
+    static void bind_playbackStart (void *_bind_ticket);
+
+    static void bind_playbackStop (void *_bind_ticket);
+
+    static void bind_closed (void *_bind_ticket);
   mt_iface_end
 
+    void doBindPlaybackStop (BindTicket * mt_nonnull bind_ticket);
+
+    mt_mutex (mutex) void doBindToStream (VideoStream *bind_audio_stream,
+                                          VideoStream *bind_video_stream,
+                                          bool         bind_audio,
+                                          bool         bind_video);
+
 public:
-    void bindToStream (VideoStream *bind_audio_stream,
-                       VideoStream *bind_video_stream,
-                       bool         bind_audio,
-                       bool         bind_video);
+    // TODO
+    typedef void BindKey;
+
+    BindKey bindToStream (VideoStream *bind_audio_stream,
+                          VideoStream *bind_video_stream,
+                          bool         bind_audio,
+                          bool         bind_video);
+
+  // ___________________________________________________________________________
+
 
     void close ();
 

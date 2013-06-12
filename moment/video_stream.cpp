@@ -1165,7 +1165,9 @@ VideoStream::EventHandler const VideoStream::abind_handler = {
     bind_audioMessage,
     NULL /* videoMessage */,
     NULL /* rtmpCommandMessage */,
-    NULL /* closed */,
+//    bind_playbackStart,
+//    bind_playbackStop,
+    bind_closed,
     NULL /* numWatchersChanged */
 };
 
@@ -1173,7 +1175,9 @@ VideoStream::EventHandler const VideoStream::vbind_handler = {
     NULL /* audioMessage */,
     bind_videoMessage,
     NULL /* rtmpCommandMessage */,
-    NULL /* closed */,
+//    bind_playbackStart,
+//    bind_playbackStop,
+    bind_closed,
     NULL /* numWatchersChanged */
 };
 
@@ -1245,6 +1249,94 @@ VideoStream::bind_rtmpCommandMessage (RtmpConnection    * const mt_nonnull /* co
 }
 
 void
+VideoStream::bind_playbackStart (void * const _bind_ticket)
+{
+    BindTicket * const bind_ticket = static_cast <BindTicket*> (_bind_ticket);
+    VideoStream * const self = bind_ticket->video_stream;
+
+    logD_ (_self_func_);
+
+    self->mutex.lock ();
+
+    if (!bind_ticket->bind_layer->valid) {
+        self->mutex.unlock ();
+        logD_ (_self_func, "invalid bind layer");
+        return;
+    }
+
+    if (self->cur_bind_el) {
+        BindLayer * const cur_bind_layer = self->cur_bind_el->data;
+        if (bind_ticket->bind_layer == cur_bind_layer) {
+            self->mutex.unlock ();
+            logD_ (_self_func, "same bind layer");
+            return;
+        }
+
+        if (bind_ticket->bind_layer->priority <= cur_bind_layer->priority) {
+            self->mutex.unlock ();
+            logD_ (_self_func, "same or lower bind priority");
+            return;
+        }
+    }
+
+    Ref<VideoStream> bind_audio_stream = bind_ticket->bind_layer->weak_audio_stream.getRef ();
+    Ref<VideoStream> bind_video_stream = bind_ticket->bind_layer->weak_video_stream.getRef ();
+    if ((bind_ticket->bind_layer->bind_audio && !bind_audio_stream) ||
+        (bind_ticket->bind_layer->bind_video && !bind_video_stream))
+    {
+        self->mutex.unlock ();
+        logD_ (_self_func, "bind stream gone");
+        return;
+    }
+
+    self->doBindToStream (bind_audio_stream,
+                          bind_video_stream,
+                          bind_ticket->bind_layer->bind_audio,
+                          bind_ticket->bind_layer->bind_video);
+
+    self->cur_bind_el = bind_ticket->bind_layer->list_el;
+
+    self->mutex.unlock ();
+}
+
+void
+VideoStream::bind_playbackStop (void * const _bind_ticket)
+{
+    BindTicket * const bind_ticket = static_cast <BindTicket*> (_bind_ticket);
+    VideoStream * const self = bind_ticket->video_stream;
+
+    logD_ (_self_func_);
+
+    self->doBindPlaybackStop (bind_ticket);
+}
+
+void
+VideoStream::bind_closed (void * const _bind_ticket)
+{
+    BindTicket * const bind_ticket = static_cast <BindTicket*> (_bind_ticket);
+    VideoStream * const self = bind_ticket->video_stream;
+
+    logD_ (_self_func_);
+
+    self->doBindPlaybackStop (bind_ticket);
+}
+
+void
+VideoStream::doBindPlaybackStop (BindTicket * const mt_nonnull bind_ticket)
+{
+#warning TODO
+}
+
+mt_mutex (mutex) void
+VideoStream::doBindToStream (VideoStream * const bind_audio_stream,
+                             VideoStream * const bind_video_stream,
+                             bool          const bind_audio,
+                             bool          const bind_video)
+{
+#warning TODO
+}
+
+VideoStream::BindKey
 VideoStream::bindToStream (VideoStream * const bind_audio_stream,
                            VideoStream * const bind_video_stream,
                            bool         bind_audio,
@@ -1453,10 +1545,10 @@ VideoStream::close ()
 VideoStream::VideoStream ()
     : is_closed (false),
       num_watchers (0),
+      event_informer (this, &mutex),
       stream_timestamp_nanosec (0),
       pending_report_in_progress (false),
-      msg_inform_counter (0),
-      event_informer (this, &mutex)
+      msg_inform_counter (0)
 {
 }
 
