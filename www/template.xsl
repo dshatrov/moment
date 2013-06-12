@@ -176,7 +176,7 @@
       padding-bottom: 5px;
 
       border-top-left-radius: 15px;
-      -moz-border-radius-toplfet: 15px;
+      -moz-border-radius-topleft: 15px;
       border-top-right-radius: 15px;
       -moz-border-radius-topright: 15px;
 
