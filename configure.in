@@ -1,5 +1,14 @@
 AC_INIT([Moment], [0.1])
 
+AC_ARG_WITH([release-tag],
+	    AC_HELP_STRING([--with-release-tag=TAG],
+			   [Relese tag (version) to use]),
+	    [with_release_tag=$withval],
+	    [with_release_tag=""])
+if test "x$with_release_tag" != "x"; then
+    AC_DEFINE_UNQUOTED([MOMENT_RELEASE_TAG], ["$with_release_tag"], [ ])
+fi
+
 AC_ARG_ENABLE([gstreamer],
 	      AC_HELP_STRING([--disable-gstreamer],
 			     [Disable GStreamer integration]),

@@ -48,13 +48,15 @@ struct Options {
     LogLevel    loglevel;
     Uint64      exit_after;
     bool        gst_debug;
+    bool        show_version;
 
     Options ()
-	: help       (false),
-	  daemonize  (false),
-	  loglevel   (LogLevel::Info),
-	  exit_after ((Uint64) -1),
-          gst_debug  (false)
+	: help         (false),
+	  daemonize    (false),
+	  loglevel     (LogLevel::Info),
+	  exit_after   ((Uint64) -1),
+          gst_debug    (false),
+          show_version (false)
     {}
 };
 
@@ -197,6 +199,7 @@ printUsage ()
 		  "  -d --daemonize             Daemonize (run in the background as a daemon).\n"
 #endif
 		  "  --exit-after <number>      Exit after specified timeout in seconds.\n"
+                  "  --version                  Output version information and exit.\n"
 		  "  -h --help                  Show this help message.\n");
     outs->flush ();
 }
@@ -299,6 +302,17 @@ cmdline_keyfile (char const * /* short_name */,
         StRef<String> * const str = static_cast < StRef<String>* > (opt_data);
         *str = st_grab (new (std::nothrow) String (value));
     }
+    return true;
+}
+
+static bool
+cmdline_version (char const * /* short_name */,
+                 char const * /* long_name */,
+                 char const * /* value */,
+                 void       * /* opt_data */,
+                 void       * /* cb_data */)
+{
+    options.show_version = true;
     return true;
 }
 
@@ -531,11 +545,15 @@ MomentInstance::loadConfig ()
                                                 options.config_filename->mem() :
                                                 ConstMemory (
 #ifdef LIBMARY_PLATFORM_WIN32
-                                                        "moment.conf"
+                                                        "moment.conf.txt"
 #else
                                                         "/opt/moment/moment.conf"
 #endif
                                                         );
+
+// Solve win32 local8bit encoding first, then uncomment.
+//    logI_ (_func, "config file: ", config_filename);
+
     if (!MConfig::parseConfig (config_filename, new_config)) {
         logE_ (_func, "Failed to parse config file ", config_filename);
         return NULL;
@@ -745,22 +763,24 @@ MomentInstance::run ()
 	ConstMemory const log_filename = options.log_filename ?
 						 options.log_filename->mem() :
 						 ConstMemory ("/var/log/moment.log");
-	// We never deallocate 'log_file' after log file is opened successfully.
-	NativeFile * const log_file = new (std::nothrow) NativeFile ();
-	assert (log_file);
-	if (!log_file->open (log_filename,
-			     File::OpenFlags::Create | File::OpenFlags::Append,
-			     File::AccessMode::WriteOnly))
-	{
-	    logE_ (_func, "Could not open log file \"", log_filename, "\": ", exc->toString());
-	    delete log_file;
-	} else {
-	    logI_ (_func, "Log file is at ", log_filename);
-	    // We never deallocate 'logs'
-	    delete logs;
-	    logs = new (std::nothrow) BufferedOutputStream (log_file, 4096);
-	    assert (logs);
-	}
+        if (log_filename.len() > 0) {
+            // We never deallocate 'log_file' after log file is opened successfully.
+            NativeFile * const log_file = new (std::nothrow) NativeFile ();
+            assert (log_file);
+            if (!log_file->open (log_filename,
+                                 File::OpenFlags::Create | File::OpenFlags::Append,
+                                 File::AccessMode::WriteOnly))
+            {
+                logE_ (_func, "Could not open log file \"", log_filename, "\": ", exc->toString());
+                delete log_file;
+            } else {
+                logI_ (_func, "Log file is at ", log_filename);
+                // We never deallocate 'logs'
+                delete logs;
+                logs = new (std::nothrow) BufferedOutputStream (log_file, 4096);
+                assert (logs);
+            }
+        }
     }
 
     MOMENT__PREINIT
@@ -952,7 +972,7 @@ int main (int argc, char **argv)
     libMaryInit ();
 
     {
-	unsigned const num_opts = 8;
+	unsigned const num_opts = 9;
 	CmdlineOption opts [num_opts];
 
 	opts [0].short_name = "h";
@@ -1003,17 +1023,35 @@ int main (int argc, char **argv)
         opts [7].opt_data   = MOMENT__KEYFILE_DATA;
         opts [7].opt_callback = cmdline_keyfile;
 
+        opts [8].short_name = NULL;
+        opts [8].long_name  = "version";
+        opts [8].with_value = false;
+        opts [8].opt_data   = NULL;
+        opts [8].opt_callback = cmdline_version;
+
 	ArrayIterator<CmdlineOption> opts_iter (opts, num_opts);
 	parseCmdline (&argc, &argv, opts_iter, NULL /* callback */, NULL /* callbackData */);
     }
 
-    libMomentGstInit (options.gst_debug ? ConstMemory ("--gst-debug=*:3") : ConstMemory());
+    if (options.show_version) {
+        setGlobalLogLevel (LogLevel::Failure);
+        outs->println ("moment "
+#ifdef MOMENT_RELEASE_TAG
+                       MOMENT_RELEASE_TAG
+#else
+                       "unknown"
+#endif
+                );
+        return 0;
+    }
 
     if (options.help) {
         setGlobalLogLevel (LogLevel::Failure);
 	printUsage ();
 	return 0;
     }
+
+    libMomentGstInit (options.gst_debug ? ConstMemory ("--gst-debug=*:3") : ConstMemory());
 
     setGlobalLogLevel (options.loglevel);
 
