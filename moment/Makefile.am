@@ -36,7 +36,6 @@ moment_target_headers +=        \
         libmoment_gst.h         \
 				\
 	moment_types.h		\
-        util_moment.h           \
         channel.h               \
         channel_options.h       \
         channel_set.h           \
@@ -78,6 +77,9 @@ moment_target_headers +=        \
         fetch_agent.h           \
                                 \
 	moment_server.h		\
+                                \
+        util_moment.h           \
+        util_config.h           \
 				\
         inc.h                   \
 	api.h			\
@@ -99,7 +101,6 @@ libmoment_1_0_la_SOURCES =	\
                                 \
 	libmoment.cpp		\
                                 \
-        util_moment.cpp         \
         channel.cpp             \
         channel_set.cpp         \
         channel_manager.cpp     \
@@ -132,6 +133,9 @@ libmoment_1_0_la_SOURCES =	\
         fetch_agent.cpp         \
                                 \
 	moment_server.cpp	\
+                                \
+        util_moment.cpp         \
+        util_config.cpp         \
 				\
 	api.cpp			\
 	api_amf.cpp		\
