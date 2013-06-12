@@ -50,7 +50,8 @@ private:
     };
 
 public:
-    mt_throws Ref<StorageFile> openFile (ConstMemory filename);
+    mt_throws Ref<StorageFile> openFile (ConstMemory        filename,
+                                         DeferredProcessor * mt_nonnull deferred_processor);
 
     LocalStorage (Object * const coderef_container)
         : DependentCodeReferenced (coderef_container)

@@ -23,7 +23,8 @@
 namespace Moment {
 
 Ref<Storage::StorageFile>
-LocalStorage::openFile (ConstMemory const filename)
+LocalStorage::openFile (ConstMemory         const filename,
+                        DeferredProcessor * const mt_nonnull deferred_processor)
 {
     Ref<LocalStorageFile> const ls_file = grab (new (std::nothrow) LocalStorageFile);
 
@@ -35,7 +36,7 @@ LocalStorage::openFile (ConstMemory const filename)
 	return NULL;
     }
 
-    ls_file->conn.init (&ls_file->file);
+    ls_file->conn.init (deferred_processor, &ls_file->file);
 
     return ls_file;
 }

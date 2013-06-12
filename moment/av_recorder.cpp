@@ -276,7 +276,7 @@ AvRecorder::start (ConstMemory const filename)
     recording = grab (new Recording);
     muxer->setSender (&recording->sender);
 
-    recording->storage_file = storage->openFile (filename);
+    recording->storage_file = storage->openFile (filename, thread_ctx->getDeferredProcessor());
     if (!recording->storage_file) {
 	logE (recorder, _func, "storage->openFile() failed for filename ",
 	      filename, ": ", exc->toString());

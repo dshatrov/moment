@@ -40,7 +40,8 @@ public:
         virtual Connection* getConnection () = 0;
     };
 
-    virtual mt_throws Ref<StorageFile> openFile (ConstMemory filename) = 0;
+    virtual mt_throws Ref<StorageFile> openFile (ConstMemory        filename,
+                                                 DeferredProcessor * mt_nonnull deferred_processor) = 0;
 };
 
 }
