@@ -110,7 +110,7 @@ private:
     static TcpConnection::Frontend const tcp_conn_frontend;
 
     static void connected (Exception *exc_,
-			   void      *_rtmp_conn);
+			   void      *_self);
 
     static RtmpConnection::Backend const rtmp_conn_backend;
 
@@ -174,15 +174,19 @@ RtmpConnection::Frontend const RtmpClient::rtmp_conn_frontend = {
 
 void
 RtmpClient::connected (Exception * const exc_,
-		       void      * const _rtmp_conn)
+		       void      * const _self)
 {
-    if (exc_)
+    RtmpClient * const self = static_cast <RtmpClient*> (_self);
+
+    if (exc_) {
+        logE_ (_func, "exception: ", exc_->toString());
 	exit (EXIT_FAILURE);
+    }
 
     logI_ (_func, "Connected successfully");
 
-    RtmpConnection * const rtmp_conn = static_cast <RtmpConnection*> (_rtmp_conn);
-    rtmp_conn->startClient ();
+    self->rtmp_conn.startClient ();
+    self->conn_receiver.start ();
 }
 
 void
@@ -391,7 +395,7 @@ RtmpClient::videoMessage (VideoStream::VideoMessage * const mt_nonnull msg,
 
     if (options.dump_frames) {
         logI (frame_dump, _func, "ts: 0x", fmt_hex, msg->timestamp_nanosec / 1000000, " (", fmt_def, msg->timestamp_nanosec / 1000000, ") ",
-              msg->codec_id, " ", msg->frame_type);
+              msg->codec_id, " ", msg->frame_type, " len ", msg->msg_len);
     }
 
     if (options.report_video && options.report_interval) {
@@ -478,12 +482,12 @@ RtmpClient::start (IpAddress const &addr)
         return Result::Failure;
     }
 
-    if (connect_res == TcpConnection::ConnectResult_Connected)
+    if (connect_res == TcpConnection::ConnectResult_Connected) {
         rtmp_conn.startClient ();
-    else
+        conn_receiver.start ();
+    } else
         assert (connect_res == TcpConnection::ConnectResult_InProgress);
 
-    conn_receiver.start ();
     return Result::Success;
 }
 
@@ -504,7 +508,7 @@ RtmpClient::init (ServerThreadContext * const thread_ctx,
     rtmp_conn.setFrontend (CbDesc<RtmpConnection::Frontend> (&rtmp_conn_frontend, this, getCoderefContainer()));
     rtmp_conn.setSender (&conn_sender);
 
-    tcp_conn.setFrontend (CbDesc<TcpConnection::Frontend> (&tcp_conn_frontend, &rtmp_conn, rtmp_conn.getCoderefContainer()));
+    tcp_conn.setFrontend (CbDesc<TcpConnection::Frontend> (&tcp_conn_frontend, this, getCoderefContainer()));
 
     rtmp_conn.init (thread_ctx->getTimers(),
                     page_pool,
