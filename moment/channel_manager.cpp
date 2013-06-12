@@ -252,14 +252,13 @@ ChannelManager::loadConfigFull ()
 {
     logD_ (_func_);
 
-#ifndef LIBMARY_PLATFORM_WIN32
     ConstMemory const dir_name = confd_dirname->mem();
     Ref<Vfs> const vfs = Vfs::createDefaultLocalVfs (dir_name);
 
     Ref<Vfs::VfsDirectory> const dir = vfs->openDirectory ("");
     if (!dir) {
         logE_ (_func, "could not open ", dir_name, " directory: ", exc->toString());
-        return Result::Failure;
+        return Result::Success;
     }
 
     for (;;) {
@@ -282,10 +281,12 @@ ChannelManager::loadConfigFull ()
         if (!loadConfigItem (filename->mem(), path->mem()))
             return Result::Failure;
     }
-#endif
 
     return Result::Success;
 }
+
+#if 0
+// Deprecated
 
 static ConstMemory itemToStreamName (ConstMemory const item_name)
 {
@@ -598,6 +599,7 @@ parseChannelConfig (MConfig::Section * const mt_nonnull section,
 
     return Result::Success;
 }
+#endif
 
 Result
 ChannelManager::loadConfigItem (ConstMemory const item_name,
