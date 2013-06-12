@@ -56,6 +56,7 @@ TestStreamGenerator::init (PagePool    * const mt_nonnull page_pool,
         }
 
         if (opts.prechunk_size > 0) {
+#warning Deal with prechunk offsets here
             RtmpConnection::PrechunkContext prechunk_ctx;
             RtmpConnection::fillPrechunkedPages (&prechunk_ctx,
                                                  ConstMemory (frame_buf, opts.frame_size),

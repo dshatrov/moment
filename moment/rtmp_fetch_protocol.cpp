@@ -225,6 +225,10 @@ RtmpFetchProtocol::connect (VideoStream * const stream,
         return NULL;
     }
 
+    logD_ (_func, "server_addr: ", server_addr, ", "
+           "app_name: ", app_name, ", stream_name: ", stream_name, ", "
+           "momentrtmp_proto: ", momentrtmp_proto, ", ping_timeout_millisec: ", ping_timeout_millisec);
+
     Ref<RtmpFetchConnection> const rtmp_fetch_conn = grab (new (std::nothrow) RtmpFetchConnection);
     rtmp_fetch_conn->init (moment->getServerApp()->getServerContext()->selectThreadContext(),
                            moment->getPagePool(),

@@ -339,7 +339,8 @@ RtmpServer::doPlay (Uint32       const msg_stream_id,
     // TODO 
 
 //    if (!playing) {
-	// TODO send StreamIsRecorded
+	// TODO Send StreamIsRecorded for non-live streams.
+        //      From the docs, it appears to affect flash player's buffering strategy.
 //        rtmp_conn->sendUserControl_StreamIsRecorded (msg_stream_id);
 	rtmp_conn->sendUserControl_StreamBegin (msg_stream_id);
 //    }
