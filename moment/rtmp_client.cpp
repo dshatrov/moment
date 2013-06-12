@@ -43,6 +43,7 @@ RtmpClient::connected (Exception * const exc_,
     logD_ (_func, "connected successfully");
 
     self->rtmp_conn.startClient ();
+    self->conn_receiver.start ();
 }
 
 RtmpConnection::Backend const RtmpClient::rtmp_conn_backend = {
@@ -254,12 +255,11 @@ RtmpClient::start ()
 
     mutex.unlock ();
 
-    if (connect_res == TcpConnection::ConnectResult_Connected)
+    if (connect_res == TcpConnection::ConnectResult_Connected) {
         rtmp_conn.startClient ();
-    else
+        conn_receiver.start ();
+    } else
         assert (connect_res == TcpConnection::ConnectResult_InProgress);
-
-    conn_receiver.start ();
 
     return Result::Success;
 }

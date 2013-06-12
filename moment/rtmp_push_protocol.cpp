@@ -135,13 +135,13 @@ RtmpPushConnection::startNewSession (Session * const old_session)
             goto _failure;
         }
 
-        if (connect_res == TcpConnection::ConnectResult_Connected)
+        if (connect_res == TcpConnection::ConnectResult_Connected) {
             session->rtmp_conn.startClient ();
-        else
+            session->conn_receiver.start ();
+        } else
             assert (connect_res == TcpConnection::ConnectResult_InProgress);
     }
 
-    session->conn_receiver.start ();
     return;
 
 _failure:
@@ -239,6 +239,7 @@ RtmpPushConnection::connected (Exception * const exc_,
     }
 
     session->rtmp_conn.startClient ();
+    session->conn_receiver.start ();
 }
 
 RtmpConnection::Backend const RtmpPushConnection::rtmp_conn_backend = {
