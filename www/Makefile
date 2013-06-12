@@ -20,6 +20,7 @@ all:	index.html              \
 	doc_stress.html		\
 	doc_examples.html	\
 				\
+        hls.html                \
         nvr.html                \
                                 \
 	fix
