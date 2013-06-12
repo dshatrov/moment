@@ -87,6 +87,7 @@ public:
 };
 
 static Ref<String> this_http_server_addr;
+static Ref<String> this_admin_server_addr;
 static Ref<String> this_rtmp_server_addr;
 static Ref<String> this_rtmpt_server_addr;
 
@@ -249,6 +250,9 @@ Result httpRequest (HttpRequest   * const mt_nonnull req,
             else
             if (equal (ext, "mp4"))
                 mime_type = "video/mp4";
+            else
+            if (equal (ext, "mov"))
+                mime_type = "video/quicktime";
 	}
     }
 //    logD_ (_func, "try_template: ", try_template);
@@ -399,26 +403,37 @@ Result httpRequest (HttpRequest   * const mt_nonnull req,
 #ifdef MOMENT_CTEMPLATE
 	if (try_template) {
             logD_ (_func, "Trying .tpl");
-	    if (momentFile_sendTemplate (
-			req,
-                        path_entry->path->mem(),
-			req->getFullPath(),
-			st_makeString (filename->mem().region (0, filename->mem().len() - ext_length),
-                                       ".tpl")->mem(),
-			conn_sender,
-			mime_type,
-                        &path_entry->varlist,
-                        path_entry->enable_varlist_defaults,
-                        strings_filename ? strings_filename->mem() : ConstMemory(),
-                        stringvars_filename ? stringvars_filename->mem() : ConstMemory()))
-	    {
-		if (!req->getKeepalive())
-		    conn_sender->closeAfterFlush();
+            do {
+                StRef<String> const filename_tpl =
+                        st_makeString (filename->mem().region (0, filename->mem().len() - ext_length),
+                                       ".tpl");
+                {
+                  // Avoiding ctemplate warnings on stderr.
+                    NativeFile tmp_file;
+                    if (!tmp_file.open (filename_tpl->mem(), 0 /* open_flags */, FileAccessMode::ReadOnly)) {
+                        break;
+                    }
+                }
+                if (momentFile_sendTemplate (
+                            req,
+                            path_entry->path->mem(),
+                            req->getFullPath(),
+                            filename_tpl->mem(),
+                            conn_sender,
+                            mime_type,
+                            &path_entry->varlist,
+                            path_entry->enable_varlist_defaults,
+                            strings_filename ? strings_filename->mem() : ConstMemory(),
+                            stringvars_filename ? stringvars_filename->mem() : ConstMemory()))
+                {
+                    if (!req->getKeepalive())
+                        conn_sender->closeAfterFlush();
 
-		logA_ ("file 200 ", req->getClientAddress(), " ", req->getRequestLine());
+                    logA_ ("file 200 ", req->getClientAddress(), " ", req->getRequestLine());
 
-		return Result::Success;
-	    }
+                    return Result::Success;
+                }
+            } while (0);
         }
 #endif
 
@@ -430,29 +445,38 @@ Result httpRequest (HttpRequest   * const mt_nonnull req,
                 while (!iter.done()) {
                     AcceptedLanguage * const alang = &iter.next ().value;
                     logD_ (_func, "Trying .tpl for language \"", alang->lang, "\"");
-
-                    if (momentFile_sendTemplate (
-                                req,
-                                path_entry->path->mem(),
-                                req->getFullPath(),
+                    do {
+                        StRef<String> const filename_tpl =
                                 st_makeString (filename->mem().region (0, filename->mem().len() - ext_length),
                                                ".",
                                                alang->lang,
-                                               ".tpl")->mem(),
-                                conn_sender,
-                                mime_type,
-                                &path_entry->varlist,
-                                path_entry->enable_varlist_defaults,
-                                strings_filename ? strings_filename->mem() : ConstMemory(),
-                                stringvars_filename ? stringvars_filename->mem() : ConstMemory()))
-                    {
-                        if (!req->getKeepalive())
-                            conn_sender->closeAfterFlush();
+                                               ".tpl");
+                        {
+                          // Avoiding ctemplate warnings on stderr.
+                            NativeFile tmp_file;
+                            if (!tmp_file.open (filename_tpl->mem(), 0 /* open_flags */, FileAccessMode::ReadOnly))
+                                break;
+                        }
+                        if (momentFile_sendTemplate (
+                                    req,
+                                    path_entry->path->mem(),
+                                    req->getFullPath(),
+                                    filename_tpl->mem(),
+                                    conn_sender,
+                                    mime_type,
+                                    &path_entry->varlist,
+                                    path_entry->enable_varlist_defaults,
+                                    strings_filename ? strings_filename->mem() : ConstMemory(),
+                                    stringvars_filename ? stringvars_filename->mem() : ConstMemory()))
+                        {
+                            if (!req->getKeepalive())
+                                conn_sender->closeAfterFlush();
 
-                        logA_ ("file 200 ", req->getClientAddress(), " ", req->getRequestLine());
+                            logA_ ("file 200 ", req->getClientAddress(), " ", req->getRequestLine());
 
-                        return Result::Success;
-                    }
+                            return Result::Success;
+                        }
+                    } while (0);
                 }
             }
 #endif
@@ -500,8 +524,6 @@ Result httpRequest (HttpRequest   * const mt_nonnull req,
     bool got_mtime = false;
     struct tm mtime;
 
-#warning Get file modification time on Win32 + enable "304 Not Modified".
-#ifndef PLATFORM_WIN32
     if (native_file.getModificationTime (&mtime))
         got_mtime = true;
     else
@@ -579,7 +601,6 @@ Result httpRequest (HttpRequest   * const mt_nonnull req,
             return Result::Success;
         }
     }
-#endif /* PLATFORM_WIN32 */
 
     NativeFile::FileStat stat;
     if (!native_file.stat (&stat)) {
@@ -705,14 +726,10 @@ namespace {
       mt_iface (MomentServer::PageRequest)
 
 	ConstMemory getParameter (ConstMemory const name)
-	{
-	    return http_req->getParameter (name);
-	}
+            { return http_req->getParameter (name); }
 
 	IpAddress getClientAddress ()
-	{
-          return http_req->getClientAddress();
-	}
+            { return http_req->getClientAddress(); }
 
 	void addHashVar (ConstMemory const name,
 			 ConstMemory const value)
@@ -722,9 +739,7 @@ namespace {
 	}
 
 	void showSection (ConstMemory const name)
-	{
-	    dict->ShowSection (String (name).cstr());
-	}
+            { dict->ShowSection (String (name).cstr()); }
 
       mt_iface_end
 
@@ -732,8 +747,7 @@ namespace {
 				  ctemplate::TemplateDictionary * const dict)
 	    : http_req (http_req),
 	      dict (dict)
-	{
-	}
+	{}
     };
 }
 
@@ -830,7 +844,13 @@ static Result momentFile_sendTemplate (HttpRequest * const http_req,
                        ctemplate::TemplateString ((char const *) this_http_server_addr->mem().mem(),
                                                   this_http_server_addr->mem().len()));
     }
-
+    {
+        char const val_name [] = "ThisAdminServerAddr";
+        dict.SetValue (ctemplate::TemplateString (val_name,
+                                                  sizeof (val_name) - 1),
+                       ctemplate::TemplateString ((char const *) this_admin_server_addr->mem().mem(),
+                                                  this_admin_server_addr->mem().len()));
+    }
     {
         char const val_name [] = "ThisRtmpServerAddr";
         dict.SetValue (ctemplate::TemplateString (val_name,
@@ -838,7 +858,6 @@ static Result momentFile_sendTemplate (HttpRequest * const http_req,
                        ctemplate::TemplateString ((char const *) this_rtmp_server_addr->mem().mem(),
                                                   this_rtmp_server_addr->mem().len()));
     }
-
     {
         char const val_name [] = "ThisRtmptServerAddr";
         dict.SetValue (ctemplate::TemplateString (val_name,
@@ -1089,6 +1108,19 @@ void momentFileInit ()
 	    logI_ (_func, opt_name, " config parameter is not set. "
 		   "Defaulting to ", this_http_server_addr);
 	}
+    }
+
+    {
+        ConstMemory const opt_name = "moment/this_admin_server_addr";
+        ConstMemory const opt_val = config->getString (opt_name);
+        logI_ (_func, opt_name, ": ", opt_val);
+        if (!opt_val.isNull()) {
+            this_admin_server_addr = grab (new (std::nothrow) String (opt_val));
+        } else {
+            this_admin_server_addr = grab( new (std::nothrow) String ("127.0.0.1:8082"));
+            logI_ (_func, opt_name, " config parameters is not set. "
+                   "Defaulting to ", this_admin_server_addr);
+        }
     }
 
     {
